@@ -39,7 +39,7 @@ describe('PickerPage', () => {
     expect(await screen.findByText(/Choose the folder GitLocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(/started without a repository location/i)).toBeInTheDocument()
     expect(screen.getByRole('list', { name: /folders/i })).toBeInTheDocument()
-    expect(await axe(container)).toHaveNoViolations()
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('loads folders on mount', async () => {

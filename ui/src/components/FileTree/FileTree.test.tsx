@@ -80,7 +80,7 @@ describe('FileTree', () => {
       expect(screen.getByRole('tree', { name: /repository files/i })).toBeInTheDocument()
     })
 
-    expect(await axe(container)).toHaveNoViolations()
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('clicking a file calls onFileSelect', async () => {

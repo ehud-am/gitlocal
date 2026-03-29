@@ -15,7 +15,7 @@ describe('Breadcrumb', () => {
     const onNavigate = vi.fn()
     const { container } = render(<Breadcrumb path="foo/bar/baz" onNavigate={onNavigate} />)
 
-    expect(await axe(container)).toHaveNoViolations()
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('renders correct segments for "foo/bar/baz"', () => {

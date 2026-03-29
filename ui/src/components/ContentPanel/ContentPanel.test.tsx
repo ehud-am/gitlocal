@@ -53,7 +53,7 @@ describe('ContentPanel', () => {
       <ContentPanel filePath="" branch="main" onNavigate={vi.fn()} />
     )
     expect(screen.getByText(/Select a file/i)).toBeInTheDocument()
-    return expect(axe(container)).resolves.toHaveNoViolations()
+    return expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
   it('shows loading skeleton while fetching', async () => {

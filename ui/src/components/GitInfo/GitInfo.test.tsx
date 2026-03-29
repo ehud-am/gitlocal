@@ -89,7 +89,7 @@ describe('GitInfo', () => {
       expect(screen.getByRole('combobox', { name: /branch selector/i })).toBeInTheDocument()
     })
 
-    expect(await axe(container)).toHaveNoViolations()
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('renders commit list', async () => {
