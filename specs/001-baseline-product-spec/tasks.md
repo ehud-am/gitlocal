@@ -1,7 +1,7 @@
 # Tasks: Current Product Baseline
 
 **Input**: Design documents from `/specs/001-baseline-product-spec/`
-**Prerequisites**: [plan.md](/Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/plan.md), [spec.md](/Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md), [research.md](/Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/research.md), [data-model.md](/Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md), [contracts/](/Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts)
+**Prerequisites**: [plan.md](specs/001-baseline-product-spec/plan.md), [spec.md](specs/001-baseline-product-spec/spec.md), [research.md](specs/001-baseline-product-spec/research.md), [data-model.md](specs/001-baseline-product-spec/data-model.md), [contracts/](specs/001-baseline-product-spec/contracts)
 
 **Tests**: The feature specification does not request TDD-only execution, so tasks focus on documentation and validation work. Validation is captured through contract review and quickstart verification tasks rather than dedicated first-failing test tasks.
 
@@ -17,9 +17,9 @@
 
 **Purpose**: Establish the baseline documentation workspace and planning context
 
-- [ ] T001 Confirm baseline feature scope and planning metadata in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/plan.md
-- [ ] T002 Create the baseline feature specification shell in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md
-- [ ] T003 [P] Capture planning decisions and constraints in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/research.md
+- [ ] T001 Confirm baseline feature scope and planning metadata in specs/001-baseline-product-spec/plan.md
+- [ ] T002 Create the baseline feature specification shell in specs/001-baseline-product-spec/spec.md
+- [ ] T003 [P] Capture planning decisions and constraints in specs/001-baseline-product-spec/research.md
 
 ---
 
@@ -29,10 +29,10 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Define shared runtime entities and relationships in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md
-- [ ] T005 [P] Document the baseline CLI contract in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/cli.md
-- [ ] T006 [P] Document the baseline local HTTP API contract in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml
-- [ ] T007 [P] Document the baseline UI navigation contract in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md
+- [ ] T004 Define shared runtime entities and relationships in specs/001-baseline-product-spec/data-model.md
+- [ ] T005 [P] Document the baseline CLI contract in specs/001-baseline-product-spec/contracts/cli.md
+- [ ] T006 [P] Document the baseline local HTTP API contract in specs/001-baseline-product-spec/contracts/http-api.yaml
+- [ ] T007 [P] Document the baseline UI navigation contract in specs/001-baseline-product-spec/contracts/ui-navigation.md
 
 **Checkpoint**: Foundation ready - user story documentation can now proceed in priority order
 
@@ -46,11 +46,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Refine User Story 1 acceptance criteria and feature inventory in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md
-- [ ] T009 [P] [US1] Map Repository Session and Picker Submission behavior to User Story 1 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md
-- [ ] T010 [P] [US1] Align initial-load and picker navigation flows with User Story 1 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md
-- [ ] T011 [US1] Align CLI startup, browser launch, and picker-mode behavior with User Story 1 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/cli.md
-- [ ] T012 [US1] Add repository-entry verification steps for User Story 1 to /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/quickstart.md
+- [ ] T008 [US1] Refine User Story 1 acceptance criteria and feature inventory in specs/001-baseline-product-spec/spec.md
+- [ ] T009 [P] [US1] Map Repository Session and Picker Submission behavior to User Story 1 in specs/001-baseline-product-spec/data-model.md
+- [ ] T010 [P] [US1] Align initial-load and picker navigation flows with User Story 1 in specs/001-baseline-product-spec/contracts/ui-navigation.md
+- [ ] T011 [US1] Align CLI startup, browser launch, and picker-mode behavior with User Story 1 in specs/001-baseline-product-spec/contracts/cli.md
+- [ ] T012 [US1] Add repository-entry verification steps for User Story 1 to specs/001-baseline-product-spec/quickstart.md
 
 **Checkpoint**: User Story 1 is fully documented and can be validated independently as the MVP baseline
 
@@ -64,11 +64,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Refine User Story 2 acceptance criteria and feature inventory in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md
-- [ ] T014 [P] [US2] Map Repository Tree Node and File View behavior to User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md
-- [ ] T015 [P] [US2] Align tree and file retrieval behavior with User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml
-- [ ] T016 [P] [US2] Align file tree, breadcrumb, and content navigation flows with User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md
-- [ ] T017 [US2] Add repository-browsing and file-view verification steps for User Story 2 to /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/quickstart.md
+- [ ] T013 [US2] Refine User Story 2 acceptance criteria and feature inventory in specs/001-baseline-product-spec/spec.md
+- [ ] T014 [P] [US2] Map Repository Tree Node and File View behavior to User Story 2 in specs/001-baseline-product-spec/data-model.md
+- [ ] T015 [P] [US2] Align tree and file retrieval behavior with User Story 2 in specs/001-baseline-product-spec/contracts/http-api.yaml
+- [ ] T016 [P] [US2] Align file tree, breadcrumb, and content navigation flows with User Story 2 in specs/001-baseline-product-spec/contracts/ui-navigation.md
+- [ ] T017 [US2] Add repository-browsing and file-view verification steps for User Story 2 to specs/001-baseline-product-spec/quickstart.md
 
 **Checkpoint**: User Stories 1 and 2 now describe the full repository-opening and file-browsing baseline independently
 
@@ -82,11 +82,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Refine User Story 3 acceptance criteria and read-only requirements in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md
-- [ ] T019 [P] [US3] Map Branch View and Commit Summary behavior to User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md
-- [ ] T020 [P] [US3] Align branch and commit endpoint behavior with User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml
-- [ ] T021 [P] [US3] Align branch-selection navigation flow with User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md
-- [ ] T022 [US3] Add branch-switching and history verification steps for User Story 3 to /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/quickstart.md
+- [ ] T018 [US3] Refine User Story 3 acceptance criteria and read-only requirements in specs/001-baseline-product-spec/spec.md
+- [ ] T019 [P] [US3] Map Branch View and Commit Summary behavior to User Story 3 in specs/001-baseline-product-spec/data-model.md
+- [ ] T020 [P] [US3] Align branch and commit endpoint behavior with User Story 3 in specs/001-baseline-product-spec/contracts/http-api.yaml
+- [ ] T021 [P] [US3] Align branch-selection navigation flow with User Story 3 in specs/001-baseline-product-spec/contracts/ui-navigation.md
+- [ ] T022 [US3] Add branch-switching and history verification steps for User Story 3 to specs/001-baseline-product-spec/quickstart.md
 
 **Checkpoint**: User Stories 1 through 3 now cover repository access, browsing, and git context as an independently reviewable baseline
 
@@ -100,11 +100,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Refine User Story 4 acceptance criteria and edge-case coverage in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md
-- [ ] T024 [P] [US4] Map failure-oriented Repository Session, File View, and Picker Submission behavior to User Story 4 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md
-- [ ] T025 [P] [US4] Align error responses and empty-result behavior with User Story 4 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml
-- [ ] T026 [P] [US4] Align error-state navigation and empty-state flows with User Story 4 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md
-- [ ] T027 [US4] Add invalid-path and missing-content verification steps for User Story 4 to /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/quickstart.md
+- [ ] T023 [US4] Refine User Story 4 acceptance criteria and edge-case coverage in specs/001-baseline-product-spec/spec.md
+- [ ] T024 [P] [US4] Map failure-oriented Repository Session, File View, and Picker Submission behavior to User Story 4 in specs/001-baseline-product-spec/data-model.md
+- [ ] T025 [P] [US4] Align error responses and empty-result behavior with User Story 4 in specs/001-baseline-product-spec/contracts/http-api.yaml
+- [ ] T026 [P] [US4] Align error-state navigation and empty-state flows with User Story 4 in specs/001-baseline-product-spec/contracts/ui-navigation.md
+- [ ] T027 [US4] Add invalid-path and missing-content verification steps for User Story 4 to specs/001-baseline-product-spec/quickstart.md
 
 **Checkpoint**: All four user stories are fully documented and independently reviewable
 
@@ -114,9 +114,9 @@
 
 **Purpose**: Final consistency and contributor-facing alignment across the whole baseline package
 
-- [ ] T028 [P] Reconcile cross-story terminology and requirement coverage in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/spec.md and /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/plan.md
-- [ ] T029 [P] Sync contributor-facing agent guidance with the finalized baseline in /Users/ehudamiri/Documents/projects/gitlocal/AGENTS.md
-- [ ] T030 Run end-to-end baseline validation using /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/quickstart.md and record any follow-up updates in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/research.md
+- [ ] T028 [P] Reconcile cross-story terminology and requirement coverage in specs/001-baseline-product-spec/spec.md and specs/001-baseline-product-spec/plan.md
+- [ ] T029 [P] Sync contributor-facing agent guidance with the finalized baseline in AGENTS.md
+- [ ] T030 Run end-to-end baseline validation using specs/001-baseline-product-spec/quickstart.md and record any follow-up updates in specs/001-baseline-product-spec/research.md
 
 ---
 
@@ -156,9 +156,9 @@
 ## Parallel Example: User Story 2
 
 ```bash
-Task: "Map Repository Tree Node and File View behavior to User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md"
-Task: "Align tree and file retrieval behavior with User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml"
-Task: "Align file tree, breadcrumb, and content navigation flows with User Story 2 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md"
+Task: "Map Repository Tree Node and File View behavior to User Story 2 in specs/001-baseline-product-spec/data-model.md"
+Task: "Align tree and file retrieval behavior with User Story 2 in specs/001-baseline-product-spec/contracts/http-api.yaml"
+Task: "Align file tree, breadcrumb, and content navigation flows with User Story 2 in specs/001-baseline-product-spec/contracts/ui-navigation.md"
 ```
 
 ---
@@ -166,9 +166,9 @@ Task: "Align file tree, breadcrumb, and content navigation flows with User Story
 ## Parallel Example: User Story 3
 
 ```bash
-Task: "Map Branch View and Commit Summary behavior to User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/data-model.md"
-Task: "Align branch and commit endpoint behavior with User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/http-api.yaml"
-Task: "Align branch-selection navigation flow with User Story 3 in /Users/ehudamiri/Documents/projects/gitlocal/specs/001-baseline-product-spec/contracts/ui-navigation.md"
+Task: "Map Branch View and Commit Summary behavior to User Story 3 in specs/001-baseline-product-spec/data-model.md"
+Task: "Align branch and commit endpoint behavior with User Story 3 in specs/001-baseline-product-spec/contracts/http-api.yaml"
+Task: "Align branch-selection navigation flow with User Story 3 in specs/001-baseline-product-spec/contracts/ui-navigation.md"
 ```
 
 ---

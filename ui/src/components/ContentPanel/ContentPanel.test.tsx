@@ -1,6 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { axe } from 'jest-axe'
 import ContentPanel from './ContentPanel'
 
 vi.mock('../../services/api', () => ({
@@ -48,10 +49,11 @@ describe('ContentPanel', () => {
   })
 
   it('shows empty state when no filePath', () => {
-    renderWithClient(
+    const { container } = renderWithClient(
       <ContentPanel filePath="" branch="main" onNavigate={vi.fn()} />
     )
     expect(screen.getByText(/Select a file/i)).toBeInTheDocument()
+    return expect(axe(container)).resolves.toHaveNoViolations()
   })
 
   it('shows loading skeleton while fetching', async () => {

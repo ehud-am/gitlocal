@@ -41,3 +41,23 @@ export interface PickResponse {
   ok: boolean
   error: string
 }
+
+export interface PickBrowseEntry {
+  name: string
+  path: string
+  isGitRepo: boolean
+}
+
+export interface PickBrowseRoot {
+  name: string
+  path: string
+}
+
+export interface PickBrowseResponse {
+  currentPath: string
+  parentPath: string | null
+  homePath: string
+  roots: PickBrowseRoot[]
+  entries: PickBrowseEntry[]
+  error: string
+}

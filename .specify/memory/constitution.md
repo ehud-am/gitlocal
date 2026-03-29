@@ -1,23 +1,23 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.0.0 → 2.0.0 (MAJOR — Principles I and IV redefined)
+  Version change: 2.0.0 → 2.1.0 (MINOR — added repo-relative path governance principle)
   Modified principles:
-    - Principle I: "Go-First" → "TypeScript-First" (backend language changed from Go to Node.js/TypeScript)
-    - Principle II: "Test Coverage" — updated to remove Go-specific references; now TypeScript-only
-    - Principle IV: "Embedded React UI" → "Node.js-Served React UI" (runtime model changed from
-      statically compiled Go binary to npm-distributed Node.js package)
-  Technology Stack section: fully rewritten to reflect Node.js runtime and npm packaging
+    - Principle VII: added "Repository-Relative Paths" to forbid local absolute filesystem paths
+      in repository documentation, specs, templates, and generated artifacts
+    - Governance: runtime guidance reference clarified to point at AGENTS.md and CLAUDE.md
   Added sections: none
   Removed sections: none
   Templates requiring updates:
-    - .specify/templates/plan-template.md — ✅ no change needed (generic placeholders)
-    - .specify/templates/spec-template.md — ✅ no change needed (generic placeholders)
-    - .specify/templates/tasks-template.md — ✅ no change needed (generic placeholders)
-    - CLAUDE.md (project root) — ⚠ pending: references Go and TypeScript stack; update after
-      feature 003 is implemented
-  Follow-up TODOs:
-    - Update CLAUDE.md active technologies section once Node.js migration is complete
+    - .specify/templates/plan-template.md — ✅ updated
+    - .specify/templates/spec-template.md — ✅ no change needed
+    - .specify/templates/tasks-template.md — ✅ updated
+    - .specify/templates/checklist-template.md — ✅ no change needed
+    - .specify/templates/constitution-template.md — ✅ no change needed
+    - README.md — ✅ no change needed
+    - AGENTS.md — ✅ no change needed
+    - CLAUDE.md — ✅ no change needed
+  Follow-up TODOs: none
 -->
 
 # GitLocal Constitution
@@ -68,6 +68,15 @@ GitLocal is released under the MIT License. All dependencies MUST be compatible 
 No proprietary components, no paid tiers, no feature gating. Contributions are welcome
 under the same license.
 
+### VII. Repository-Relative Paths
+
+Repository documentation, specifications, templates, generated planning artifacts, and
+Markdown links MUST use repository-relative paths rather than contributor-local absolute
+filesystem paths. Local absolute paths such as `/Users/...` or platform-specific machine paths
+MUST NOT be committed because they do not resolve on GitHub or on other contributors' machines.
+Absolute paths remain acceptable only for local runtime behavior that genuinely requires them,
+such as user-provided CLI arguments or operating-system file selection.
+
 ## Technology Stack
 
 - **Backend**: TypeScript on Node.js 22+ (active LTS)
@@ -106,7 +115,9 @@ implementation decisions, code reviews, and release gates MUST comply with these
 - **Compliance**: Every pull request MUST pass CI checks that enforce test coverage
   thresholds and build integrity. Reviewers MUST verify alignment with constitution
   principles.
-- **Runtime guidance**: See `CLAUDE.md` (when updated) for development-time conventions
-  and workflow details that supplement but do not override this constitution.
+- **Documentation paths**: Reviews for specs, plans, task lists, README updates, and other
+  committed documentation MUST reject newly introduced absolute contributor-local paths.
+- **Runtime guidance**: See `AGENTS.md` and `CLAUDE.md` for development-time conventions and
+  workflow details that supplement but do not override this constitution.
 
-**Version**: 2.0.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-03-28
+**Version**: 2.1.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-03-29

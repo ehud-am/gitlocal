@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { Suspense, lazy, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import MarkdownRenderer from './MarkdownRenderer'
-import CodeViewer from './CodeViewer'
+
+const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
+const CodeViewer = lazy(() => import('./CodeViewer'))
 
 interface Props {
   filePath: string
@@ -50,6 +51,7 @@ export default function ContentPanel({ filePath, branch, onNavigate, placeholder
   }
 
   const canToggleRaw = data.type === 'markdown' || data.type === 'text'
+  const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
 
   return (
     <div className="content-panel">
@@ -74,9 +76,13 @@ export default function ContentPanel({ filePath, branch, onNavigate, placeholder
           alt={filePath}
         />
       ) : data.type === 'markdown' && !showRaw ? (
-        <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
+        <Suspense fallback={loadingFallback}>
+          <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
+        </Suspense>
       ) : (
-        <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
+        <Suspense fallback={loadingFallback}>
+          <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
+        </Suspense>
       )}
     </div>
   )
