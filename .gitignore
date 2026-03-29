@@ -1,0 +1,114 @@
+# ── Node.js ───────────────────────────────────────────────────────────────────
+
+node_modules/
+ui/node_modules/
+
+# Build output
+dist/
+ui/dist/
+
+# Coverage reports
+coverage/
+ui/coverage/
+
+# npm/yarn/pnpm lock files are intentionally committed when present;
+# generated caches are not
+.npm/
+.yarn/
+.pnpm-store/
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials.json
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+.AppleDouble
+.LSOverride
+
+# macOS Finder tags and extended attributes
+*.icloud
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Windows installer leftovers
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ── Editors & IDEs ────────────────────────────────────────────────────────────
+
+# JetBrains (GoLand, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ── AI Tools ───────────────────────────────────────────────────────────────
+
+.claude/
+.agents/
+
+# ── Miscellaneous ─────────────────────────────────────────────────────────────
+
+*.tmp
+*.temp
+*.log
+*.bak
+*.orig
+*.rej

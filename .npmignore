@@ -1,0 +1,29 @@
+# Source — not needed in published package
+src/
+tests/
+specs/
+ui/src/
+
+# Config — not needed by consumers
+tsconfig.json
+tsconfig*.json
+vitest.config.ts
+.specify/
+
+# Dev artifacts
+*.test.ts
+coverage/
+ui/coverage/
+.env
+.env.*
+!.env.example
+
+# Editor & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# AI Tools
+.claude/
+.agents/
