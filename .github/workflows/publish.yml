@@ -8,6 +8,7 @@ jobs:
   publish:
     if: github.event.release.prerelease == false
     runs-on: ubuntu-latest
+    environment: release
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     permissions:
