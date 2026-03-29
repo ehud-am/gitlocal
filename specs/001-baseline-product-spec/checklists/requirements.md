@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: 2026-03-28  
-**Feature**: [spec.md](specs/001-baseline-product-spec/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
