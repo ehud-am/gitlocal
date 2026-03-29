@@ -34,9 +34,11 @@
     "open": "^10.1.0"
   },
   "devDependencies": {
+    "@emnapi/core": "^1.9.1",
+    "@emnapi/runtime": "^1.9.1",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.2",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.27.4",
     "typescript": "^5.8.3",
     "vitest": "^4.1.2"
   },
