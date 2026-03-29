@@ -36,6 +36,7 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 ## Recent Changes
 
 - 003-simplify-tech-stack: Replaced Go backend with Node.js/TypeScript/Hono; removed Makefile and all shell script dependencies; single `npm` toolchain for build, test, and install
+- 001-baseline-product-spec: Added baseline planning artifacts, contracts, quickstart, task breakdown, and contributor guidance for the documented current product baseline
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
