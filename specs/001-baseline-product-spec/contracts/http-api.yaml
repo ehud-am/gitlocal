@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: GitLocal Local HTTP API
+  version: 0.1.0-baseline
+  description: Local-only API contract for the current GitLocal repository viewer.
+servers:
+  - url: http://localhost:{port}
+    variables:
+      port:
+        default: "0"
+paths:
+  /api/info:
+    get:
+      summary: Get repository session metadata
+      responses:
+        "200":
+          description: Repository metadata for the current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoInfo"
+  /api/readme:
+    get:
+      summary: Get the top-level README path for the current repository
+      responses:
+        "200":
+          description: README path or empty result when unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [path]
+                properties:
+                  path:
+                    type: string
+  /api/branches:
+    get:
+      summary: List available branches for the current repository
+      responses:
+        "200":
+          description: Branch list or empty list when no repository is loaded
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Branch"
+  /api/commits:
+    get:
+      summary: List recent commits for a branch
+      parameters:
+        - in: query
+          name: branch
+          schema:
+            type: string
+          required: false
+          description: Branch to inspect. Defaults to the current repository branch context.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Requested commit count. Defaults to 10 and is capped at 100.
+      responses:
+        "200":
+          description: Recent commits or an empty list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Commit"
+  /api/tree:
+    get:
+      summary: List directory contents for the selected branch and path
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: false
+          description: Repository-relative directory path. Defaults to the root.
+        - in: query
+          name: branch
+          schema:
+            type: string
+          required: false
+          description: Branch or revision to inspect. Defaults to HEAD.
+      responses:
+        "200":
+          description: Immediate child tree nodes or an empty list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TreeNode"
+  /api/file:
+    get:
+      summary: Load a file payload for the selected branch and path
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+          description: Repository-relative file path.
+        - in: query
+          name: branch
+          schema:
+            type: string
+          required: false
+          description: Branch or revision to inspect. Defaults to HEAD.
+      responses:
+        "200":
+          description: File payload formatted for viewer rendering
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileContent"
+        "400":
+          description: Missing repository or missing path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: File not found for the selected branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/pick:
+    post:
+      summary: Select a repository from the picker flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+      responses:
+        "200":
+          description: Picker submission result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickResponse"
+components:
+  schemas:
+    RepoInfo:
+      type: object
+      required: [name, path, currentBranch, isGitRepo, pickerMode]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        currentBranch:
+          type: string
+        isGitRepo:
+          type: boolean
+        pickerMode:
+          type: boolean
+    Branch:
+      type: object
+      required: [name, isCurrent]
+      properties:
+        name:
+          type: string
+        isCurrent:
+          type: boolean
+    Commit:
+      type: object
+      required: [hash, shortHash, author, date, message]
+      properties:
+        hash:
+          type: string
+        shortHash:
+          type: string
+        author:
+          type: string
+        date:
+          type: string
+          format: date-time
+        message:
+          type: string
+    TreeNode:
+      type: object
+      required: [name, path, type]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+          enum: [file, dir]
+    FileContent:
+      type: object
+      required: [path, content, encoding, type, language]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        encoding:
+          type: string
+          enum: [utf-8, base64, none]
+        type:
+          type: string
+          enum: [markdown, text, image, binary]
+        language:
+          type: string
+    PickResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
