@@ -1,6 +1,6 @@
 # GitLocal
 
-[![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
+[![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
@@ -35,7 +35,8 @@ npx gitlocal
 ```bash
 git clone https://github.com/ehud-am/gitlocal.git
 cd gitlocal
-npm install
+npm ci
+npm --prefix ui ci
 npm run build
 ```
 
@@ -78,7 +79,12 @@ Run `gitlocal` with no arguments to open a browser-based folder picker:
 gitlocal
 ```
 
-Type the path to your git repository and click **Open**. The viewer loads immediately without restarting.
+Select a folder in the picker, then:
+
+- click **Browse** for a normal folder to move deeper into it
+- click **Open** for a detected git repository to open it immediately
+
+You can still paste a path manually in the selected-folder field when needed.
 
 ---
 
@@ -89,6 +95,7 @@ Type the path to your git repository and click **Open**. The viewer loads immedi
 - **See git status** — current branch, recent commits, and a branch switcher (read-only)
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
+- **Clear folder actions** — non-git folders can be browsed deeper, while detected git repositories can be opened directly
 - **No internet required** — everything runs locally; no accounts, no telemetry, no registration
 
 ---
@@ -131,6 +138,14 @@ npm run build
 
 Builds the React frontend (Vite) and compiles the Node.js backend (esbuild) into `dist/cli.js`.
 
+### Full verification
+
+```bash
+npm run verify
+```
+
+Runs tests, builds, and dependency audits for both the root package and the UI package.
+
 ---
 
 ## Architecture
@@ -148,7 +163,7 @@ gitlocal/
 │   └── handlers/
 │       ├── git.ts       — /api/info, /api/readme, /api/branches, /api/commits
 │       ├── files.ts     — /api/tree, /api/file
-│       └── pick.ts      — /api/pick (folder picker submit)
+│       └── pick.ts      — /api/pick and /api/pick/browse for the folder picker
 └── ui/src/
     ├── App.tsx                      — layout, state, README auto-load, picker mode
     ├── components/
@@ -156,7 +171,7 @@ gitlocal/
     │   ├── Breadcrumb/              — path navigation
     │   ├── ContentPanel/            — Markdown, code, image, binary rendering
     │   ├── GitInfo/                 — branch switcher + commit list
-    │   └── Picker/                  — PickerPage folder input form
+    │   └── Picker/                  — PickerPage folder browser with Browse/Open actions
     └── services/api.ts              — typed fetch wrappers for all endpoints
 ```
 
@@ -181,6 +196,7 @@ All endpoints are served under `/api/`:
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
 | `GET /api/commits?branch=&limit=` | Recent commits (default 10, max 100) |
+| `GET /api/pick/browse?path=` | Folder-picker directory listing with git-repo detection |
 | `POST /api/pick` | Set the repo path from the picker UI (body: `{"path":"..."}`) |
 
 ---

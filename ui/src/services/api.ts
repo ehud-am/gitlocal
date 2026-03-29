@@ -1,4 +1,11 @@
-import type { Branch, Commit, FileContent, RepoInfo, TreeNode } from '../types'
+import type {
+  Branch,
+  Commit,
+  FileContent,
+  PickBrowseResponse,
+  RepoInfo,
+  TreeNode,
+} from '../types'
 
 const BASE = ''
 
@@ -44,11 +51,25 @@ export const api = {
 
   getReadme: (): Promise<{ path: string }> => request('/api/readme'),
 
+  getPickBrowse: (path?: string): Promise<PickBrowseResponse> => {
+    const params = new URLSearchParams()
+    if (path) params.set('path', path)
+    const qs = params.toString()
+    return request(`/api/pick/browse${qs ? '?' + qs : ''}`)
+  },
+
   submitPick: async (path: string): Promise<{ ok: boolean; error: string }> => {
     const res = await fetch('/api/pick', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
+    })
+    return res.json()
+  },
+
+  showParentPicker: async (): Promise<{ ok: boolean; error: string }> => {
+    const res = await fetch('/api/pick/parent', {
+      method: 'POST',
     })
     return res.json()
   },

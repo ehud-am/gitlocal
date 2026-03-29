@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.3.0",
+  "version": "0.2.0",
   "description": "Browse any local git repository in your browser",
   "type": "module",
   "bin": {
@@ -14,15 +14,19 @@
     "ui/dist"
   ],
   "scripts": {
-    "build:ui": "cd ui && npm install && npm run build",
+    "build:ui": "npm --prefix ui run build",
     "build:server": "tsc --noEmit && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
     "build": "npm run build:ui && npm run build:server && chmod +x dist/cli.js",
-    "dev:ui": "cd ui && npm run dev",
+    "dev:ui": "npm --prefix ui run dev",
     "dev:server": "node --watch --experimental-strip-types src/cli.ts .",
     "test:server": "vitest run --coverage",
-    "test:ui": "cd ui && npx vitest run --coverage",
+    "test:ui": "npm --prefix ui run test:ci",
     "test": "npm run test:server && npm run test:ui",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "audit": "npm audit --audit-level=moderate",
+    "audit:ui": "npm --prefix ui audit --audit-level=moderate",
+    "verify": "npm test && npm run build && npm run audit && npm run audit:ui",
+    "prepublishOnly": "npm run verify"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
@@ -31,14 +35,17 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^3.1.1",
+    "@vitest/coverage-v8": "^4.1.2",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.2"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/ehud-am/gitlocal"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

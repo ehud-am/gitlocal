@@ -11,8 +11,9 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState('')
   const [currentBranch, setCurrentBranch] = useState('')
   const [readmeMissing, setReadmeMissing] = useState(false)
+  const [pickerLoading, setPickerLoading] = useState(false)
 
-  const { data: info } = useQuery({
+  const { data: info, isLoading } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
@@ -40,6 +41,17 @@ export default function App() {
       })
   }, [info]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (isLoading) {
+    return (
+      <div className="error-screen">
+        <div className="error-card">
+          <h2>Loading repository…</h2>
+          <p>GitLocal is checking the current launch context.</p>
+        </div>
+      </div>
+    )
+  }
+
   // Picker mode: show the folder selector page
   if (info?.pickerMode) {
     return <PickerPage />
@@ -62,11 +74,33 @@ export default function App() {
   const noReadmePlaceholder =
     readmeMissing && !selectedFile ? 'No README found in this repository.' : undefined
 
+  async function handleBrowseParentFolder() {
+    setPickerLoading(true)
+    try {
+      const result = await api.showParentPicker()
+      if (result.ok) {
+        window.location.reload()
+      }
+    } finally {
+      setPickerLoading(false)
+    }
+  }
+
   return (
     <>
       <header className="app-header">
         <span className="logo">GitLocal</span>
         {info && <span className="repo-name">{info.name}</span>}
+        <div className="app-header-actions">
+          <button
+            type="button"
+            className="app-header-button"
+            onClick={() => handleBrowseParentFolder().catch(() => {})}
+            disabled={pickerLoading}
+          >
+            {pickerLoading ? 'Opening parent…' : 'Browse parent folder'}
+          </button>
+        </div>
       </header>
       <div className="app-body">
         <aside className="sidebar">

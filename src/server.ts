@@ -1,31 +1,60 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { infoHandler, branchesHandler, commitsHandler, readmeHandler } from './handlers/git.js'
 import { treeHandler, fileHandler } from './handlers/files.js'
-import { pickHandler } from './handlers/pick.js'
+import { pickBrowseHandler, pickHandler, pickParentHandler } from './handlers/pick.js'
+import { validateRepo } from './git/repo.js'
 
-type AppVariables = { repoPath: string }
+type AppVariables = { repoPath: string; pickerPath: string }
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
+let currentPickerPath = ''
 
 export function setRepoPath(path: string): void {
   currentRepoPath = path
+}
+
+export function setPickerPath(path: string): void {
+  currentPickerPath = path
 }
 
 export function getRepoPath(): string {
   return currentRepoPath
 }
 
+export function getPickerPath(): string {
+  return currentPickerPath
+}
+
+function initializePaths(initialPath: string): void {
+  if (!initialPath) {
+    currentRepoPath = ''
+    currentPickerPath = process.cwd()
+    return
+  }
+
+  const resolvedPath = resolve(initialPath)
+  if (validateRepo(resolvedPath)) {
+    currentRepoPath = resolvedPath
+    currentPickerPath = ''
+    return
+  }
+
+  currentRepoPath = ''
+  currentPickerPath = resolvedPath
+}
+
 export function createApp(initialRepoPath: string): Hono<{ Variables: AppVariables }> {
-  currentRepoPath = initialRepoPath
+  initializePaths(initialRepoPath)
 
   const app = new Hono<{ Variables: AppVariables }>()
 
-  // Inject repoPath into context for all handlers
+  // Inject repoPath and pickerPath into context for all handlers
   app.use('*', async (c, next) => {
     c.set('repoPath', currentRepoPath)
+    c.set('pickerPath', currentPickerPath)
     await next()
   })
 
@@ -36,7 +65,9 @@ export function createApp(initialRepoPath: string): Hono<{ Variables: AppVariabl
   app.get('/api/readme', readmeHandler)
   app.get('/api/tree', treeHandler)
   app.get('/api/file', fileHandler)
+  app.get('/api/pick/browse', pickBrowseHandler)
   app.post('/api/pick', pickHandler)
+  app.post('/api/pick/parent', pickParentHandler)
 
   // Static file serving with SPA fallback
   const uiDir = join(import.meta.dirname, '../ui/dist')

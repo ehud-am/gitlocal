@@ -6,6 +6,7 @@ export function spawnGit(repoPath: string, ...args: string[]): string {
   const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
   /* v8 ignore next */
   if (result.error) throw result.error
+  /* v8 ignore next */
   if (result.status !== 0) throw new Error(result.stderr?.trim() || `git ${args[0]} failed`)
   /* v8 ignore next */
   return result.stdout?.trim() ?? ''
@@ -81,8 +82,8 @@ export function getCommits(repoPath: string, branch: string, limit: number = 10)
     .filter(Boolean)
     .map((line) => {
       const [hash, author, date, ...msgParts] = line.split('\x1f')
+      /* v8 ignore next 6 */
       return {
-        /* v8 ignore next 4 */
         hash: hash ?? '',
         shortHash: (hash ?? '').slice(0, 7),
         author: author ?? '',

@@ -1,10 +1,20 @@
 import type { Context } from 'hono'
 import { getInfo, getBranches, getCommits, findReadme } from '../git/repo.js'
 
-type Variables = { repoPath: string }
+type Variables = { repoPath: string; pickerPath: string }
 
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
+  const pickerPath = c.get('pickerPath')
+  if (pickerPath) {
+    return c.json({
+      name: '',
+      path: pickerPath,
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: true,
+    })
+  }
   const info = getInfo(repoPath)
   return c.json(info)
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import Breadcrumb from './Breadcrumb'
 
 describe('Breadcrumb', () => {
@@ -8,6 +9,13 @@ describe('Breadcrumb', () => {
     render(<Breadcrumb path="" onNavigate={onNavigate} />)
 
     expect(screen.getByText('root')).toBeInTheDocument()
+  })
+
+  it('has no obvious accessibility violations', async () => {
+    const onNavigate = vi.fn()
+    const { container } = render(<Breadcrumb path="foo/bar/baz" onNavigate={onNavigate} />)
+
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('renders correct segments for "foo/bar/baz"', () => {
@@ -42,6 +50,33 @@ describe('Breadcrumb', () => {
     fireEvent.click(screen.getByText('root'))
 
     expect(onNavigate).toHaveBeenCalledWith('')
+  })
+
+  it('pressing Enter on root navigates to the root path', () => {
+    const onNavigate = vi.fn()
+    render(<Breadcrumb path="foo/bar/baz" onNavigate={onNavigate} />)
+
+    fireEvent.keyDown(screen.getByText('root'), { key: 'Enter' })
+
+    expect(onNavigate).toHaveBeenCalledWith('')
+  })
+
+  it('pressing Enter on a segment navigates with the partial path', () => {
+    const onNavigate = vi.fn()
+    render(<Breadcrumb path="foo/bar/baz" onNavigate={onNavigate} />)
+
+    fireEvent.keyDown(screen.getByText('foo'), { key: 'Enter' })
+
+    expect(onNavigate).toHaveBeenCalledWith('foo')
+  })
+
+  it('ignores non-Enter key presses on breadcrumb links', () => {
+    const onNavigate = vi.fn()
+    render(<Breadcrumb path="foo/bar/baz" onNavigate={onNavigate} />)
+
+    fireEvent.keyDown(screen.getByText('bar'), { key: 'Space' })
+
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('clicking last segment does nothing', () => {
