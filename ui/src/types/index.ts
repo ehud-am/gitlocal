@@ -11,6 +11,7 @@ export type SearchMode = 'name' | 'content'
 export interface ViewerState {
   branch: string
   path: string
+  pathType: 'file' | 'dir' | 'none'
   raw: boolean
   sidebarCollapsed: boolean
   searchMode: SearchMode
@@ -95,6 +96,7 @@ export interface SyncStatus {
   currentPath: string
   resolvedPath: string
   currentPathType: 'file' | 'dir' | 'missing' | 'none'
+  resolvedPathType: 'file' | 'dir' | 'missing' | 'none'
   statusMessage: string
   checkedAt: string
 }

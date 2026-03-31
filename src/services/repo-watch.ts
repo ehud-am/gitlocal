@@ -1,8 +1,8 @@
 import {
-  getPathType,
+  getTrackedPathType,
   getWorkingTreeRevision,
   isWorkingTreeBranch,
-  nearestExistingRepoPath,
+  nearestExistingTrackedRepoPath,
 } from '../git/repo.js'
 import type { SyncStatus } from '../types.js'
 
@@ -18,25 +18,23 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
       currentPath,
       resolvedPath: currentPath,
       currentPathType: currentPath ? 'file' : 'none',
+      resolvedPathType: currentPath ? 'file' : 'none',
       statusMessage: '',
       checkedAt,
     }
   }
 
-  const currentPathType = getPathType(repoPath, currentPath)
+  const currentPathType = getTrackedPathType(repoPath, currentPath)
   const resolvedPath = currentPathType === 'missing'
-    ? nearestExistingRepoPath(repoPath, currentPath)
+    ? nearestExistingTrackedRepoPath(repoPath, currentPath)
     : currentPath
+  const resolvedPathType = getTrackedPathType(repoPath, resolvedPath)
 
-  const treeStatus = currentPathType === 'missing' ? 'invalid' : 'changed'
+  const treeStatus = currentPathType === 'missing' ? 'invalid' : 'unchanged'
   const fileStatus =
     currentPathType === 'missing'
       ? 'deleted'
-      : currentPathType === 'file'
-        ? 'changed'
-        : currentPathType === 'dir'
-          ? 'unchanged'
-          : 'unchanged'
+      : 'unchanged'
 
   return {
     branch,
@@ -47,6 +45,7 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     currentPath,
     resolvedPath,
     currentPathType,
+    resolvedPathType,
     statusMessage:
       currentPathType === 'missing'
         ? 'The current location is no longer available. GitLocal moved you to the nearest valid path.'

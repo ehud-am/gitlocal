@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -17,6 +17,9 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   writeFileSync(join(dir, 'main.ts'), '')
   writeFileSync(join(dir, 'src', 'index.ts'), '')
   writeFileSync(join(dir, 'src', 'utils.ts'), '')
+  mkdirSync(join(dir, 'src', 'lib'))
+  writeFileSync(join(dir, 'src', 'lib', 'helpers.ts'), '')
+  writeFileSync(join(dir, 'src', 'lib', 'more.ts'), '')
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
@@ -72,6 +75,7 @@ describe('listDir', () => {
     const names = nodes.map((n) => n.name)
     expect(names).toContain('index.ts')
     expect(names).toContain('utils.ts')
+    expect(names).toContain('lib')
   })
 
   it('returns correct path for subdirectory entries', () => {
@@ -115,18 +119,50 @@ describe('working tree tree helpers', () => {
     expect(listWorkingTreeDir(dir, 'missing/path')).toEqual([])
   })
 
+  it('collapses nested tracked files into immediate directory children', () => {
+    const nodes = listWorkingTreeDir(dir, 'src')
+    expect(nodes.some((node) => node.path === 'src/lib' && node.type === 'dir')).toBe(true)
+  })
+
   it('finds name matches in the working tree', () => {
     const matches = searchWorkingTreeByName(dir, 'readme', false)
     expect(matches.some((match) => match.path === 'README.md')).toBe(true)
   })
 
+  it('supports case-sensitive working tree name matching', () => {
+    expect(searchWorkingTreeByName(dir, 'README', true).some((match) => match.path === 'README.md')).toBe(true)
+    expect(searchWorkingTreeByName(dir, 'readme', true)).toEqual([])
+  })
+
   it('finds content matches in the working tree', () => {
-    writeFileSync(join(dir, 'notes.txt'), 'Working tree search target')
+    writeFileSync(join(dir, 'README.md'), 'Working tree search target')
     const matches = searchWorkingTreeByContent(dir, 'search target', false)
-    expect(matches.some((match) => match.path === 'notes.txt')).toBe(true)
+    expect(matches.some((match) => match.path === 'README.md')).toBe(true)
+  })
+
+  it('returns no snippet when file content cannot be read', () => {
+    const target = join(dir, 'README.md')
+    chmodSync(target, 0)
+
+    try {
+      expect(searchWorkingTreeByContent(dir, 'test', false)).toEqual([])
+    } finally {
+      chmodSync(target, 0o644)
+    }
+  })
+
+  it('does not surface untracked working-tree files', () => {
+    writeFileSync(join(dir, 'scratch.txt'), 'local-only')
+    expect(listWorkingTreeDir(dir, '').some((node) => node.path === 'scratch.txt')).toBe(false)
+    expect(searchWorkingTreeByName(dir, 'scratch', false)).toEqual([])
   })
 
   it('returns no matches for an empty name query', () => {
     expect(searchWorkingTreeByName(dir, '', false)).toEqual([])
+  })
+
+  it('skips oversized tracked files during content search', () => {
+    writeFileSync(join(dir, 'README.md'), 'a'.repeat(600_000))
+    expect(searchWorkingTreeByContent(dir, 'aaaa', false)).toEqual([])
   })
 })

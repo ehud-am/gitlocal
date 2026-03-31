@@ -58,6 +58,20 @@ describe('searchHandler', () => {
     expect(body.results[0].snippet).toContain('Searchable')
   })
 
+  it('excludes untracked files from current-branch searches', async () => {
+    writeFileSync(join(dir, 'draft-notes.md'), 'draft content')
+    const client = testClient(createApp(dir))
+    const nameRes = await client.api.search.$get({
+      query: { query: 'draft-notes', branch, mode: 'name' },
+    })
+    const contentRes = await client.api.search.$get({
+      query: { query: 'draft content', branch, mode: 'content' },
+    })
+
+    expect((await nameRes.json()).results).toEqual([])
+    expect((await contentRes.json()).results).toEqual([])
+  })
+
   it('honors case-sensitive matching', async () => {
     const client = testClient(createApp(dir))
     const sensitive = await client.api.search.$get({

@@ -10,6 +10,7 @@ describe('viewerState', () => {
     expect(readViewerState()).toEqual({
       branch: '',
       path: '',
+      pathType: 'none',
       raw: false,
       sidebarCollapsed: false,
       searchMode: 'name',
@@ -22,6 +23,7 @@ describe('viewerState', () => {
     writeViewerState({
       branch: 'main',
       path: 'src/index.ts',
+      pathType: 'file',
       raw: true,
       sidebarCollapsed: true,
       searchMode: 'content',
@@ -32,6 +34,7 @@ describe('viewerState', () => {
     expect(readViewerState()).toEqual({
       branch: 'main',
       path: 'src/index.ts',
+      pathType: 'file',
       raw: true,
       sidebarCollapsed: true,
       searchMode: 'content',
@@ -41,16 +44,31 @@ describe('viewerState', () => {
   })
 
   it('clears the current path and raw mode without resetting other state', () => {
-    writeViewerState({ branch: 'main', path: 'README.md', raw: true })
+    writeViewerState({ branch: 'main', path: 'README.md', pathType: 'file', raw: true })
     const next = clearViewerPath()
     expect(next.branch).toBe('main')
     expect(next.path).toBe('')
+    expect(next.pathType).toBe('none')
     expect(next.raw).toBe(false)
   })
 
   it('resets all state', () => {
-    writeViewerState({ branch: 'main', path: 'README.md' })
+    writeViewerState({ branch: 'main', path: 'README.md', pathType: 'file' })
     resetViewerState()
     expect(window.location.search).toBe('')
+  })
+
+  it('persists directory selections', () => {
+    writeViewerState({ branch: 'main', path: 'docs', pathType: 'dir' })
+    expect(readViewerState()).toEqual({
+      branch: 'main',
+      path: 'docs',
+      pathType: 'dir',
+      raw: false,
+      sidebarCollapsed: false,
+      searchMode: 'name',
+      searchQuery: '',
+      caseSensitive: false,
+    })
   })
 })

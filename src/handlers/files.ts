@@ -1,6 +1,12 @@
 import type { Context } from 'hono'
 import { spawnSync } from 'node:child_process'
-import { detectFileType, getCurrentBranch, isWorkingTreeBranch, readWorkingTreeFile } from '../git/repo.js'
+import {
+  detectFileType,
+  getCurrentBranch,
+  getTrackedPathType,
+  isWorkingTreeBranch,
+  readWorkingTreeFile,
+} from '../git/repo.js'
 import { listDir, listWorkingTreeDir } from '../git/tree.js'
 
 type Variables = { repoPath: string }
@@ -27,6 +33,10 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
 
   if (type === 'binary') {
     return c.json({ path, content: '', encoding: 'none', type: 'binary', language: '' })
+  }
+
+  if (isWorkingTreeBranch(repoPath, branch) && getTrackedPathType(repoPath, path) !== 'file') {
+    return c.json({ error: 'File not found' }, 404)
   }
 
   const rawBytes = isWorkingTreeBranch(repoPath, branch)

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { RepoInfo, Branch, Commit } from '../types.js'
 
 export function spawnGit(repoPath: string, ...args: string[]): string {
@@ -144,29 +144,50 @@ export function nearestExistingRepoPath(repoPath: string, filePath: string): str
   return ''
 }
 
-function walkWorkingTree(repoPath: string, root = repoPath): string[] {
-  const entries = readdirSync(root, { withFileTypes: true })
-  const files: string[] = []
+export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
+  try {
+    return spawnGit(repoPath, 'ls-files')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((filePath) => getPathType(repoPath, filePath) === 'file')
+      .sort()
+  } catch {
+    return []
+  }
+}
 
-  for (const entry of entries) {
-    if (entry.name === '.git') continue
-    const fullPath = resolve(root, entry.name)
-    if (entry.isDirectory()) {
-      files.push(...walkWorkingTree(repoPath, fullPath))
-      continue
+export function getTrackedPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
+  if (!filePath) return 'none'
+
+  const files = getTrackedWorkingTreeFiles(repoPath)
+  if (files.includes(filePath)) return 'file'
+  return files.some((candidate) => candidate.startsWith(`${filePath}/`)) ? 'dir' : 'missing'
+}
+
+export function nearestExistingTrackedRepoPath(repoPath: string, filePath: string): string {
+  if (!filePath) return ''
+
+  let current = filePath
+  while (current) {
+    const currentType = getTrackedPathType(repoPath, current)
+    if (currentType === 'file' || currentType === 'dir') {
+      return current
     }
-    const rel = relative(repoPath, fullPath)
-    if (rel) files.push(rel.split('\\').join('/'))
+
+    const boundary = current.lastIndexOf('/')
+    if (boundary < 0) break
+    current = current.slice(0, boundary)
   }
 
-  return files.sort()
+  return ''
 }
 
 export function getWorkingTreeRevision(repoPath: string): string {
   const hash = createHash('sha1')
   hash.update(getCurrentBranch(repoPath))
 
-  for (const relPath of walkWorkingTree(repoPath)) {
+  for (const relPath of getTrackedWorkingTreeFiles(repoPath)) {
     const fullPath = resolveRepoPath(repoPath, relPath)
     const stats = statSync(fullPath)
     hash.update(relPath)

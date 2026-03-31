@@ -6,8 +6,9 @@ import FileTreeNode from './FileTreeNode'
 
 interface Props {
   branch: string
-  selectedFile: string
-  onFileSelect: (path: string) => void
+  selectedPath: string
+  selectedPathType: 'file' | 'dir' | 'none'
+  onSelect: (path: string, type: 'file' | 'dir') => void
 }
 
 interface NodeState {
@@ -17,7 +18,7 @@ interface NodeState {
   error: boolean
 }
 
-export default function FileTree({ branch, selectedFile, onFileSelect }: Props) {
+export default function FileTree({ branch, selectedPath, selectedPathType, onSelect }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
 
   const { data: roots, isLoading, isError } = useQuery({
@@ -66,11 +67,11 @@ export default function FileTree({ branch, selectedFile, onFileSelect }: Props) 
   }, [nodeStates, branch])
 
   useEffect(() => {
-    if (!selectedFile) return
-    const directories = selectedFile
+    if (!selectedPath) return
+    const directories = selectedPath
       .split('/')
       .filter(Boolean)
-      .slice(0, -1)
+      .slice(0, selectedPathType === 'dir' ? undefined : -1)
       .map((_, index, parts) => parts.slice(0, index + 1).join('/'))
 
     void directories.reduce<Promise<void>>(async (previous, dirPath) => {
@@ -99,7 +100,7 @@ export default function FileTree({ branch, selectedFile, onFileSelect }: Props) 
         })
       }
     }, Promise.resolve())
-  }, [selectedFile, branch, nodeStates])
+  }, [selectedPath, selectedPathType, branch, nodeStates])
 
   const renderNodes = (nodes: TreeNode[], depth: number): React.ReactNode => (
     <>
@@ -111,13 +112,14 @@ export default function FileTree({ branch, selectedFile, onFileSelect }: Props) 
             <FileTreeNode
               node={node}
               isExpanded={isExpanded}
-              isSelected={selectedFile === node.path}
+              isSelected={selectedPath === node.path}
               depth={depth}
               onClick={() => {
                 if (node.type === 'dir') {
+                  onSelect(node.path, 'dir')
                   toggleDir(node)
                 } else {
-                  onFileSelect(node.path)
+                  onSelect(node.path, 'file')
                 }
               }}
             />

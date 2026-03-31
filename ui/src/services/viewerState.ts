@@ -3,6 +3,7 @@ import type { SearchMode, ViewerState } from '../types'
 const DEFAULTS: ViewerState = {
   branch: '',
   path: '',
+  pathType: 'none',
   raw: false,
   sidebarCollapsed: false,
   searchMode: 'name',
@@ -33,6 +34,12 @@ export function readViewerState(): ViewerState {
   return {
     branch: params.get('branch') ?? DEFAULTS.branch,
     path: params.get('path') ?? DEFAULTS.path,
+    pathType:
+      params.get('pathType') === 'dir'
+        ? 'dir'
+        : params.get('pathType') === 'file'
+          ? 'file'
+          : DEFAULTS.pathType,
     raw: parseBoolean(params.get('raw'), DEFAULTS.raw),
     sidebarCollapsed: parseBoolean(params.get('sidebarCollapsed'), DEFAULTS.sidebarCollapsed),
     searchMode,
@@ -47,6 +54,7 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
 
   if (next.branch) params.set('branch', next.branch)
   if (next.path) params.set('path', next.path)
+  if (next.pathType !== DEFAULTS.pathType) params.set('pathType', next.pathType)
   if (next.raw) params.set('raw', 'true')
   if (next.sidebarCollapsed) params.set('sidebarCollapsed', 'true')
   if (next.searchMode !== DEFAULTS.searchMode) params.set('searchMode', next.searchMode)
@@ -58,7 +66,7 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
 }
 
 export function clearViewerPath(): ViewerState {
-  return writeViewerState({ path: '', raw: false })
+  return writeViewerState({ path: '', pathType: 'none', raw: false })
 }
 
 export function resetViewerState(): void {

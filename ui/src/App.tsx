@@ -10,9 +10,12 @@ import SearchPanel from './components/Search/SearchPanel'
 import type { SearchMode, SearchResult } from './types'
 import { readViewerState, writeViewerState } from './services/viewerState'
 
+type SelectedPathType = 'file' | 'dir' | 'none'
+
 export default function App() {
   const initialViewerState = readViewerState()
-  const [selectedFile, setSelectedFile] = useState(initialViewerState.path)
+  const [selectedPath, setSelectedPath] = useState(initialViewerState.path)
+  const [selectedPathType, setSelectedPathType] = useState<SelectedPathType>(initialViewerState.pathType)
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
   const [showRaw, setShowRaw] = useState(initialViewerState.raw)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
@@ -31,8 +34,8 @@ export default function App() {
   })
 
   const { data: syncStatus } = useQuery({
-    queryKey: ['sync', selectedFile, currentBranch],
-    queryFn: () => api.getSyncStatus(selectedFile, currentBranch),
+    queryKey: ['sync', selectedPath, currentBranch],
+    queryFn: () => api.getSyncStatus(selectedPath, currentBranch),
     enabled: !!info?.isGitRepo,
     refetchInterval: 3000,
   })
@@ -46,7 +49,7 @@ export default function App() {
 
   // Auto-select README on first load (viewer mode only)
   useEffect(() => {
-    if (!info || info.pickerMode || selectedFile) return
+    if (!info || info.pickerMode || selectedPath) return
     api.getReadme()
       .then(({ path }) => {
         if (path) {
@@ -63,14 +66,15 @@ export default function App() {
   useEffect(() => {
     writeViewerState({
       branch: currentBranch,
-      path: selectedFile,
+      path: selectedPath,
+      pathType: selectedPathType,
       raw: showRaw,
       sidebarCollapsed,
       searchMode,
       searchQuery,
       caseSensitive,
     })
-  }, [currentBranch, selectedFile, showRaw, sidebarCollapsed, searchMode, searchQuery, caseSensitive])
+  }, [currentBranch, selectedPath, selectedPathType, showRaw, sidebarCollapsed, searchMode, searchQuery, caseSensitive])
 
   useEffect(() => {
     if (!syncStatus) return
@@ -83,7 +87,8 @@ export default function App() {
 
     if (syncStatus.currentPath && syncStatus.currentPathType === 'missing') {
       setStatusMessage(syncStatus.statusMessage)
-      setSelectedFile(syncStatus.resolvedPath)
+      setSelectedPath(syncStatus.resolvedPath)
+      setSelectedPathType(syncStatus.resolvedPathType === 'missing' ? 'none' : syncStatus.resolvedPathType)
       setShowRaw(false)
       return
     }
@@ -91,22 +96,33 @@ export default function App() {
     if (syncStatus.statusMessage) {
       setStatusMessage(syncStatus.statusMessage)
     }
+
+    if (selectedPath === syncStatus.currentPath && syncStatus.currentPathType !== 'missing') {
+      setSelectedPathType(syncStatus.currentPathType === 'none' ? 'none' : syncStatus.currentPathType)
+    }
   }, [syncStatus, queryClient])
 
   function handleSelectFile(path: string) {
-    setSelectedFile(path)
+    setSelectedPath(path)
+    setSelectedPathType(path ? 'file' : 'none')
+    setStatusMessage('')
+    setShowRaw(false)
+  }
+
+  function handleSelectFolder(path: string) {
+    setSelectedPath(path)
+    setSelectedPathType(path ? 'dir' : 'none')
+    setStatusMessage('')
     setShowRaw(false)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
     if (result.type === 'file') {
       handleSelectFile(result.path)
-      setStatusMessage('')
       return
     }
 
-    setSelectedFile('')
-    setStatusMessage(`"${result.path}" is a folder. Use the navigation tree to browse inside it.`)
+    handleSelectFolder(result.path)
   }
 
   if (isLoading) {
@@ -140,7 +156,7 @@ export default function App() {
   }
 
   const noReadmePlaceholder =
-    readmeMissing && !selectedFile ? 'No README found in this repository.' : undefined
+    readmeMissing && !selectedPath ? 'No README found in this repository.' : undefined
 
   async function handleBrowseParentFolder() {
     setPickerLoading(true)
@@ -182,8 +198,18 @@ export default function App() {
           <aside className="sidebar">
             <FileTree
               branch={currentBranch}
-              selectedFile={selectedFile}
-              onFileSelect={handleSelectFile}
+              selectedPath={selectedPath}
+              selectedPathType={selectedPathType}
+              onSelect={(
+                path,
+                type,
+              ) => {
+                if (type === 'dir') {
+                  handleSelectFolder(path)
+                  return
+                }
+                handleSelectFile(path)
+              }}
             />
             <GitInfo
               branch={currentBranch}
@@ -208,17 +234,18 @@ export default function App() {
             onSelectResult={handleSelectSearchResult}
           />
           <Breadcrumb
-            path={selectedFile}
+            path={selectedPath}
             onNavigate={(path) => {
               if (path === '') {
                 handleSelectFile('')
               } else {
-                handleSelectFile(path)
+                handleSelectFolder(path)
               }
             }}
           />
           <ContentPanel
-            filePath={selectedFile}
+            selectedPath={selectedPath}
+            selectedPathType={selectedPathType}
             branch={currentBranch}
             onNavigate={handleSelectFile}
             placeholder={noReadmePlaceholder}

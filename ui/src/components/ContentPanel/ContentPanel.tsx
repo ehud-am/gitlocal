@@ -7,7 +7,8 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 
 interface Props {
-  filePath: string
+  selectedPath: string
+  selectedPathType: 'file' | 'dir' | 'none'
   branch: string
   onNavigate: (path: string) => void
   placeholder?: string
@@ -15,24 +16,40 @@ interface Props {
   onRawChange?: (value: boolean) => void
 }
 
-export default function ContentPanel({ filePath, branch, onNavigate, placeholder, raw = false, onRawChange }: Props) {
+export default function ContentPanel({
+  selectedPath,
+  selectedPathType,
+  branch,
+  onNavigate,
+  placeholder,
+  raw = false,
+  onRawChange,
+}: Props) {
   const [showRaw, setShowRaw] = useState(raw)
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['file', filePath, branch, showRaw],
-    queryFn: () => api.getFile(filePath, branch, showRaw),
-    enabled: !!filePath,
+    queryKey: ['file', selectedPath, branch, showRaw],
+    queryFn: () => api.getFile(selectedPath, branch, showRaw),
+    enabled: !!selectedPath && selectedPathType === 'file',
   })
 
   // Reset raw view when file changes
   React.useEffect(() => {
     setShowRaw(raw)
-  }, [filePath, raw])
+  }, [selectedPath, raw])
 
-  if (!filePath) {
+  if (!selectedPath) {
     return (
       <div className="content-panel empty">
         {placeholder ?? 'Select a file to view its contents'}
+      </div>
+    )
+  }
+
+  if (selectedPathType === 'dir') {
+    return (
+      <div className="content-panel empty">
+        Browse files inside <code>{selectedPath}</code> from the navigation tree or search results.
       </div>
     )
   }
@@ -87,7 +104,7 @@ export default function ContentPanel({ filePath, branch, onNavigate, placeholder
         <img
           className="content-image"
           src={`data:image/*;base64,${data.content}`}
-          alt={filePath}
+          alt={selectedPath}
         />
       ) : data.type === 'markdown' && !showRaw ? (
         <Suspense fallback={loadingFallback}>

@@ -50,7 +50,7 @@ describe('ContentPanel', () => {
 
   it('shows empty state when no filePath', () => {
     const { container } = renderWithClient(
-      <ContentPanel filePath="" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="" selectedPathType="none" branch="main" onNavigate={vi.fn()} />
     )
     expect(screen.getByText(/Select a file/i)).toBeInTheDocument()
     return expect(axe(container)).resolves.toMatchObject({ violations: [] })
@@ -61,7 +61,7 @@ describe('ContentPanel', () => {
     vi.mocked(api.getFile).mockReturnValue(new Promise(() => {}))
 
     renderWithClient(
-      <ContentPanel filePath="README.md" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     expect(screen.getByLabelText('loading content')).toBeInTheDocument()
@@ -77,7 +77,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="README.md" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -95,7 +95,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="main.go" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="main.go" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -113,7 +113,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="image.bin" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="image.bin" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -131,7 +131,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="photo.png" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="photo.png" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -151,7 +151,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="README.md" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -184,7 +184,7 @@ describe('ContentPanel', () => {
     })
 
     renderWithClient(
-      <ContentPanel filePath="README.md" branch="main" onNavigate={vi.fn()} />
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
     )
 
     await waitFor(() => {
@@ -203,7 +203,7 @@ describe('ContentPanel', () => {
 
   it('shows custom placeholder when filePath empty and placeholder prop provided', () => {
     renderWithClient(
-      <ContentPanel filePath="" branch="main" onNavigate={vi.fn()} placeholder="No README found in this repository." />
+      <ContentPanel selectedPath="" selectedPathType="none" branch="main" onNavigate={vi.fn()} placeholder="No README found in this repository." />
     )
     expect(screen.getByText('No README found in this repository.')).toBeInTheDocument()
   })
@@ -220,7 +220,7 @@ describe('ContentPanel', () => {
     const onNavigate = vi.fn()
 
     renderWithClient(
-      <ContentPanel filePath="README.md" branch="main" onNavigate={onNavigate} />
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={onNavigate} />
     )
 
     await waitFor(() => {
@@ -230,5 +230,14 @@ describe('ContentPanel', () => {
     fireEvent.click(screen.getByText('link'))
 
     expect(onNavigate).toHaveBeenCalledWith('docs/guide.md')
+  })
+
+  it('shows a folder placeholder without requesting file content', () => {
+    renderWithClient(
+      <ContentPanel selectedPath="docs" selectedPathType="dir" branch="main" onNavigate={vi.fn()} />
+    )
+
+    expect(screen.getByText(/browse files inside/i)).toHaveTextContent('docs')
+    expect(api.getFile).not.toHaveBeenCalled()
   })
 })

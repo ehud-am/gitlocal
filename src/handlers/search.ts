@@ -41,6 +41,24 @@ function searchGitTreeByName(repoPath: string, branch: string, query: string, ca
   return results
 }
 
+function searchWorkingTreeByTrackedName(repoPath: string, query: string, caseSensitive: boolean): SearchResult[] {
+  return searchWorkingTreeByName(repoPath, query, caseSensitive).map((entry) => ({
+    path: entry.path,
+    type: entry.type,
+    matchType: 'name' as const,
+  }))
+}
+
+function searchWorkingTreeByTrackedContent(repoPath: string, query: string, caseSensitive: boolean): SearchResult[] {
+  return searchWorkingTreeByContent(repoPath, query, caseSensitive).map((entry) => ({
+    path: entry.path,
+    type: entry.type,
+    matchType: 'content' as const,
+    line: entry.line,
+    snippet: entry.snippet,
+  }))
+}
+
 function searchGitTreeByContent(repoPath: string, branch: string, query: string, caseSensitive: boolean): SearchResult[] {
   const args = ['grep', '-n']
   if (!caseSensitive) args.push('-i')
@@ -82,19 +100,11 @@ export async function searchHandler(c: Context<{ Variables: Variables }>): Promi
 
   const results =
     mode === 'name'
-      ? (
-          isWorkingTreeBranch(repoPath, branch)
-            ? searchWorkingTreeByName(repoPath, query, caseSensitive)
-            : searchGitTreeByName(repoPath, branch, query, caseSensitive)
-        ).map((entry) => ({ path: entry.path, type: entry.type, matchType: 'name' as const }))
+      ? isWorkingTreeBranch(repoPath, branch)
+        ? searchWorkingTreeByTrackedName(repoPath, query, caseSensitive)
+        : searchGitTreeByName(repoPath, branch, query, caseSensitive)
       : isWorkingTreeBranch(repoPath, branch)
-        ? searchWorkingTreeByContent(repoPath, query, caseSensitive).map((entry) => ({
-            path: entry.path,
-            type: entry.type,
-            matchType: 'content' as const,
-            line: entry.line,
-            snippet: entry.snippet,
-          }))
+        ? searchWorkingTreeByTrackedContent(repoPath, query, caseSensitive)
         : searchGitTreeByContent(repoPath, branch, query, caseSensitive)
 
   const response: SearchResponse = { query, branch, mode, caseSensitive, results }

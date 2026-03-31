@@ -35,8 +35,9 @@ function renderWithClient(ui: React.ReactElement) {
 
 const defaultProps = {
   branch: 'main',
-  selectedFile: '',
-  onFileSelect: vi.fn(),
+  selectedPath: '',
+  selectedPathType: 'none' as const,
+  onSelect: vi.fn(),
 }
 
 beforeEach(() => {
@@ -83,21 +84,21 @@ describe('FileTree', () => {
     expect((await axe(container)).violations).toHaveLength(0)
   })
 
-  it('clicking a file calls onFileSelect', async () => {
-    const onFileSelect = vi.fn()
+  it('clicking a file calls onSelect with the file type', async () => {
+    const onSelect = vi.fn()
     mockedApi.getTree.mockResolvedValue([
       { name: 'src', path: 'src', type: 'dir' },
       { name: 'README.md', path: 'README.md', type: 'file' },
     ])
 
-    renderWithClient(<FileTree {...defaultProps} onFileSelect={onFileSelect} />)
+    renderWithClient(<FileTree {...defaultProps} onSelect={onSelect} />)
 
     await waitFor(() => {
       expect(screen.getByText('README.md')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByText('README.md'))
-    expect(onFileSelect).toHaveBeenCalledWith('README.md')
+    expect(onSelect).toHaveBeenCalledWith('README.md', 'file')
   })
 
   it('clicking a folder fetches children', async () => {
@@ -121,6 +122,8 @@ describe('FileTree', () => {
     await waitFor(() => {
       expect(screen.getByText('main.go')).toBeInTheDocument()
     })
+
+    expect(defaultProps.onSelect).toHaveBeenCalledWith('src', 'dir')
   })
 
   it('clicking expanded folder collapses it', async () => {

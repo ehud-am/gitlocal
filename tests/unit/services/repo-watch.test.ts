@@ -41,12 +41,14 @@ describe('repo-watch', () => {
     }
   })
 
-  it('reports changed files for working-tree paths', () => {
+  it('keeps existing tracked files marked as unchanged', () => {
     const { dir, branch, cleanup } = makeGitRepo()
     try {
       const status = getSyncStatus(dir, branch, 'README.md')
-      expect(status.fileStatus).toBe('changed')
+      expect(status.fileStatus).toBe('unchanged')
+      expect(status.treeStatus).toBe('unchanged')
       expect(status.currentPathType).toBe('file')
+      expect(status.resolvedPathType).toBe('file')
       expect(status.workingTreeRevision).toBeTruthy()
     } finally {
       cleanup()
@@ -58,6 +60,7 @@ describe('repo-watch', () => {
     try {
       const status = getSyncStatus(dir, branch, '')
       expect(status.currentPathType).toBe('none')
+      expect(status.resolvedPathType).toBe('none')
       expect(status.fileStatus).toBe('unchanged')
     } finally {
       cleanup()
@@ -70,7 +73,8 @@ describe('repo-watch', () => {
       const status = getSyncStatus(dir, branch, 'docs/missing/file.md')
       expect(status.fileStatus).toBe('deleted')
       expect(status.treeStatus).toBe('invalid')
-      expect(status.resolvedPath).toBe('docs')
+      expect(status.resolvedPath).toBe('')
+      expect(status.resolvedPathType).toBe('none')
     } finally {
       cleanup()
     }

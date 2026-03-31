@@ -33,7 +33,7 @@ function renderWithClient() {
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&sidebarCollapsed=true&searchMode=content&searchQuery=hello&caseSensitive=true&raw=true')
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file&sidebarCollapsed=true&searchMode=content&searchQuery=hello&caseSensitive=true&raw=true')
     vi.mocked(api.getInfo).mockResolvedValue({
       name: 'repo',
       path: '/tmp/repo',
@@ -51,6 +51,7 @@ describe('App', () => {
       currentPath: 'docs/guide.md',
       resolvedPath: 'docs/guide.md',
       currentPathType: 'file',
+      resolvedPathType: 'file',
       statusMessage: '',
       checkedAt: new Date().toISOString(),
     })
@@ -94,6 +95,7 @@ describe('App', () => {
       currentPath: 'docs/guide.md',
       resolvedPath: '',
       currentPathType: 'missing',
+      resolvedPathType: 'none',
       statusMessage: 'The current location is no longer available. GitLocal moved you to the nearest valid path.',
       checkedAt: new Date().toISOString(),
     })
@@ -114,5 +116,41 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByRole('tree', { name: /repository files/i })).toBeInTheDocument()
     })
+  })
+
+  it('navigates folder search results instead of showing a dead-end message', async () => {
+    vi.mocked(api.getSearchResults).mockResolvedValue({
+      query: 'docs',
+      branch: 'main',
+      mode: 'name',
+      caseSensitive: false,
+      results: [{ path: 'docs', type: 'dir', matchType: 'name' }],
+    })
+
+    renderWithClient()
+
+    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
+    fireEvent.click(screen.getByLabelText('Name'))
+    fireEvent.change(searchInput, { target: { value: 'docs' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+
+    const folderResult = await screen.findByRole('button', { name: /docs/i })
+    fireEvent.click(folderResult)
+
+    await waitFor(() => {
+      expect(screen.getByText(/browse files inside/i)).toHaveTextContent('docs')
+    })
+  })
+
+  it('hydrates a saved folder selection without trying to load it as a file', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir')
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByText(/browse files inside/i)).toHaveTextContent('docs')
+    })
+
+    expect(api.getFile).not.toHaveBeenCalledWith('docs', 'main', expect.anything())
   })
 })

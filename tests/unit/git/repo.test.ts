@@ -15,7 +15,10 @@ import {
   isWorkingTreeBranch,
   getWorkingTreeRevision,
   getPathType,
+  getTrackedPathType,
+  getTrackedWorkingTreeFiles,
   nearestExistingRepoPath,
+  nearestExistingTrackedRepoPath,
   readWorkingTreeFile,
 } from '../../../src/git/repo.js'
 
@@ -28,6 +31,7 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   writeFileSync(join(dir, 'main.ts'), 'console.log("hello")')
   writeFileSync(join(dir, 'notes.txt'), 'notes')
   mkdirSync(join(dir, 'docs'))
+  writeFileSync(join(dir, 'docs', 'guide.md'), 'guide')
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
@@ -324,5 +328,27 @@ describe('working tree helpers', () => {
     } finally {
       cleanup()
     }
+  })
+
+  it('returns tracked files and tracked path types without surfacing untracked files', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'scratch.txt'), 'local-only')
+      expect(getTrackedWorkingTreeFiles(dir)).toContain('docs/guide.md')
+      expect(getTrackedWorkingTreeFiles(dir)).not.toContain('scratch.txt')
+      expect(getTrackedPathType(dir, '')).toBe('none')
+      expect(getTrackedPathType(dir, 'docs')).toBe('dir')
+      expect(getTrackedPathType(dir, 'docs/guide.md')).toBe('file')
+      expect(getTrackedPathType(dir, 'scratch.txt')).toBe('missing')
+      expect(nearestExistingTrackedRepoPath(dir, 'docs/guide.md')).toBe('docs/guide.md')
+      expect(nearestExistingTrackedRepoPath(dir, 'docs/guide.md/missing')).toBe('docs/guide.md')
+      expect(nearestExistingTrackedRepoPath(dir, 'docs/missing/file.md')).toBe('docs')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns an empty tracked file list for invalid repositories', () => {
+    expect(getTrackedWorkingTreeFiles(join(tmpdir(), 'definitely-missing-repo'))).toEqual([])
   })
 })

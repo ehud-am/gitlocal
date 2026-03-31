@@ -90,6 +90,15 @@ describe('treeHandler', () => {
     const body = await res.json()
     expect(body.some((node: { name: string }) => node.name === 'feature.txt')).toBe(true)
   })
+
+  it('excludes untracked files from the current branch tree', async () => {
+    writeFileSync(join(dir, 'local-only.txt'), 'draft')
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.tree.$get({ query: { path: '', branch } })
+    const body = await res.json()
+    expect(body.some((node: { name: string }) => node.name === 'local-only.txt')).toBe(false)
+  })
 })
 
 describe('treeHandler — empty repoPath', () => {
@@ -173,6 +182,14 @@ describe('fileHandler — 404 and error cases', () => {
     const app = createApp(dir)
     const client = testClient(app)
     const res = await client.api.file.$get({ query: { path: 'nonexistent.ts', branch } })
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for untracked files in the current branch', async () => {
+    writeFileSync(join(dir, 'scratch.txt'), 'local-only')
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'scratch.txt', branch } })
     expect(res.status).toBe(404)
   })
 })

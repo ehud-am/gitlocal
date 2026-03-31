@@ -16,6 +16,7 @@ export async function syncHandler(c: Context<{ Variables: Variables }>): Promise
       currentPath: '',
       resolvedPath: '',
       currentPathType: 'none',
+      resolvedPathType: 'none',
       statusMessage: '',
       checkedAt: new Date().toISOString(),
     })

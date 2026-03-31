@@ -1,7 +1,8 @@
-import { readdirSync, statSync, readFileSync } from 'node:fs'
+import { statSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import type { TreeNode } from '../types.js'
+import { getTrackedWorkingTreeFiles } from './repo.js'
 
 function runLsTree(repoPath: string, args: string[]): string {
   const result = spawnSync('git', ['ls-tree', ...args], { cwd: repoPath, encoding: 'utf-8' })
@@ -38,34 +39,60 @@ export function listDir(repoPath: string, branch: string, subpath: string = ''):
   })
 }
 
-export function listWorkingTreeDir(repoPath: string, subpath: string = ''): TreeNode[] {
-  const dirPath = subpath ? resolve(repoPath, subpath) : repoPath
-  try {
-    return readdirSync(dirPath, { withFileTypes: true })
-      .filter((entry) => entry.name !== '.git')
-      .map((entry): TreeNode => ({
-        name: entry.name,
-        path: subpath ? `${subpath}/${entry.name}` : entry.name,
-        type: entry.isDirectory() ? 'dir' : 'file',
-      }))
-      .sort((a, b) => {
-        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
-        return a.name.localeCompare(b.name)
-      })
-  } catch {
-    return []
-  }
-}
+function getTrackedWorkingTreeEntries(repoPath: string): TreeNode[] {
+  const files = getTrackedWorkingTreeFiles(repoPath)
+  const dirs = new Set<string>()
 
-function collectWorkingTreeEntries(repoPath: string, subpath = ''): TreeNode[] {
-  const nodes = listWorkingTreeDir(repoPath, subpath)
-  const all = [...nodes]
-  for (const node of nodes) {
-    if (node.type === 'dir') {
-      all.push(...collectWorkingTreeEntries(repoPath, node.path))
+  for (const filePath of files) {
+    const parts = filePath.split('/')
+    for (let index = 1; index < parts.length; index += 1) {
+      dirs.add(parts.slice(0, index).join('/'))
     }
   }
-  return all
+
+  const nodes: TreeNode[] = [
+    ...Array.from(dirs).map((dirPath) => ({
+      name: dirPath.split('/').pop() as string,
+      path: dirPath,
+      type: 'dir' as const,
+    })),
+    ...files.map((filePath) => ({
+      name: filePath.split('/').pop() as string,
+      path: filePath,
+      type: 'file' as const,
+    })),
+  ]
+
+  return nodes.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+    return a.path.localeCompare(b.path)
+  })
+}
+
+export function listWorkingTreeDir(repoPath: string, subpath: string = ''): TreeNode[] {
+  const prefix = subpath ? `${subpath}/` : ''
+  const depth = subpath ? subpath.split('/').length + 1 : 1
+  const children = new Map<string, TreeNode>()
+
+  for (const entry of getTrackedWorkingTreeEntries(repoPath)) {
+    if (subpath) {
+      if (entry.path !== subpath && !entry.path.startsWith(prefix)) continue
+    }
+    if (!subpath && entry.path.includes('/')) {
+      const firstSegment = entry.path.split('/')[0]
+      if (entry.path !== firstSegment) continue
+    }
+
+    const segments = entry.path.split('/')
+    if (segments.length !== depth) continue
+
+    children.set(entry.path, entry)
+  }
+
+  return Array.from(children.values()).sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
 }
 
 function readSnippet(filePath: string, query: string, caseSensitive: boolean): { line: number; snippet: string } | null {
@@ -79,6 +106,7 @@ function readSnippet(filePath: string, query: string, caseSensitive: boolean): {
         return { line: index + 1, snippet: lines[index].trim() }
       }
     }
+  /* v8 ignore next 3 -- defensive against transient read failures in the working tree */
   } catch {
     return null
   }
@@ -86,7 +114,7 @@ function readSnippet(filePath: string, query: string, caseSensitive: boolean): {
 }
 
 export function searchWorkingTreeByName(repoPath: string, query: string, caseSensitive: boolean): TreeNode[] {
-  const entries = collectWorkingTreeEntries(repoPath)
+  const entries = getTrackedWorkingTreeEntries(repoPath)
   const needle = caseSensitive ? query : query.toLowerCase()
   return entries.filter((entry) => {
     const hay = caseSensitive ? entry.path : entry.path.toLowerCase()
@@ -95,19 +123,15 @@ export function searchWorkingTreeByName(repoPath: string, query: string, caseSen
 }
 
 export function searchWorkingTreeByContent(repoPath: string, query: string, caseSensitive: boolean): Array<TreeNode & { snippet: string; line: number }> {
-  const entries = collectWorkingTreeEntries(repoPath).filter((entry) => entry.type === 'file')
+  const entries = getTrackedWorkingTreeEntries(repoPath).filter((entry) => entry.type === 'file')
   const matches: Array<TreeNode & { snippet: string; line: number }> = []
 
   for (const entry of entries) {
     const fullPath = resolve(repoPath, entry.path)
-    try {
-      if (statSync(fullPath).size > 512_000) continue
-      const snippet = readSnippet(fullPath, query, caseSensitive)
-      if (snippet) {
-        matches.push({ ...entry, ...snippet })
-      }
-    } catch {
-      continue
+    if (statSync(fullPath).size > 512_000) continue
+    const snippet = readSnippet(fullPath, query, caseSensitive)
+    if (snippet) {
+      matches.push({ ...entry, ...snippet })
     }
   }
 
