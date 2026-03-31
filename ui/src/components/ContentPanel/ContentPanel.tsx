@@ -92,7 +92,7 @@ export default function ContentPanel({
             <CopyButton
               getText={() => data.content}
               className="copy-button raw-copy-button"
-              label="Copy file"
+              label="Copy raw file"
             />
           )}
         </div>

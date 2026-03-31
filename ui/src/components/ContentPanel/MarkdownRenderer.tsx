@@ -47,19 +47,21 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
             return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
           },
           code: ({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: ReactNode }) => {
-            if (inline) {
+            const rawText = flattenText(children)
+            const text = rawText.replace(/\n$/, '')
+            const isBlockCode = inline === false || className?.startsWith('language-') || rawText.includes('\n')
+
+            if (!isBlockCode) {
               return (
                 <code className={className} {...props}>
                   {children}
                 </code>
               )
             }
-
-            const text = flattenText(children).replace(/\n$/, '')
             return (
               <div className="markdown-code-block">
                 <div className="markdown-code-toolbar">
-                  <CopyButton getText={() => text} className="copy-button code-copy-button" label="Copy code" />
+                  <CopyButton getText={() => text} className="copy-button code-copy-button" label="Copy code block" />
                 </div>
                 <code className={className} {...props}>
                   {children}
