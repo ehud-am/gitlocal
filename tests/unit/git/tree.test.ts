@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { listDir } from '../../../src/git/tree.js'
+import { listDir, listWorkingTreeDir, searchWorkingTreeByContent, searchWorkingTreeByName } from '../../../src/git/tree.js'
 
 function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-tree-test-'))
@@ -88,5 +88,45 @@ describe('listDir', () => {
   it('returns empty array for invalid subpath', () => {
     const nodes = listDir(dir, branch, 'nonexistent-subdir')
     expect(nodes).toEqual([])
+  })
+})
+
+describe('working tree tree helpers', () => {
+  let dir: string
+  let branch: string
+  let cleanup: () => void
+
+  beforeAll(() => {
+    const repo = makeGitRepo()
+    dir = repo.dir
+    branch = repo.branch
+    cleanup = repo.cleanup
+  })
+
+  afterAll(() => cleanup())
+
+  it('lists working-tree directories and files from disk', () => {
+    const nodes = listWorkingTreeDir(dir, '')
+    expect(nodes.map((node) => node.name)).toContain('README.md')
+    expect(nodes.map((node) => node.name)).toContain('src')
+  })
+
+  it('returns an empty array for an invalid working-tree subpath', () => {
+    expect(listWorkingTreeDir(dir, 'missing/path')).toEqual([])
+  })
+
+  it('finds name matches in the working tree', () => {
+    const matches = searchWorkingTreeByName(dir, 'readme', false)
+    expect(matches.some((match) => match.path === 'README.md')).toBe(true)
+  })
+
+  it('finds content matches in the working tree', () => {
+    writeFileSync(join(dir, 'notes.txt'), 'Working tree search target')
+    const matches = searchWorkingTreeByContent(dir, 'search target', false)
+    expect(matches.some((match) => match.path === 'notes.txt')).toBe(true)
+  })
+
+  it('returns no matches for an empty name query', () => {
+    expect(searchWorkingTreeByName(dir, '', false)).toEqual([])
   })
 })

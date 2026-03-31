@@ -1,9 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { spawnGit, validateRepo, getInfo, getBranches, getCommits, findReadme, detectFileType } from '../../../src/git/repo.js'
+import {
+  spawnGit,
+  validateRepo,
+  getInfo,
+  getBranches,
+  getCommits,
+  findReadme,
+  detectFileType,
+  getCurrentBranch,
+  isWorkingTreeBranch,
+  getWorkingTreeRevision,
+  getPathType,
+  nearestExistingRepoPath,
+  readWorkingTreeFile,
+} from '../../../src/git/repo.js'
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-test-'))
@@ -12,6 +26,8 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: dir })
   writeFileSync(join(dir, 'README.md'), '# Test')
   writeFileSync(join(dir, 'main.ts'), 'console.log("hello")')
+  writeFileSync(join(dir, 'notes.txt'), 'notes')
+  mkdirSync(join(dir, 'docs'))
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
@@ -265,5 +281,48 @@ describe('detectFileType', () => {
   it('handles files with no extension', () => {
     const result = detectFileType('Makefile')
     expect(result.type).toBe('text')
+  })
+})
+
+describe('working tree helpers', () => {
+  it('returns the current branch name and recognizes working-tree branches', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const branch = getCurrentBranch(dir)
+      expect(branch).toBeTruthy()
+      expect(isWorkingTreeBranch(dir, branch)).toBe(true)
+      expect(isWorkingTreeBranch(dir, 'nonexistent')).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('changes the working tree revision when tracked files change on disk', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const before = getWorkingTreeRevision(dir)
+      writeFileSync(join(dir, 'main.ts'), 'console.log("updated")')
+      const after = getWorkingTreeRevision(dir)
+      expect(after).not.toBe(before)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('reports path types, nearest fallback paths, and reads working tree files', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(getPathType(dir, '')).toBe('none')
+      expect(getPathType(dir, 'docs')).toBe('dir')
+      expect(getPathType(dir, 'README.md')).toBe('file')
+      expect(getPathType(dir, 'missing/file.md')).toBe('missing')
+      expect(nearestExistingRepoPath(dir, 'docs/missing/file.md')).toBe('docs')
+      expect(nearestExistingRepoPath(dir, 'README.md')).toBe('README.md')
+      expect(readWorkingTreeFile(dir, 'README.md')?.toString('utf-8')).toContain('# Test')
+      expect(readWorkingTreeFile(dir, 'docs')).toBeNull()
+      expect(readWorkingTreeFile(dir, 'missing.md')).toBeNull()
+    } finally {
+      cleanup()
+    }
   })
 })

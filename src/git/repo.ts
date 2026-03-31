@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { basename } from 'node:path'
+import { basename, dirname, relative, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import type { RepoInfo, Branch, Commit } from '../types.js'
 
 export function spawnGit(repoPath: string, ...args: string[]): string {
@@ -21,6 +23,14 @@ export function validateRepo(repoPath: string): boolean {
   }
 }
 
+export function getCurrentBranch(repoPath: string): string {
+  try {
+    return spawnGit(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD')
+  } catch {
+    return ''
+  }
+}
+
 export function getInfo(repoPath: string): RepoInfo {
   if (!repoPath) {
     return { name: '', path: '', currentBranch: '', isGitRepo: false, pickerMode: true }
@@ -30,12 +40,7 @@ export function getInfo(repoPath: string): RepoInfo {
     return { name: basename(repoPath), path: repoPath, currentBranch: '', isGitRepo: false, pickerMode: false }
   }
   let currentBranch = ''
-  try {
-    currentBranch = spawnGit(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD')
-    /* v8 ignore next 3 */
-  } catch {
-    currentBranch = ''
-  }
+  currentBranch = getCurrentBranch(repoPath)
   return { name: basename(repoPath), path: repoPath, currentBranch, isGitRepo: true, pickerMode: false }
 }
 
@@ -103,6 +108,81 @@ export function findReadme(repoPath: string, branch: string = 'HEAD'): string {
   const files = output.split('\n').filter(Boolean)
   const readme = files.find((f) => /^readme(\.\w+)?$/i.test(f))
   return readme ?? ''
+}
+
+export function isWorkingTreeBranch(repoPath: string, branch: string): boolean {
+  if (!branch || branch === 'HEAD') return true
+  return branch === getCurrentBranch(repoPath)
+}
+
+export function resolveRepoPath(repoPath: string, filePath: string): string {
+  return resolve(repoPath, filePath)
+}
+
+export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
+  if (!filePath) return 'none'
+  const fullPath = resolveRepoPath(repoPath, filePath)
+  if (!existsSync(fullPath)) return 'missing'
+  const stats = statSync(fullPath)
+  return stats.isDirectory() ? 'dir' : 'file'
+}
+
+export function nearestExistingRepoPath(repoPath: string, filePath: string): string {
+  if (!filePath) return ''
+
+  let current = resolveRepoPath(repoPath, filePath)
+  while (current.startsWith(resolve(repoPath))) {
+    if (existsSync(current)) {
+      const rel = relative(repoPath, current)
+      return rel === '' ? '' : rel.split('\\').join('/')
+    }
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+
+  return ''
+}
+
+function walkWorkingTree(repoPath: string, root = repoPath): string[] {
+  const entries = readdirSync(root, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    if (entry.name === '.git') continue
+    const fullPath = resolve(root, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...walkWorkingTree(repoPath, fullPath))
+      continue
+    }
+    const rel = relative(repoPath, fullPath)
+    if (rel) files.push(rel.split('\\').join('/'))
+  }
+
+  return files.sort()
+}
+
+export function getWorkingTreeRevision(repoPath: string): string {
+  const hash = createHash('sha1')
+  hash.update(getCurrentBranch(repoPath))
+
+  for (const relPath of walkWorkingTree(repoPath)) {
+    const fullPath = resolveRepoPath(repoPath, relPath)
+    const stats = statSync(fullPath)
+    hash.update(relPath)
+    hash.update(String(stats.size))
+    hash.update(String(stats.mtimeMs))
+  }
+
+  return hash.digest('hex')
+}
+
+export function readWorkingTreeFile(repoPath: string, filePath: string): Buffer | null {
+  const fullPath = resolveRepoPath(repoPath, filePath)
+  if (!existsSync(fullPath)) return null
+  const stats = statSync(fullPath)
+  if (stats.isDirectory()) return null
+  return readFileSync(fullPath)
 }
 
 export function detectFileType(filename: string): { type: 'markdown' | 'text' | 'image' | 'binary'; language: string } {

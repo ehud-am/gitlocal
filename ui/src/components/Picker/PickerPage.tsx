@@ -35,7 +35,7 @@ export default function PickerPage() {
   }
 
   useEffect(() => {
-    loadPath().catch(() => {})
+    void loadPath()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -148,6 +148,13 @@ export default function PickerPage() {
                       className="picker-entry-main"
                       aria-label={`${entry.name} ${entry.isGitRepo ? 'git repository' : 'folder'}`}
                       onClick={() => setPath(entry.path)}
+                      onDoubleClick={() => {
+                        if (entry.isGitRepo) {
+                          void handleOpenRepository(entry.path)
+                        } else {
+                          void loadPath(entry.path)
+                        }
+                      }}
                     >
                       <span className="picker-entry-copy">
                         <span className="picker-entry-name">{entry.name}</span>
@@ -164,9 +171,9 @@ export default function PickerPage() {
                       aria-label={`${entry.isGitRepo ? 'Open' : 'Browse'} ${entry.name}`}
                       onClick={() => {
                         if (entry.isGitRepo) {
-                          handleOpenRepository(entry.path).catch(() => {})
+                          void handleOpenRepository(entry.path)
                         } else {
-                          loadPath(entry.path).catch(() => {})
+                          void loadPath(entry.path)
                         }
                       }}
                     >

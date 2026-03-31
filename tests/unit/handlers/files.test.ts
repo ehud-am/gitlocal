@@ -24,6 +24,11 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
+  spawnSync('git', ['checkout', '-b', 'feature-files'], { cwd: dir })
+  writeFileSync(join(dir, 'feature.txt'), 'feature branch file')
+  spawnSync('git', ['add', '.'], { cwd: dir })
+  spawnSync('git', ['commit', '-m', 'feature'], { cwd: dir })
+  spawnSync('git', ['checkout', '-'], { cwd: dir })
 
   const branch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
     cwd: dir, encoding: 'utf-8',
@@ -76,6 +81,14 @@ describe('treeHandler', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(Array.isArray(body)).toBe(true)
+  })
+
+  it('reads a non-current branch tree through git data', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.tree.$get({ query: { path: '', branch: 'feature-files' } })
+    const body = await res.json()
+    expect(body.some((node: { name: string }) => node.name === 'feature.txt')).toBe(true)
   })
 })
 
@@ -207,9 +220,24 @@ describe('fileHandler', () => {
     expect(body.content.length).toBeGreaterThan(0)
   })
 
+  it('reads file content from a non-current branch through git cat-file', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'feature.txt', branch: 'feature-files' } })
+    const body = await res.json()
+    expect(body.content).toContain('feature branch file')
+  })
+
   it('uses HEAD branch and empty path when params are absent', async () => {
     const app = createApp(dir)
     const res = await app.fetch(new Request('http://localhost/api/file'))
     expect(res.status).toBe(400)
+  })
+
+  it('returns 404 for a missing file in a non-current branch', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'missing.txt', branch: 'feature-files' } })
+    expect(res.status).toBe(404)
   })
 })

@@ -1,37 +1,56 @@
-import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import FileTree from './components/FileTree/FileTree'
 import Breadcrumb from './components/Breadcrumb/Breadcrumb'
 import ContentPanel from './components/ContentPanel/ContentPanel'
 import GitInfo from './components/GitInfo/GitInfo'
 import PickerPage from './components/Picker/PickerPage'
+import SearchPanel from './components/Search/SearchPanel'
+import type { SearchMode, SearchResult } from './types'
+import { readViewerState, writeViewerState } from './services/viewerState'
 
 export default function App() {
-  const [selectedFile, setSelectedFile] = useState('')
-  const [currentBranch, setCurrentBranch] = useState('')
+  const initialViewerState = readViewerState()
+  const [selectedFile, setSelectedFile] = useState(initialViewerState.path)
+  const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
+  const [showRaw, setShowRaw] = useState(initialViewerState.raw)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialViewerState.searchMode)
+  const [searchQuery, setSearchQuery] = useState(initialViewerState.searchQuery)
+  const [caseSensitive, setCaseSensitive] = useState(initialViewerState.caseSensitive)
   const [readmeMissing, setReadmeMissing] = useState(false)
   const [pickerLoading, setPickerLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  const queryClient = useQueryClient()
+  const lastRevisionRef = useRef('')
 
   const { data: info, isLoading } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
 
+  const { data: syncStatus } = useQuery({
+    queryKey: ['sync', selectedFile, currentBranch],
+    queryFn: () => api.getSyncStatus(selectedFile, currentBranch),
+    enabled: !!info?.isGitRepo,
+    refetchInterval: 3000,
+  })
+
   // Initialize branch from info
-  React.useEffect(() => {
+  useEffect(() => {
     if (info?.currentBranch && !currentBranch) {
       setCurrentBranch(info.currentBranch)
     }
   }, [info, currentBranch])
 
   // Auto-select README on first load (viewer mode only)
-  React.useEffect(() => {
+  useEffect(() => {
     if (!info || info.pickerMode || selectedFile) return
     api.getReadme()
       .then(({ path }) => {
         if (path) {
-          setSelectedFile(path)
+          handleSelectFile(path)
         } else {
           setReadmeMissing(true)
         }
@@ -40,6 +59,55 @@ export default function App() {
         setReadmeMissing(true)
       })
   }, [info]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    writeViewerState({
+      branch: currentBranch,
+      path: selectedFile,
+      raw: showRaw,
+      sidebarCollapsed,
+      searchMode,
+      searchQuery,
+      caseSensitive,
+    })
+  }, [currentBranch, selectedFile, showRaw, sidebarCollapsed, searchMode, searchQuery, caseSensitive])
+
+  useEffect(() => {
+    if (!syncStatus) return
+
+    if (lastRevisionRef.current && lastRevisionRef.current !== syncStatus.workingTreeRevision) {
+      queryClient.invalidateQueries({ queryKey: ['tree'] }).catch(() => {})
+      queryClient.invalidateQueries({ queryKey: ['file'] }).catch(() => {})
+    }
+    lastRevisionRef.current = syncStatus.workingTreeRevision
+
+    if (syncStatus.currentPath && syncStatus.currentPathType === 'missing') {
+      setStatusMessage(syncStatus.statusMessage)
+      setSelectedFile(syncStatus.resolvedPath)
+      setShowRaw(false)
+      return
+    }
+
+    if (syncStatus.statusMessage) {
+      setStatusMessage(syncStatus.statusMessage)
+    }
+  }, [syncStatus, queryClient])
+
+  function handleSelectFile(path: string) {
+    setSelectedFile(path)
+    setShowRaw(false)
+  }
+
+  function handleSelectSearchResult(result: SearchResult) {
+    if (result.type === 'file') {
+      handleSelectFile(result.path)
+      setStatusMessage('')
+      return
+    }
+
+    setSelectedFile('')
+    setStatusMessage(`"${result.path}" is a folder. Use the navigation tree to browse inside it.`)
+  }
 
   if (isLoading) {
     return (
@@ -95,6 +163,13 @@ export default function App() {
           <button
             type="button"
             className="app-header-button"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            {sidebarCollapsed ? 'Show navigation' : 'Hide navigation'}
+          </button>
+          <button
+            type="button"
+            className="app-header-button"
             onClick={() => handleBrowseParentFolder().catch(() => {})}
             disabled={pickerLoading}
           >
@@ -103,33 +178,52 @@ export default function App() {
         </div>
       </header>
       <div className="app-body">
-        <aside className="sidebar">
-          <FileTree
-            branch={currentBranch}
-            selectedFile={selectedFile}
-            onFileSelect={setSelectedFile}
-          />
-          <GitInfo
-            branch={currentBranch}
-            onBranchChange={setCurrentBranch}
-          />
-        </aside>
+        {!sidebarCollapsed && (
+          <aside className="sidebar">
+            <FileTree
+              branch={currentBranch}
+              selectedFile={selectedFile}
+              onFileSelect={handleSelectFile}
+            />
+            <GitInfo
+              branch={currentBranch}
+              onBranchChange={setCurrentBranch}
+            />
+          </aside>
+        )}
         <div className="content-area">
+          {statusMessage && (
+            <div className="status-banner" role="status">
+              {statusMessage}
+            </div>
+          )}
+          <SearchPanel
+            branch={currentBranch}
+            mode={searchMode}
+            query={searchQuery}
+            caseSensitive={caseSensitive}
+            onModeChange={setSearchMode}
+            onQueryChange={setSearchQuery}
+            onCaseSensitiveChange={setCaseSensitive}
+            onSelectResult={handleSelectSearchResult}
+          />
           <Breadcrumb
             path={selectedFile}
             onNavigate={(path) => {
               if (path === '') {
-                setSelectedFile('')
+                handleSelectFile('')
               } else {
-                setSelectedFile(path)
+                handleSelectFile(path)
               }
             }}
           />
           <ContentPanel
             filePath={selectedFile}
             branch={currentBranch}
-            onNavigate={setSelectedFile}
+            onNavigate={handleSelectFile}
             placeholder={noReadmePlaceholder}
+            raw={showRaw}
+            onRawChange={setShowRaw}
           />
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { TreeNode } from '../../types'
@@ -64,6 +64,42 @@ export default function FileTree({ branch, selectedFile, onFileSelect }: Props) 
       })
     }
   }, [nodeStates, branch])
+
+  useEffect(() => {
+    if (!selectedFile) return
+    const directories = selectedFile
+      .split('/')
+      .filter(Boolean)
+      .slice(0, -1)
+      .map((_, index, parts) => parts.slice(0, index + 1).join('/'))
+
+    void directories.reduce<Promise<void>>(async (previous, dirPath) => {
+      await previous
+      const current = nodeStates.get(dirPath)
+      if (current?.expanded || current?.children) return
+
+      setNodeStates((prev) => {
+        const next = new Map(prev)
+        next.set(dirPath, { expanded: true, loading: true, error: false })
+        return next
+      })
+
+      try {
+        const children = await api.getTree(dirPath, branch)
+        setNodeStates((prev) => {
+          const next = new Map(prev)
+          next.set(dirPath, { expanded: true, loading: false, error: false, children })
+          return next
+        })
+      } catch {
+        setNodeStates((prev) => {
+          const next = new Map(prev)
+          next.set(dirPath, { expanded: false, loading: false, error: true })
+          return next
+        })
+      }
+    }, Promise.resolve())
+  }, [selectedFile, branch, nodeStates])
 
   const renderNodes = (nodes: TreeNode[], depth: number): React.ReactNode => (
     <>

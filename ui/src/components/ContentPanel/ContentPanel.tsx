@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
+import CopyButton from './CopyButton'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
@@ -10,10 +11,12 @@ interface Props {
   branch: string
   onNavigate: (path: string) => void
   placeholder?: string
+  raw?: boolean
+  onRawChange?: (value: boolean) => void
 }
 
-export default function ContentPanel({ filePath, branch, onNavigate, placeholder }: Props) {
-  const [showRaw, setShowRaw] = useState(false)
+export default function ContentPanel({ filePath, branch, onNavigate, placeholder, raw = false, onRawChange }: Props) {
+  const [showRaw, setShowRaw] = useState(raw)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', filePath, branch, showRaw],
@@ -23,8 +26,8 @@ export default function ContentPanel({ filePath, branch, onNavigate, placeholder
 
   // Reset raw view when file changes
   React.useEffect(() => {
-    setShowRaw(false)
-  }, [filePath])
+    setShowRaw(raw)
+  }, [filePath, raw])
 
   if (!filePath) {
     return (
@@ -59,11 +62,22 @@ export default function ContentPanel({ filePath, branch, onNavigate, placeholder
         <div className="content-toolbar">
           <button
             className="btn-raw"
-            onClick={() => setShowRaw(r => !r)}
+            onClick={() => {
+              const next = !showRaw
+              setShowRaw(next)
+              onRawChange?.(next)
+            }}
             aria-pressed={showRaw}
           >
             {showRaw ? 'View Rendered' : 'View Raw'}
           </button>
+          {showRaw && (
+            <CopyButton
+              getText={() => data.content}
+              className="copy-button raw-copy-button"
+              label="Copy file"
+            />
+          )}
         </div>
       )}
 

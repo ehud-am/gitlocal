@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 import { infoHandler, branchesHandler, commitsHandler, readmeHandler } from './handlers/git.js'
 import { treeHandler, fileHandler } from './handlers/files.js'
 import { pickBrowseHandler, pickHandler, pickParentHandler } from './handlers/pick.js'
+import { searchHandler } from './handlers/search.js'
+import { syncHandler } from './handlers/sync.js'
 import { validateRepo } from './git/repo.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
@@ -65,6 +67,8 @@ export function createApp(initialRepoPath: string): Hono<{ Variables: AppVariabl
   app.get('/api/readme', readmeHandler)
   app.get('/api/tree', treeHandler)
   app.get('/api/file', fileHandler)
+  app.get('/api/search', searchHandler)
+  app.get('/api/sync', syncHandler)
   app.get('/api/pick/browse', pickBrowseHandler)
   app.post('/api/pick', pickHandler)
   app.post('/api/pick/parent', pickParentHandler)

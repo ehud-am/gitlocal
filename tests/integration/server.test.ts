@@ -109,6 +109,32 @@ describe('Server integration', () => {
     const body = await res.json() as { ok: boolean }
     expect(body.ok).toBe(true)
   })
+
+  it('GET /api/sync returns sync metadata for the current file path', async () => {
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/sync?path=README.md'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { currentPath: string; workingTreeRevision: string }
+    expect(body.currentPath).toBe('README.md')
+    expect(body.workingTreeRevision).toBeTruthy()
+  })
+
+  it('GET /api/sync respects an explicitly requested branch', async () => {
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/sync?branch=main'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { branch: string }
+    expect(body.branch).toBe('main')
+  })
+
+  it('GET /api/sync handles missing repositories safely', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/sync'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { repoPath: string; fileStatus: string }
+    expect(body.repoPath).toBe('')
+    expect(body.fileStatus).toBe('unavailable')
+  })
 })
 
 describe('getRepoPath / setRepoPath', () => {

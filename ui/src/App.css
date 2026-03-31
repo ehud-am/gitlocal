@@ -118,6 +118,14 @@ body {
   min-width: 0;
 }
 
+.status-banner {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: #fff8c5;
+  color: #7d4e00;
+  font-size: 13px;
+}
+
 /* ── Breadcrumb ── */
 .breadcrumb {
   padding: 8px 16px;
@@ -587,13 +595,16 @@ body {
 
 .content-toolbar {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   margin-bottom: 12px;
 }
 
-.btn-raw {
+.btn-raw,
+.copy-button,
+.search-submit {
   font-size: 12px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-bg);
@@ -601,7 +612,14 @@ body {
   color: var(--color-text);
 }
 
-.btn-raw:hover { background: var(--color-hover); }
+.btn-raw:hover,
+.copy-button:hover,
+.search-submit:hover { background: var(--color-hover); }
+
+.raw-copy-button,
+.code-copy-button {
+  white-space: nowrap;
+}
 
 .binary-placeholder {
   color: var(--color-text-muted);
@@ -659,6 +677,17 @@ body {
   margin: 0 0 16px;
 }
 
+.markdown-code-block {
+  position: relative;
+}
+
+.markdown-code-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
 .markdown-body pre code {
   background: transparent;
   border: none;
@@ -707,6 +736,82 @@ body {
   overflow-x: auto;
   white-space: pre;
   line-height: 1.5;
+}
+
+.search-panel {
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.search-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.search-checkbox {
+  margin-left: auto;
+}
+
+.search-results {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  margin: 0;
+}
+
+.search-result-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.search-result-button:hover {
+  background: var(--color-hover);
+}
+
+.search-result-path {
+  font-weight: 600;
+}
+
+.search-result-meta,
+.search-result-snippet,
+.search-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 /* ── Error screen ── */

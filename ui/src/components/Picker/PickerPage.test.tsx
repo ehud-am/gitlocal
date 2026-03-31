@@ -71,6 +71,16 @@ describe('PickerPage', () => {
     })
   })
 
+  it('double-clicking a normal folder browses into it', async () => {
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^projects folder$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledWith('/Users/example/projects')
+    })
+  })
+
   it('opening a git repository uses the explicit open button', async () => {
     vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
 
@@ -82,6 +92,42 @@ describe('PickerPage', () => {
       expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/gitlocal')
     })
     expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledTimes(1)
+  })
+
+  it('double-clicking a repository opens it directly', async () => {
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^gitlocal git repository$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/gitlocal')
+    })
+  })
+
+  it('shows an inline error when double-click repository open returns ok:false', async () => {
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: false, error: 'cannot open repo' })
+
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^gitlocal git repository$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('cannot open repo')
+    })
+  })
+
+  it('shows a connection error when double-click repository open throws', async () => {
+    vi.mocked(api.submitPick).mockRejectedValue(new Error('boom'))
+
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^gitlocal git repository$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/failed to connect to gitlocal server/i)
+    })
   })
 
   it('uses quick-access navigation buttons', async () => {

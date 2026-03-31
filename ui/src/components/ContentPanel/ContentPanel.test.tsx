@@ -168,6 +168,39 @@ describe('ContentPanel', () => {
     expect(screen.queryByTestId('markdown-renderer')).not.toBeInTheDocument()
   })
 
+  it('shows a raw copy action and copies the full file content', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'README.md',
+      type: 'markdown',
+      content: '# Hello',
+      language: '',
+      encoding: 'utf8',
+    })
+
+    renderWithClient(
+      <ContentPanel filePath="README.md" branch="main" onNavigate={vi.fn()} />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('View Raw')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('View Raw'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /copy file/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /copy file/i }))
+    expect(writeText).toHaveBeenCalledWith('# Hello')
+  })
+
   it('shows custom placeholder when filePath empty and placeholder prop provided', () => {
     renderWithClient(
       <ContentPanel filePath="" branch="main" onNavigate={vi.fn()} placeholder="No README found in this repository." />

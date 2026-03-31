@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { spawnSync } from 'node:child_process'
-import { spawnGit, detectFileType } from '../git/repo.js'
-import { listDir } from '../git/tree.js'
+import { detectFileType, getCurrentBranch, isWorkingTreeBranch, readWorkingTreeFile } from '../git/repo.js'
+import { listDir, listWorkingTreeDir } from '../git/tree.js'
 
 type Variables = { repoPath: string }
 
@@ -10,7 +10,7 @@ export async function treeHandler(c: Context<{ Variables: Variables }>): Promise
   if (!repoPath) return c.json([])
   const path = c.req.query('path') ?? ''
   const branch = c.req.query('branch') ?? 'HEAD'
-  const nodes = listDir(repoPath, branch, path)
+  const nodes = isWorkingTreeBranch(repoPath, branch) ? listWorkingTreeDir(repoPath, path) : listDir(repoPath, branch, path)
   return c.json(nodes)
 }
 
@@ -29,14 +29,22 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json({ path, content: '', encoding: 'none', type: 'binary', language: '' })
   }
 
-  const result = spawnSync('git', ['cat-file', 'blob', `${branch}:${path}`], {
-    cwd: repoPath,
-    encoding: 'buffer',
-  })
-  if (result.status !== 0) {
+  const rawBytes = isWorkingTreeBranch(repoPath, branch)
+    ? readWorkingTreeFile(repoPath, path)
+    : (() => {
+        const result = spawnSync('git', ['cat-file', 'blob', `${branch}:${path}`], {
+          cwd: repoPath,
+          encoding: 'buffer',
+        })
+        if (result.status !== 0) {
+          return null
+        }
+        return result.stdout as Buffer
+      })()
+
+  if (!rawBytes) {
     return c.json({ error: 'File not found' }, 404)
   }
-  const rawBytes: Buffer = result.stdout
 
   if (type === 'image') {
     return c.json({

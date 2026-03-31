@@ -4,6 +4,9 @@ import type {
   FileContent,
   PickBrowseResponse,
   RepoInfo,
+  SearchMode,
+  SearchResponse,
+  SyncStatus,
   TreeNode,
 } from '../types'
 
@@ -50,6 +53,25 @@ export const api = {
   },
 
   getReadme: (): Promise<{ path: string }> => request('/api/readme'),
+
+  getSearchResults: (
+    query: string,
+    mode: SearchMode,
+    branch?: string,
+    caseSensitive?: boolean,
+  ): Promise<SearchResponse> => {
+    const params = new URLSearchParams({ query, mode })
+    if (branch) params.set('branch', branch)
+    if (caseSensitive) params.set('caseSensitive', 'true')
+    return request(`/api/search?${params.toString()}`)
+  },
+
+  getSyncStatus: (path: string, branch?: string): Promise<SyncStatus> => {
+    const params = new URLSearchParams()
+    if (path) params.set('path', path)
+    if (branch) params.set('branch', branch)
+    return request(`/api/sync?${params.toString()}`)
+  },
 
   getPickBrowse: (path?: string): Promise<PickBrowseResponse> => {
     const params = new URLSearchParams()
