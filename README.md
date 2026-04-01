@@ -30,6 +30,8 @@ Or run without installing:
 npx gitlocal
 ```
 
+If you run `gitlocal` with no explicit path from inside an existing git repository, GitLocal now opens that repository directly instead of sending you to the folder picker first.
+
 ### From source
 
 ```bash
@@ -73,11 +75,17 @@ Press **Ctrl+C** to stop the server.
 
 ### Open with a folder picker
 
-Run `gitlocal` with no arguments to open a browser-based folder picker:
+Run `gitlocal` with no arguments to open a browser-based folder picker when your current working directory is not already a git repository:
 
 ```bash
 gitlocal
 ```
+
+If your current shell is already inside a git repository, `gitlocal` opens that repository immediately.
+
+If the browser URL still contains a saved branch from a previously opened repository, GitLocal now automatically falls back to a valid branch in the newly opened repo instead of failing to load.
+
+If the browser URL still contains a saved file or folder path from a previously opened repository, GitLocal now clears that stale location and falls back to the new repository's README or default landing state instead of opening the same relative path in the new repo.
 
 Select a folder in the picker, then:
 
@@ -95,6 +103,7 @@ You can still paste a path manually in the selected-folder field when needed.
 - **See git status** — current branch, recent commits, and a branch switcher (read-only)
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
+- **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; otherwise GitLocal starts in the folder picker
 - **Clear folder actions** — non-git folders can be browsed deeper, while detected git repositories can be opened directly
 - **No internet required** — everything runs locally; no accounts, no telemetry, no registration
 

@@ -9,6 +9,13 @@ Defines the search behaviors, result expectations, and matching controls for rep
 - **Name search** returns matching folder names and file names within the open repository.
 - **Content search** returns files whose contents match the current query, along with enough surrounding context to explain each match.
 
+## Presentation Contract
+
+- When search is idle, the top area of the repository viewer shows an icon-only search trigger instead of the full expanded search panel.
+- Activating the trigger expands the full repository search UI in place.
+- Pressing `Command+F` on macOS or `Control+F` on Windows and Linux while the repository viewer is active opens the same expanded search UI and focuses the query input.
+- Once a query or result set is active, the expanded search UI remains open until the user dismisses it or intentionally returns it to an idle empty state.
+
 ## Matching Controls
 
 - The interface exposes the active search mode clearly.
@@ -33,3 +40,4 @@ Defines the search behaviors, result expectations, and matching controls for rep
 
 - This contract does not require regular-expression search in the first iteration.
 - This contract does not require cross-repository search.
+- This contract does not require browser-native page find to remain the primary search mechanism while the repository viewer is active.

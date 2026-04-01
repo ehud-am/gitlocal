@@ -38,8 +38,8 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 
 ## Recent Changes
 - 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
+- 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
 - 003-viewer-usability-search: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
-- 002-release-quality-automation: Added a branded cross-platform repository picker, PR verification and release publish GitHub Actions, `npm run verify`, Vite 7 UI build updates, and prerelease-safe npm publication rules
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

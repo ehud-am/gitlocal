@@ -9,6 +9,7 @@ import { syncHandler } from './handlers/sync.js'
 import { validateRepo } from './git/repo.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
+type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean }
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
@@ -30,10 +31,17 @@ export function getPickerPath(): string {
   return currentPickerPath
 }
 
-function initializePaths(initialPath: string): void {
+function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   if (!initialPath) {
+    const cwd = process.cwd()
+    if (options.detectCurrentRepoOnEmptyPath && validateRepo(cwd)) {
+      currentRepoPath = cwd
+      currentPickerPath = ''
+      return
+    }
+
     currentRepoPath = ''
-    currentPickerPath = process.cwd()
+    currentPickerPath = cwd
     return
   }
 
@@ -48,8 +56,8 @@ function initializePaths(initialPath: string): void {
   currentPickerPath = resolvedPath
 }
 
-export function createApp(initialRepoPath: string): Hono<{ Variables: AppVariables }> {
-  initializePaths(initialRepoPath)
+export function createApp(initialRepoPath: string, options: CreateAppOptions = {}): Hono<{ Variables: AppVariables }> {
+  initializePaths(initialRepoPath, options)
 
   const app = new Hono<{ Variables: AppVariables }>()
 

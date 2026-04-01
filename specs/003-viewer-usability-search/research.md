@@ -32,7 +32,31 @@
   - One combined search box with blended results. Rejected because it would be harder to scan and explain, especially for non-developer users.
   - Name search only. Rejected because the feature explicitly requires searching file contents.
 
-## Decision 5: Surface copy actions as contextual controls embedded in content containers
+## Decision 5: Redesign top-of-viewer search as a compact trigger that expands on demand
+
+- **Decision**: Replace the always-visible top-of-viewer search footprint with an icon-only trigger in the idle state, and expand the full search UI only when the user activates that trigger or uses the platform shortcut.
+- **Rationale**: Search is important but not continuously active, so keeping the full panel visible wastes vertical space and makes the top of the viewer feel heavy. An icon-first trigger keeps the interface calmer while preserving a fast path into search when the user needs it.
+- **Alternatives considered**:
+  - Keep the full search panel always visible but slimmer. Rejected because it still spends permanent space on an occasionally used action.
+  - Move search into a modal or detached overlay. Rejected because that would make repository search feel more separate from the page context than necessary.
+
+## Decision 6: Support in-app repository search through Command+F and Control+F
+
+- **Decision**: Intercept `Command+F` on macOS and `Control+F` on Windows and Linux while the repository viewer is active so the shortcut opens the expanded repository search UI and focuses the search input.
+- **Rationale**: Users already reach for the browser find shortcut instinctively. Mapping that action to repository search reduces confusion and makes the compact trigger practical even when no text field is always visible.
+- **Alternatives considered**:
+  - Leave the browser-native find shortcut untouched. Rejected because it would search the current rendered page instead of the repository and would conflict with the new compact search model.
+  - Add a custom shortcut that differs from the browser convention. Rejected because it would be harder to discover and remember.
+
+## Decision 7: Keep expanded search open while it has active intent
+
+- **Decision**: Keep the expanded search surface open while a query or result set is active, and allow it to collapse when the user intentionally dismisses it or returns it to an idle empty state.
+- **Rationale**: A compact trigger solves the wasted-space problem, but auto-collapsing too aggressively would make search feel unstable. Keeping the expanded panel open while the user is actively searching preserves orientation and avoids forcing repeated re-expansion.
+- **Alternatives considered**:
+  - Collapse immediately after result selection. Rejected because users often need to refine or revisit their search after opening one result.
+  - Keep search pinned open forever once opened. Rejected because it would reintroduce the persistent-space problem the redesign is trying to fix.
+
+## Decision 8: Surface copy actions as contextual controls embedded in content containers
 
 - **Decision**: Add small, consistently placed copy controls directly inside markdown code blocks and the raw file toolbar instead of using a global copy command.
 - **Rationale**: Users should not need to infer which content region will be copied. Contextual controls make the target obvious and allow accurate success and failure feedback for each copied unit.
@@ -46,3 +70,5 @@
 - Repository sync metadata should include enough information to tell whether the current file, folder tree, or parent path is still valid before the UI chooses to refetch or fall back.
 - Double-click handling in the picker should coexist with the current single-click selection model so keyboard and pointer interactions remain predictable.
 - Search result rendering should emphasize direct navigation and clear empty states rather than advanced filtering in the first iteration.
+- The compact search trigger should remain visible in the top viewer chrome even when the expanded search panel is closed so users always retain a lightweight entry point.
+- Shortcut interception should be scoped to the active repository viewer experience so it does not unexpectedly override unrelated browser behavior outside that context.

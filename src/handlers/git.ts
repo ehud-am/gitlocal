@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { getInfo, getBranches, getCommits, findReadme } from '../git/repo.js'
+import { getAppVersion, getInfo, getBranches, getCommits, findReadme } from '../git/repo.js'
 
 type Variables = { repoPath: string; pickerPath: string }
 
@@ -13,6 +13,7 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
       currentBranch: '',
       isGitRepo: false,
       pickerMode: true,
+      version: getAppVersion(),
     })
   }
   const info = getInfo(repoPath)

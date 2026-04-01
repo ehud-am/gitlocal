@@ -70,13 +70,17 @@ node --experimental-strip-types src/cli.ts /path/to/parent-folder
 
 ## 6. Validate Repository Search
 
-1. Open the repository search UI.
-2. Run a name search for a known folder or file and confirm the result navigates to that location.
-3. Switch to content search and search for a known string inside a file.
-4. Confirm content results include enough context to identify the match.
-5. Toggle case sensitivity and repeat a search whose result set should change.
-6. Confirm the results update to match the selected case mode.
-7. Search for a string with no matches and confirm the empty state is clear without leaving the current repository context.
+1. Confirm the top area of the repository viewer shows a compact icon-only search trigger when search is idle.
+2. Activate the trigger and confirm the expanded repository search UI opens in place.
+3. Close or clear search back to idle, then press `Command+F` on macOS or `Control+F` on Windows or Linux.
+4. Confirm the expanded search UI opens again and the query input is focused immediately.
+5. Run a name search for a known folder or file and confirm the result navigates to that location.
+6. Switch to content search and search for a known string inside a file.
+7. Confirm content results include enough context to identify the match.
+8. Toggle case sensitivity and repeat a search whose result set should change.
+9. Confirm the results update to match the selected case mode.
+10. Search for a string with no matches and confirm the empty state is clear without leaving the current repository context.
+11. While a query or result set is still active, confirm the expanded search UI stays open until you dismiss it or intentionally return it to an idle state.
 
 ## 7. Run Automated Verification
 
@@ -95,4 +99,4 @@ npm run build
 
 ## Expected Outcome
 
-GitLocal should let users copy visible code or raw content directly, navigate more naturally in picker mode, retain repository context across refresh, react to local filesystem changes without manual reloads, collapse and restore navigation safely, and search by both path names and file contents with explicit case-matching controls.
+GitLocal should let users copy visible code or raw content directly, navigate more naturally in picker mode, retain repository context across refresh, react to local filesystem changes without manual reloads, collapse and restore navigation safely, and search by both path names and file contents with explicit case-matching controls through a compact top-of-viewer trigger that expands on demand and responds to `Command+F` or `Control+F`.

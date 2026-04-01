@@ -8,38 +8,38 @@ describe('viewerState', () => {
 
   it('reads empty defaults from the URL', () => {
     expect(readViewerState()).toEqual({
+      repoPath: '',
       branch: '',
       path: '',
       pathType: 'none',
       raw: false,
       sidebarCollapsed: false,
-      searchMode: 'name',
+      searchPresentation: 'collapsed',
       searchQuery: '',
-      caseSensitive: false,
     })
   })
 
   it('writes and reads viewer state from query params', () => {
     writeViewerState({
+      repoPath: '/tmp/repo',
       branch: 'main',
       path: 'src/index.ts',
       pathType: 'file',
       raw: true,
       sidebarCollapsed: true,
-      searchMode: 'content',
+      searchPresentation: 'expanded',
       searchQuery: 'hello',
-      caseSensitive: true,
     })
 
     expect(readViewerState()).toEqual({
+      repoPath: '/tmp/repo',
       branch: 'main',
       path: 'src/index.ts',
       pathType: 'file',
       raw: true,
       sidebarCollapsed: true,
-      searchMode: 'content',
+      searchPresentation: 'expanded',
       searchQuery: 'hello',
-      caseSensitive: true,
     })
   })
 
@@ -59,16 +59,21 @@ describe('viewerState', () => {
   })
 
   it('persists directory selections', () => {
-    writeViewerState({ branch: 'main', path: 'docs', pathType: 'dir' })
+    writeViewerState({ repoPath: '/tmp/repo', branch: 'main', path: 'docs', pathType: 'dir' })
     expect(readViewerState()).toEqual({
+      repoPath: '/tmp/repo',
       branch: 'main',
       path: 'docs',
       pathType: 'dir',
       raw: false,
       sidebarCollapsed: false,
-      searchMode: 'name',
+      searchPresentation: 'collapsed',
       searchQuery: '',
-      caseSensitive: false,
     })
+  })
+
+  it('persists expanded search presentation separately from query text', () => {
+    writeViewerState({ searchPresentation: 'expanded' })
+    expect(readViewerState().searchPresentation).toBe('expanded')
   })
 })

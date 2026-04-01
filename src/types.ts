@@ -4,6 +4,7 @@ export interface RepoInfo {
   currentBranch: string
   isGitRepo: boolean
   pickerMode: boolean
+  version: string
 }
 
 export interface ViewerState {

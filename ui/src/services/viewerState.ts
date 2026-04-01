@@ -1,14 +1,14 @@
-import type { SearchMode, ViewerState } from '../types'
+import type { SearchPresentation, ViewerState } from '../types'
 
 const DEFAULTS: ViewerState = {
+  repoPath: '',
   branch: '',
   path: '',
   pathType: 'none',
   raw: false,
   sidebarCollapsed: false,
-  searchMode: 'name',
+  searchPresentation: 'collapsed',
   searchQuery: '',
-  caseSensitive: false,
 }
 
 function parseBoolean(value: string | null, fallback: boolean): boolean {
@@ -28,10 +28,11 @@ function writeParams(params: URLSearchParams): void {
 
 export function readViewerState(): ViewerState {
   const params = getParams()
-  const mode = params.get('searchMode')
-  const searchMode: SearchMode = mode === 'content' ? 'content' : 'name'
+  const presentation = params.get('searchPresentation')
+  const searchPresentation: SearchPresentation = presentation === 'expanded' ? 'expanded' : 'collapsed'
 
   return {
+    repoPath: params.get('repoPath') ?? DEFAULTS.repoPath,
     branch: params.get('branch') ?? DEFAULTS.branch,
     path: params.get('path') ?? DEFAULTS.path,
     pathType:
@@ -42,9 +43,8 @@ export function readViewerState(): ViewerState {
           : DEFAULTS.pathType,
     raw: parseBoolean(params.get('raw'), DEFAULTS.raw),
     sidebarCollapsed: parseBoolean(params.get('sidebarCollapsed'), DEFAULTS.sidebarCollapsed),
-    searchMode,
+    searchPresentation,
     searchQuery: params.get('searchQuery') ?? DEFAULTS.searchQuery,
-    caseSensitive: parseBoolean(params.get('caseSensitive'), DEFAULTS.caseSensitive),
   }
 }
 
@@ -52,14 +52,14 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
   const next = { ...readViewerState(), ...partial }
   const params = new URLSearchParams()
 
+  if (next.repoPath) params.set('repoPath', next.repoPath)
   if (next.branch) params.set('branch', next.branch)
   if (next.path) params.set('path', next.path)
   if (next.pathType !== DEFAULTS.pathType) params.set('pathType', next.pathType)
   if (next.raw) params.set('raw', 'true')
   if (next.sidebarCollapsed) params.set('sidebarCollapsed', 'true')
-  if (next.searchMode !== DEFAULTS.searchMode) params.set('searchMode', next.searchMode)
+  if (next.searchPresentation !== DEFAULTS.searchPresentation) params.set('searchPresentation', next.searchPresentation)
   if (next.searchQuery) params.set('searchQuery', next.searchQuery)
-  if (next.caseSensitive) params.set('caseSensitive', 'true')
 
   writeParams(params)
   return next

@@ -7,7 +7,7 @@
 
 ## Summary
 
-Improve GitLocal's core repository-browsing workflow by adding one-click copy actions for rendered code blocks and raw files, enabling double-click activation in folder selection, preserving repository context across browser refreshes, auto-refreshing tree and file views when the local filesystem changes, allowing the sidebar to collapse and restore, and introducing explicit repository search modes for names and file contents with case-matching controls. The implementation will extend the existing Hono API and React SPA without adding a remote dependency, using URL-backed viewer state, local repository change detection, and focused UI contracts for search and recovery behavior.
+Improve GitLocal's core repository-browsing workflow by adding one-click copy actions for rendered code blocks and raw files, enabling double-click activation in folder selection, preserving repository context across browser refreshes, auto-refreshing tree and file views when the local filesystem changes, allowing the sidebar to collapse and restore, and introducing fast in-viewer repository finding. The search experience now centers on a compact icon trigger that opens a narrower floating quick finder with live file-name matches after the user types at least 3 characters, while `Command+F` or `Control+F` still routes into the in-app experience instead of browser-native find. The latest refinement also makes the left-panel collapse and restore interaction consistent between the repository viewer and the folder-selection page, shifts the quick finder into a true overlay that no longer pushes content downward, adds a fixed footer that exposes the product link and running version across the app, fixes startup detection so launching with no explicit path from inside a repo opens that repo directly, and hardens viewer hydration so stale branch or file-path state from a previously opened repository cannot leak into a newly opened repository. The implementation will extend the existing Hono API and React SPA without adding a remote dependency, using URL-backed viewer state, local repository change detection, and focused UI contracts for search, layout, startup detection, and recovery behavior.
 
 ## Technical Context
 
@@ -17,8 +17,8 @@ Improve GitLocal's core repository-browsing workflow by adding one-click copy ac
 **Testing**: Vitest for backend and frontend, React Testing Library for UI behavior, repository integration tests for server endpoints and context recovery flows  
 **Target Platform**: Local desktop browser sessions on macOS, Windows, and Linux, served by the Node.js CLI process  
 **Project Type**: Local-first CLI application with a Node.js-served React single-page app  
-**Performance Goals**: Copy actions should feel immediate, refresh should restore the previous view in one navigation cycle, filesystem-driven UI refresh should surface visible changes within a few seconds, and repository search should return useful initial results quickly enough for interactive use on normal local repositories  
-**Constraints**: Fully local runtime only, preserve the existing GitLocal visual language, maintain at least 90% per-file coverage, avoid introducing platform-specific file picker behavior, keep repository browsing understandable for non-developers, use repository-relative paths in committed docs, and degrade gracefully when files or folders disappear during use  
+**Performance Goals**: Copy actions should feel immediate, refresh should restore the previous view in one navigation cycle, filesystem-driven UI refresh should surface visible changes within a few seconds, the quick finder should start returning useful live file-name matches as soon as the query reaches 3 characters, the compact search trigger should expand with focused input quickly enough to feel like a direct command rather than a mode switch, collapsing the sidebar should reclaim horizontal reading space without making restore actions harder to locate, opening the quick finder should not cause visible content reflow, and launching from inside a repo with no explicit path should enter the viewer without a redundant picker detour  
+**Constraints**: Fully local runtime only, preserve the existing GitLocal visual language, maintain at least 90% per-file coverage, avoid introducing platform-specific file picker behavior, keep repository browsing understandable for non-developers, use repository-relative paths in committed docs, degrade gracefully when files or folders disappear during use, intercept `Command+F` or `Control+F` only while the repository viewer is active and able to present in-app search, keep sidebar controls visually anchored to the panel area instead of placing them as detached page-level buttons, keep the quick finder narrower and simpler than the previous full-width multi-mode search panel, ensure fixed-footer treatment does not obscure critical content or controls, and treat file and folder selection as repository-scoped state that must be cleared when the user opens a different repository  
 **Scale/Scope**: Single open repository at a time, one active viewer context per browser tab, filesystem monitoring limited to the currently open repository, search scoped to the open repository, and focused API/UI changes within the existing server and SPA architecture
 
 ## Constitution Check
@@ -29,7 +29,7 @@ Improve GitLocal's core repository-browsing workflow by adding one-click copy ac
 - **Test Coverage**: Pass. The feature touches interactive UI and server handlers, so the plan includes matching backend and frontend tests to preserve the ≥90% per-file coverage bar.
 - **Fully Local**: Pass. Refresh persistence, monitoring, and search all operate on local repository data only; no remote services are introduced.
 - **Node.js-Served React UI**: Pass. The entire feature is delivered through the existing React SPA served by the Hono backend.
-- **Clean & Useful UI**: Pass. The design emphasizes discoverable copy actions, predictable search modes, graceful fallback states, and reduced navigation friction.
+- **Clean & Useful UI**: Pass. The design emphasizes discoverable copy actions, graceful fallback states, reduced navigation friction, a smaller top-of-viewer footprint when search is idle, panel-local icon controls for collapse and restore, and a narrower live quick finder that avoids heavyweight search controls.
 - **Free & Open Source**: Pass. No proprietary dependencies or gated services are required.
 - **Repository-Relative Paths**: Pass. This plan and the generated artifacts use repository-relative paths suitable for commit history and GitHub rendering.
 
@@ -99,13 +99,14 @@ ui/
 │       │   └── PickerPage.tsx
 │       ├── Search/
 │       │   ├── SearchPanel.tsx
-│       │   └── SearchResults.tsx
+│       │   ├── SearchResults.tsx
+│       │   └── SearchTrigger.tsx
 │       └── GitInfo/
 │           └── GitInfo.tsx
 └── package.json
 ```
 
-**Structure Decision**: Keep the existing single-repository Hono + React structure and add focused backend handlers/services plus a small set of UI components for copy controls, viewer state, and search. Filesystem synchronization logic belongs on the backend so the UI can stay declarative and poll lightweight sync state. URL state helpers live in the UI service layer so refresh recovery, sidebar collapse, selected branch, selected file, raw mode, and active search mode are all restored consistently.
+**Structure Decision**: Keep the existing single-repository Hono + React structure and add focused backend handlers/services plus a small set of UI components for copy controls, viewer state, search, and global layout chrome. Filesystem synchronization logic belongs on the backend so the UI can stay declarative and poll lightweight sync state. URL state helpers live in the UI service layer so refresh recovery, sidebar collapse, selected branch, selected file, raw mode, compact-versus-expanded search presentation, and repository identity can all be restored consistently. The search UI should separate a small top-level trigger from the narrower expanded quick-finder surface so the idle state stays compact without losing discoverability or shortcut-based access, while both the repository viewer and picker sidebar layouts should render a collapsed rail instead of removing the panel region entirely and a shared fixed footer should render from runtime app metadata.
 
 ## Complexity Tracking
 
