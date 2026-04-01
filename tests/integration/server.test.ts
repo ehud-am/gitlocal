@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -35,8 +36,9 @@ describe('Server integration', () => {
     const res = await app.fetch(new Request('http://localhost/api/info'))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toContain('application/json')
-    const body = await res.json() as { isGitRepo: boolean }
+    const body = await res.json() as { isGitRepo: boolean; version: string }
     expect(body.isGitRepo).toBe(true)
+    expect(body.version).toBe('0.4.2')
   })
 
   it('GET / returns 200 HTML (SPA index)', async () => {
@@ -74,10 +76,11 @@ describe('Server integration', () => {
       const app = createApp(nonGitDir)
       const res = await app.fetch(new Request('http://localhost/api/info'))
       expect(res.status).toBe(200)
-      const body = await res.json() as { pickerMode: boolean; path: string; isGitRepo: boolean }
+      const body = await res.json() as { pickerMode: boolean; path: string; isGitRepo: boolean; version: string }
       expect(body.pickerMode).toBe(true)
       expect(body.isGitRepo).toBe(false)
       expect(body.path).toBe(nonGitDir)
+      expect(body.version).toBe('0.4.2')
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }
@@ -134,6 +137,35 @@ describe('Server integration', () => {
     const body = await res.json() as { repoPath: string; fileStatus: string }
     expect(body.repoPath).toBe('')
     expect(body.fileStatus).toBe('unavailable')
+  })
+})
+
+describe('Server startup path detection', () => {
+  let originalCwd: string
+  let dir: string
+  let repoCleanup: () => void
+
+  beforeAll(() => {
+    originalCwd = process.cwd()
+    const repo = makeGitRepo()
+    dir = repo.dir
+    repoCleanup = repo.cleanup
+  })
+
+  afterAll(() => {
+    chdir(originalCwd)
+    repoCleanup?.()
+  })
+
+  it('opens the current working directory as a repo when launched without an explicit path', async () => {
+    chdir(dir)
+    const app = createApp('', { detectCurrentRepoOnEmptyPath: true })
+    const res = await app.fetch(new Request('http://localhost/api/info'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { pickerMode: boolean; isGitRepo: boolean; path: string }
+    expect(body.pickerMode).toBe(false)
+    expect(body.isGitRepo).toBe(true)
+    expect(realpathSync(body.path)).toBe(realpathSync(dir))
   })
 })
 

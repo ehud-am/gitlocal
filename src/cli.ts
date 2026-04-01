@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server'
+import { validateRepo } from './git/repo.js'
 import { createApp } from './server.js'
 
 function checkNodeVersion(): void {
@@ -25,13 +26,17 @@ async function main(): Promise<void> {
   checkNodeVersion()
 
   const repoPath = process.argv[2] ?? ''
-  const app = createApp(repoPath)
+  const launchPath = repoPath || process.cwd()
+  const openingCurrentRepo = !repoPath && validateRepo(launchPath)
+  const app = createApp(repoPath, { detectCurrentRepoOnEmptyPath: true })
 
   const server = serve({ fetch: app.fetch, port: 0 }, async (info) => {
     const url = `http://localhost:${info.port}`
     console.log(`gitlocal listening on ${url}`)
     if (repoPath) {
       console.log(`Serving: ${repoPath}`)
+    } else if (openingCurrentRepo) {
+      console.log(`Serving current repository: ${launchPath}`)
     } else {
       console.log('No repository specified — opening folder picker.')
     }

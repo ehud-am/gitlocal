@@ -40,42 +40,32 @@ describe('SearchPanel', () => {
     renderWithClient(
       <SearchPanel
         branch="main"
-        mode="name"
         query="readme"
-        caseSensitive={false}
-        onModeChange={vi.fn()}
         onQueryChange={onQueryChange}
-        onCaseSensitiveChange={vi.fn()}
         onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
       />,
     )
 
     await waitFor(() => {
-      expect(api.getSearchResults).toHaveBeenCalledWith('readme', 'name', 'main', false)
+      expect(api.getSearchResults).toHaveBeenCalledWith('readme', 'main')
     })
     expect(await screen.findByText('README.md')).toBeInTheDocument()
   })
 
-  it('reports mode and case-sensitivity changes', () => {
-    const onModeChange = vi.fn()
-    const onCaseSensitiveChange = vi.fn()
+  it('does not search before the 3-character threshold', () => {
     renderWithClient(
       <SearchPanel
         branch="main"
-        mode="name"
         query=""
-        caseSensitive={false}
-        onModeChange={onModeChange}
         onQueryChange={vi.fn()}
-        onCaseSensitiveChange={onCaseSensitiveChange}
         onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByLabelText('Content'))
-    fireEvent.click(screen.getByLabelText(/case sensitive/i))
-    expect(onModeChange).toHaveBeenCalledWith('content')
-    expect(onCaseSensitiveChange).toHaveBeenCalledWith(true)
+    expect(api.getSearchResults).not.toHaveBeenCalled()
+    expect(screen.getByText(/type 3 or more characters/i)).toBeInTheDocument()
   })
 
   it('navigates through a selected result', async () => {
@@ -83,13 +73,10 @@ describe('SearchPanel', () => {
     renderWithClient(
       <SearchPanel
         branch="main"
-        mode="name"
         query="readme"
-        caseSensitive={false}
-        onModeChange={vi.fn()}
         onQueryChange={vi.fn()}
-        onCaseSensitiveChange={vi.fn()}
         onSelectResult={onSelectResult}
+        onDismiss={vi.fn()}
       />,
     )
 
@@ -98,5 +85,68 @@ describe('SearchPanel', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /readme\.md/i }))
     expect(onSelectResult).toHaveBeenCalled()
+  })
+
+  it('shows a dismiss control and expanded idle messaging', () => {
+    const { container } = renderWithClient(
+      <SearchPanel
+        branch="main"
+        query=""
+        onQueryChange={vi.fn()}
+        onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    expect(container.querySelector('.search-panel')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /close search/i })).toBeInTheDocument()
+    expect(screen.getByText(/type 3 or more characters/i)).toBeInTheDocument()
+    expect(screen.getByText(/cmd\/ctrl \+ f/i)).toBeInTheDocument()
+  })
+
+  it('dismisses search on Escape', () => {
+    const onDismiss = vi.fn()
+    renderWithClient(
+      <SearchPanel
+        branch="main"
+        query=""
+        onQueryChange={vi.fn()}
+        onSelectResult={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: /search query/i }), { key: 'Escape' })
+    expect(onDismiss).toHaveBeenCalled()
+  })
+
+  it('renders the floating-card header copy for the modern overlay', () => {
+    renderWithClient(
+      <SearchPanel
+        branch="main"
+        query=""
+        onQueryChange={vi.fn()}
+        onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/type at least 3 characters/i)).toBeInTheDocument()
+  })
+
+  it('reports live query updates as the user types', () => {
+    const onQueryChange = vi.fn()
+    renderWithClient(
+      <SearchPanel
+        branch="main"
+        query=""
+        onQueryChange={onQueryChange}
+        onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search query/i }), { target: { value: 'rea' } })
+    expect(onQueryChange).toHaveBeenLastCalledWith('rea')
   })
 })

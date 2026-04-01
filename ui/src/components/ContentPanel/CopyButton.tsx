@@ -20,7 +20,7 @@ export default function CopyButton({ getText, className = 'copy-button', label =
     }
   }
 
-  const text = status === 'copied' ? 'Copied' : status === 'failed' ? 'Retry copy' : label
+  const text = status === 'copied' ? `Copied ${label.toLowerCase()}` : status === 'failed' ? `Retry ${label.toLowerCase()}` : label
 
   return (
     <button
@@ -30,7 +30,29 @@ export default function CopyButton({ getText, className = 'copy-button', label =
       aria-label={text}
       title={text}
     >
-      {text}
+      <svg
+        className="copy-button-icon"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+      >
+        <path
+          d="M2.75 4.5A1.75 1.75 0 0 1 4.5 2.75h5.75c.966 0 1.75.784 1.75 1.75v7a1.75 1.75 0 0 1-1.75 1.75H4.5a1.75 1.75 0 0 1-1.75-1.75z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M5 2h5.5A2.5 2.5 0 0 1 13 4.5V10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="sr-only">{text}</span>
     </button>
   )
 }

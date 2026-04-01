@@ -11,6 +11,7 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - **State**: All state in-process or derived from filesystem/git at request time
 - TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild (003-viewer-usability-search)
 - No database; all runtime state is derived from the local filesystem, git metadata, URL state, and in-memory server process state (003-viewer-usability-search)
+- No database; runtime state is derived from the filesystem, git metadata, browser URL state, and in-memory UI state (004-copy-control-polish)
 
 ## Project Structure
 
@@ -36,9 +37,9 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). No Go, no Makefile, no shell scripts.
 
 ## Recent Changes
+- 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
+- 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
 - 003-viewer-usability-search: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
-- 002-release-quality-automation: Added a branded cross-platform repository picker, PR verification and release publish GitHub Actions, `npm run verify`, Vite 7 UI build updates, and prerelease-safe npm publication rules
-- 003-simplify-tech-stack: Replaced Go backend with Node.js/TypeScript/Hono; removed Makefile and all shell script dependencies; single `npm` toolchain for build, test, and install
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

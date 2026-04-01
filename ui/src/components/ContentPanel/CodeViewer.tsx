@@ -60,7 +60,7 @@ export default function CodeViewer({ content, language }: Props) {
   }, [content, language])
 
   return (
-    <pre className="code-viewer">
+    <pre className="code-viewer raw-code-viewer">
       <code ref={codeRef} className={language ? `language-${language}` : ''}>
         {content}
       </code>

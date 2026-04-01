@@ -4,19 +4,20 @@ export interface RepoInfo {
   currentBranch: string
   isGitRepo: boolean
   pickerMode: boolean
+  version: string
 }
 
-export type SearchMode = 'name' | 'content'
+export type SearchPresentation = 'collapsed' | 'expanded'
 
 export interface ViewerState {
+  repoPath: string
   branch: string
   path: string
   pathType: 'file' | 'dir' | 'none'
   raw: boolean
   sidebarCollapsed: boolean
-  searchMode: SearchMode
+  searchPresentation: SearchPresentation
   searchQuery: string
-  caseSensitive: boolean
 }
 
 export interface Branch {
@@ -74,7 +75,7 @@ export interface PickBrowseResponse {
 export interface SearchResult {
   path: string
   type: 'file' | 'dir'
-  matchType: SearchMode
+  matchType: 'name' | 'content'
   snippet?: string
   line?: number
 }
@@ -82,7 +83,7 @@ export interface SearchResult {
 export interface SearchResponse {
   query: string
   branch: string
-  mode: SearchMode
+  mode: 'name' | 'content'
   caseSensitive: boolean
   results: SearchResult[]
 }

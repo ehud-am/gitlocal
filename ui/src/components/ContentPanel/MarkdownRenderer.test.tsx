@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import MarkdownRenderer from './MarkdownRenderer'
 
 describe('MarkdownRenderer', () => {
-  it('renders a copy button for fenced code blocks', async () => {
+  it('renders copy buttons only for fenced code blocks and copies the selected block', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText },
@@ -12,15 +12,41 @@ describe('MarkdownRenderer', () => {
 
     render(
       <MarkdownRenderer
-        content={'```ts\nconst answer = 42\n```'}
+        content={[
+          '# Guide',
+          '',
+          'Paragraph with `inline code` but no block copy action.',
+          '',
+          '```ts',
+          'const answer = 42',
+          '```',
+          '',
+          '```js',
+          'console.log(answer)',
+          '```',
+        ].join('\n')}
         onNavigate={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /copy code/i }))
+    const copyButtons = screen.getAllByRole('button', { name: /copy code block/i })
+    expect(copyButtons).toHaveLength(2)
+
+    fireEvent.click(copyButtons[0])
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('const answer = 42')
     })
+  })
+
+  it('does not render copy buttons when markdown contains no fenced code blocks', () => {
+    render(
+      <MarkdownRenderer
+        content={'# Guide\n\nParagraph text.\n\n- list item\n\n> quote'}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: /copy code block/i })).not.toBeInTheDocument()
   })
 
   it('navigates relative links through onNavigate', () => {

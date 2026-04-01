@@ -7,7 +7,7 @@ interface Props {
 
 export default function SearchResults({ results, onSelect }: Props) {
   if (results.length === 0) {
-    return <p className="search-empty">No results matched the current search.</p>
+    return <p className="search-empty">No file names matched the current search.</p>
   }
 
   return (
@@ -16,11 +16,7 @@ export default function SearchResults({ results, onSelect }: Props) {
         <li key={`${result.matchType}:${result.path}:${result.line ?? 0}`} className="search-result-item">
           <button type="button" className="search-result-button" onClick={() => onSelect(result)}>
             <span className="search-result-path">{result.path}</span>
-            <span className="search-result-meta">
-              {result.type === 'dir' ? 'Folder' : 'File'}
-              {result.line ? ` • line ${result.line}` : ''}
-            </span>
-            {result.snippet && <span className="search-result-snippet">{result.snippet}</span>}
+            <span className="search-result-meta">File</span>
           </button>
         </li>
       ))}

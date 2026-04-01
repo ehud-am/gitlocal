@@ -37,6 +37,7 @@ describe('infoHandler', () => {
     const body = await res.json()
     expect(body.pickerMode).toBe(true)
     expect(body.isGitRepo).toBe(false)
+    expect(body.version).toBe('0.4.2')
   })
 
   it('returns repo metadata for valid repo', async () => {
@@ -49,6 +50,7 @@ describe('infoHandler', () => {
     expect(body.pickerMode).toBe(false)
     expect(body.name).toBeTruthy()
     expect(body.currentBranch).toBeTruthy()
+    expect(body.version).toBe('0.4.2')
   })
 })
 

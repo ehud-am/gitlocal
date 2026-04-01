@@ -4,7 +4,6 @@ import type {
   FileContent,
   PickBrowseResponse,
   RepoInfo,
-  SearchMode,
   SearchResponse,
   SyncStatus,
   TreeNode,
@@ -54,15 +53,9 @@ export const api = {
 
   getReadme: (): Promise<{ path: string }> => request('/api/readme'),
 
-  getSearchResults: (
-    query: string,
-    mode: SearchMode,
-    branch?: string,
-    caseSensitive?: boolean,
-  ): Promise<SearchResponse> => {
-    const params = new URLSearchParams({ query, mode })
+  getSearchResults: (query: string, branch?: string): Promise<SearchResponse> => {
+    const params = new URLSearchParams({ query, mode: 'name' })
     if (branch) params.set('branch', branch)
-    if (caseSensitive) params.set('caseSensitive', 'true')
     return request(`/api/search?${params.toString()}`)
   },
 

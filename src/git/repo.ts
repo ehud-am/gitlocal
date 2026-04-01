@@ -4,6 +4,22 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { RepoInfo, Branch, Commit } from '../types.js'
 
+let cachedAppVersion = ''
+
+export function getAppVersion(): string {
+  if (cachedAppVersion) return cachedAppVersion
+
+  try {
+    const packageJsonPath = new URL('../../package.json', import.meta.url)
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { version?: string }
+    cachedAppVersion = packageJson.version ?? '0.0.0'
+  } catch {
+    cachedAppVersion = '0.0.0'
+  }
+
+  return cachedAppVersion
+}
+
 export function spawnGit(repoPath: string, ...args: string[]): string {
   const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
   /* v8 ignore next */
@@ -32,16 +48,17 @@ export function getCurrentBranch(repoPath: string): string {
 }
 
 export function getInfo(repoPath: string): RepoInfo {
+  const version = getAppVersion()
   if (!repoPath) {
-    return { name: '', path: '', currentBranch: '', isGitRepo: false, pickerMode: true }
+    return { name: '', path: '', currentBranch: '', isGitRepo: false, pickerMode: true, version }
   }
   const isGitRepo = validateRepo(repoPath)
   if (!isGitRepo) {
-    return { name: basename(repoPath), path: repoPath, currentBranch: '', isGitRepo: false, pickerMode: false }
+    return { name: basename(repoPath), path: repoPath, currentBranch: '', isGitRepo: false, pickerMode: false, version }
   }
   let currentBranch = ''
   currentBranch = getCurrentBranch(repoPath)
-  return { name: basename(repoPath), path: repoPath, currentBranch, isGitRepo: true, pickerMode: false }
+  return { name: basename(repoPath), path: repoPath, currentBranch, isGitRepo: true, pickerMode: false, version }
 }
 
 export function getBranches(repoPath: string): Branch[] {

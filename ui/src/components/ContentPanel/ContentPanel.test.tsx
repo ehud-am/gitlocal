@@ -194,11 +194,31 @@ describe('ContentPanel', () => {
     fireEvent.click(screen.getByText('View Raw'))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /copy file/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /copy raw file/i })).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /copy file/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy raw file/i }))
     expect(writeText).toHaveBeenCalledWith('# Hello')
+  })
+
+  it('does not show the raw copy action while markdown stays in rendered mode', async () => {
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'README.md',
+      type: 'markdown',
+      content: '# Hello',
+      language: '',
+      encoding: 'utf8',
+    })
+
+    renderWithClient(
+      <ContentPanel selectedPath="README.md" selectedPathType="file" branch="main" onNavigate={vi.fn()} />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('button', { name: /copy raw file/i })).not.toBeInTheDocument()
   })
 
   it('shows custom placeholder when filePath empty and placeholder prop provided', () => {

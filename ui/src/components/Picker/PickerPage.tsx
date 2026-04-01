@@ -2,11 +2,24 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
 import type { PickBrowseEntry, PickBrowseRoot } from '../../types'
 
+function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return collapsed ? (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M10 3.5L5.5 8L10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function PickerPage() {
   const [path, setPath] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [browseLoading, setBrowseLoading] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentPath, setCurrentPath] = useState('')
   const [parentPath, setParentPath] = useState<string | null>(null)
   const [homePath, setHomePath] = useState('')
@@ -87,24 +100,51 @@ export default function PickerPage() {
         <span className="repo-name">Folder selector</span>
       </header>
       <div className="picker-layout">
-        <aside className="picker-sidebar">
-          <div className="picker-sidebar-section">
-            <p className="picker-sidebar-label">Quick access</p>
-            <button type="button" className="picker-nav-button" onClick={() => loadPath(homePath)}>
-              Home
-            </button>
-            {roots.map((root) => (
+        {sidebarCollapsed ? (
+          <aside className="sidebar-rail picker-sidebar-rail" aria-label="collapsed quick access">
+            <div className="sidebar-rail-toolbar">
               <button
-                key={root.path}
                 type="button"
-                className="picker-nav-button"
-                onClick={() => loadPath(root.path)}
+                className="panel-icon-button sidebar-toggle-button"
+                aria-label="Expand quick access"
+                title="Expand quick access"
+                onClick={() => setSidebarCollapsed(false)}
               >
-                {root.name}
+                <PanelToggleIcon collapsed />
               </button>
-            ))}
-          </div>
-        </aside>
+            </div>
+          </aside>
+        ) : (
+          <aside className="picker-sidebar">
+            <div className="sidebar-toolbar">
+              <button
+                type="button"
+                className="panel-icon-button sidebar-toggle-button"
+                aria-label="Collapse quick access"
+                title="Collapse quick access"
+                onClick={() => setSidebarCollapsed(true)}
+              >
+                <PanelToggleIcon collapsed={false} />
+              </button>
+            </div>
+            <div className="picker-sidebar-section">
+              <p className="picker-sidebar-label">Quick access</p>
+              <button type="button" className="picker-nav-button" onClick={() => loadPath(homePath)}>
+                Home
+              </button>
+              {roots.map((root) => (
+                <button
+                  key={root.path}
+                  type="button"
+                  className="picker-nav-button"
+                  onClick={() => loadPath(root.path)}
+                >
+                  {root.name}
+                </button>
+              ))}
+            </div>
+          </aside>
+        )}
 
         <main className="picker-main">
           <section className="picker-hero">

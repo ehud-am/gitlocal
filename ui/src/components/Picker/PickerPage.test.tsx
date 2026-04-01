@@ -152,6 +152,18 @@ describe('PickerPage', () => {
     })
   })
 
+  it('collapses and restores quick access with the same rail pattern as the viewer', async () => {
+    render(<PickerPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /collapse quick access/i }))
+
+    expect(await screen.findByLabelText(/collapsed quick access/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /expand quick access/i }))
+
+    expect(await screen.findByRole('button', { name: /collapse quick access/i })).toBeInTheDocument()
+  })
+
   it('browses the typed path from the selected-folder action', async () => {
     render(<PickerPage />)
 
