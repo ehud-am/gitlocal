@@ -20,7 +20,10 @@ vi.mock('./MarkdownRenderer', () => ({
 
 vi.mock('./CodeViewer', () => ({
   default: ({ content }: { content: string; language: string }) => (
-    <pre data-testid="code-viewer">{content}</pre>
+    <div data-testid="code-viewer">
+      <div data-testid="line-number-gutter">1</div>
+      <pre>{content}</pre>
+    </div>
   ),
 }))
 
@@ -101,6 +104,7 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('line-number-gutter')).toBeInTheDocument()
   })
 
   it('shows binary placeholder for binary files', async () => {
@@ -164,6 +168,7 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('line-number-gutter')).toBeInTheDocument()
 
     expect(screen.queryByTestId('markdown-renderer')).not.toBeInTheDocument()
   })

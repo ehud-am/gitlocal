@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { createApp, getRepoPath, setRepoPath } from '../../src/server.js'
+
+const APP_VERSION = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'),
+) as { version: string }
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-int-test-'))
@@ -38,7 +42,7 @@ describe('Server integration', () => {
     expect(res.headers.get('content-type')).toContain('application/json')
     const body = await res.json() as { isGitRepo: boolean; version: string }
     expect(body.isGitRepo).toBe(true)
-    expect(body.version).toBe('0.4.2')
+    expect(body.version).toBe(APP_VERSION.version)
   })
 
   it('GET / returns 200 HTML (SPA index)', async () => {
@@ -80,7 +84,7 @@ describe('Server integration', () => {
       expect(body.pickerMode).toBe(true)
       expect(body.isGitRepo).toBe(false)
       expect(body.path).toBe(nonGitDir)
-      expect(body.version).toBe('0.4.2')
+      expect(body.version).toBe(APP_VERSION.version)
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }

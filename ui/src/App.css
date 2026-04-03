@@ -793,6 +793,10 @@ body {
   z-index: 1;
 }
 
+.markdown-code-frame {
+  margin-bottom: 0;
+}
+
 .markdown-body pre code {
   background: transparent;
   border: none;
@@ -831,20 +835,57 @@ body {
 .markdown-body img { max-width: 100%; border-radius: 4px; }
 
 /* ── Code viewer ── */
-.code-viewer {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
+.code-frame {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
   background: var(--color-code-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
+  overflow: hidden;
+  margin: 0 0 16px;
+}
+
+.code-line-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  padding: 16px 10px 16px 14px;
+  background: rgba(208, 215, 222, 0.18);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.code-line-number {
+  display: block;
+  min-width: 2ch;
+  line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.code-viewer {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 16px;
   overflow-x: auto;
   white-space: pre;
   line-height: 1.5;
+  margin: 0;
 }
 
 .raw-code-viewer {
   margin: 0;
+}
+
+.code-viewer code {
+  display: block;
+  min-width: max-content;
 }
 
 .search-layer {

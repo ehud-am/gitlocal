@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
 import c from 'highlight.js/lib/languages/c'
@@ -41,10 +41,19 @@ hljs.registerLanguage('yaml', yaml)
 interface Props {
   content: string
   language: string
+  className?: string
 }
 
-export default function CodeViewer({ content, language }: Props) {
+export default function CodeViewer({ content, language, className = '' }: Props) {
   const codeRef = useRef<HTMLElement>(null)
+  const lineCount = useMemo(
+    () => (content === '' ? 1 : content.split('\n').length),
+    [content],
+  )
+  const lineNumbers = useMemo(
+    () => Array.from({ length: lineCount }, (_, index) => index + 1),
+    [lineCount],
+  )
 
   useEffect(() => {
     if (codeRef.current) {
@@ -60,10 +69,19 @@ export default function CodeViewer({ content, language }: Props) {
   }, [content, language])
 
   return (
-    <pre className="code-viewer raw-code-viewer">
-      <code ref={codeRef} className={language ? `language-${language}` : ''}>
-        {content}
-      </code>
-    </pre>
+    <div className={`code-frame ${className}`.trim()}>
+      <div className="code-line-gutter" aria-hidden="true" data-testid="line-number-gutter">
+        {lineNumbers.map((lineNumber) => (
+          <span key={lineNumber} className="code-line-number">
+            {lineNumber}
+          </span>
+        ))}
+      </div>
+      <pre className="code-viewer raw-code-viewer">
+        <code ref={codeRef} className={language ? `language-${language}` : ''}>
+          {content}
+        </code>
+      </pre>
+    </div>
   )
 }

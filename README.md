@@ -100,12 +100,15 @@ You can still paste a path manually in the selected-folder field when needed.
 
 - **Browse the file tree** — expand and collapse folders lazily, just like GitHub
 - **Read files beautifully** — Markdown renders as formatted HTML with GitHub Flavored Markdown; code files get syntax highlighting; images display inline
+- **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **See git status** — current branch, recent commits, and a branch switcher (read-only)
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
 - **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; otherwise GitLocal starts in the folder picker
 - **Clear folder actions** — non-git folders can be browsed deeper, while detected git repositories can be opened directly
 - **No internet required** — everything runs locally; no accounts, no telemetry, no registration
+
+The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
 
 ---
 

@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-31
+Auto-generated from all feature plans. Last updated: 2026-04-02
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-31
 - TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild (003-viewer-usability-search)
 - No database; all runtime state is derived from the local filesystem, git metadata, URL state, and in-memory server process state (003-viewer-usability-search)
 - No database; runtime state is derived from the filesystem, git metadata, browser URL state, and in-memory UI state (004-copy-control-polish)
+- TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, react-markdown, rehype-highlight, highlight.js, Vitest, React Testing Library, esbuild (005-version-line-numbers)
+- No database; runtime state comes from local filesystem metadata, git metadata, build/package metadata, URL state, and in-memory server state (005-version-line-numbers)
 
 ## Project Structure
 
@@ -37,9 +39,9 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). No Go, no Makefile, no shell scripts.
 
 ## Recent Changes
+- 005-version-line-numbers: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, react-markdown, rehype-highlight, highlight.js, Vitest, React Testing Library, esbuild
 - 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
 - 004-copy-control-polish: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
-- 003-viewer-usability-search: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, esbuild
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
