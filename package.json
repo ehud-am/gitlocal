@@ -1,7 +1,21 @@
 {
   "name": "gitlocal",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Browse any local git repository in your browser",
+  "keywords": [
+    "git",
+    "repository",
+    "viewer",
+    "local",
+    "git viewer",
+    "repository browser",
+    "local git repository viewer",
+    "github-like",
+    "code viewer",
+    "markdown viewer",
+    "browser-based git ui",
+    "gitlocal"
+  ],
   "type": "module",
   "bin": {
     "gitlocal": "./dist/cli.js"
@@ -46,6 +60,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ehud-am/gitlocal"
+  },
+  "homepage": "https://github.com/ehud-am/gitlocal#readme",
+  "bugs": {
+    "url": "https://github.com/ehud-am/gitlocal/issues"
   },
   "publishConfig": {
     "access": "public"
