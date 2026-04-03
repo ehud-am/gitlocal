@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.4.3
+## 0.4.4
+
+- Added npm package keywords and richer package metadata so the npm package page is easier to discover and links cleanly back to the GitHub project.
 
 - Fixed footer version rendering so GitLocal shows the actual running release version instead of falling back to `v0.0.0`.
 - Added left-side line numbers to code-oriented viewer presentations for easier line-by-line reading and reference.
