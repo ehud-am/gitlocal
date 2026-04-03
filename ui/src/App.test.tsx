@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,6 +23,10 @@ vi.mock('./services/api', () => ({
 
 import { api } from './services/api'
 
+const APP_VERSION = JSON.parse(
+  readFileSync(resolve(process.cwd(), '../package.json'), 'utf-8'),
+) as { version: string }
+
 function renderWithClient() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchInterval: false } },
@@ -42,7 +48,7 @@ describe('App', () => {
       currentBranch: 'main',
       isGitRepo: true,
       pickerMode: false,
-      version: '0.4.2',
+      version: APP_VERSION.version,
     })
     vi.mocked(api.getReadme).mockResolvedValue({ path: 'README.md' })
     vi.mocked(api.getSyncStatus).mockResolvedValue({
@@ -239,7 +245,7 @@ describe('App', () => {
 
     const currentYear = new Date().getFullYear().toString()
     expect(await screen.findByText(currentYear)).toBeInTheDocument()
-    expect(screen.getByText('v0.4.2')).toBeInTheDocument()
+    expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
 
     const link = screen.getByRole('link', { name: 'GitLocal' })
     expect(link).toHaveAttribute('href', 'https://github.com/ehud-am/gitlocal')
@@ -252,13 +258,13 @@ describe('App', () => {
       currentBranch: '',
       isGitRepo: false,
       pickerMode: true,
-      version: '0.4.2',
+      version: APP_VERSION.version,
     })
 
     renderWithClient()
 
     expect(await screen.findByText(/choose the folder gitlocal should open/i)).toBeInTheDocument()
-    expect(screen.getByText('v0.4.2')).toBeInTheDocument()
+    expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
   })
 
   it('falls back to the current repo branch when the saved URL branch is not available', async () => {
@@ -302,7 +308,7 @@ describe('App', () => {
       currentBranch: 'main',
       isGitRepo: true,
       pickerMode: false,
-      version: '0.4.2',
+      version: APP_VERSION.version,
     })
     vi.mocked(api.getFile).mockResolvedValueOnce({
       path: 'README.md',

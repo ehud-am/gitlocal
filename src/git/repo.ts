@@ -6,16 +6,30 @@ import type { RepoInfo, Branch, Commit } from '../types.js'
 
 let cachedAppVersion = ''
 
+function resolvePackageVersionFromCandidates(): string | null {
+  const candidatePaths = [
+    new URL('../../package.json', import.meta.url),
+    new URL('../package.json', import.meta.url),
+  ]
+
+  for (const packageJsonPath of candidatePaths) {
+    try {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { version?: string }
+      if (packageJson.version) {
+        return packageJson.version
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
 export function getAppVersion(): string {
   if (cachedAppVersion) return cachedAppVersion
 
-  try {
-    const packageJsonPath = new URL('../../package.json', import.meta.url)
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { version?: string }
-    cachedAppVersion = packageJson.version ?? '0.0.0'
-  } catch {
-    cachedAppVersion = '0.0.0'
-  }
+  cachedAppVersion = resolvePackageVersionFromCandidates() ?? '0.0.0'
 
   return cachedAppVersion
 }

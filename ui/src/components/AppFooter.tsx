@@ -4,6 +4,7 @@ interface Props {
 
 export default function AppFooter({ version }: Props) {
   const currentYear = new Date().getFullYear()
+  const normalizedVersion = version.replace(/^v/i, '')
 
   return (
     <footer className="app-footer">
@@ -16,7 +17,7 @@ export default function AppFooter({ version }: Props) {
       >
         GitLocal
       </a>
-      <span>{`v${version}`}</span>
+      {normalizedVersion ? <span>{`v${normalizedVersion}`}</span> : null}
     </footer>
   )
 }

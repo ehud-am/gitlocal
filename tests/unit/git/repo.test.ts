@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -21,6 +21,10 @@ import {
   nearestExistingTrackedRepoPath,
   readWorkingTreeFile,
 } from '../../../src/git/repo.js'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-test-'))
@@ -107,6 +111,47 @@ describe('getInfo', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('getAppVersion', () => {
+  it('falls back to the second package.json candidate when the first read fails', async () => {
+    vi.resetModules()
+    const readFileSyncMock = vi.fn()
+      .mockImplementationOnce(() => {
+        throw new Error('missing first candidate')
+      })
+      .mockImplementationOnce(() => JSON.stringify({ version: '9.9.9' }))
+
+    vi.doMock('node:fs', async () => {
+      const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+      return {
+        ...actual,
+        readFileSync: readFileSyncMock,
+      }
+    })
+
+    const { getAppVersion } = await import('../../../src/git/repo.js?version-fallback-second')
+    expect(getAppVersion()).toBe('9.9.9')
+    expect(readFileSyncMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns 0.0.0 when no package.json candidate can be read', async () => {
+    vi.resetModules()
+    const readFileSyncMock = vi.fn(() => {
+      throw new Error('missing package metadata')
+    })
+
+    vi.doMock('node:fs', async () => {
+      const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+      return {
+        ...actual,
+        readFileSync: readFileSyncMock,
+      }
+    })
+
+    const { getAppVersion } = await import('../../../src/git/repo.js?version-fallback-none')
+    expect(getAppVersion()).toBe('0.0.0')
   })
 })
 

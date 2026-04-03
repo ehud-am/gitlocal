@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
 import { createApp } from '../../../src/server.js'
+
+const APP_VERSION = JSON.parse(
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf-8'),
+) as { version: string }
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-handler-test-'))
@@ -37,7 +41,7 @@ describe('infoHandler', () => {
     const body = await res.json()
     expect(body.pickerMode).toBe(true)
     expect(body.isGitRepo).toBe(false)
-    expect(body.version).toBe('0.4.2')
+    expect(body.version).toBe(APP_VERSION.version)
   })
 
   it('returns repo metadata for valid repo', async () => {
@@ -50,7 +54,7 @@ describe('infoHandler', () => {
     expect(body.pickerMode).toBe(false)
     expect(body.name).toBeTruthy()
     expect(body.currentBranch).toBeTruthy()
-    expect(body.version).toBe('0.4.2')
+    expect(body.version).toBe(APP_VERSION.version)
   })
 })
 

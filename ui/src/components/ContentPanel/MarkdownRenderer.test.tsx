@@ -31,11 +31,34 @@ describe('MarkdownRenderer', () => {
 
     const copyButtons = screen.getAllByRole('button', { name: /copy code block/i })
     expect(copyButtons).toHaveLength(2)
+    expect(screen.getAllByTestId('line-number-gutter')).toHaveLength(2)
 
     fireEvent.click(copyButtons[0])
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('const answer = 42')
     })
+  })
+
+  it('renders line numbers for fenced code blocks only', () => {
+    render(
+      <MarkdownRenderer
+        content={[
+          '# Guide',
+          '',
+          'Inline `const answer = 42` only.',
+          '',
+          '```ts',
+          'const answer = 42',
+          'console.log(answer)',
+          '```',
+        ].join('\n')}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const gutter = screen.getByTestId('line-number-gutter')
+    expect(gutter).toHaveTextContent('1')
+    expect(gutter).toHaveTextContent('2')
   })
 
   it('does not render copy buttons when markdown contains no fenced code blocks', () => {

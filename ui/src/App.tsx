@@ -216,7 +216,6 @@ export default function App() {
             <p>GitLocal is checking the current launch context.</p>
           </div>
         </div>
-        <AppFooter version="0.4.2" />
       </>
     )
   }
@@ -265,7 +264,6 @@ export default function App() {
     setSearchQuery('')
   }
 
-  const appVersion = info?.version ?? '0.4.2'
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
   const visibleSelectedPathType: SelectedPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
@@ -383,7 +381,7 @@ export default function App() {
           </div>
         </div>
       </div>
-      <AppFooter version={appVersion} />
+      <AppFooter version={info?.version ?? ''} />
     </>
   )
 }

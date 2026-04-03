@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css'
 import CopyButton from './CopyButton'
+import CodeViewer from './CodeViewer'
 
 interface Props {
   content: string
@@ -50,6 +51,8 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
             const rawText = flattenText(children)
             const text = rawText.replace(/\n$/, '')
             const isBlockCode = inline === false || className?.startsWith('language-') || rawText.includes('\n')
+            const languageMatch = className?.match(/language-([\w-]+)/)
+            const language = languageMatch?.[1] ?? ''
 
             if (!isBlockCode) {
               return (
@@ -63,9 +66,7 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
                 <div className="markdown-code-toolbar">
                   <CopyButton getText={() => text} className="copy-button code-copy-button" label="Copy code block" />
                 </div>
-                <code className={className} {...props}>
-                  {children}
-                </code>
+                <CodeViewer content={text} language={language} className="markdown-code-frame" />
               </div>
             )
           },
