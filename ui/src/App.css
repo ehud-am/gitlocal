@@ -659,6 +659,14 @@ body {
   font-size: 14px;
 }
 
+.content-empty-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
 .content-toolbar {
   display: flex;
   gap: 8px;
@@ -676,6 +684,26 @@ body {
   background: var(--color-bg);
   cursor: pointer;
   color: var(--color-text);
+}
+
+.btn-primary {
+  background: #0969da;
+  border-color: #0969da;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #0858b8;
+  border-color: #0858b8;
+}
+
+.btn-danger {
+  border-color: #cf222e;
+  color: #cf222e;
+}
+
+.btn-danger:hover {
+  background: rgba(207, 34, 46, 0.08);
 }
 
 .btn-raw:hover,
@@ -729,6 +757,84 @@ body {
   color: var(--color-text-muted);
   font-style: italic;
   padding: 24px 0;
+}
+
+.manual-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 18px;
+}
+
+.manual-editor-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.manual-editor-header h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: var(--color-text);
+}
+
+.manual-editor-header p,
+.manual-delete-copy {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.manual-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.manual-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.manual-editor-input,
+.manual-editor-textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--color-text);
+  background: #fff;
+}
+
+.manual-editor-input:focus-visible,
+.manual-editor-textarea:focus-visible {
+  outline: 2px solid rgba(9, 105, 218, 0.35);
+  outline-offset: 2px;
+}
+
+.manual-editor-textarea {
+  min-height: 340px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  line-height: 1.5;
+}
+
+.manual-editor-error {
+  margin: 0;
+  color: #cf222e;
+  font-size: 13px;
+}
+
+.manual-delete-card {
+  max-width: 620px;
 }
 
 .content-image {

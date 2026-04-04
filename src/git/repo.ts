@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { basename, dirname, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import type { RepoInfo, Branch, Commit } from '../types.js'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import type { RepoInfo, Branch, Commit, TreeNode } from '../types.js'
 
 let cachedAppVersion = ''
 
@@ -150,9 +150,30 @@ export function resolveRepoPath(repoPath: string, filePath: string): string {
   return resolve(repoPath, filePath)
 }
 
+export function normalizeRepoRelativePath(filePath: string): string {
+  const normalized = filePath.replaceAll('\\', '/').trim()
+  if (!normalized) return ''
+  return normalized.replace(/^\.?\//, '').replace(/\/+/g, '/')
+}
+
+export function isPathInsideRepo(repoPath: string, filePath: string): boolean {
+  const normalized = normalizeRepoRelativePath(filePath)
+  if (!normalized) return false
+  const resolvedPath = resolveRepoPath(repoPath, normalized)
+  const rel = relative(repoPath, resolvedPath)
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+export function resolveSafeRepoPath(repoPath: string, filePath: string): string | null {
+  if (!filePath) return repoPath
+  if (!isPathInsideRepo(repoPath, filePath)) return null
+  return resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
+}
+
 export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
-  const fullPath = resolveRepoPath(repoPath, filePath)
+  const fullPath = resolveSafeRepoPath(repoPath, filePath)
+  if (!fullPath) return 'missing'
   if (!existsSync(fullPath)) return 'missing'
   const stats = statSync(fullPath)
   return stats.isDirectory() ? 'dir' : 'file'
@@ -161,7 +182,7 @@ export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' 
 export function nearestExistingRepoPath(repoPath: string, filePath: string): string {
   if (!filePath) return ''
 
-  let current = resolveRepoPath(repoPath, filePath)
+  let current = resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
   while (current.startsWith(resolve(repoPath))) {
     if (existsSync(current)) {
       const rel = relative(repoPath, current)
@@ -230,11 +251,90 @@ export function getWorkingTreeRevision(repoPath: string): string {
 }
 
 export function readWorkingTreeFile(repoPath: string, filePath: string): Buffer | null {
-  const fullPath = resolveRepoPath(repoPath, filePath)
+  const fullPath = resolveSafeRepoPath(repoPath, filePath)
+  if (!fullPath) return null
   if (!existsSync(fullPath)) return null
   const stats = statSync(fullPath)
   if (stats.isDirectory()) return null
   return readFileSync(fullPath)
+}
+
+export function isIgnoredPath(repoPath: string, filePath: string): boolean {
+  const normalized = normalizeRepoRelativePath(filePath)
+  if (!normalized) return false
+  const result = spawnSync('git', ['check-ignore', '-q', normalized], { cwd: repoPath })
+  return result.status === 0
+}
+
+export function getEditableState(repoPath: string, filePath: string, branch: string): { editable: boolean; revisionToken: string | null } {
+  if (!isWorkingTreeBranch(repoPath, branch)) {
+    return { editable: false, revisionToken: null }
+  }
+
+  const pathType = getPathType(repoPath, filePath)
+  if (pathType !== 'file') {
+    return { editable: false, revisionToken: null }
+  }
+
+  const { type } = detectFileType(filePath)
+  return {
+    editable: type === 'markdown' || type === 'text',
+    revisionToken: getFileRevisionToken(repoPath, filePath),
+  }
+}
+
+export function getFileRevisionToken(repoPath: string, filePath: string): string | null {
+  const rawBytes = readWorkingTreeFile(repoPath, filePath)
+  if (!rawBytes) return null
+  const hash = createHash('sha1')
+  hash.update(normalizeRepoRelativePath(filePath))
+  hash.update(rawBytes)
+  return hash.digest('hex')
+}
+
+export function writeWorkingTreeTextFile(repoPath: string, filePath: string, content: string): void {
+  const fullPath = resolveSafeRepoPath(repoPath, filePath)
+  if (!fullPath) {
+    throw new Error('Path must stay inside the opened repository.')
+  }
+
+  mkdirSync(dirname(fullPath), { recursive: true })
+  writeFileSync(fullPath, content, 'utf-8')
+}
+
+export function deleteWorkingTreeFile(repoPath: string, filePath: string): void {
+  const fullPath = resolveSafeRepoPath(repoPath, filePath)
+  if (!fullPath) {
+    throw new Error('Path must stay inside the opened repository.')
+  }
+
+  unlinkSync(fullPath)
+}
+
+export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: string = ''): TreeNode[] {
+  const normalized = normalizeRepoRelativePath(subpath)
+  const dirPath = normalized ? resolveSafeRepoPath(repoPath, normalized) : repoPath
+
+  if (!dirPath || !existsSync(dirPath) || !statSync(dirPath).isDirectory()) {
+    return []
+  }
+
+  return readdirSync(dirPath, { withFileTypes: true })
+    .filter((entry) => entry.name !== '.git')
+    .map((entry) => {
+      const path = normalized ? `${normalized}/${entry.name}` : entry.name
+      return { entry, path }
+    })
+    .filter(({ path }) => !isIgnoredPath(repoPath, path))
+    .map(({ entry, path }) => ({
+      name: entry.name,
+      path,
+      type: entry.isDirectory() ? 'dir' as const : 'file' as const,
+    }))
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
 }
 
 export function detectFileType(filename: string): { type: 'markdown' | 'text' | 'image' | 'binary'; language: string } {

@@ -73,8 +73,8 @@ describe('repo-watch', () => {
       const status = getSyncStatus(dir, branch, 'docs/missing/file.md')
       expect(status.fileStatus).toBe('deleted')
       expect(status.treeStatus).toBe('invalid')
-      expect(status.resolvedPath).toBe('')
-      expect(status.resolvedPathType).toBe('none')
+      expect(status.resolvedPath).toBe('docs')
+      expect(status.resolvedPathType).toBe('dir')
     } finally {
       cleanup()
     }

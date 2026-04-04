@@ -151,9 +151,9 @@ describe('working tree tree helpers', () => {
     }
   })
 
-  it('does not surface untracked working-tree files', () => {
+  it('surfaces untracked working-tree files while leaving search behavior unchanged', () => {
     writeFileSync(join(dir, 'scratch.txt'), 'local-only')
-    expect(listWorkingTreeDir(dir, '').some((node) => node.path === 'scratch.txt')).toBe(false)
+    expect(listWorkingTreeDir(dir, '').some((node) => node.path === 'scratch.txt')).toBe(true)
     expect(searchWorkingTreeByName(dir, 'scratch', false)).toEqual([])
   })
 

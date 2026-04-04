@@ -142,6 +142,49 @@ describe('Server integration', () => {
     expect(body.repoPath).toBe('')
     expect(body.fileStatus).toBe('unavailable')
   })
+
+  it('supports create, update, and delete through /api/file mutation routes', async () => {
+    const app = createApp(dir)
+
+    const createRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'docs/notes.md', content: '# Draft' }),
+    }))
+    expect(createRes.status).toBe(201)
+
+    const readCreated = await app.fetch(new Request('http://localhost/api/file?path=docs%2Fnotes.md'))
+    const createdBody = await readCreated.json() as { content: string; revisionToken: string }
+    expect(createdBody.content).toContain('# Draft')
+    expect(createdBody.revisionToken).toBeTruthy()
+
+    const updateRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'docs/notes.md',
+        content: '# Updated Draft',
+        revisionToken: createdBody.revisionToken,
+      }),
+    }))
+    expect(updateRes.status).toBe(200)
+
+    const reread = await app.fetch(new Request('http://localhost/api/file?path=docs%2Fnotes.md'))
+    const rereadBody = await reread.json() as { revisionToken: string }
+
+    const deleteRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'docs/notes.md',
+        revisionToken: rereadBody.revisionToken,
+      }),
+    }))
+    expect(deleteRes.status).toBe(200)
+
+    const missingRes = await app.fetch(new Request('http://localhost/api/file?path=docs%2Fnotes.md'))
+    expect(missingRes.status).toBe(404)
+  })
 })
 
 describe('Server startup path detection', () => {

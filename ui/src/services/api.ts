@@ -1,7 +1,10 @@
 import type {
+  ApiError,
   Branch,
   Commit,
   FileContent,
+  ManualFileMutationRequest,
+  ManualFileOperationResult,
   PickBrowseResponse,
   RepoInfo,
   SearchResponse,
@@ -23,6 +26,28 @@ async function request<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: unknown): Promise<T> {
+  const res = await fetch(BASE + path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  const payload = await res.json().catch(
+    () =>
+      ({
+        error: res.statusText,
+        code: 'UNKNOWN',
+      }) satisfies ApiError,
+  )
+
+  if (!res.ok) {
+    throw payload
+  }
+
+  return payload as T
+}
+
 export const api = {
   getInfo: (): Promise<RepoInfo> => request('/api/info'),
 
@@ -42,6 +67,15 @@ export const api = {
     if (raw) params.set('raw', 'true')
     return request(`/api/file?${params.toString()}`)
   },
+
+  createFile: (payload: ManualFileMutationRequest): Promise<ManualFileOperationResult> =>
+    mutate('/api/file', 'POST', payload),
+
+  updateFile: (payload: ManualFileMutationRequest): Promise<ManualFileOperationResult> =>
+    mutate('/api/file', 'PUT', payload),
+
+  deleteFile: (payload: ManualFileMutationRequest): Promise<ManualFileOperationResult> =>
+    mutate('/api/file', 'DELETE', payload),
 
   getCommits: (branch?: string, limit?: number): Promise<Commit[]> => {
     const params = new URLSearchParams()

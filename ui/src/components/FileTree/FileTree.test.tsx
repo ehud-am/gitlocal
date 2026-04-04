@@ -24,10 +24,10 @@ function makeQueryClient() {
   })
 }
 
-function renderWithClient(ui: React.ReactElement) {
-  const client = makeQueryClient()
+function renderWithClient(ui: React.ReactElement, client?: QueryClient) {
+  const queryClient = client ?? makeQueryClient()
   return render(
-    <QueryClientProvider client={client}>
+    <QueryClientProvider client={queryClient}>
       {ui}
     </QueryClientProvider>
   )
@@ -35,6 +35,7 @@ function renderWithClient(ui: React.ReactElement) {
 
 const defaultProps = {
   branch: 'main',
+  refreshToken: 0,
   selectedPath: '',
   selectedPathType: 'none' as const,
   onSelect: vi.fn(),
@@ -256,5 +257,86 @@ describe('FileTree', () => {
 
     const treeItem = screen.getByRole('treeitem', { name: /src/i })
     expect(treeItem).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('refreshes expanded folders when the refresh token changes', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }, { name: 'new.go', path: 'src/new.go', type: 'file' }])
+
+    const client = makeQueryClient()
+    const { rerender } = renderWithClient(<FileTree {...defaultProps} />, client)
+
+    await waitFor(() => {
+      expect(screen.getByText('src')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('src'))
+
+    await waitFor(() => {
+      expect(screen.getByText('main.go')).toBeInTheDocument()
+    })
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <FileTree {...defaultProps} refreshToken={1} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('new.go')).toBeInTheDocument()
+    })
+  })
+
+  it('marks expanded folders as errored when a refresh fetch fails', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockRejectedValueOnce(new Error('refresh failed'))
+
+    const client = makeQueryClient()
+    const { rerender } = renderWithClient(<FileTree {...defaultProps} />, client)
+
+    await waitFor(() => {
+      expect(screen.getByText('src')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('src'))
+    await waitFor(() => {
+      expect(screen.getByText('main.go')).toBeInTheDocument()
+    })
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <FileTree {...defaultProps} refreshToken={2} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      const treeItem = screen.getByRole('treeitem', { name: /src/i })
+      expect(treeItem).toHaveAttribute('aria-expanded', 'true')
+    })
+  })
+
+  it('handles auto-expansion failures for saved selected paths', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockRejectedValueOnce(new Error('expand failed'))
+
+    renderWithClient(
+      <FileTree
+        {...defaultProps}
+        selectedPath="src/main.go"
+        selectedPathType="file"
+      />,
+    )
+
+    await waitFor(() => {
+      const treeItem = screen.getByRole('treeitem', { name: /src/i })
+      expect(treeItem).toHaveAttribute('aria-expanded', 'false')
+    })
   })
 })

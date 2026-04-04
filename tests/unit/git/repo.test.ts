@@ -20,6 +20,15 @@ import {
   nearestExistingRepoPath,
   nearestExistingTrackedRepoPath,
   readWorkingTreeFile,
+  normalizeRepoRelativePath,
+  isPathInsideRepo,
+  resolveSafeRepoPath,
+  isIgnoredPath,
+  getEditableState,
+  getFileRevisionToken,
+  writeWorkingTreeTextFile,
+  deleteWorkingTreeFile,
+  listWorkingTreeDirectoryEntries,
 } from '../../../src/git/repo.js'
 
 afterEach(() => {
@@ -375,6 +384,19 @@ describe('working tree helpers', () => {
     }
   })
 
+  it('normalizes and validates repository-relative paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(normalizeRepoRelativePath('./docs/guide.md')).toBe('docs/guide.md')
+      expect(normalizeRepoRelativePath('\\docs\\guide.md')).toBe('docs/guide.md')
+      expect(isPathInsideRepo(dir, 'docs/guide.md')).toBe(true)
+      expect(isPathInsideRepo(dir, '../outside.txt')).toBe(false)
+      expect(resolveSafeRepoPath(dir, '../outside.txt')).toBeNull()
+    } finally {
+      cleanup()
+    }
+  })
+
   it('returns tracked files and tracked path types without surfacing untracked files', () => {
     const { dir, cleanup } = makeGitRepo()
     try {
@@ -395,5 +417,47 @@ describe('working tree helpers', () => {
 
   it('returns an empty tracked file list for invalid repositories', () => {
     expect(getTrackedWorkingTreeFiles(join(tmpdir(), 'definitely-missing-repo'))).toEqual([])
+  })
+
+  it('returns an empty tracked fallback when no tracked path exists', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(nearestExistingTrackedRepoPath(dir, 'missing/file.md')).toBe('')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('computes editable state and revision tokens for working-tree files only', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const branch = getCurrentBranch(dir)
+      const editable = getEditableState(dir, 'README.md', branch)
+      expect(editable.editable).toBe(true)
+      expect(editable.revisionToken).toBeTruthy()
+      expect(getEditableState(dir, 'missing.txt', branch)).toEqual({ editable: false, revisionToken: null })
+      expect(getEditableState(dir, 'README.md', 'feature-missing')).toEqual({ editable: false, revisionToken: null })
+      expect(getFileRevisionToken(dir, 'missing.txt')).toBeNull()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('writes, lists, ignores, and deletes working-tree files safely', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+      writeWorkingTreeTextFile(dir, 'notes/new.md', 'hello')
+      expect(readWorkingTreeFile(dir, 'notes/new.md')?.toString('utf-8')).toBe('hello')
+      expect(listWorkingTreeDirectoryEntries(dir, 'notes').some((node) => node.path === 'notes/new.md')).toBe(true)
+      writeFileSync(join(dir, 'ignored.txt'), 'skip me')
+      expect(isIgnoredPath(dir, 'ignored.txt')).toBe(true)
+      deleteWorkingTreeFile(dir, 'notes/new.md')
+      expect(readWorkingTreeFile(dir, 'notes/new.md')).toBeNull()
+      expect(() => writeWorkingTreeTextFile(dir, '../escape.txt', 'x')).toThrow(/inside the opened repository/i)
+      expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
+    } finally {
+      cleanup()
+    }
   })
 })

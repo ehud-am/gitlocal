@@ -15,6 +15,9 @@ vi.mock('./services/api', () => ({
     getBranches: vi.fn(),
     getCommits: vi.fn(),
     getFile: vi.fn(),
+    createFile: vi.fn(),
+    updateFile: vi.fn(),
+    deleteFile: vi.fn(),
     getSearchResults: vi.fn(),
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
@@ -72,7 +75,9 @@ describe('App', () => {
       type: 'text',
       content: 'hello',
       language: 'markdown',
-      encoding: 'utf8',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-docs',
     })
     vi.mocked(api.getSearchResults).mockResolvedValue({
       query: 'hello',
@@ -288,7 +293,9 @@ describe('App', () => {
       type: 'markdown',
       content: '# hello',
       language: '',
-      encoding: 'utf8',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-readme',
     })
 
     renderWithClient()
@@ -315,7 +322,9 @@ describe('App', () => {
       type: 'text',
       content: '# hello',
       language: 'markdown',
-      encoding: 'utf8',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-readme',
     })
 
     renderWithClient()
