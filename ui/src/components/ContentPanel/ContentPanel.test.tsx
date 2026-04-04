@@ -121,7 +121,7 @@ describe('ContentPanel', () => {
   })
 
   it('shows create errors and supports returning from create mode', async () => {
-    vi.mocked(api.createFile).mockRejectedValue({ error: 'That path already exists in the repository.' })
+    vi.mocked(api.createFile).mockRejectedValue({ message: 'That path already exists in the repository.' })
 
     renderWithClient(
       <ContentPanel
@@ -144,6 +144,29 @@ describe('ContentPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
     expect(screen.getByText(/select a file/i)).toBeInTheDocument()
+  })
+
+  it('suggests myfile names when README.md already exists in the folder', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file' },
+      { name: 'myfile.md', path: 'myfile.md', type: 'file' },
+      { name: 'myfile 1.md', path: 'myfile 1.md', type: 'file' },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    expect(screen.getByLabelText(/new file path/i)).toHaveValue('myfile 2.md')
   })
 
   it('shows a directory list for folders and supports creating a file in that folder', async () => {

@@ -43,13 +43,36 @@ function parentPathOf(path: string): string {
   return boundary >= 0 ? path.slice(0, boundary) : ''
 }
 
-function defaultDraftPath(selectedPath: string, selectedPathType: ViewerPathType): string {
-  if (selectedPathType === 'dir') return `${selectedPath}/README.md`
-  if (selectedPathType === 'file') {
-    const parentPath = parentPathOf(selectedPath)
-    return parentPath ? `${parentPath}/README.md` : 'README.md'
+function buildSuggestedFilename(entries: TreeNode[]): string {
+  const fileNames = new Set(
+    entries
+      .filter((entry) => entry.type === 'file')
+      .map((entry) => entry.name.toLowerCase()),
+  )
+
+  if (!fileNames.has('readme.md')) return 'README.md'
+  if (!fileNames.has('myfile.md')) return 'myfile.md'
+
+  let index = 1
+  while (fileNames.has(`myfile ${index}.md`)) {
+    index += 1
   }
-  return 'README.md'
+
+  return `myfile ${index}.md`
+}
+
+function buildSuggestedDraftPath(folderPath: string, entries: TreeNode[]): string {
+  const filename = buildSuggestedFilename(entries)
+  return folderPath ? `${folderPath}/${filename}` : filename
+}
+
+function getMutationErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message
+  if (error && typeof error === 'object') {
+    const maybePayload = error as { error?: string; message?: string }
+    return maybePayload.error ?? maybePayload.message ?? fallback
+  }
+  return fallback
 }
 
 export default function ContentPanel({
@@ -145,7 +168,7 @@ export default function ContentPanel({
       onStatusMessage?.(result.message)
       onMutationComplete?.({ result, nextPath: selectedPath, nextPathType: 'file' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : (error as { error?: string }).error ?? 'Failed to update the file.'
+      const message = getMutationErrorMessage(error, 'Failed to update the file.')
       setFormError(message)
       onStatusMessage?.(message)
     } finally {
@@ -168,7 +191,7 @@ export default function ContentPanel({
       onStatusMessage?.(result.message)
       onMutationComplete?.({ result, nextPath: result.path, nextPathType: 'file' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : (error as { error?: string }).error ?? 'Failed to create the file.'
+      const message = getMutationErrorMessage(error, 'Failed to create the file.')
       setFormError(message)
       onStatusMessage?.(message)
     } finally {
@@ -191,7 +214,7 @@ export default function ContentPanel({
       onStatusMessage?.(result.message)
       onMutationComplete?.({ result, nextPath, nextPathType: nextPath ? 'dir' : 'none' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : (error as { error?: string }).error ?? 'Failed to delete the file.'
+      const message = getMutationErrorMessage(error, 'Failed to delete the file.')
       setFormError(message)
       onStatusMessage?.(message)
     } finally {
@@ -199,9 +222,20 @@ export default function ContentPanel({
     }
   }
 
-  function beginCreateMode(): void {
+  async function beginCreateMode(): Promise<void> {
     if (!confirmDiscardIfNeeded()) return
-    setDraftPath(defaultDraftPath(selectedPath, selectedPathType).replace(/^\/+/, ''))
+    const folderPath = selectedPathType === 'dir' ? selectedPath : selectedPathType === 'file' ? parentPathOf(selectedPath) : ''
+    let entries = folderPath === directoryPath ? visibleDirectoryEntries : null
+
+    if (!entries) {
+      try {
+        entries = await api.getTree(folderPath, branch)
+      } catch {
+        entries = []
+      }
+    }
+
+    setDraftPath(buildSuggestedDraftPath(folderPath, entries).replace(/^\/+/, ''))
     setDraftContent('')
     setFormError('')
     setMode('create')
@@ -221,7 +255,7 @@ export default function ContentPanel({
             <div className="content-empty-actions">
               {emptyStateActions.map(({ label, action }) =>
                 action === 'create-file' ? (
-                  <button key={label} type="button" className="btn-raw btn-primary" onClick={beginCreateMode}>
+                  <button key={label} type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
                     {label}
                   </button>
                 ) : (
@@ -232,7 +266,7 @@ export default function ContentPanel({
               )}
             </div>
           ) : canMutateFiles ? (
-            <button type="button" className="btn-raw btn-primary" onClick={beginCreateMode}>
+            <button type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
               New file
             </button>
           ) : null}
@@ -258,7 +292,7 @@ export default function ContentPanel({
               <div className="content-empty-actions">
                 {emptyStateActions.map(({ label, action }) =>
                   action === 'create-file' ? (
-                    <button key={label} type="button" className="btn-raw btn-primary" onClick={beginCreateMode}>
+                    <button key={label} type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
                       {label}
                     </button>
                   ) : (
@@ -279,7 +313,7 @@ export default function ContentPanel({
               <h2 className="content-directory-heading">{path || 'root'}</h2>
             </div>
             {canMutateFiles ? (
-              <button type="button" className="btn-raw" onClick={beginCreateMode}>
+              <button type="button" className="btn-raw" onClick={() => { void beginCreateMode() }}>
                 {path ? 'New file here' : 'New file'}
               </button>
             ) : null}
@@ -415,7 +449,7 @@ export default function ContentPanel({
             <button
               type="button"
               className="btn-raw"
-              onClick={beginCreateMode}
+              onClick={() => { void beginCreateMode() }}
               disabled={mode !== 'view'}
             >
               New file

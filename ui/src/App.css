@@ -843,7 +843,7 @@ body {
   color: #fff;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #0858b8;
   border-color: #0858b8;
 }
@@ -853,12 +853,24 @@ body {
   color: #cf222e;
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background: rgba(207, 34, 46, 0.08);
 }
 
-.btn-raw:hover,
+.btn-raw:not(.btn-primary):not(.btn-danger):hover:not(:disabled),
 .copy-button:hover { background: var(--color-hover); }
+
+.btn-raw:disabled,
+.copy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-primary:disabled {
+  background: #0969da;
+  border-color: #0969da;
+  color: #fff;
+}
 
 .copy-button {
   width: 32px;
