@@ -1,8 +1,8 @@
 import {
-  getTrackedPathType,
+  getPathType,
   getWorkingTreeRevision,
   isWorkingTreeBranch,
-  nearestExistingTrackedRepoPath,
+  nearestExistingRepoPath,
 } from '../git/repo.js'
 import type { SyncStatus } from '../types.js'
 
@@ -24,11 +24,11 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     }
   }
 
-  const currentPathType = getTrackedPathType(repoPath, currentPath)
+  const currentPathType = getPathType(repoPath, currentPath)
   const resolvedPath = currentPathType === 'missing'
-    ? nearestExistingTrackedRepoPath(repoPath, currentPath)
+    ? nearestExistingRepoPath(repoPath, currentPath)
     : currentPath
-  const resolvedPathType = getTrackedPathType(repoPath, resolvedPath)
+  const resolvedPathType = getPathType(repoPath, resolvedPath)
 
   const treeStatus = currentPathType === 'missing' ? 'invalid' : 'unchanged'
   const fileStatus =

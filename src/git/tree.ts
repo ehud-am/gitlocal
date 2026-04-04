@@ -2,7 +2,7 @@ import { statSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import type { TreeNode } from '../types.js'
-import { getTrackedWorkingTreeFiles } from './repo.js'
+import { getTrackedWorkingTreeFiles, listWorkingTreeDirectoryEntries } from './repo.js'
 
 function runLsTree(repoPath: string, args: string[]): string {
   const result = spawnSync('git', ['ls-tree', ...args], { cwd: repoPath, encoding: 'utf-8' })
@@ -70,29 +70,7 @@ function getTrackedWorkingTreeEntries(repoPath: string): TreeNode[] {
 }
 
 export function listWorkingTreeDir(repoPath: string, subpath: string = ''): TreeNode[] {
-  const prefix = subpath ? `${subpath}/` : ''
-  const depth = subpath ? subpath.split('/').length + 1 : 1
-  const children = new Map<string, TreeNode>()
-
-  for (const entry of getTrackedWorkingTreeEntries(repoPath)) {
-    if (subpath) {
-      if (entry.path !== subpath && !entry.path.startsWith(prefix)) continue
-    }
-    if (!subpath && entry.path.includes('/')) {
-      const firstSegment = entry.path.split('/')[0]
-      if (entry.path !== firstSegment) continue
-    }
-
-    const segments = entry.path.split('/')
-    if (segments.length !== depth) continue
-
-    children.set(entry.path, entry)
-  }
-
-  return Array.from(children.values()).sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
+  return listWorkingTreeDirectoryEntries(repoPath, subpath)
 }
 
 function readSnippet(filePath: string, query: string, caseSensitive: boolean): { line: number; snippet: string } | null {

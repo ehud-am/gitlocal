@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { join, resolve } from 'node:path'
 import { infoHandler, branchesHandler, commitsHandler, readmeHandler } from './handlers/git.js'
-import { treeHandler, fileHandler } from './handlers/files.js'
+import { treeHandler, fileHandler, createFileHandler, updateFileHandler, deleteFileHandler } from './handlers/files.js'
 import { pickBrowseHandler, pickHandler, pickParentHandler } from './handlers/pick.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
@@ -75,6 +75,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/readme', readmeHandler)
   app.get('/api/tree', treeHandler)
   app.get('/api/file', fileHandler)
+  app.post('/api/file', createFileHandler)
+  app.put('/api/file', updateFileHandler)
+  app.delete('/api/file', deleteFileHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
   app.get('/api/pick/browse', pickBrowseHandler)

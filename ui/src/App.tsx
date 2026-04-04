@@ -39,6 +39,8 @@ export default function App() {
   const [readmeMissing, setReadmeMissing] = useState(false)
   const [pickerLoading, setPickerLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
 
@@ -187,7 +189,24 @@ export default function App() {
     }
   }, [syncStatus, queryClient])
 
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedChanges])
+
+  function confirmDiscardChanges(): boolean {
+    if (!hasUnsavedChanges) return true
+    return window.confirm('Discard your unsaved file changes?')
+  }
+
   function handleSelectFile(path: string) {
+    if (!confirmDiscardChanges()) return
     setSelectedPath(path)
     setSelectedPathType(path ? 'file' : 'none')
     setStatusMessage('')
@@ -195,6 +214,7 @@ export default function App() {
   }
 
   function handleSelectFolder(path: string) {
+    if (!confirmDiscardChanges()) return
     setSelectedPath(path)
     setSelectedPathType(path ? 'dir' : 'none')
     setStatusMessage('')
@@ -264,6 +284,23 @@ export default function App() {
     setSearchQuery('')
   }
 
+  const canMutateFiles = Boolean(info?.isGitRepo && !hasRepoMismatch && info.currentBranch && currentBranch === info.currentBranch)
+
+  async function handleMutationComplete(event: {
+    nextPath: string
+    nextPathType: SelectedPathType
+    result: { message: string }
+  }) {
+    setHasUnsavedChanges(false)
+    setSelectedPath(event.nextPath)
+    setSelectedPathType(event.nextPathType)
+    setShowRaw(false)
+    setStatusMessage(event.result.message)
+    setTreeRefreshToken((value) => value + 1)
+    await queryClient.invalidateQueries({ queryKey: ['tree'] })
+    await queryClient.invalidateQueries({ queryKey: ['sync'] })
+  }
+
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
   const visibleSelectedPathType: SelectedPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
@@ -316,6 +353,7 @@ export default function App() {
             </div>
             <FileTree
               branch={currentBranch}
+              refreshToken={treeRefreshToken}
               selectedPath={visibleSelectedPath}
               selectedPathType={visibleSelectedPathType}
               onSelect={(
@@ -331,7 +369,10 @@ export default function App() {
             />
             <GitInfo
               branch={currentBranch}
-              onBranchChange={setCurrentBranch}
+              onBranchChange={(nextBranch) => {
+                if (!confirmDiscardChanges()) return
+                setCurrentBranch(nextBranch)
+              }}
             />
           </aside>
         )}
@@ -370,13 +411,18 @@ export default function App() {
               }}
             />
             <ContentPanel
+              canMutateFiles={canMutateFiles}
+              refreshToken={treeRefreshToken}
               selectedPath={visibleSelectedPath}
               selectedPathType={visibleSelectedPathType}
               branch={currentBranch}
               onNavigate={handleSelectFile}
+              onDirtyChange={setHasUnsavedChanges}
+              onMutationComplete={(event) => { void handleMutationComplete(event) }}
               placeholder={noReadmePlaceholder}
               raw={visibleShowRaw}
               onRawChange={setShowRaw}
+              onStatusMessage={setStatusMessage}
             />
           </div>
         </div>

@@ -37,12 +37,34 @@ export interface TreeNode {
   type: 'file' | 'dir'
 }
 
+export type FileEncoding = 'utf-8' | 'base64' | 'none'
+export type FileContentType = 'markdown' | 'text' | 'image' | 'binary'
+
 export interface FileContent {
   path: string
   content: string
-  encoding: 'utf-8' | 'base64' | 'none'
-  type: 'markdown' | 'text' | 'image' | 'binary'
+  encoding: FileEncoding
+  type: FileContentType
   language: string
+  editable: boolean
+  revisionToken: string | null
+}
+
+export interface ManualFileMutationRequest {
+  path: string
+  content?: string
+  revisionToken?: string
+}
+
+export type ManualFileOperation = 'create' | 'update' | 'delete'
+export type ManualFileOperationStatus = 'created' | 'updated' | 'deleted' | 'conflict' | 'blocked' | 'failed'
+
+export interface ManualFileOperationResult {
+  ok: boolean
+  operation: ManualFileOperation
+  path: string
+  status: ManualFileOperationStatus
+  message: string
 }
 
 export interface PickRequest {

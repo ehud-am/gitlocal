@@ -6,6 +6,7 @@ import FileTreeNode from './FileTreeNode'
 
 interface Props {
   branch: string
+  refreshToken: number
   selectedPath: string
   selectedPathType: 'file' | 'dir' | 'none'
   onSelect: (path: string, type: 'file' | 'dir') => void
@@ -18,11 +19,11 @@ interface NodeState {
   error: boolean
 }
 
-export default function FileTree({ branch, selectedPath, selectedPathType, onSelect }: Props) {
+export default function FileTree({ branch, refreshToken, selectedPath, selectedPathType, onSelect }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
 
   const { data: roots, isLoading, isError } = useQuery({
-    queryKey: ['tree', '', branch],
+    queryKey: ['tree', '', branch, refreshToken],
     queryFn: () => api.getTree('', branch),
   })
 
@@ -67,6 +68,54 @@ export default function FileTree({ branch, selectedPath, selectedPathType, onSel
   }, [nodeStates, branch])
 
   useEffect(() => {
+    const expandedPaths = Array.from(nodeStates.entries())
+      .filter(([, state]) => state.expanded)
+      .map(([path]) => path)
+
+    if (expandedPaths.length === 0) return
+
+    setNodeStates((prev) => {
+      const next = new Map(prev)
+      for (const path of expandedPaths) {
+        const current = next.get(path)
+        if (!current) continue
+        next.set(path, { ...current, loading: true, error: false })
+      }
+      return next
+    })
+
+    let cancelled = false
+
+    for (const path of expandedPaths) {
+      api.getTree(path, branch)
+        .then((children) => {
+          if (cancelled) return
+          setNodeStates((current) => {
+            const updated = new Map(current)
+            const existing = updated.get(path)
+            if (!existing) return updated
+            updated.set(path, { ...existing, children, loading: false, error: false })
+            return updated
+          })
+        })
+        .catch(() => {
+          if (cancelled) return
+          setNodeStates((current) => {
+            const updated = new Map(current)
+            const existing = updated.get(path)
+            if (!existing) return updated
+            updated.set(path, { ...existing, loading: false, error: true })
+            return updated
+          })
+        })
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [branch, refreshToken])
+
+  useEffect(() => {
     if (!selectedPath) return
     const directories = selectedPath
       .split('/')
@@ -77,7 +126,7 @@ export default function FileTree({ branch, selectedPath, selectedPathType, onSel
     void directories.reduce<Promise<void>>(async (previous, dirPath) => {
       await previous
       const current = nodeStates.get(dirPath)
-      if (current?.expanded || current?.children) return
+      if (current?.expanded || current?.children || current?.error) return
 
       setNodeStates((prev) => {
         const next = new Map(prev)
