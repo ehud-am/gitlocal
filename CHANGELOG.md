@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.6
+
+- Reserved the next release version for the upcoming editor workspace and empty-repository UX improvements captured in `007-editor-empty-repo`.
+
 ## 0.4.5
 
 - Added manual local file creation, in-place editing, and deletion flows in the repository viewer with dirty-state protection and sync-aware refresh behavior.

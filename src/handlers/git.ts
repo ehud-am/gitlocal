@@ -14,6 +14,8 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
       isGitRepo: false,
       pickerMode: true,
       version: getAppVersion(),
+      hasCommits: false,
+      rootEntryCount: 0,
     })
   }
   const info = getInfo(repoPath)

@@ -49,7 +49,7 @@ async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: 
 }
 
 export const api = {
-  getInfo: (): Promise<RepoInfo> => request('/api/info'),
+  getInfo: (): Promise<RepoInfo> => request<RepoInfo>('/api/info'),
 
   getBranches: (): Promise<Branch[]> => request('/api/branches'),
 

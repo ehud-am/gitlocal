@@ -46,10 +46,7 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     resolvedPath,
     currentPathType,
     resolvedPathType,
-    statusMessage:
-      currentPathType === 'missing'
-        ? 'The current location is no longer available. GitLocal moved you to the nearest valid path.'
-        : '',
+    statusMessage: '',
     checkedAt,
   }
 }

@@ -61,18 +61,59 @@ export function getCurrentBranch(repoPath: string): string {
   }
 }
 
+export function hasCommits(repoPath: string): boolean {
+  const result = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
+    cwd: repoPath,
+    stdio: 'ignore',
+  })
+  return result.status === 0
+}
+
+export function getBrowseableRootEntryCount(repoPath: string): number {
+  return listWorkingTreeDirectoryEntries(repoPath)
+    .filter((entry) => !entry.name.startsWith('.'))
+    .length
+}
+
 export function getInfo(repoPath: string): RepoInfo {
   const version = getAppVersion()
   if (!repoPath) {
-    return { name: '', path: '', currentBranch: '', isGitRepo: false, pickerMode: true, version }
+    return {
+      name: '',
+      path: '',
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: true,
+      version,
+      hasCommits: false,
+      rootEntryCount: 0,
+    }
   }
   const isGitRepo = validateRepo(repoPath)
   if (!isGitRepo) {
-    return { name: basename(repoPath), path: repoPath, currentBranch: '', isGitRepo: false, pickerMode: false, version }
+    return {
+      name: basename(repoPath),
+      path: repoPath,
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: false,
+      version,
+      hasCommits: false,
+      rootEntryCount: 0,
+    }
   }
   let currentBranch = ''
   currentBranch = getCurrentBranch(repoPath)
-  return { name: basename(repoPath), path: repoPath, currentBranch, isGitRepo: true, pickerMode: false, version }
+  return {
+    name: basename(repoPath),
+    path: repoPath,
+    currentBranch,
+    isGitRepo: true,
+    pickerMode: false,
+    version,
+    hasCommits: hasCommits(repoPath),
+    rootEntryCount: getBrowseableRootEntryCount(repoPath),
+  }
 }
 
 export function getBranches(repoPath: string): Branch[] {
@@ -130,6 +171,15 @@ export function getCommits(repoPath: string, branch: string, limit: number = 10)
 }
 
 export function findReadme(repoPath: string, branch: string = 'HEAD'): string {
+  if (isWorkingTreeBranch(repoPath, branch)) {
+    const workingTreeReadme = listWorkingTreeDirectoryEntries(repoPath)
+      .map((entry) => entry.path)
+      .find((filePath) => /^readme(\.\w+)?$/i.test(filePath))
+    if (workingTreeReadme) {
+      return workingTreeReadme
+    }
+  }
+
   let output = ''
   try {
     output = spawnGit(repoPath, 'ls-tree', '--name-only', branch)

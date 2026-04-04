@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -55,6 +55,29 @@ describe('infoHandler', () => {
     expect(body.name).toBeTruthy()
     expect(body.currentBranch).toBeTruthy()
     expect(body.version).toBe(APP_VERSION.version)
+    expect(body.hasCommits).toBe(true)
+    expect(body.rootEntryCount).toBeGreaterThan(0)
+  })
+
+  it('returns empty-repo metadata for a repo with no commits and no browseable entries', async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-info-'))
+    spawnSync('git', ['init'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: emptyDir })
+
+    try {
+      const app = createApp(emptyDir)
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.isGitRepo).toBe(true)
+      expect(body.currentBranch).toBe('')
+      expect(body.hasCommits).toBe(false)
+      expect(body.rootEntryCount).toBe(0)
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -214,5 +237,50 @@ describe('readmeHandler', () => {
     expect(body.path).toBe('')
 
     rmSync(emptyDir, { recursive: true, force: true })
+  })
+
+  it('returns a working-tree README path for newly initialized repositories before the first commit', async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'working-tree-readme-handler-'))
+    spawnSync('git', ['init'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: emptyDir })
+    writeFileSync(join(emptyDir, 'README.md'), '# Draft')
+
+    try {
+      const app = createApp(emptyDir)
+      const client = testClient(app)
+      const res = await client.api.readme.$get()
+      const body = await res.json()
+      expect(body.path).toBe('README.md')
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('treeHandler', () => {
+  it('returns immediate child files and folders for the requested directory', async () => {
+    const repo = makeGitRepo()
+    const dir = repo.dir
+
+    mkdirSync(join(dir, 'docs', 'nested'), { recursive: true })
+    writeFileSync(join(dir, 'docs', 'guide.md'), '# guide')
+    writeFileSync(join(dir, 'docs', 'notes.md'), '# notes')
+    writeFileSync(join(dir, 'docs', 'nested', 'child.md'), '# nested')
+
+    try {
+      const app = createApp(dir)
+      const client = testClient(app)
+      const res = await client.api.tree.$get({ query: { path: 'docs' } })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual([
+        { name: 'nested', path: 'docs/nested', type: 'dir' },
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+        { name: 'notes.md', path: 'docs/notes.md', type: 'file' },
+      ])
+    } finally {
+      repo.cleanup()
+    }
   })
 })
