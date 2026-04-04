@@ -11,6 +11,13 @@ interface Props {
   onNavigate: (path: string) => void
 }
 
+function stripHiddenMarkdownComments(content: string): string {
+  return content
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^\[\/\/\]:\s*#\s*\(.*\)\s*$/gm, '')
+    .replace(/^\[comment\]:\s*#\s*\(.*\)\s*$/gim, '')
+}
+
 function flattenText(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node)
   if (Array.isArray(node)) return node.map(flattenText).join('')
@@ -21,6 +28,8 @@ function flattenText(node: ReactNode): string {
 }
 
 export default function MarkdownRenderer({ content, onNavigate }: Props) {
+  const renderContent = stripHiddenMarkdownComments(content)
+
   return (
     <div className="markdown-body">
       <ReactMarkdown
@@ -72,7 +81,7 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
           },
         }}
       >
-        {content}
+        {renderContent}
       </ReactMarkdown>
     </div>
   )

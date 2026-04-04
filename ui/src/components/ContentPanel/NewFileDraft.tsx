@@ -47,7 +47,7 @@ export default function NewFileDraft({
           aria-label="New file path"
           value={path}
           onChange={(event) => onPathChange(event.target.value)}
-          placeholder="docs/notes.md"
+          placeholder="README.md"
           autoFocus
         />
       </label>

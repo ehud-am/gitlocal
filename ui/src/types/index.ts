@@ -5,15 +5,18 @@ export interface RepoInfo {
   isGitRepo: boolean
   pickerMode: boolean
   version: string
+  hasCommits: boolean
+  rootEntryCount: number
 }
 
 export type SearchPresentation = 'collapsed' | 'expanded'
+export type ViewerPathType = 'file' | 'dir' | 'none'
 
 export interface ViewerState {
   repoPath: string
   branch: string
   path: string
-  pathType: 'file' | 'dir' | 'none'
+  pathType: ViewerPathType
   raw: boolean
   sidebarCollapsed: boolean
   searchPresentation: SearchPresentation

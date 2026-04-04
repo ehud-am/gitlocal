@@ -10,7 +10,7 @@ interface Props {
 
 export default function InlineFileEditor({ path, content, busy = false, error, onChange, onSave, onCancel }: Props) {
   return (
-    <div className="manual-editor-card">
+    <div className="manual-editor-card manual-editor-expanded">
       <div className="manual-editor-header">
         <div>
           <h3>Edit file</h3>

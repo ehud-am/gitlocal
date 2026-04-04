@@ -52,6 +52,8 @@ describe('App', () => {
       isGitRepo: true,
       pickerMode: false,
       version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 1,
     })
     vi.mocked(api.getReadme).mockResolvedValue({ path: 'README.md' })
     vi.mocked(api.getSyncStatus).mockResolvedValue({
@@ -155,7 +157,7 @@ describe('App', () => {
     expect(screen.queryByDisplayValue('hello')).not.toBeInTheDocument()
   })
 
-  it('shows a recovery status when sync reports a missing path', async () => {
+  it('silently recovers when sync reports a missing path', async () => {
     vi.mocked(api.getSyncStatus).mockResolvedValueOnce({
       branch: 'main',
       repoPath: '/tmp/repo',
@@ -173,8 +175,9 @@ describe('App', () => {
     renderWithClient()
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(/no longer available/i)
+      expect(api.getFile).not.toHaveBeenCalledWith('docs/guide.md', 'main', true)
     })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('renders a collapsed navigation rail with an in-panel restore icon', async () => {
@@ -235,11 +238,17 @@ describe('App', () => {
 
   it('hydrates a saved folder selection without trying to load it as a file', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir')
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path === 'docs'
+        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file' }]
+        : []
+    ))
 
     renderWithClient()
 
     await waitFor(() => {
-      expect(screen.getByText(/browse files inside/i)).toHaveTextContent('docs')
+      expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
     })
 
     expect(api.getFile).not.toHaveBeenCalledWith('docs', 'main', expect.anything())
@@ -264,6 +273,8 @@ describe('App', () => {
       isGitRepo: false,
       pickerMode: true,
       version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
     })
 
     renderWithClient()
@@ -316,6 +327,8 @@ describe('App', () => {
       isGitRepo: true,
       pickerMode: false,
       version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 1,
     })
     vi.mocked(api.getFile).mockResolvedValueOnce({
       path: 'README.md',
@@ -337,5 +350,135 @@ describe('App', () => {
     expect(window.location.search).toContain('repoPath=%2Ftmp%2Fnew-repo')
     expect(window.location.search).toContain('path=README.md')
     expect(window.location.search).not.toContain('docs%2Fguide.md')
+  })
+
+  it('falls back to the current folder list after switching repositories resets the saved file context', async () => {
+    window.history.replaceState(null, '', '/?repoPath=%2Ftmp%2Fold-repo&branch=main&path=docs%2Fguide.md&pathType=file')
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/new-repo',
+      currentBranch: 'main',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 2,
+    })
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path
+        ? []
+        : [
+            { name: 'README.md', path: 'README.md', type: 'file' },
+            { name: 'docs', path: 'docs', type: 'dir' },
+          ]
+    ))
+
+    renderWithClient()
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/reset the saved file context/i)
+    expect(screen.queryByRole('heading', { name: /pick up where you left off/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file readme\.md/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
+  })
+
+  it('shows an empty-repository landing state when there is no README and no root content', async () => {
+    window.history.replaceState(null, '', '/')
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: '',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
+    })
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
+    vi.mocked(api.getBranches).mockResolvedValueOnce([])
+
+    renderWithClient()
+
+    expect(await screen.findByRole('button', { name: /create first file/i })).toBeInTheDocument()
+    expect(screen.getByText(/newly initialized or empty/i)).toBeInTheDocument()
+  })
+
+  it('opens a working-tree README by default before the first commit exists', async () => {
+    window.history.replaceState(null, '', '/')
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: '',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 1,
+    })
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: 'README.md' })
+    vi.mocked(api.getFile).mockResolvedValueOnce({
+      path: 'README.md',
+      type: 'markdown',
+      content: '# hello',
+      language: '',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-readme',
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('README.md', '', false)
+    })
+  })
+
+  it('clears a stale saved branch when the opened repository has no commits yet', async () => {
+    window.history.replaceState(null, '', '/?branch=main')
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: '',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
+    })
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
+    vi.mocked(api.getBranches).mockResolvedValueOnce([])
+
+    renderWithClient()
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/has no commits yet/i)
+  })
+
+  it('shows a missing-readme landing state when the repository has content but no README', async () => {
+    window.history.replaceState(null, '', '/?branch=main')
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: 'main',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 3,
+    })
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path
+        ? []
+        : [
+            { name: 'src', path: 'src', type: 'dir' },
+            { name: 'main.ts', path: 'main.ts', type: 'file' },
+          ]
+    ))
+
+    renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: /no readme yet/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open folder src/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file main\.ts/i })).toBeInTheDocument()
   })
 })

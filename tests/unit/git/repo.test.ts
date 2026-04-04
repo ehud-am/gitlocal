@@ -7,6 +7,8 @@ import {
   spawnGit,
   validateRepo,
   getInfo,
+  hasCommits,
+  getBrowseableRootEntryCount,
   getBranches,
   getCommits,
   findReadme,
@@ -106,6 +108,8 @@ describe('getInfo', () => {
       expect(info.pickerMode).toBe(false)
       expect(info.currentBranch).toBeTruthy()
       expect(info.name).toBeTruthy()
+      expect(info.hasCommits).toBe(true)
+      expect(info.rootEntryCount).toBe(4)
     } finally {
       cleanup()
     }
@@ -175,6 +179,31 @@ describe('getInfo — empty repo', () => {
       const info = getInfo(dir)
       expect(info.isGitRepo).toBe(true)
       expect(info.currentBranch).toBe('')
+      expect(info.hasCommits).toBe(false)
+      expect(info.rootEntryCount).toBe(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('hasCommits', () => {
+  it('returns true for a repository with at least one commit', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(hasCommits(dir)).toBe(true)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns false for a repository with no commits yet', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'empty-git-commits-'))
+    spawnSync('git', ['init'], { cwd: dir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir })
+    try {
+      expect(hasCommits(dir)).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -232,6 +261,20 @@ describe('findReadme', () => {
       expect(readme.toLowerCase()).toContain('readme')
     } finally {
       cleanup()
+    }
+  })
+
+  it('finds an uncommitted working-tree README in a newly initialized repository', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'working-tree-readme-'))
+    spawnSync('git', ['init'], { cwd: dir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir })
+    writeFileSync(join(dir, 'README.md'), '# Draft readme')
+
+    try {
+      expect(findReadme(dir, 'HEAD')).toBe('README.md')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
@@ -456,6 +499,17 @@ describe('working tree helpers', () => {
       expect(readWorkingTreeFile(dir, 'notes/new.md')).toBeNull()
       expect(() => writeWorkingTreeTextFile(dir, '../escape.txt', 'x')).toThrow(/inside the opened repository/i)
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('counts only browseable root entries for landing-state decisions', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+      writeFileSync(join(dir, 'ignored.txt'), 'skip me')
+      expect(getBrowseableRootEntryCount(dir)).toBe(4)
     } finally {
       cleanup()
     }

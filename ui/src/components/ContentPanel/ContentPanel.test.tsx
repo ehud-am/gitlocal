@@ -7,18 +7,11 @@ import ContentPanel from './ContentPanel'
 vi.mock('../../services/api', () => ({
   api: {
     getFile: vi.fn(),
+    getTree: vi.fn(),
     createFile: vi.fn(),
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
   },
-}))
-
-vi.mock('./MarkdownRenderer', () => ({
-  default: ({ onNavigate }: { content: string; onNavigate: (p: string) => void }) => (
-    <div data-testid="markdown-renderer">
-      <button onClick={() => onNavigate('docs/guide.md')}>link</button>
-    </div>
-  ),
 }))
 
 vi.mock('./CodeViewer', () => ({
@@ -64,9 +57,10 @@ describe('ContentPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.getTree).mockResolvedValue([])
   })
 
-  it('shows empty state when no filePath', () => {
+  it('shows empty state when no filePath', async () => {
     const { container } = renderWithClient(
       <ContentPanel
         canMutateFiles={false}
@@ -75,17 +69,18 @@ describe('ContentPanel', () => {
         selectedPathType="none"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
-    expect(screen.getByText(/Select a file/i)).toBeInTheDocument()
-    return expect(axe(container)).resolves.toMatchObject({ violations: [] })
+    expect(await screen.findByText(/Select a file/i)).toBeInTheDocument()
+    await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
   it('offers a create action from the empty state when mutation is allowed', async () => {
     vi.mocked(api.createFile).mockResolvedValue({
       ok: true,
       operation: 'create',
-      path: 'docs/new.md',
+      path: 'README.md',
       status: 'created',
       message: 'File created successfully.',
     })
@@ -101,23 +96,25 @@ describe('ContentPanel', () => {
         selectedPathType="none"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
         onMutationComplete={onMutationComplete}
         onStatusMessage={onStatusMessage}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /new file/i }))
-    fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'docs/new.md' } })
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    expect(screen.getByLabelText(/new file path/i)).toHaveValue('README.md')
+    fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
     fireEvent.change(screen.getByLabelText(/new file content/i), { target: { value: '# Draft' } })
     fireEvent.click(screen.getByRole('button', { name: /create file/i }))
 
     await waitFor(() => {
-      expect(api.createFile).toHaveBeenCalledWith({ path: 'docs/new.md', content: '# Draft' })
+      expect(api.createFile).toHaveBeenCalledWith({ path: 'README.md', content: '# Draft' })
     })
     expect(onStatusMessage).toHaveBeenCalledWith('File created successfully.')
     expect(onMutationComplete).toHaveBeenCalledWith(
       expect.objectContaining({
-        nextPath: 'docs/new.md',
+        nextPath: 'README.md',
         nextPathType: 'file',
       }),
     )
@@ -134,11 +131,13 @@ describe('ContentPanel', () => {
         selectedPathType="none"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /new file/i }))
-    fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'docs/new.md' } })
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    expect(screen.getByLabelText(/new file path/i)).toHaveAttribute('placeholder', 'README.md')
+    fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
     fireEvent.click(screen.getByRole('button', { name: /create file/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/already exists/i)
@@ -147,7 +146,7 @@ describe('ContentPanel', () => {
     expect(screen.getByText(/select a file/i)).toBeInTheDocument()
   })
 
-  it('shows folder placeholder and supports creating a file in that folder', async () => {
+  it('shows a directory list for folders and supports creating a file in that folder', async () => {
     vi.mocked(api.createFile).mockResolvedValue({
       ok: true,
       operation: 'create',
@@ -155,6 +154,9 @@ describe('ContentPanel', () => {
       status: 'created',
       message: 'File created successfully.',
     })
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+    ])
 
     renderWithClient(
       <ContentPanel
@@ -164,14 +166,20 @@ describe('ContentPanel', () => {
         selectedPathType="dir"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
+    expect(await screen.findByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /new file here/i }))
-    expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/')
+    expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/README.md')
   })
 
   it('cancels create mode from the draft form', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+    ])
+
     renderWithClient(
       <ContentPanel
         canMutateFiles
@@ -180,13 +188,59 @@ describe('ContentPanel', () => {
         selectedPathType="dir"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /new file here/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /new file here/i }))
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
 
-    expect(screen.getByText(/browse files inside/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+  })
+
+  it('opens directory entries with the row button and double click', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'src', path: 'src', type: 'dir' },
+      { name: 'main.ts', path: 'main.ts', type: 'file' },
+    ])
+
+    const onOpenPath = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /open folder src/i }))
+    fireEvent.doubleClick(screen.getByRole('button', { name: /open file main\.ts/i }).closest('.content-directory-row') as HTMLElement)
+
+    expect(onOpenPath).toHaveBeenNthCalledWith(1, 'src', 'dir')
+    expect(onOpenPath).toHaveBeenNthCalledWith(2, 'main.ts', 'file')
+  })
+
+  it('shows an intentional empty-folder state for selected folders with no entries', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="empty"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/does not have any visible files or folders yet/i)).toBeInTheDocument()
   })
 
   it('shows loading skeleton while fetching', async () => {
@@ -200,6 +254,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -217,6 +272,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -236,11 +292,12 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument()
     })
   })
 
@@ -256,6 +313,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
         onRawChange={onRawChange}
       />,
     )
@@ -298,6 +356,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -314,6 +373,7 @@ describe('ContentPanel', () => {
           selectedPathType="file"
           branch="main"
           onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
         />
       </QueryClientProvider>,
     )
@@ -346,6 +406,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
         onDirtyChange={onDirtyChange}
         onMutationComplete={onMutationComplete}
       />,
@@ -353,6 +414,8 @@ describe('ContentPanel', () => {
 
     await screen.findByRole('button', { name: /edit file/i })
     fireEvent.click(screen.getByRole('button', { name: /edit file/i }))
+    expect(document.querySelector('.content-panel.content-panel-editing')).toBeTruthy()
+    expect(document.querySelector('.manual-editor-card.manual-editor-expanded')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'updated text' } })
 
     await waitFor(() => {
@@ -388,6 +451,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -410,6 +474,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -431,6 +496,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -461,6 +527,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
         onMutationComplete={onMutationComplete}
       />,
     )
@@ -496,6 +563,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
@@ -519,17 +587,18 @@ describe('ContentPanel', () => {
         selectedPathType="none"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /new file/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
     fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'docs/draft.md' } })
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
 
     expect(screen.getByLabelText(/new file path/i)).toBeInTheDocument()
   })
 
-  it('shows custom placeholder when filePath empty and placeholder prop provided', () => {
+  it('shows custom placeholder when filePath empty and placeholder prop provided', async () => {
     renderWithClient(
       <ContentPanel
         canMutateFiles={false}
@@ -538,14 +607,49 @@ describe('ContentPanel', () => {
         selectedPathType="none"
         branch="main"
         onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
         placeholder="No README found in this repository."
       />,
     )
-    expect(screen.getByText('No README found in this repository.')).toBeInTheDocument()
+    expect(await screen.findByText('No README found in this repository.')).toBeInTheDocument()
+  })
+
+  it('renders a structured landing state with title, detail, and actions when provided', async () => {
+    const onBrowseParent = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        placeholder="No README found in this repository."
+        emptyStateTitle="This repository is ready for a first file"
+        emptyStateDetail="There is no README yet, so GitLocal is showing a guided landing state instead."
+        emptyStateActions={[
+          { label: 'Create first file', action: 'create-file' },
+          { label: 'Browse parent folder', action: 'open-parent' },
+        ]}
+        onBrowseParent={onBrowseParent}
+      />,
+    )
+
+    expect(await screen.findByRole('heading', { name: /ready for a first file/i })).toBeInTheDocument()
+    expect(screen.getByText(/guided landing state/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /create first file/i }))
+    expect(screen.getByLabelText(/new file path/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
+    fireEvent.click(screen.getByRole('button', { name: /browse parent folder/i }))
+    expect(onBrowseParent).toHaveBeenCalledTimes(1)
   })
 
   it('relative link in MarkdownRenderer calls onNavigate', async () => {
-    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ type: 'markdown', language: '', content: '# Hello' }))
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ type: 'markdown', language: '', content: '[Guide](docs/guide.md)' }),
+    )
 
     const onNavigate = vi.fn()
 
@@ -557,15 +661,51 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         branch="main"
         onNavigate={onNavigate}
+        onOpenPath={vi.fn()}
       />,
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Guide' })).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByText('link'))
+    fireEvent.click(screen.getByRole('link', { name: 'Guide' }))
 
     expect(onNavigate).toHaveBeenCalledWith('docs/guide.md')
+  })
+
+  it('hides markdown comments in rendered mode while raw mode still shows them', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({
+        type: 'markdown',
+        language: '',
+        content: '# Hello\n\n<!-- hidden comment -->\n\n[//]: # (hidden reference)\n\nVisible text',
+      }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/hidden comment/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/hidden reference/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /view raw/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/hidden comment/i)).toBeInTheDocument()
+      expect(screen.getByText(/hidden reference/i)).toBeInTheDocument()
+    })
   })
 })

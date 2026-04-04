@@ -9,10 +9,10 @@ import PickerPage from './components/Picker/PickerPage'
 import SearchPanel from './components/Search/SearchPanel'
 import SearchTrigger from './components/Search/SearchTrigger'
 import AppFooter from './components/AppFooter'
-import type { SearchPresentation, SearchResult } from './types'
+import type { SearchPresentation, SearchResult, ViewerPathType } from './types'
 import { readViewerState, writeViewerState } from './services/viewerState'
 
-type SelectedPathType = 'file' | 'dir' | 'none'
+type LandingAction = { label: string; action: 'create-file' | 'open-parent' }
 
 function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
@@ -30,7 +30,7 @@ export default function App() {
   const initialViewerState = readViewerState()
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
   const [selectedPath, setSelectedPath] = useState(initialViewerState.path)
-  const [selectedPathType, setSelectedPathType] = useState<SelectedPathType>(initialViewerState.pathType)
+  const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>(initialViewerState.pathType)
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
   const [showRaw, setShowRaw] = useState(initialViewerState.raw)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
@@ -71,7 +71,17 @@ export default function App() {
   }, [info, currentBranch])
 
   useEffect(() => {
-    if (!info?.isGitRepo || !branches || branches.length === 0 || !currentBranch) return
+    if (!info?.isGitRepo || !branches) return
+
+    if (branches.length === 0) {
+      if (currentBranch) {
+        setCurrentBranch('')
+        setStatusMessage('GitLocal cleared the saved branch because this repository has no commits yet.')
+      }
+      return
+    }
+
+    if (!currentBranch) return
 
     const branchExists = branches.some((branch) => branch.name === currentBranch)
     if (branchExists) return
@@ -108,8 +118,8 @@ export default function App() {
     setStatusMessage('GitLocal reset the saved file context because you opened a different repository.')
     lastRevisionRef.current = ''
 
-    if (info.currentBranch && currentBranch !== info.currentBranch) {
-      setCurrentBranch(info.currentBranch)
+    if (currentBranch !== info.currentBranch) {
+      setCurrentBranch(info.currentBranch || '')
     }
   }, [currentBranch, info, viewerRepoPath])
 
@@ -284,11 +294,15 @@ export default function App() {
     setSearchQuery('')
   }
 
-  const canMutateFiles = Boolean(info?.isGitRepo && !hasRepoMismatch && info.currentBranch && currentBranch === info.currentBranch)
+  const canMutateFiles = Boolean(
+    info?.isGitRepo
+    && !hasRepoMismatch
+    && (!info.currentBranch || currentBranch === info.currentBranch),
+  )
 
   async function handleMutationComplete(event: {
     nextPath: string
-    nextPathType: SelectedPathType
+    nextPathType: ViewerPathType
     result: { message: string }
   }) {
     setHasUnsavedChanges(false)
@@ -302,10 +316,33 @@ export default function App() {
   }
 
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
-  const visibleSelectedPathType: SelectedPathType = hasRepoMismatch ? 'none' : selectedPathType
+  const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
-  const noReadmePlaceholder =
-    readmeMissing && !visibleSelectedPath ? 'No README found in this repository.' : undefined
+  let emptyStateTitle: string | undefined
+  let emptyStateDetail: string | undefined
+  let emptyStateActions: LandingAction[] | undefined
+
+  if (!visibleSelectedPath && !hasRepoMismatch) {
+    if (readmeMissing && info?.rootEntryCount === 0) {
+      emptyStateTitle = 'This repository is ready for a first file'
+      emptyStateDetail = 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
+      emptyStateActions = canMutateFiles
+        ? [
+            { label: 'Create first file', action: 'create-file' },
+            { label: 'Browse parent folder', action: 'open-parent' },
+          ]
+        : [{ label: 'Browse parent folder', action: 'open-parent' }]
+    } else if (readmeMissing) {
+      emptyStateTitle = 'No README yet'
+      emptyStateDetail = 'This repository has content, but there is no README to open by default. You can browse the repository tree, create a new file, or return to a parent folder.'
+      emptyStateActions = canMutateFiles
+        ? [
+            { label: 'Create new file', action: 'create-file' },
+            { label: 'Browse parent folder', action: 'open-parent' },
+          ]
+        : [{ label: 'Browse parent folder', action: 'open-parent' }]
+    }
+  }
 
   return (
     <>
@@ -417,9 +454,20 @@ export default function App() {
               selectedPathType={visibleSelectedPathType}
               branch={currentBranch}
               onNavigate={handleSelectFile}
+              onOpenPath={(path, type) => {
+                if (type === 'dir') {
+                  handleSelectFolder(path)
+                  return
+                }
+                handleSelectFile(path)
+              }}
               onDirtyChange={setHasUnsavedChanges}
               onMutationComplete={(event) => { void handleMutationComplete(event) }}
-              placeholder={noReadmePlaceholder}
+              placeholder={readmeMissing && !visibleSelectedPath ? 'No README found in this repository.' : undefined}
+              emptyStateTitle={emptyStateTitle}
+              emptyStateDetail={emptyStateDetail}
+              emptyStateActions={emptyStateActions}
+              onBrowseParent={() => { void handleBrowseParentFolder() }}
               raw={visibleShowRaw}
               onRawChange={setShowRaw}
               onStatusMessage={setStatusMessage}

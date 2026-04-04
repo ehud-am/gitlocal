@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -40,9 +40,31 @@ describe('Server integration', () => {
     const res = await app.fetch(new Request('http://localhost/api/info'))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toContain('application/json')
-    const body = await res.json() as { isGitRepo: boolean; version: string }
+    const body = await res.json() as { isGitRepo: boolean; version: string; hasCommits: boolean; rootEntryCount: number }
     expect(body.isGitRepo).toBe(true)
     expect(body.version).toBe(APP_VERSION.version)
+    expect(body.hasCommits).toBe(true)
+    expect(body.rootEntryCount).toBeGreaterThan(0)
+  })
+
+  it('GET /api/info reports newly initialized repositories as empty landing states', async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-int-'))
+    spawnSync('git', ['init'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: emptyDir })
+
+    try {
+      const app = createApp(emptyDir)
+      const res = await app.fetch(new Request('http://localhost/api/info'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { isGitRepo: boolean; currentBranch: string; hasCommits: boolean; rootEntryCount: number }
+      expect(body.isGitRepo).toBe(true)
+      expect(body.currentBranch).toBe('')
+      expect(body.hasCommits).toBe(false)
+      expect(body.rootEntryCount).toBe(0)
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
   })
 
   it('GET / returns 200 HTML (SPA index)', async () => {
@@ -57,6 +79,20 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as unknown[]
     expect(Array.isArray(body)).toBe(true)
+  })
+
+  it('GET /api/tree returns immediate child entries for content-panel folder browsing', async () => {
+    mkdirSync(join(dir, 'docs'), { recursive: true })
+    writeFileSync(join(dir, 'docs', 'guide.md'), '# Guide')
+    writeFileSync(join(dir, 'docs', 'tree-view.md'), '# Notes')
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/tree?path=docs'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ name: string; path: string; type: 'file' | 'dir' }>
+    expect(body).toEqual([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+      { name: 'tree-view.md', path: 'docs/tree-view.md', type: 'file' },
+    ])
   })
 
   it('GET /unknown-path returns index.html SPA fallback', async () => {
