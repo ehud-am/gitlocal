@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5
+
+- Added manual local file creation, in-place editing, and deletion flows in the repository viewer with dirty-state protection and sync-aware refresh behavior.
+- Updated GitHub Actions workflows to current `actions/checkout` and `actions/setup-node` majors so CI and publish runs no longer rely on deprecated Node 20 action runtimes.
+- Simplified npm packaging ignore rules so release artifacts are defined by the tracked build outputs and package `files` list instead of a separate `.npmignore`.
+
 ## 0.4.4
 
 - Added npm package keywords and richer package metadata so the npm package page is easier to discover and links cleanly back to the GitHub project.

@@ -101,6 +101,7 @@ You can still paste a path manually in the selected-folder field when needed.
 - **Browse the file tree** — expand and collapse folders lazily, just like GitHub
 - **Read files beautifully** — Markdown renders as formatted HTML with GitHub Flavored Markdown; code files get syntax highlighting; images display inline
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
+- **Make local file edits** — create, edit, and delete files from the viewer when you are on the repository's working branch
 - **See git status** — current branch, recent commits, and a branch switcher (read-only)
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
@@ -181,7 +182,7 @@ gitlocal/
     ├── components/
     │   ├── FileTree/                — lazy expand/collapse tree
     │   ├── Breadcrumb/              — path navigation
-    │   ├── ContentPanel/            — Markdown, code, image, binary rendering
+    │   ├── ContentPanel/            — Markdown, code, image, binary rendering, and local file editing
     │   ├── GitInfo/                 — branch switcher + commit list
     │   └── Picker/                  — PickerPage folder browser with Browse/Open actions
     └── services/api.ts              — typed fetch wrappers for all endpoints
@@ -192,7 +193,7 @@ gitlocal/
 - **No external runtime dependencies beyond Node.js** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
 - **Single npm toolchain** — build, test, and install all via `npm`; no Go, no Makefile, no shell scripts
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
-- **Read-only** — GitLocal never writes to the repository; it only reads via `git ls-tree`, `git cat-file`, and `git log`
+- **Local-first editing** — GitLocal can create, update, and delete working-tree files locally, while branch history and other repository metadata remain read-only in the UI
 
 ---
 
@@ -207,6 +208,9 @@ All endpoints are served under `/api/`:
 | `GET /api/branches` | List of branches with `isCurrent` flag |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
+| `POST /api/file` | Create a new file in the current repository working tree |
+| `PUT /api/file` | Update an existing file using its revision token |
+| `DELETE /api/file` | Delete an existing file using its revision token |
 | `GET /api/commits?branch=&limit=` | Recent commits (default 10, max 100) |
 | `GET /api/pick/browse?path=` | Folder-picker directory listing with git-repo detection |
 | `POST /api/pick` | Set the repo path from the picker UI (body: `{"path":"..."}`) |
