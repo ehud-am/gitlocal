@@ -20,6 +20,7 @@ When a user notices a small issue while browsing a repository in GitLocal, they 
 1. **Given** a user is viewing an existing local text file, **When** they enter edit mode, modify the content, and save, **Then** the updated file content is written to that same local file.
 2. **Given** a user has unsaved edits to an existing file, **When** they attempt to leave the editing flow, **Then** the system warns them before discarding those unsaved changes.
 3. **Given** a user saves a valid change to an existing file, **When** the save completes, **Then** the interface shows that the edit succeeded and returns the user to a readable view of the updated file.
+4. **Given** a user is viewing a non-current branch or historical file state, **When** they view that file, **Then** manual editing actions are unavailable for that non-working-tree context.
 
 ---
 
@@ -36,6 +37,7 @@ When a user realizes a small supporting file is missing, they can create a new l
 1. **Given** a user is browsing a local repository, **When** they choose to create a new file, enter a valid file path and content, and save, **Then** the new file is created in that local repository location.
 2. **Given** a user chooses a file path that already exists, **When** they attempt to create the new file, **Then** the system prevents accidental overwrite and explains that the path is already in use.
 3. **Given** a user successfully creates a new file, **When** the save completes, **Then** the new file is visible in the app and can be opened immediately.
+4. **Given** a user provides a valid new file path whose parent folders do not yet exist inside the opened repository, **When** they save the file, **Then** the system creates the needed parent folders as part of the same successful file-creation action.
 
 ---
 
@@ -68,12 +70,15 @@ When a user identifies an obsolete or mistaken local file, they can delete it fr
 - **FR-001**: The system MUST allow users to open an inline editing flow for an existing local text file within the currently opened repository.
 - **FR-002**: The system MUST allow users to save manual content changes back to that same local file.
 - **FR-003**: The system MUST warn users before they lose unsaved manual edits through navigation, closing, refresh, or mode changes.
+- **FR-003a**: Those unsaved-change warnings MAY be delivered through in-app confirmation UI for in-app navigation and browser-native confirmation behavior for page refresh or tab-close scenarios.
 - **FR-004**: The system MUST allow users to start a new-file flow from within the currently opened local repository.
 - **FR-005**: Users MUST be able to specify the intended file path and initial file content before creating a new file.
 - **FR-006**: The system MUST prevent creation when the requested file path already exists as a file or folder and explain why the action was blocked.
+- **FR-006a**: When a requested new file path is otherwise valid but includes missing parent folders within the currently opened repository, the system MUST create those parent folders as part of the successful file-creation flow.
 - **FR-007**: The system MUST allow users to delete an existing local file from within the currently opened repository.
 - **FR-008**: The system MUST require an explicit user confirmation step before permanently deleting a local file.
 - **FR-009**: The system MUST limit create, update, and delete actions to files inside the currently opened local repository and MUST block attempts to act on paths outside that boundary.
+- **FR-009a**: The system MUST allow create, update, and delete actions only for the currently opened repository's working-tree view and MUST NOT offer those mutation actions while the user is viewing a non-current branch or historical file state.
 - **FR-010**: The system MUST provide clear success feedback after a file is created, updated, or deleted.
 - **FR-011**: The system MUST provide clear failure feedback when a requested file action cannot be completed and MUST leave the existing file state unchanged when the action fails.
 - **FR-012**: The system MUST refresh the visible repository/file view after a successful create, update, or delete so the user can immediately see the resulting file state.
@@ -103,3 +108,4 @@ When a user identifies an obsolete or mistaken local file, they can delete it fr
 - Lightweight editing is limited to minor text-based file work and does not need to match the breadth of a full IDE editing experience.
 - The initial version can focus on whole-file editing rather than advanced editing tools such as multi-file tabs, refactor workflows, or live collaboration.
 - Users still rely on tools such as Codex, Claude Code, or a full IDE for larger authoring tasks, with this feature covering only quick manual interventions.
+- Missing parent folders for a valid new file path may be created automatically as part of file creation, as long as the resulting path stays inside the opened repository boundary.
