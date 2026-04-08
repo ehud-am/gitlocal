@@ -1,0 +1,12 @@
+node_modules/
+ui/node_modules/
+coverage/
+ui/coverage/
+src/
+tests/
+specs/
+.specify/
+.agents/
+.claude/
+*.log
+.env*

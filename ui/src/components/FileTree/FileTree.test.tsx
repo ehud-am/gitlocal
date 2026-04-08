@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'jest-axe'
 import FileTree from './FileTree'
@@ -56,8 +56,8 @@ describe('FileTree', () => {
 
   it('renders top-level nodes', async () => {
     mockedApi.getTree.mockResolvedValue([
-      { name: 'src', path: 'src', type: 'dir' },
-      { name: 'README.md', path: 'README.md', type: 'file' },
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
     renderWithClient(<FileTree {...defaultProps} />)
@@ -70,10 +70,37 @@ describe('FileTree', () => {
     expect(screen.getByRole('tree', { name: /repository files/i })).toBeInTheDocument()
   })
 
+  it('renders ignored files and folders returned by the tree API', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+      { name: '.cache', path: '.cache', type: 'dir', localOnly: true },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('.env')).toBeInTheDocument()
+      expect(screen.getByText('.cache')).toBeInTheDocument()
+    })
+  })
+
+  it('shows a local-only cue for ignored tree entries', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    const ignoredEntry = await screen.findByRole('treeitem', { name: /\.env/i })
+    expect(within(ignoredEntry).getByText(/local only/i)).toBeInTheDocument()
+    expect(screen.queryAllByText(/local only/i)).toHaveLength(1)
+  })
+
   it('has no obvious accessibility violations for the loaded tree', async () => {
     mockedApi.getTree.mockResolvedValue([
-      { name: 'src', path: 'src', type: 'dir' },
-      { name: 'README.md', path: 'README.md', type: 'file' },
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
     const { container } = renderWithClient(<FileTree {...defaultProps} />)
@@ -88,8 +115,8 @@ describe('FileTree', () => {
   it('clicking a file calls onSelect with the file type', async () => {
     const onSelect = vi.fn()
     mockedApi.getTree.mockResolvedValue([
-      { name: 'src', path: 'src', type: 'dir' },
-      { name: 'README.md', path: 'README.md', type: 'file' },
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
     renderWithClient(<FileTree {...defaultProps} onSelect={onSelect} />)
@@ -99,17 +126,17 @@ describe('FileTree', () => {
     })
 
     fireEvent.click(screen.getByText('README.md'))
-    expect(onSelect).toHaveBeenCalledWith('README.md', 'file')
+    expect(onSelect).toHaveBeenCalledWith('README.md', 'file', false)
   })
 
   it('clicking a folder fetches children', async () => {
     mockedApi.getTree
       .mockResolvedValueOnce([
-        { name: 'src', path: 'src', type: 'dir' },
-        { name: 'README.md', path: 'README.md', type: 'file' },
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
       ])
       .mockResolvedValueOnce([
-        { name: 'main.go', path: 'src/main.go', type: 'file' },
+        { name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false },
       ])
 
     renderWithClient(<FileTree {...defaultProps} />)
@@ -124,17 +151,17 @@ describe('FileTree', () => {
       expect(screen.getByText('main.go')).toBeInTheDocument()
     })
 
-    expect(defaultProps.onSelect).toHaveBeenCalledWith('src', 'dir')
+    expect(defaultProps.onSelect).toHaveBeenCalledWith('src', 'dir', false)
   })
 
   it('clicking expanded folder collapses it', async () => {
     mockedApi.getTree
       .mockResolvedValueOnce([
-        { name: 'src', path: 'src', type: 'dir' },
-        { name: 'README.md', path: 'README.md', type: 'file' },
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
       ])
       .mockResolvedValueOnce([
-        { name: 'main.go', path: 'src/main.go', type: 'file' },
+        { name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false },
       ])
 
     renderWithClient(<FileTree {...defaultProps} />)
@@ -161,10 +188,10 @@ describe('FileTree', () => {
   it('reopens an already loaded folder without refetching children', async () => {
     mockedApi.getTree
       .mockResolvedValueOnce([
-        { name: 'src', path: 'src', type: 'dir' },
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
       ])
       .mockResolvedValueOnce([
-        { name: 'main.go', path: 'src/main.go', type: 'file' },
+        { name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false },
       ])
 
     renderWithClient(<FileTree {...defaultProps} />)
@@ -204,11 +231,11 @@ describe('FileTree', () => {
   })
 
   it('shows a loading row while fetching folder children', async () => {
-    let resolveChildren: ((value: { name: string; path: string; type: 'file' }[]) => void) | undefined
+    let resolveChildren: ((value: { name: string; path: string; type: 'file'; localOnly: boolean }[]) => void) | undefined
 
     mockedApi.getTree
       .mockResolvedValueOnce([
-        { name: 'src', path: 'src', type: 'dir' },
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
       ])
       .mockImplementationOnce(
         () =>
@@ -229,7 +256,7 @@ describe('FileTree', () => {
       expect(screen.getByText('Loading...')).toBeInTheDocument()
     })
 
-    resolveChildren?.([{ name: 'main.go', path: 'src/main.go', type: 'file' }])
+    resolveChildren?.([{ name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false }])
 
     await waitFor(() => {
       expect(screen.getByText('main.go')).toBeInTheDocument()
@@ -239,7 +266,7 @@ describe('FileTree', () => {
   it('collapses a folder and marks it as errored when child loading fails', async () => {
     mockedApi.getTree
       .mockResolvedValueOnce([
-        { name: 'src', path: 'src', type: 'dir' },
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
       ])
       .mockRejectedValueOnce(new Error('child load failed'))
 
@@ -261,10 +288,10 @@ describe('FileTree', () => {
 
   it('refreshes expanded folders when the refresh token changes', async () => {
     mockedApi.getTree
-      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
-      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }])
-      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
-      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }, { name: 'new.go', path: 'src/new.go', type: 'file' }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false }, { name: 'new.go', path: 'src/new.go', type: 'file', localOnly: false }])
 
     const client = makeQueryClient()
     const { rerender } = renderWithClient(<FileTree {...defaultProps} />, client)
@@ -292,9 +319,9 @@ describe('FileTree', () => {
 
   it('marks expanded folders as errored when a refresh fetch fails', async () => {
     mockedApi.getTree
-      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
-      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file' }])
-      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
       .mockRejectedValueOnce(new Error('refresh failed'))
 
     const client = makeQueryClient()
@@ -323,7 +350,7 @@ describe('FileTree', () => {
 
   it('handles auto-expansion failures for saved selected paths', async () => {
     mockedApi.getTree
-      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir' }])
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
       .mockRejectedValueOnce(new Error('expand failed'))
 
     renderWithClient(

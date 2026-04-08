@@ -42,7 +42,10 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, onCl
     >
       {node.type === 'dir' && <ChevronIcon open={isExpanded} />}
       {node.type === 'dir' ? <FolderIcon open={isExpanded} /> : <FileIcon />}
-      <span title={node.name}>{node.name}</span>
+      <div className="file-tree-node-label">
+        <span className="file-tree-node-name" title={node.name}>{node.name}</span>
+        {node.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+      </div>
     </div>
   )
 }

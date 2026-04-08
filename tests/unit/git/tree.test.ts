@@ -157,6 +157,27 @@ describe('working tree tree helpers', () => {
     expect(searchWorkingTreeByName(dir, 'scratch', false)).toEqual([])
   })
 
+  it('surfaces ignored working-tree entries and marks them local-only', () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\nignored-dir/\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'hidden note')
+    mkdirSync(join(dir, 'ignored-dir'))
+    writeFileSync(join(dir, 'ignored-dir', 'nested.md'), 'nested local only')
+
+    expect(listWorkingTreeDir(dir, '').some((node) => node.path === 'ignored.txt' && node.localOnly === true)).toBe(true)
+    expect(listWorkingTreeDir(dir, '').some((node) => node.path === 'ignored-dir' && node.localOnly === true)).toBe(true)
+    expect(searchWorkingTreeByName(dir, 'ignored', false)).toContainEqual(expect.objectContaining({ path: 'ignored.txt', localOnly: true }))
+    expect(searchWorkingTreeByName(dir, 'ignored', false)).toContainEqual(expect.objectContaining({ path: 'ignored-dir', localOnly: true }))
+  })
+
+  it('searches ignored file contents in the current working tree and marks them local-only', () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'hidden search target')
+
+    expect(searchWorkingTreeByContent(dir, 'search target', false)).toContainEqual(
+      expect.objectContaining({ path: 'ignored.txt', localOnly: true }),
+    )
+  })
+
   it('returns no matches for an empty name query', () => {
     expect(searchWorkingTreeByName(dir, '', false)).toEqual([])
   })

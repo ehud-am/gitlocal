@@ -23,9 +23,10 @@ interface Props {
   refreshToken: number
   selectedPath: string
   selectedPathType: ViewerPathType
+  selectedPathLocalOnly?: boolean
   branch: string
   onNavigate: (path: string) => void
-  onOpenPath: (path: string, type: 'file' | 'dir') => void
+  onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
   onDirtyChange?: (value: boolean) => void
   onMutationComplete?: (event: FileMutationEvent) => void
   placeholder?: string
@@ -80,6 +81,7 @@ export default function ContentPanel({
   refreshToken,
   selectedPath,
   selectedPathType,
+  selectedPathLocalOnly = false,
   branch,
   onNavigate,
   onOpenPath,
@@ -112,6 +114,7 @@ export default function ContentPanel({
   const {
     data: directoryEntries,
     isLoading: isDirectoryLoading,
+    isError: isDirectoryError,
   } = useQuery({
     queryKey: ['tree', directoryPath, branch, refreshToken, 'content-panel'],
     queryFn: () => api.getTree(directoryPath, branch),
@@ -310,7 +313,10 @@ export default function ContentPanel({
           <div className="content-directory-header">
             <div>
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
-              <h2 className="content-directory-heading">{path || 'root'}</h2>
+              <div className="content-active-heading-row">
+                <h2 className="content-directory-heading">{path || 'root'}</h2>
+                {selectedPathLocalOnly && path ? <span className="local-only-badge">Local only</span> : null}
+              </div>
             </div>
             {canMutateFiles ? (
               <button type="button" className="btn-raw" onClick={() => { void beginCreateMode() }}>
@@ -332,21 +338,24 @@ export default function ContentPanel({
                   key={entry.path}
                   className="content-directory-row"
                   role="listitem"
-                  onDoubleClick={() => onOpenPath(entry.path, entry.type)}
+                  onDoubleClick={() => onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))}
                 >
                   <div className="content-directory-entry">
                     <span className={`content-directory-badge content-directory-badge-${entry.type}`}>
                       {entry.type === 'dir' ? 'Folder' : 'File'}
                     </span>
                     <div className="content-directory-meta">
-                      <span className="content-directory-name">{entry.name}</span>
+                      <div className="content-directory-name-row">
+                        <span className="content-directory-name">{entry.name}</span>
+                        {entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+                      </div>
                       <span className="content-directory-path">{entry.path}</span>
                     </div>
                   </div>
                   <button
                     type="button"
                     className="btn-raw content-directory-open"
-                    onClick={() => onOpenPath(entry.path, entry.type)}
+                    onClick={() => onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))}
                     aria-label={`Open ${entry.type === 'dir' ? 'folder' : 'file'} ${entry.name}`}
                   >
                     Open
@@ -409,6 +418,13 @@ export default function ContentPanel({
   }
 
   if (selectedPathType === 'dir') {
+    if (isDirectoryError && selectedPathLocalOnly) {
+      return (
+        <div className="content-panel">
+          <p style={{ color: '#cf222e' }}>This local-only folder is no longer available.</p>
+        </div>
+      )
+    }
     return renderDirectoryList(selectedPath, visibleDirectoryEntries)
   }
 
@@ -423,13 +439,22 @@ export default function ContentPanel({
   if (isError || !data) {
     return (
       <div className="content-panel">
-        <p style={{ color: '#cf222e' }}>Failed to load file.</p>
+        <p style={{ color: '#cf222e' }}>
+          {selectedPathLocalOnly ? 'This local-only file is no longer available.' : 'Failed to load file.'}
+        </p>
       </div>
     )
   }
 
   return (
     <div className={`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`}>
+      <div className="content-active-context">
+        <p className="content-directory-kicker">File</p>
+        <div className="content-active-heading-row">
+          <h2 className="content-directory-heading">{selectedPath}</h2>
+          {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+        </div>
+      </div>
       <div className="content-toolbar">
         {canMutateFiles && (
           <>

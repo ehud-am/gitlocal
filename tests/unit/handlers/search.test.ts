@@ -72,6 +72,28 @@ describe('searchHandler', () => {
     expect((await contentRes.json()).results).toEqual([])
   })
 
+  it('returns local-only matches for ignored files in current-branch searches', async () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'ignored search body')
+
+    const client = testClient(createApp(dir))
+    const nameRes = await client.api.search.$get({
+      query: { query: 'ignored', branch, mode: 'name' },
+    })
+    const contentRes = await client.api.search.$get({
+      query: { query: 'search body', branch, mode: 'content' },
+    })
+
+    expect((await nameRes.json()).results).toContainEqual(expect.objectContaining({
+      path: 'ignored.txt',
+      localOnly: true,
+    }))
+    expect((await contentRes.json()).results).toContainEqual(expect.objectContaining({
+      path: 'ignored.txt',
+      localOnly: true,
+    }))
+  })
+
   it('honors case-sensitive matching', async () => {
     const client = testClient(createApp(dir))
     const sensitive = await client.api.search.$get({

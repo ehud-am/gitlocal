@@ -31,6 +31,7 @@ export default function App() {
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
   const [selectedPath, setSelectedPath] = useState(initialViewerState.path)
   const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>(initialViewerState.pathType)
+  const [selectedPathLocalOnly, setSelectedPathLocalOnly] = useState(false)
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
   const [showRaw, setShowRaw] = useState(initialViewerState.raw)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
@@ -111,6 +112,7 @@ export default function App() {
     setViewerRepoPath(info.path)
     setSelectedPath('')
     setSelectedPathType('none')
+    setSelectedPathLocalOnly(false)
     setShowRaw(false)
     setSearchPresentation('collapsed')
     setSearchQuery('')
@@ -159,6 +161,11 @@ export default function App() {
   }, [searchPresentation, searchQuery])
 
   useEffect(() => {
+    if (!info?.currentBranch || currentBranch === info.currentBranch) return
+    setSelectedPathLocalOnly(false)
+  }, [currentBranch, info?.currentBranch])
+
+  useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
       const isShortcut = key === 'f' && (event.metaKey || event.ctrlKey)
@@ -186,6 +193,7 @@ export default function App() {
       setStatusMessage(syncStatus.statusMessage)
       setSelectedPath(syncStatus.resolvedPath)
       setSelectedPathType(syncStatus.resolvedPathType === 'missing' ? 'none' : syncStatus.resolvedPathType)
+      setSelectedPathLocalOnly(false)
       setShowRaw(false)
       return
     }
@@ -215,24 +223,30 @@ export default function App() {
     return window.confirm('Discard your unsaved file changes?')
   }
 
-  function handleSelectFile(path: string) {
+  function handleSelectFile(path: string, localOnly = false) {
     if (!confirmDiscardChanges()) return
     setSelectedPath(path)
     setSelectedPathType(path ? 'file' : 'none')
+    setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
   }
 
-  function handleSelectFolder(path: string) {
+  function handleSelectFolder(path: string, localOnly = false) {
     if (!confirmDiscardChanges()) return
     setSelectedPath(path)
     setSelectedPathType(path ? 'dir' : 'none')
+    setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
-    handleSelectFile(result.path)
+    if (result.type === 'dir') {
+      handleSelectFolder(result.path, result.localOnly)
+    } else {
+      handleSelectFile(result.path, result.localOnly)
+    }
     setSearchPresentation('collapsed')
     setSearchQuery('')
   }
@@ -308,6 +322,7 @@ export default function App() {
     setHasUnsavedChanges(false)
     setSelectedPath(event.nextPath)
     setSelectedPathType(event.nextPathType)
+    setSelectedPathLocalOnly(false)
     setShowRaw(false)
     setStatusMessage(event.result.message)
     setTreeRefreshToken((value) => value + 1)
@@ -317,13 +332,15 @@ export default function App() {
 
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
   const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
+  const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
+  const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
   let emptyStateTitle: string | undefined
   let emptyStateDetail: string | undefined
   let emptyStateActions: LandingAction[] | undefined
 
   if (!visibleSelectedPath && !hasRepoMismatch) {
-    if (readmeMissing && info?.rootEntryCount === 0) {
+    if (readmeMissing && isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
       emptyStateTitle = 'This repository is ready for a first file'
       emptyStateDetail = 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
       emptyStateActions = canMutateFiles
@@ -332,7 +349,7 @@ export default function App() {
             { label: 'Browse parent folder', action: 'open-parent' },
           ]
         : [{ label: 'Browse parent folder', action: 'open-parent' }]
-    } else if (readmeMissing) {
+    } else if (readmeMissing && isWorkingTreeBranchSelected) {
       emptyStateTitle = 'No README yet'
       emptyStateDetail = 'This repository has content, but there is no README to open by default. You can browse the repository tree, create a new file, or return to a parent folder.'
       emptyStateActions = canMutateFiles
@@ -396,12 +413,13 @@ export default function App() {
               onSelect={(
                 path,
                 type,
+                localOnly,
               ) => {
                 if (type === 'dir') {
-                  handleSelectFolder(path)
+                  handleSelectFolder(path, localOnly)
                   return
                 }
-                handleSelectFile(path)
+                handleSelectFile(path, localOnly)
               }}
             />
             <GitInfo
@@ -454,16 +472,25 @@ export default function App() {
               selectedPathType={visibleSelectedPathType}
               branch={currentBranch}
               onNavigate={handleSelectFile}
-              onOpenPath={(path, type) => {
+              onOpenPath={(path, type, localOnly) => {
                 if (type === 'dir') {
-                  handleSelectFolder(path)
+                  handleSelectFolder(path, localOnly)
                   return
                 }
-                handleSelectFile(path)
+                handleSelectFile(path, localOnly)
               }}
+              selectedPathLocalOnly={visibleSelectedPathLocalOnly}
               onDirtyChange={setHasUnsavedChanges}
               onMutationComplete={(event) => { void handleMutationComplete(event) }}
-              placeholder={readmeMissing && !visibleSelectedPath ? 'No README found in this repository.' : undefined}
+              placeholder={
+                !visibleSelectedPath && readmeMissing
+                  ? (
+                      isWorkingTreeBranchSelected
+                        ? 'No README found in this repository.'
+                        : 'This branch does not have any visible files or folders yet.'
+                    )
+                  : undefined
+              }
               emptyStateTitle={emptyStateTitle}
               emptyStateDetail={emptyStateDetail}
               emptyStateActions={emptyStateActions}

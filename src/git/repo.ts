@@ -373,13 +373,13 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     .filter((entry) => entry.name !== '.git')
     .map((entry) => {
       const path = normalized ? `${normalized}/${entry.name}` : entry.name
-      return { entry, path }
+      return { entry, path, localOnly: isIgnoredPath(repoPath, path) }
     })
-    .filter(({ path }) => !isIgnoredPath(repoPath, path))
-    .map(({ entry, path }) => ({
+    .map(({ entry, path, localOnly }) => ({
       name: entry.name,
       path,
       type: entry.isDirectory() ? 'dir' as const : 'file' as const,
+      localOnly,
     }))
     .sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
