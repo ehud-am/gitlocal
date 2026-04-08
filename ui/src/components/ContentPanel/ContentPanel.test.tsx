@@ -148,9 +148,9 @@ describe('ContentPanel', () => {
 
   it('suggests myfile names when README.md already exists in the folder', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
-      { name: 'README.md', path: 'README.md', type: 'file' },
-      { name: 'myfile.md', path: 'myfile.md', type: 'file' },
-      { name: 'myfile 1.md', path: 'myfile 1.md', type: 'file' },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      { name: 'myfile.md', path: 'myfile.md', type: 'file', localOnly: false },
+      { name: 'myfile 1.md', path: 'myfile 1.md', type: 'file', localOnly: false },
     ])
 
     renderWithClient(
@@ -178,7 +178,7 @@ describe('ContentPanel', () => {
       message: 'File created successfully.',
     })
     vi.mocked(api.getTree).mockResolvedValue([
-      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
     ])
 
     renderWithClient(
@@ -198,9 +198,81 @@ describe('ContentPanel', () => {
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/README.md')
   })
 
+  it('shows ignored files and folders in directory listings and opens them normally', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.cache', path: 'docs/.cache', type: 'dir', localOnly: true },
+      { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
+    ])
+
+    const onOpenPath = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /open folder \.cache/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open file \.env/i }))
+
+    expect(onOpenPath).toHaveBeenNthCalledWith(1, 'docs/.cache', 'dir', true)
+    expect(onOpenPath).toHaveBeenNthCalledWith(2, 'docs/.env', 'file', true)
+  })
+
+  it('shows local-only cues in ignored directory rows and active folder context', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.cache', path: 'docs/.cache', type: 'dir', localOnly: true },
+      { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        selectedPathLocalOnly
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/local only/i)).toHaveLength(3)
+    })
+    expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+  })
+
+  it('shows a local-only cue in the active file context for ignored files', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: '.env' }))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=".env"
+        selectedPathType="file"
+        selectedPathLocalOnly
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/local only/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '.env' })).toBeInTheDocument()
+  })
+
   it('cancels create mode from the draft form', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
-      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
     ])
 
     renderWithClient(
@@ -223,8 +295,8 @@ describe('ContentPanel', () => {
 
   it('opens directory entries with the row button and double click', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
-      { name: 'src', path: 'src', type: 'dir' },
-      { name: 'main.ts', path: 'main.ts', type: 'file' },
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      { name: 'main.ts', path: 'main.ts', type: 'file', localOnly: false },
     ])
 
     const onOpenPath = vi.fn()
@@ -244,8 +316,8 @@ describe('ContentPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: /open folder src/i }))
     fireEvent.doubleClick(screen.getByRole('button', { name: /open file main\.ts/i }).closest('.content-directory-row') as HTMLElement)
 
-    expect(onOpenPath).toHaveBeenNthCalledWith(1, 'src', 'dir')
-    expect(onOpenPath).toHaveBeenNthCalledWith(2, 'main.ts', 'file')
+    expect(onOpenPath).toHaveBeenNthCalledWith(1, 'src', 'dir', false)
+    expect(onOpenPath).toHaveBeenNthCalledWith(2, 'main.ts', 'file', false)
   })
 
   it('shows an intentional empty-folder state for selected folders with no entries', async () => {
@@ -264,6 +336,29 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByText(/does not have any visible files or folders yet/i)).toBeInTheDocument()
+  })
+
+  it('shows ignored-only folder contents instead of the empty-folder state', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.cache', path: 'generated/.cache', type: 'dir', localOnly: true },
+      { name: '.env', path: 'generated/.env', type: 'file', localOnly: true },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="generated"
+        selectedPathType="dir"
+        selectedPathLocalOnly
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: /open folder \.cache/i })).toBeInTheDocument()
+    expect(screen.queryByText(/does not have any visible files or folders yet/i)).not.toBeInTheDocument()
   })
 
   it('shows loading skeleton while fetching', async () => {
@@ -300,6 +395,25 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByText(/failed to load file/i)).toBeInTheDocument()
+  })
+
+  it('shows an unavailable message when an ignored local file disappears', async () => {
+    vi.mocked(api.getFile).mockRejectedValue(new Error('boom'))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=".env"
+        selectedPathType="file"
+        selectedPathLocalOnly
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/local-only file is no longer available/i)).toBeInTheDocument()
   })
 
   it('shows markdown renderer for markdown files', async () => {

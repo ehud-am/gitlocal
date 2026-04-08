@@ -59,6 +59,18 @@ describe('infoHandler', () => {
     expect(body.rootEntryCount).toBeGreaterThan(0)
   })
 
+  it('counts ignored local root entries in repo metadata', async () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'local only')
+
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.info.$get()
+    const body = await res.json()
+
+    expect(body.rootEntryCount).toBe(2)
+  })
+
   it('returns empty-repo metadata for a repo with no commits and no browseable entries', async () => {
     const emptyDir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-info-'))
     spawnSync('git', ['init'], { cwd: emptyDir })
@@ -258,6 +270,25 @@ describe('readmeHandler', () => {
   })
 })
 
+describe('tree responses', () => {
+  it('returns ignored entries with localOnly metadata for the working tree', async () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+      writeFileSync(join(dir, 'ignored.txt'), 'local only')
+
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/tree'))
+      const body = await res.json() as Array<{ path: string; localOnly?: boolean }>
+
+      expect(body).toContainEqual(expect.objectContaining({ path: 'ignored.txt', localOnly: true }))
+    } finally {
+      cleanup()
+    }
+  })
+})
+
 describe('treeHandler', () => {
   it('returns immediate child files and folders for the requested directory', async () => {
     const repo = makeGitRepo()
@@ -275,9 +306,9 @@ describe('treeHandler', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body).toEqual([
-        { name: 'nested', path: 'docs/nested', type: 'dir' },
-        { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
-        { name: 'notes.md', path: 'docs/notes.md', type: 'file' },
+        { name: 'nested', path: 'docs/nested', type: 'dir', localOnly: false },
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+        { name: 'notes.md', path: 'docs/notes.md', type: 'file', localOnly: false },
       ])
     } finally {
       repo.cleanup()

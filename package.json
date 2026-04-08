@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Browse any local git repository in your browser",
   "keywords": [
     "git",
@@ -43,18 +43,18 @@
     "prepublishOnly": "npm run verify"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
-    "hono": "^4.7.5",
+    "@hono/node-server": "^1.19.13",
+    "hono": "^4.12.12",
     "open": "^10.1.0"
   },
   "devDependencies": {
     "@emnapi/core": "^1.9.1",
     "@emnapi/runtime": "^1.9.1",
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.3",
     "esbuild": "^0.27.4",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.3"
   },
   "license": "MIT",
   "repository": {

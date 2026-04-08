@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.7
+
+- Added ignored file and folder visibility across the repository tree, folder listings, and search so local-only content remains discoverable in the UI.
+- Marked ignored content consistently as local-only in navigation and active file context to clarify that it exists only on the local machine and will not be pushed to a remote.
+- Fixed ignored-only directories and roots so they no longer fall into misleading empty states when ignored content is the only visible content.
+- Updated Hono, Vitest, and Vite dependencies to publish-safe versions so the release verification audit passes cleanly.
+
 ## 0.4.6
 
 - Reserved the next release version for the upcoming editor workspace and empty-repository UX improvements captured in `007-editor-empty-repo`.

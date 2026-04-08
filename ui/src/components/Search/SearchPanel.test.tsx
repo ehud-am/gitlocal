@@ -30,7 +30,7 @@ describe('SearchPanel', () => {
       mode: 'name',
       caseSensitive: false,
       results: [
-        { path: 'README.md', type: 'file', matchType: 'name' },
+        { path: 'README.md', type: 'file', matchType: 'name', localOnly: false },
       ],
     })
   })
@@ -85,6 +85,63 @@ describe('SearchPanel', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /readme\.md/i }))
     expect(onSelectResult).toHaveBeenCalled()
+  })
+
+  it('renders folder results and passes them through selection', async () => {
+    const onSelectResult = vi.fn()
+    vi.mocked(api.getSearchResults).mockResolvedValueOnce({
+      query: 'igno',
+      branch: 'main',
+      mode: 'name',
+      caseSensitive: false,
+      results: [
+        { path: 'ignored-dir', type: 'dir', matchType: 'name', localOnly: true },
+      ],
+    })
+
+    renderWithClient(
+      <SearchPanel
+        branch="main"
+        query="igno"
+        onQueryChange={vi.fn()}
+        onSelectResult={onSelectResult}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    const folderResult = await screen.findByRole('button', { name: /ignored-dir/i })
+    fireEvent.click(folderResult)
+
+    expect(onSelectResult).toHaveBeenCalledWith({
+      path: 'ignored-dir',
+      type: 'dir',
+      matchType: 'name',
+      localOnly: true,
+    })
+  })
+
+  it('shows a local-only cue for ignored search results', async () => {
+    vi.mocked(api.getSearchResults).mockResolvedValueOnce({
+      query: 'env',
+      branch: 'main',
+      mode: 'name',
+      caseSensitive: false,
+      results: [
+        { path: '.env', type: 'file', matchType: 'name', localOnly: true },
+      ],
+    })
+
+    renderWithClient(
+      <SearchPanel
+        branch="main"
+        query="env"
+        onQueryChange={vi.fn()}
+        onSelectResult={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/local only/i)).toBeInTheDocument()
   })
 
   it('shows a dismiss control and expanded idle messaging', () => {

@@ -9,7 +9,7 @@ interface Props {
   refreshToken: number
   selectedPath: string
   selectedPathType: 'file' | 'dir' | 'none'
-  onSelect: (path: string, type: 'file' | 'dir') => void
+  onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
 }
 
 interface NodeState {
@@ -165,10 +165,10 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
               depth={depth}
               onClick={() => {
                 if (node.type === 'dir') {
-                  onSelect(node.path, 'dir')
+                  onSelect(node.path, 'dir', Boolean(node.localOnly))
                   toggleDir(node)
                 } else {
-                  onSelect(node.path, 'file')
+                  onSelect(node.path, 'file', Boolean(node.localOnly))
                 }
               }}
             />

@@ -90,9 +90,29 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as Array<{ name: string; path: string; type: 'file' | 'dir' }>
     expect(body).toEqual([
-      { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
-      { name: 'tree-view.md', path: 'docs/tree-view.md', type: 'file' },
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+      { name: 'tree-view.md', path: 'docs/tree-view.md', type: 'file', localOnly: false },
     ])
+  })
+
+  it('GET /api/tree includes ignored local entries with localOnly metadata', async () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'local only')
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/tree'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ path: string; localOnly?: boolean }>
+    expect(body).toContainEqual(expect.objectContaining({ path: 'ignored.txt', localOnly: true }))
+  })
+
+  it('GET /api/search includes ignored local matches with localOnly metadata', async () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+    writeFileSync(join(dir, 'ignored.txt'), 'search me locally')
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/search?query=ignored&mode=name'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { results: Array<{ path: string; localOnly?: boolean }> }
+    expect(body.results).toContainEqual(expect.objectContaining({ path: 'ignored.txt', localOnly: true }))
   })
 
   it('GET /unknown-path returns index.html SPA fallback', async () => {

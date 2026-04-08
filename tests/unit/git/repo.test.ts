@@ -495,10 +495,25 @@ describe('working tree helpers', () => {
       expect(listWorkingTreeDirectoryEntries(dir, 'notes').some((node) => node.path === 'notes/new.md')).toBe(true)
       writeFileSync(join(dir, 'ignored.txt'), 'skip me')
       expect(isIgnoredPath(dir, 'ignored.txt')).toBe(true)
+      expect(listWorkingTreeDirectoryEntries(dir, '').some((node) => node.path === 'ignored.txt' && node.localOnly === true)).toBe(true)
       deleteWorkingTreeFile(dir, 'notes/new.md')
       expect(readWorkingTreeFile(dir, 'notes/new.md')).toBeNull()
       expect(() => writeWorkingTreeTextFile(dir, '../escape.txt', 'x')).toThrow(/inside the opened repository/i)
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('surfaces ignored directories and their children as local-only entries', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'cache/\n')
+      mkdirSync(join(dir, 'cache'))
+      writeFileSync(join(dir, 'cache', 'draft.txt'), 'draft')
+
+      expect(listWorkingTreeDirectoryEntries(dir, '').some((node) => node.path === 'cache' && node.type === 'dir' && node.localOnly === true)).toBe(true)
+      expect(listWorkingTreeDirectoryEntries(dir, 'cache').some((node) => node.path === 'cache/draft.txt' && node.localOnly === true)).toBe(true)
     } finally {
       cleanup()
     }
@@ -509,7 +524,7 @@ describe('working tree helpers', () => {
     try {
       writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
       writeFileSync(join(dir, 'ignored.txt'), 'skip me')
-      expect(getBrowseableRootEntryCount(dir)).toBe(4)
+      expect(getBrowseableRootEntryCount(dir)).toBe(5)
     } finally {
       cleanup()
     }

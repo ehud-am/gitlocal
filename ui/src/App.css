@@ -242,10 +242,38 @@ body {
   flex-shrink: 0;
 }
 
-.file-tree-node span {
+.file-tree-node-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.file-tree-node-name {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
+}
+
+.local-only-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(191, 135, 0, 0.28);
+  background: rgba(255, 228, 156, 0.28);
+  color: #9a6700;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.local-only-badge-compact {
+  padding: 2px 8px;
+  font-size: 10px;
 }
 
 .file-tree-children {
@@ -735,6 +763,22 @@ body {
   color: var(--color-text);
 }
 
+.content-active-context {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 1040px;
+  width: 100%;
+  margin: 0 auto 16px;
+}
+
+.content-active-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .content-directory-list {
   display: flex;
   flex-direction: column;
@@ -797,6 +841,13 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.content-directory-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .content-directory-path {
@@ -1384,6 +1435,13 @@ body {
 .search-empty {
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+.search-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .search-empty {

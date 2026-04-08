@@ -32,6 +32,7 @@ export interface TreeNode {
   name: string
   path: string
   type: 'file' | 'dir'
+  localOnly: boolean
 }
 
 export type FileEncoding = 'utf-8' | 'base64' | 'none'
@@ -103,6 +104,7 @@ export interface SearchResult {
   matchType: 'name' | 'content'
   snippet?: string
   line?: number
+  localOnly: boolean
 }
 
 export interface SearchResponse {

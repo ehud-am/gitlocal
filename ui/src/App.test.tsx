@@ -220,7 +220,7 @@ describe('App', () => {
       branch: 'main',
       mode: 'name',
       caseSensitive: false,
-      results: [{ path: 'README.md', type: 'file', matchType: 'name' }],
+      results: [{ path: 'README.md', type: 'file', matchType: 'name', localOnly: false }],
     })
 
     renderWithClient()
@@ -236,11 +236,125 @@ describe('App', () => {
     })
   })
 
+  it('opens folder quick-finder results as folders instead of loading them as files', async () => {
+    vi.mocked(api.getSearchResults).mockResolvedValue({
+      query: 'doc',
+      branch: 'main',
+      mode: 'name',
+      caseSensitive: false,
+      results: [{ path: 'docs', type: 'dir', matchType: 'name', localOnly: true }],
+    })
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path === 'docs'
+        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+        : []
+    ))
+
+    renderWithClient()
+
+    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
+    fireEvent.change(searchInput, { target: { value: 'doc' } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /docs/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
+    })
+
+    expect(api.getFile).not.toHaveBeenCalledWith('docs', 'main', false)
+  })
+
+  it('opens ignored folders from the repository tree', async () => {
+    window.history.replaceState(null, '', '/?branch=main')
+    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: 'main',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 1,
+    })
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path === '.cache'
+        ? [{ name: 'index.db', path: '.cache/index.db', type: 'file', localOnly: true }]
+        : [{ name: '.cache', path: '.cache', type: 'dir', localOnly: true }]
+    ))
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('treeitem', { name: /\.cache/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '.cache' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open file index\.db/i })).toBeInTheDocument()
+    })
+  })
+
+  it('opens ignored files from the folder list', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=.cache&pathType=dir')
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path === '.cache'
+        ? [{ name: 'index.db', path: '.cache/index.db', type: 'file', localOnly: true }]
+        : []
+    ))
+    vi.mocked(api.getFile).mockResolvedValueOnce({
+      path: '.cache/index.db',
+      type: 'text',
+      content: 'cache entry',
+      language: '',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-cache',
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /open file index\.db/i }))
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenLastCalledWith('.cache/index.db', 'main', false)
+    })
+  })
+
+  it('preserves the local-only cue after opening ignored items', async () => {
+    vi.mocked(api.getSearchResults).mockResolvedValue({
+      query: 'env',
+      branch: 'main',
+      mode: 'name',
+      caseSensitive: false,
+      results: [{ path: '.env', type: 'file', matchType: 'name', localOnly: true }],
+    })
+    vi.mocked(api.getFile).mockResolvedValueOnce({
+      path: '.env',
+      type: 'text',
+      content: 'SECRET=value',
+      language: '',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-env',
+    })
+
+    renderWithClient()
+
+    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
+    fireEvent.change(searchInput, { target: { value: 'env' } })
+    fireEvent.click(await screen.findByRole('button', { name: /\.env/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '.env' })).toBeInTheDocument()
+    })
+    expect(screen.getByText(/local only/i)).toBeInTheDocument()
+  })
+
   it('hydrates a saved folder selection without trying to load it as a file', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir')
     vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
       path === 'docs'
-        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file' }]
+        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
         : []
     ))
 
@@ -369,8 +483,8 @@ describe('App', () => {
       path
         ? []
         : [
-            { name: 'README.md', path: 'README.md', type: 'file' },
-            { name: 'docs', path: 'docs', type: 'dir' },
+            { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+            { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
           ]
     ))
 
@@ -401,6 +515,37 @@ describe('App', () => {
 
     expect(await screen.findByRole('button', { name: /create first file/i })).toBeInTheDocument()
     expect(screen.getByText(/newly initialized or empty/i)).toBeInTheDocument()
+  })
+
+  it('shows ignored-only root content instead of the empty-repository landing state', async () => {
+    window.history.replaceState(null, '', '/')
+    vi.mocked(api.getInfo).mockResolvedValue({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: 'main',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 2,
+    })
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
+      path
+        ? []
+        : [
+            { name: '.cache', path: '.cache', type: 'dir', localOnly: true },
+            { name: '.env', path: '.env', type: 'file', localOnly: true },
+          ]
+    ))
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /open folder \.cache/i })).toBeInTheDocument()
+    }, { timeout: 3000 })
+    expect(screen.getByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create first file/i })).not.toBeInTheDocument()
   })
 
   it('opens a working-tree README by default before the first commit exists', async () => {
@@ -470,8 +615,8 @@ describe('App', () => {
       path
         ? []
         : [
-            { name: 'src', path: 'src', type: 'dir' },
-            { name: 'main.ts', path: 'main.ts', type: 'file' },
+            { name: 'src', path: 'src', type: 'dir', localOnly: false },
+            { name: 'main.ts', path: 'main.ts', type: 'file', localOnly: false },
           ]
     ))
 
@@ -480,5 +625,30 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: /no readme yet/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open folder src/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open file main\.ts/i })).toBeInTheDocument()
+  })
+
+  it('falls back to a neutral empty state on a non-current branch when only ignored working-tree content exists', async () => {
+    window.history.replaceState(null, '', '/?branch=feature')
+    vi.mocked(api.getInfo).mockResolvedValue({
+      name: 'repo',
+      path: '/tmp/repo',
+      currentBranch: 'main',
+      isGitRepo: true,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: true,
+      rootEntryCount: 2,
+    })
+    vi.mocked(api.getBranches).mockResolvedValue([
+      { name: 'main', isCurrent: true },
+      { name: 'feature', isCurrent: false },
+    ])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+    vi.mocked(api.getTree).mockResolvedValue([])
+
+    renderWithClient()
+
+    expect(await screen.findByText(/does not have any visible files or folders yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /no readme yet/i })).not.toBeInTheDocument()
   })
 })
