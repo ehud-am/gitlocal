@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.9
+
+- Reissued the ignored-file visibility release from the updated trusted-publishing workflow on `main` after the previous `0.4.8` release still ran the older tag-scoped publish flow.
+- Added ignored file and folder visibility across the repository tree, folder listings, and search so local-only content remains discoverable in the UI.
+- Marked ignored content consistently as local-only in navigation and active file context to clarify that it exists only on the local machine and will not be pushed to a remote.
+- Fixed ignored-only directories and roots so they no longer fall into misleading empty states when ignored content is the only visible content.
+- Updated Hono, Vitest, and Vite dependencies to publish-safe versions so the release verification audit passes cleanly.
+
 ## 0.4.8
 
 - Reissued the ignored-file visibility release after the previous npm publication attempt failed before the package reached the registry.
