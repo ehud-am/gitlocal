@@ -9,11 +9,9 @@ jobs:
     if: github.event.release.prerelease == false
     runs-on: ubuntu-latest
     environment: release
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Required for npm trusted publishing via OIDC
 
     steps:
       - name: Check out repository
@@ -22,19 +20,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: |
             package-lock.json
             ui/package-lock.json
-
-      - name: Configure npm authentication
-        run: |
-          printf '%s\n' \
-            'registry=https://registry.npmjs.org/' \
-            'always-auth=true' \
-            '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$HOME/.npmrc"
 
       - name: Install root dependencies
         run: npm ci
@@ -46,4 +37,4 @@ jobs:
         run: npm run verify
 
       - name: Publish package to npm
-        run: npm publish --provenance --access public
+        run: npm publish --access public
