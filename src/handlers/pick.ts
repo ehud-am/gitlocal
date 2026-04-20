@@ -1,12 +1,15 @@
 import type { Context } from 'hono'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
-import { validateRepo } from '../git/repo.js'
+import { cloneRepositoryInto, createChildFolder, initializeGitRepository, validateRepo } from '../git/repo.js'
 import { getPickerPath, setPickerPath, setRepoPath } from '../server.js'
 import type {
+  PickCloneRequest,
   PickBrowseEntry,
   PickBrowseResponse,
+  PickCreateFolderRequest,
+  PickInitGitRequest,
   PickRequest,
   PickResponse,
 } from '../types.js'
@@ -57,6 +60,26 @@ function getParentPath(currentPath: string): string | null {
   return parent === currentPath ? null : parent
 }
 
+function getBrowseCapabilities(currentPath: string): Pick<PickBrowseResponse, 'isGitRepo' | 'canOpen' | 'canCreateChild' | 'canInitGit' | 'canCloneIntoChild'> {
+  const exists = existsSync(currentPath)
+  const isDirectory = exists && statSync(currentPath).isDirectory()
+  const isGitRepo = isDirectory && validateRepo(currentPath)
+
+  return {
+    isGitRepo,
+    canOpen: isGitRepo,
+    canCreateChild: isDirectory,
+    canInitGit: isDirectory && !isGitRepo,
+    canCloneIntoChild: isDirectory,
+  }
+}
+
+function getActionError(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message
+  /* v8 ignore next -- helpers always throw Error instances, this is defensive */
+  return fallback
+}
+
 export async function pickBrowseHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const requestedPath = c.req.query('path') ?? ''
   const homePath = homedir()
@@ -72,6 +95,11 @@ export async function pickBrowseHandler(c: Context<{ Variables: Variables }>): P
       roots: getRoots().map((path) => ({ name: path, path })),
       entries: [],
       error: `Path does not exist: ${currentPath}`,
+      isGitRepo: false,
+      canOpen: false,
+      canCreateChild: false,
+      canInitGit: false,
+      canCloneIntoChild: false,
     }
     return c.json(res)
   }
@@ -85,6 +113,7 @@ export async function pickBrowseHandler(c: Context<{ Variables: Variables }>): P
     roots: getRoots().map((path) => ({ name: path, path })),
     entries: listDirectories(currentPath),
     error: '',
+    ...getBrowseCapabilities(currentPath),
   }
   return c.json(res)
 }
@@ -130,4 +159,80 @@ export async function pickParentHandler(c: Context<{ Variables: Variables }>): P
   setRepoPath('')
   setPickerPath(parentPath)
   return c.json({ ok: true, error: '' })
+}
+
+export async function pickCreateFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let payload: PickCreateFolderRequest
+  try {
+    payload = await c.req.json<PickCreateFolderRequest>()
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON body.' })
+  }
+
+  try {
+    const path = createChildFolder(payload.parentPath ?? '', payload.name ?? '')
+    return c.json({
+      ok: true,
+      error: '',
+      path,
+      message: 'Folder created successfully.',
+    })
+  } catch (error) {
+    return c.json({
+      ok: false,
+      error: getActionError(error, 'Failed to create the folder.'),
+    })
+  }
+}
+
+export async function pickInitGitHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let payload: PickInitGitRequest
+  try {
+    payload = await c.req.json<PickInitGitRequest>()
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON body.' })
+  }
+
+  try {
+    const path = initializeGitRepository(payload.path ?? '')
+    return c.json({
+      ok: true,
+      error: '',
+      path,
+      message: 'Git repository initialized successfully.',
+    })
+  } catch (error) {
+    return c.json({
+      ok: false,
+      error: getActionError(error, 'Failed to initialize the repository.'),
+    })
+  }
+}
+
+export async function pickCloneHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let payload: PickCloneRequest
+  try {
+    payload = await c.req.json<PickCloneRequest>()
+  } catch {
+    return c.json({ ok: false, error: 'Invalid JSON body.' })
+  }
+
+  try {
+    const path = cloneRepositoryInto(
+      payload.parentPath ?? '',
+      payload.name ?? '',
+      payload.repositoryUrl ?? '',
+    )
+    return c.json({
+      ok: true,
+      error: '',
+      path,
+      message: 'Repository cloned successfully.',
+    })
+  } catch (error) {
+    return c.json({
+      ok: false,
+      error: getActionError(error, 'Failed to clone the repository.'),
+    })
+  }
 }

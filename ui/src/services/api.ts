@@ -1,11 +1,19 @@
 import type {
   ApiError,
   Branch,
+  BranchSwitchRequest,
+  BranchSwitchResponse,
   Commit,
   FileContent,
+  GitIdentityUpdateRequest,
+  GitIdentityUpdateResponse,
   ManualFileMutationRequest,
   ManualFileOperationResult,
+  PickCloneRequest,
+  PickCreateFolderRequest,
   PickBrowseResponse,
+  PickInitGitRequest,
+  PickResponse,
   RepoInfo,
   SearchResponse,
   SyncStatus,
@@ -48,6 +56,25 @@ async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: 
   return payload as T
 }
 
+async function branchSwitchRequest(payload: BranchSwitchRequest): Promise<BranchSwitchResponse> {
+  const res = await fetch(BASE + '/api/branches/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  const body = await res.json().catch(
+    () =>
+      ({
+        ok: false,
+        status: 'failed',
+        message: res.statusText || 'Branch switch failed.',
+      }) satisfies BranchSwitchResponse,
+  )
+
+  return body as BranchSwitchResponse
+}
+
 export const api = {
   getInfo: (): Promise<RepoInfo> => request<RepoInfo>('/api/info'),
 
@@ -85,7 +112,19 @@ export const api = {
     return request(`/api/commits${qs ? '?' + qs : ''}`)
   },
 
-  getReadme: (): Promise<{ path: string }> => request('/api/readme'),
+  getReadme: (path?: string, branch?: string): Promise<{ path: string }> => {
+    const params = new URLSearchParams()
+    if (path) params.set('path', path)
+    if (branch) params.set('branch', branch)
+    const qs = params.toString()
+    return request(`/api/readme${qs ? '?' + qs : ''}`)
+  },
+
+  switchBranch: (payload: BranchSwitchRequest): Promise<BranchSwitchResponse> =>
+    branchSwitchRequest(payload),
+
+  updateGitIdentity: (payload: GitIdentityUpdateRequest): Promise<GitIdentityUpdateResponse> =>
+    mutate('/api/git/identity', 'PUT', payload),
 
   getSearchResults: (query: string, branch?: string): Promise<SearchResponse> => {
     const params = new URLSearchParams({ query, mode: 'name' })
@@ -107,19 +146,18 @@ export const api = {
     return request(`/api/pick/browse${qs ? '?' + qs : ''}`)
   },
 
-  submitPick: async (path: string): Promise<{ ok: boolean; error: string }> => {
-    const res = await fetch('/api/pick', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
-    })
-    return res.json()
-  },
+  submitPick: (path: string): Promise<PickResponse> =>
+    mutate('/api/pick', 'POST', { path }),
 
-  showParentPicker: async (): Promise<{ ok: boolean; error: string }> => {
-    const res = await fetch('/api/pick/parent', {
-      method: 'POST',
-    })
-    return res.json()
-  },
+  createPickFolder: (payload: PickCreateFolderRequest): Promise<PickResponse> =>
+    mutate('/api/pick/create-folder', 'POST', payload),
+
+  initPickGit: (payload: PickInitGitRequest): Promise<PickResponse> =>
+    mutate('/api/pick/init', 'POST', payload),
+
+  clonePickRepo: (payload: PickCloneRequest): Promise<PickResponse> =>
+    mutate('/api/pick/clone', 'POST', payload),
+
+  showParentPicker: (): Promise<PickResponse> =>
+    mutate('/api/pick/parent', 'POST', {}),
 }

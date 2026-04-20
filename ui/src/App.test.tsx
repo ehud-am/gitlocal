@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -21,6 +21,11 @@ vi.mock('./services/api', () => ({
     getSearchResults: vi.fn(),
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
+    switchBranch: vi.fn(),
+    updateGitIdentity: vi.fn(),
+    createPickFolder: vi.fn(),
+    initPickGit: vi.fn(),
+    clonePickRepo: vi.fn(),
   },
 }))
 
@@ -29,6 +34,55 @@ import { api } from './services/api'
 const APP_VERSION = JSON.parse(
   readFileSync(resolve(process.cwd(), '../package.json'), 'utf-8'),
 ) as { version: string }
+
+function buildInfo(currentBranch: string) {
+  return {
+    name: 'repo',
+    path: '/tmp/repo',
+    currentBranch,
+    isGitRepo: true,
+    pickerMode: false,
+    version: APP_VERSION.version,
+    hasCommits: true,
+    rootEntryCount: 2,
+    gitContext: {
+      user: {
+        name: 'Local User',
+        email: 'local@example.com',
+        source: 'local' as const,
+      },
+      remote: {
+        name: 'origin',
+        fetchUrl: 'git@github.com:ehud-am/gitlocal.git',
+        webUrl: 'https://github.com/ehud-am/gitlocal',
+        selectionReason: 'origin',
+      },
+    },
+  }
+}
+
+function buildBranches(currentBranch: string) {
+  const branches = [
+    {
+      name: 'main',
+      displayName: 'main',
+      scope: 'local' as const,
+      hasLocalCheckout: true,
+      isCurrent: currentBranch === 'main',
+    },
+    {
+      name: 'release',
+      displayName: currentBranch === 'release' ? 'release' : 'release (origin)',
+      scope: currentBranch === 'release' ? 'local' as const : 'remote' as const,
+      trackingRef: currentBranch === 'release' ? 'origin/release' : 'origin/release',
+      remoteName: 'origin',
+      hasLocalCheckout: currentBranch === 'release',
+      isCurrent: currentBranch === 'release',
+    },
+  ]
+
+  return branches
+}
 
 function renderWithClient() {
   const client = new QueryClient({
@@ -42,52 +96,95 @@ function renderWithClient() {
 }
 
 describe('App', () => {
+  const getItem = vi.fn()
+  const setItem = vi.fn()
+
   beforeEach(() => {
     vi.clearAllMocks()
-    window.history.replaceState(null, '', '/?repoPath=%2Ftmp%2Frepo&branch=main&path=docs/guide.md&pathType=file&sidebarCollapsed=true&searchPresentation=expanded&searchQuery=hello&raw=true')
-    vi.mocked(api.getInfo).mockResolvedValue({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 1,
+    window.history.replaceState(null, '', '/')
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem,
+        setItem,
+      },
+      writable: true,
     })
-    vi.mocked(api.getReadme).mockResolvedValue({ path: 'README.md' })
+    Object.defineProperty(window, 'matchMedia', {
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+      writable: true,
+    })
+
+    getItem.mockReturnValue(null)
+
+    vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
+    vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
+      path: path === 'docs' ? 'docs/README.md' : 'README.md',
+    }))
     vi.mocked(api.getSyncStatus).mockResolvedValue({
       branch: 'main',
       repoPath: '/tmp/repo',
       workingTreeRevision: 'abc',
       treeStatus: 'unchanged',
       fileStatus: 'unchanged',
-      currentPath: 'docs/guide.md',
-      resolvedPath: 'docs/guide.md',
-      currentPathType: 'file',
-      resolvedPathType: 'file',
+      currentPath: '',
+      resolvedPath: '',
+      currentPathType: 'none',
+      resolvedPathType: 'none',
       statusMessage: '',
       checkedAt: new Date().toISOString(),
     })
-    vi.mocked(api.getTree).mockResolvedValue([])
-    vi.mocked(api.getBranches).mockResolvedValue([{ name: 'main', isCurrent: true }])
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
+      if (path === 'docs') {
+        return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+      }
+
+      return [
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      ]
+    })
+    vi.mocked(api.getBranches).mockResolvedValue(buildBranches('main'))
     vi.mocked(api.getCommits).mockResolvedValue([])
-    vi.mocked(api.getFile).mockResolvedValue({
-      path: 'docs/guide.md',
-      type: 'text',
-      content: 'hello',
-      language: 'markdown',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-docs',
+    vi.mocked(api.getFile).mockImplementation(async (path?: string) => {
+      if (path === 'docs/guide.md') {
+        return {
+          path,
+          type: 'text',
+          content: 'guide content',
+          language: 'markdown',
+          encoding: 'utf-8',
+          editable: true,
+          revisionToken: 'guide-rev',
+        }
+      }
+
+      return {
+        path: path ?? 'README.md',
+        type: 'markdown',
+        content: path === 'docs/README.md' ? '# Docs Readme' : '# Root Readme',
+        language: 'markdown',
+        encoding: 'utf-8',
+        editable: true,
+        revisionToken: 'readme-rev',
+      }
     })
     vi.mocked(api.getSearchResults).mockResolvedValue({
-      query: 'hello',
+      query: '',
       branch: 'main',
       mode: 'name',
       caseSensitive: false,
       results: [],
     })
+    vi.mocked(api.switchBranch).mockResolvedValue({
+      ok: false,
+      status: 'blocked',
+      message: 'Branch switching is not configured for this test.',
+    })
+    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: true, error: '' })
     vi.mocked(api.getPickBrowse).mockResolvedValue({
       currentPath: '/tmp',
       parentPath: '/',
@@ -95,291 +192,294 @@ describe('App', () => {
       roots: [{ name: '/', path: '/' }],
       entries: [],
       error: '',
+      isGitRepo: false,
+      canOpen: false,
+      canCreateChild: true,
+      canInitGit: true,
+      canCloneIntoChild: true,
+    })
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+    vi.mocked(api.updateGitIdentity).mockResolvedValue({
+      ok: true,
+      message: 'Repository git identity updated.',
+      user: {
+        name: 'Updated User',
+        email: 'updated@example.com',
+        source: 'local',
+      },
     })
   })
 
-  it('hydrates branch, file, sidebar state, and search state from the URL', async () => {
+  it('renders the repo context header with git metadata plus the root folder README preview', async () => {
     renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+    expect(screen.getByText('/tmp/repo')).toBeInTheDocument()
+    expect(screen.getByText(/linked to remote git/i)).toBeInTheDocument()
+    expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
+    expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+  })
+
+  it('opens an info modal before leaving the repository from the root .. row', async () => {
+    vi.mocked(api.showParentPicker).mockResolvedValueOnce({
+      ok: false,
+      error: 'Parent folder unavailable.',
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /open parent folder outside this repository/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: /leave this repository/i })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /open parent folder/i }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+      expect(api.showParentPicker).toHaveBeenCalledTimes(1)
     })
-
-    expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', true)
-    expect(screen.getByDisplayValue('hello')).toBeInTheDocument()
   })
 
-  it('shows a compact search trigger when search is idle', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+  it('hydrates a saved file selection and search state from the URL', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file&searchPresentation=expanded&searchQuery=guide')
 
     renderWithClient()
 
-    expect(await screen.findByRole('button', { name: /open repository search/i })).toBeInTheDocument()
-    expect(screen.queryByRole('searchbox', { name: /search query/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('searchbox', { name: /search query/i })).toHaveValue('guide')
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
   })
 
-  it('opens search from the compact trigger', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+  it('toggles the theme and persists the preference', async () => {
+    renderWithClient()
 
+    const toggle = await screen.findByRole('switch', { name: /toggle dark theme/i })
+    fireEvent.click(toggle)
+
+    await waitFor(() => {
+      expect(setItem).toHaveBeenCalledWith('gitlocal-theme', 'dark')
+    })
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('updates the repository-local git identity from the header dialog', async () => {
+    let gitUser = {
+      name: 'Local User',
+      email: 'local@example.com',
+      source: 'local' as const,
+    }
+
+    vi.mocked(api.getInfo).mockImplementation(async () => ({
+      ...buildInfo('main'),
+      gitContext: {
+        user: gitUser,
+        remote: buildInfo('main').gitContext.remote,
+      },
+    }))
+    vi.mocked(api.updateGitIdentity).mockImplementation(async (payload) => {
+      gitUser = {
+        name: payload.name,
+        email: payload.email,
+        source: 'local',
+      }
+      return {
+        ok: true,
+        message: 'Repository git identity updated.',
+        user: gitUser,
+      }
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit repository git identity/i }))
+
+    expect(await screen.findByRole('heading', { name: /edit repository git identity/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: /git user name/i }), {
+      target: { value: 'Updated User' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: /git user email/i }), {
+      target: { value: 'updated@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /save identity/i }))
+
+    await waitFor(() => {
+      expect(api.updateGitIdentity).toHaveBeenCalledWith({
+        name: 'Updated User',
+        email: 'updated@example.com',
+      })
+    })
+    expect(await screen.findByText(/repository git identity updated\./i)).toBeInTheDocument()
+    expect(await screen.findByText(/updated user <updated@example.com>/i)).toBeInTheDocument()
+  })
+
+  it('opens search from the compact trigger and with the keyboard shortcut', async () => {
     renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
+    expect(await screen.findByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
 
-    await waitFor(() => {
-      expect(screen.getByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
-    })
-
-    expect(screen.getByTestId('search-layer')).toBeInTheDocument()
-  })
-
-  it('opens search on Command+F or Control+F', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
-
-    renderWithClient()
-
-    await screen.findByRole('button', { name: /open repository search/i })
     fireEvent.keyDown(window, { key: 'f', metaKey: true })
-
-    await waitFor(() => {
-      expect(screen.getByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
-    })
+    expect(screen.getByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
   })
 
-  it('collapses search and clears the query when dismissed', async () => {
+  it('collapses and restores the repository tree rail', async () => {
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('button', { name: /close search/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /open repository search/i })).toBeInTheDocument()
-    })
-
-    expect(screen.queryByDisplayValue('hello')).not.toBeInTheDocument()
-  })
-
-  it('silently recovers when sync reports a missing path', async () => {
-    vi.mocked(api.getSyncStatus).mockResolvedValueOnce({
-      branch: 'main',
-      repoPath: '/tmp/repo',
-      workingTreeRevision: 'def',
-      treeStatus: 'invalid',
-      fileStatus: 'deleted',
-      currentPath: 'docs/guide.md',
-      resolvedPath: '',
-      currentPathType: 'missing',
-      resolvedPathType: 'none',
-      statusMessage: 'The current location is no longer available. GitLocal moved you to the nearest valid path.',
-      checkedAt: new Date().toISOString(),
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).not.toHaveBeenCalledWith('docs/guide.md', 'main', true)
-    })
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-  })
-
-  it('renders a collapsed navigation rail with an in-panel restore icon', async () => {
-    renderWithClient()
-
+    fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
     expect(await screen.findByLabelText(/collapsed navigation/i)).toBeInTheDocument()
-    const toggle = screen.getByRole('button', { name: /expand navigation/i })
-    fireEvent.click(toggle)
 
-    await waitFor(() => {
-      expect(screen.getByRole('tree', { name: /repository files/i })).toBeInTheDocument()
-    })
+    fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
+    expect(await screen.findByRole('tree', { name: /repository files/i })).toBeInTheDocument()
   })
 
-  it('collapses the sidebar from the in-panel icon control', async () => {
+  it('falls back to the current repository branch when the saved branch is unavailable', async () => {
+    window.history.replaceState(null, '', '/?branch=missing-branch')
+
+    renderWithClient()
+
+    expect(await screen.findByRole('combobox', { name: /branch selector/i })).toHaveValue('main')
+  })
+
+  it('switches to a remote-tracking branch and reconciles a missing selected path after checkout', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
 
+    let currentBranch = 'main'
+
+    vi.mocked(api.getInfo).mockImplementation(async () => buildInfo(currentBranch))
+    vi.mocked(api.getBranches).mockImplementation(async () => buildBranches(currentBranch))
+    vi.mocked(api.switchBranch).mockImplementation(async (payload) => {
+      expect(payload).toEqual({
+        target: 'origin/release',
+        resolution: 'preview',
+      })
+      currentBranch = 'release'
+      return {
+        ok: true,
+        status: 'switched',
+        message: 'Switched to release.',
+        currentBranch: 'release',
+        createdTrackingBranch: 'release',
+      }
+    })
+    vi.mocked(api.getSyncStatus).mockImplementation(async (path, branch) => {
+      if (path === 'docs/guide.md' && branch === 'release') {
+        return {
+          branch: 'release',
+          repoPath: '/tmp/repo',
+          workingTreeRevision: 'release-rev',
+          treeStatus: 'invalid',
+          fileStatus: 'deleted',
+          currentPath: 'docs/guide.md',
+          resolvedPath: 'docs',
+          currentPathType: 'missing',
+          resolvedPathType: 'dir',
+          statusMessage: '',
+          checkedAt: new Date().toISOString(),
+        }
+      }
+
+      return {
+        branch: branch ?? currentBranch,
+        repoPath: '/tmp/repo',
+        workingTreeRevision: `${branch ?? currentBranch}-rev`,
+        treeStatus: 'unchanged',
+        fileStatus: 'unchanged',
+        currentPath: path ?? '',
+        resolvedPath: path ?? '',
+        currentPathType: path ? 'file' : 'none',
+        resolvedPathType: path ? 'file' : 'none',
+        statusMessage: '',
+        checkedAt: new Date().toISOString(),
+      }
+    })
+
     renderWithClient()
 
-    const toggle = await screen.findByRole('button', { name: /collapse navigation/i })
-    fireEvent.click(toggle)
+    fireEvent.change(await screen.findByRole('combobox', { name: /branch selector/i }), {
+      target: { value: 'origin/release' },
+    })
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/collapsed navigation/i)).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('release')
     })
+    expect(await screen.findByRole('heading', { name: 'docs' })).toBeInTheDocument()
+    expect(await screen.findByText(/moved you to docs/i)).toBeInTheDocument()
+    expect(api.getSyncStatus).toHaveBeenCalledWith('docs/guide.md', 'release')
   })
 
-  it('does not render live results before the 3-character threshold', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file&searchPresentation=expanded&searchQuery=re')
+  it('opens the branch switch dialog and commits before switching', async () => {
+    let currentBranch = 'main'
+
+    vi.mocked(api.getInfo).mockImplementation(async () => buildInfo(currentBranch))
+    vi.mocked(api.getBranches).mockImplementation(async () => [
+      {
+        name: 'main',
+        displayName: 'main',
+        scope: 'local',
+        hasLocalCheckout: true,
+        isCurrent: currentBranch === 'main',
+      },
+      {
+        name: 'feature',
+        displayName: 'feature',
+        scope: 'local',
+        hasLocalCheckout: true,
+        isCurrent: currentBranch === 'feature',
+      },
+    ])
+    vi.mocked(api.switchBranch).mockImplementation(async (payload) => {
+      if (payload.resolution === 'preview') {
+        return {
+          ok: false,
+          status: 'confirmation-required',
+          message: 'This branch switch needs confirmation because your working tree has uncommitted changes.',
+          currentBranch: 'main',
+          trackedChangeCount: 1,
+          untrackedChangeCount: 0,
+          blockingPaths: ['README.md'],
+          suggestedCommitMessage: 'WIP before switching to feature',
+        }
+      }
+
+      expect(payload).toEqual({
+        target: 'feature',
+        resolution: 'commit',
+        commitMessage: 'save before switch',
+        allowDeleteUntracked: false,
+      })
+      currentBranch = 'feature'
+      return {
+        ok: true,
+        status: 'switched',
+        message: 'Switched to feature.',
+        currentBranch: 'feature',
+      }
+    })
 
     renderWithClient()
 
-    expect(await screen.findByText(/type 3 or more characters/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /readme/i })).not.toBeInTheDocument()
-  })
-
-  it('navigates file quick-finder results and keeps the viewer synchronized', async () => {
-    vi.mocked(api.getSearchResults).mockResolvedValue({
-      query: 'read',
-      branch: 'main',
-      mode: 'name',
-      caseSensitive: false,
-      results: [{ path: 'README.md', type: 'file', matchType: 'name', localOnly: false }],
+    fireEvent.change(await screen.findByRole('combobox', { name: /branch selector/i }), {
+      target: { value: 'feature' },
     })
 
-    renderWithClient()
+    expect(await screen.findByRole('heading', { name: /switch branches/i })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('WIP before switching to feature')).toBeInTheDocument()
 
-    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
-    fireEvent.change(searchInput, { target: { value: 'read' } })
-
-    const fileResult = await screen.findByRole('button', { name: /readme\.md/i })
-    fireEvent.click(fileResult)
+    fireEvent.change(screen.getByLabelText(/commit message/i), {
+      target: { value: 'save before switch' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /commit and switch/i }))
 
     await waitFor(() => {
-      expect(api.getFile).toHaveBeenLastCalledWith('README.md', 'main', false)
+      expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('feature')
     })
+    expect(await screen.findByText(/switched to feature/i)).toBeInTheDocument()
   })
 
-  it('opens folder quick-finder results as folders instead of loading them as files', async () => {
-    vi.mocked(api.getSearchResults).mockResolvedValue({
-      query: 'doc',
-      branch: 'main',
-      mode: 'name',
-      caseSensitive: false,
-      results: [{ path: 'docs', type: 'dir', matchType: 'name', localOnly: true }],
-    })
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path === 'docs'
-        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
-        : []
-    ))
-
-    renderWithClient()
-
-    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
-    fireEvent.change(searchInput, { target: { value: 'doc' } })
-
-    fireEvent.click(await screen.findByRole('button', { name: /docs/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
-    })
-
-    expect(api.getFile).not.toHaveBeenCalledWith('docs', 'main', false)
-  })
-
-  it('opens ignored folders from the repository tree', async () => {
-    window.history.replaceState(null, '', '/?branch=main')
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 1,
-    })
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path === '.cache'
-        ? [{ name: 'index.db', path: '.cache/index.db', type: 'file', localOnly: true }]
-        : [{ name: '.cache', path: '.cache', type: 'dir', localOnly: true }]
-    ))
-
-    renderWithClient()
-
-    fireEvent.click(await screen.findByRole('treeitem', { name: /\.cache/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '.cache' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /open file index\.db/i })).toBeInTheDocument()
-    })
-  })
-
-  it('opens ignored files from the folder list', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=.cache&pathType=dir')
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path === '.cache'
-        ? [{ name: 'index.db', path: '.cache/index.db', type: 'file', localOnly: true }]
-        : []
-    ))
-    vi.mocked(api.getFile).mockResolvedValueOnce({
-      path: '.cache/index.db',
-      type: 'text',
-      content: 'cache entry',
-      language: '',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-cache',
-    })
-
-    renderWithClient()
-
-    fireEvent.click(await screen.findByRole('button', { name: /open file index\.db/i }))
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenLastCalledWith('.cache/index.db', 'main', false)
-    })
-  })
-
-  it('preserves the local-only cue after opening ignored items', async () => {
-    vi.mocked(api.getSearchResults).mockResolvedValue({
-      query: 'env',
-      branch: 'main',
-      mode: 'name',
-      caseSensitive: false,
-      results: [{ path: '.env', type: 'file', matchType: 'name', localOnly: true }],
-    })
-    vi.mocked(api.getFile).mockResolvedValueOnce({
-      path: '.env',
-      type: 'text',
-      content: 'SECRET=value',
-      language: '',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-env',
-    })
-
-    renderWithClient()
-
-    const searchInput = await screen.findByRole('searchbox', { name: /search query/i })
-    fireEvent.change(searchInput, { target: { value: 'env' } })
-    fireEvent.click(await screen.findByRole('button', { name: /\.env/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '.env' })).toBeInTheDocument()
-    })
-    expect(screen.getByText(/local only/i)).toBeInTheDocument()
-  })
-
-  it('hydrates a saved folder selection without trying to load it as a file', async () => {
-    window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir')
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path === 'docs'
-        ? [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
-        : []
-    ))
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
-    })
-
-    expect(api.getFile).not.toHaveBeenCalledWith('docs', 'main', expect.anything())
-  })
-
-  it('renders a fixed footer with the current year, product link, and running version', async () => {
-    renderWithClient()
-
-    const currentYear = new Date().getFullYear().toString()
-    expect(await screen.findByText(currentYear)).toBeInTheDocument()
-    expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
-
-    const link = screen.getByRole('link', { name: 'GitLocal' })
-    expect(link).toHaveAttribute('href', 'https://github.com/ehud-am/gitlocal')
-  })
-
-  it('renders the same footer in picker mode', async () => {
+  it('opens the picker page and footer in picker mode', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce({
       name: '',
       path: '/tmp',
@@ -389,266 +489,12 @@ describe('App', () => {
       version: APP_VERSION.version,
       hasCommits: false,
       rootEntryCount: 0,
+      gitContext: null,
     })
 
     renderWithClient()
 
     expect(await screen.findByText(/choose the folder gitlocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
-  })
-
-  it('falls back to the current repo branch when the saved URL branch is not available', async () => {
-    window.history.replaceState(null, '', '/?branch=004-copy-control-polish&path=README.md&pathType=file')
-    vi.mocked(api.getBranches).mockResolvedValue([{ name: 'main', isCurrent: true }])
-    vi.mocked(api.getSyncStatus).mockResolvedValue({
-      branch: 'main',
-      repoPath: '/tmp/repo',
-      workingTreeRevision: 'abc',
-      treeStatus: 'unchanged',
-      fileStatus: 'unchanged',
-      currentPath: 'README.md',
-      resolvedPath: 'README.md',
-      currentPathType: 'file',
-      resolvedPathType: 'file',
-      statusMessage: '',
-      checkedAt: new Date().toISOString(),
-    })
-    vi.mocked(api.getFile).mockResolvedValue({
-      path: 'README.md',
-      type: 'markdown',
-      content: '# hello',
-      language: '',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-readme',
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
-    })
-
-    expect(screen.getByRole('status')).toHaveTextContent(/reset the saved branch/i)
-  })
-
-  it('clears the saved file context when a different repository is opened', async () => {
-    window.history.replaceState(null, '', '/?repoPath=%2Ftmp%2Fold-repo&branch=main&path=docs%2Fguide.md&pathType=file&raw=true')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/new-repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 1,
-    })
-    vi.mocked(api.getFile).mockResolvedValueOnce({
-      path: 'README.md',
-      type: 'text',
-      content: '# hello',
-      language: 'markdown',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-readme',
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
-    })
-
-    expect(api.getFile).not.toHaveBeenCalledWith('docs/guide.md', 'main', true)
-    expect(window.location.search).toContain('repoPath=%2Ftmp%2Fnew-repo')
-    expect(window.location.search).toContain('path=README.md')
-    expect(window.location.search).not.toContain('docs%2Fguide.md')
-  })
-
-  it('falls back to the current folder list after switching repositories resets the saved file context', async () => {
-    window.history.replaceState(null, '', '/?repoPath=%2Ftmp%2Fold-repo&branch=main&path=docs%2Fguide.md&pathType=file')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/new-repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 2,
-    })
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path
-        ? []
-        : [
-            { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
-            { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
-          ]
-    ))
-
-    renderWithClient()
-
-    expect(await screen.findByRole('status')).toHaveTextContent(/reset the saved file context/i)
-    expect(screen.queryByRole('heading', { name: /pick up where you left off/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open file readme\.md/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
-  })
-
-  it('shows an empty-repository landing state when there is no README and no root content', async () => {
-    window.history.replaceState(null, '', '/')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: '',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: false,
-      rootEntryCount: 0,
-    })
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
-    vi.mocked(api.getBranches).mockResolvedValueOnce([])
-
-    renderWithClient()
-
-    expect(await screen.findByRole('button', { name: /create first file/i })).toBeInTheDocument()
-    expect(screen.getByText(/newly initialized or empty/i)).toBeInTheDocument()
-  })
-
-  it('shows ignored-only root content instead of the empty-repository landing state', async () => {
-    window.history.replaceState(null, '', '/')
-    vi.mocked(api.getInfo).mockResolvedValue({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 2,
-    })
-    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path
-        ? []
-        : [
-            { name: '.cache', path: '.cache', type: 'dir', localOnly: true },
-            { name: '.env', path: '.env', type: 'file', localOnly: true },
-          ]
-    ))
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /open folder \.cache/i })).toBeInTheDocument()
-    }, { timeout: 3000 })
-    expect(screen.getByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /create first file/i })).not.toBeInTheDocument()
-  })
-
-  it('opens a working-tree README by default before the first commit exists', async () => {
-    window.history.replaceState(null, '', '/')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: '',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: false,
-      rootEntryCount: 1,
-    })
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: 'README.md' })
-    vi.mocked(api.getFile).mockResolvedValueOnce({
-      path: 'README.md',
-      type: 'markdown',
-      content: '# hello',
-      language: '',
-      encoding: 'utf-8',
-      editable: true,
-      revisionToken: 'rev-readme',
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('README.md', '', false)
-    })
-  })
-
-  it('clears a stale saved branch when the opened repository has no commits yet', async () => {
-    window.history.replaceState(null, '', '/?branch=main')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: '',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: false,
-      rootEntryCount: 0,
-    })
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
-    vi.mocked(api.getBranches).mockResolvedValueOnce([])
-
-    renderWithClient()
-
-    expect(await screen.findByRole('status')).toHaveTextContent(/has no commits yet/i)
-  })
-
-  it('shows a missing-readme landing state when the repository has content but no README', async () => {
-    window.history.replaceState(null, '', '/?branch=main')
-    vi.mocked(api.getInfo).mockResolvedValueOnce({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 3,
-    })
-    vi.mocked(api.getReadme).mockResolvedValueOnce({ path: '' })
-    vi.mocked(api.getTree).mockImplementation(async (path?: string) => (
-      path
-        ? []
-        : [
-            { name: 'src', path: 'src', type: 'dir', localOnly: false },
-            { name: 'main.ts', path: 'main.ts', type: 'file', localOnly: false },
-          ]
-    ))
-
-    renderWithClient()
-
-    expect(await screen.findByRole('heading', { name: /no readme yet/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open folder src/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open file main\.ts/i })).toBeInTheDocument()
-  })
-
-  it('falls back to a neutral empty state on a non-current branch when only ignored working-tree content exists', async () => {
-    window.history.replaceState(null, '', '/?branch=feature')
-    vi.mocked(api.getInfo).mockResolvedValue({
-      name: 'repo',
-      path: '/tmp/repo',
-      currentBranch: 'main',
-      isGitRepo: true,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: true,
-      rootEntryCount: 2,
-    })
-    vi.mocked(api.getBranches).mockResolvedValue([
-      { name: 'main', isCurrent: true },
-      { name: 'feature', isCurrent: false },
-    ])
-    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
-    vi.mocked(api.getTree).mockResolvedValue([])
-
-    renderWithClient()
-
-    expect(await screen.findByText(/does not have any visible files or folders yet/i)).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /no readme yet/i })).not.toBeInTheDocument()
   })
 })

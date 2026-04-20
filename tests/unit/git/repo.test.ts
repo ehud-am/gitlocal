@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import {
+  cloneRepositoryInto,
+  convertGitRemoteToWebUrl,
+  createChildFolder,
   spawnGit,
   validateRepo,
   getInfo,
+  getGitRemoteContext,
+  getGitUserIdentity,
+  setRepoGitIdentity,
   hasCommits,
   getBrowseableRootEntryCount,
   getBranches,
@@ -22,12 +28,15 @@ import {
   nearestExistingRepoPath,
   nearestExistingTrackedRepoPath,
   readWorkingTreeFile,
+  getWorkingTreeChanges,
   normalizeRepoRelativePath,
   isPathInsideRepo,
   resolveSafeRepoPath,
   isIgnoredPath,
   getEditableState,
   getFileRevisionToken,
+  initializeGitRepository,
+  switchBranch,
   writeWorkingTreeTextFile,
   deleteWorkingTreeFile,
   listWorkingTreeDirectoryEntries,
@@ -50,6 +59,18 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+function makeBareRepo(prefix: string = 'gitlocal-remote-'): { dir: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  spawnSync('git', ['init', '--bare'], { cwd: dir })
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+function git(dir: string, ...args: string[]): string {
+  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf-8' })
+  expect(result.status).toBe(0)
+  return result.stdout.trim()
 }
 
 describe('spawnGit', () => {
@@ -419,6 +440,7 @@ describe('working tree helpers', () => {
       expect(getPathType(dir, 'missing/file.md')).toBe('missing')
       expect(nearestExistingRepoPath(dir, 'docs/missing/file.md')).toBe('docs')
       expect(nearestExistingRepoPath(dir, 'README.md')).toBe('README.md')
+      expect(nearestExistingRepoPath(dir, 'missing/file.md')).toBe('')
       expect(readWorkingTreeFile(dir, 'README.md')?.toString('utf-8')).toContain('# Test')
       expect(readWorkingTreeFile(dir, 'docs')).toBeNull()
       expect(readWorkingTreeFile(dir, 'missing.md')).toBeNull()
@@ -527,6 +549,365 @@ describe('working tree helpers', () => {
       expect(getBrowseableRootEntryCount(dir)).toBe(5)
     } finally {
       cleanup()
+    }
+  })
+
+  it('converts supported git remote URLs into browser URLs', () => {
+    expect(convertGitRemoteToWebUrl('https://github.com/example/project.git')).toBe('https://github.com/example/project')
+    expect(convertGitRemoteToWebUrl('ssh://git@github.com/example/project.git')).toBe('https://github.com/example/project')
+    expect(convertGitRemoteToWebUrl('git@github.com:example/project.git')).toBe('https://github.com/example/project')
+    expect(convertGitRemoteToWebUrl('https://')).toBe('https:')
+    expect(convertGitRemoteToWebUrl('git://github.com/example/project')).toBe('')
+    expect(convertGitRemoteToWebUrl('file:///tmp/project')).toBe('')
+    expect(convertGitRemoteToWebUrl('/tmp/project')).toBe('')
+  })
+
+  it('resolves git user identity from local and global configuration', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-home-'))
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      process.env.HOME = homeDir
+      spawnSync('git', ['config', '--global', 'user.name', 'Global User'], { encoding: 'utf-8' })
+      spawnSync('git', ['config', '--global', 'user.email', 'global@example.com'], { encoding: 'utf-8' })
+
+      spawnSync('git', ['config', '--local', 'user.name', 'Local User'], { cwd: dir, encoding: 'utf-8' })
+      spawnSync('git', ['config', '--local', '--unset', 'user.email'], { cwd: dir, encoding: 'utf-8' })
+
+      expect(getGitUserIdentity(dir)).toEqual({
+        name: 'Local User',
+        email: 'global@example.com',
+        source: 'mixed',
+      })
+
+      spawnSync('git', ['config', '--local', 'user.email', 'local@example.com'], { cwd: dir, encoding: 'utf-8' })
+      expect(getGitUserIdentity(dir)).toEqual({
+        name: 'Local User',
+        email: 'local@example.com',
+        source: 'local',
+      })
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+      cleanup()
+    }
+  })
+
+  it('writes git identity into the repository local config', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-update-home-'))
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      process.env.HOME = homeDir
+      spawnSync('git', ['config', '--global', 'user.name', 'Global User'], { encoding: 'utf-8' })
+      spawnSync('git', ['config', '--global', 'user.email', 'global@example.com'], { encoding: 'utf-8' })
+
+      const result = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com')
+
+      expect(result).toEqual({
+        ok: true,
+        message: 'Repository git identity updated.',
+        user: {
+          name: 'Repo User',
+          email: 'repo@example.com',
+          source: 'local',
+        },
+      })
+      expect(getGitUserIdentity(dir)).toEqual(result.user)
+      expect(git(dir, 'config', '--local', 'user.name')).toBe('Repo User')
+      expect(git(dir, 'config', '--local', 'user.email')).toBe('repo@example.com')
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+      cleanup()
+    }
+  })
+
+  it('rejects incomplete repository git identity updates', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      expect(() => setRepoGitIdentity(dir, 'Repo User', '   ')).toThrow('Git email is required.')
+      expect(() => setRepoGitIdentity(join(tmpdir(), 'definitely-missing-repo'), 'Repo User', 'repo@example.com')).toThrow(
+        'No repository is currently open.',
+      )
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns null when git identity and remotes are unavailable', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-home-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-identity-'))
+    spawnSync('git', ['init'], { cwd: dir })
+
+    try {
+      process.env.HOME = homeDir
+      expect(getGitUserIdentity(dir)).toBeNull()
+      expect(getGitRemoteContext(dir)).toBeNull()
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('selects upstream, then origin, then the first configured remote for repo context', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const upstreamRemote = makeBareRepo('gitlocal-upstream-')
+    const originRemote = makeBareRepo('gitlocal-origin-')
+    const mirrorRemote = makeBareRepo('gitlocal-mirror-')
+    const currentBranch = getCurrentBranch(dir)
+
+    try {
+      git(dir, 'remote', 'add', 'origin', originRemote.dir)
+      git(dir, 'remote', 'add', 'upstream', upstreamRemote.dir)
+      git(dir, 'config', `branch.${currentBranch}.remote`, 'upstream')
+      git(dir, 'config', `branch.${currentBranch}.merge`, `refs/heads/${currentBranch}`)
+
+      expect(getGitRemoteContext(dir)).toEqual(expect.objectContaining({
+        name: 'upstream',
+        selectionReason: 'upstream',
+      }))
+
+      git(dir, 'config', '--unset', `branch.${currentBranch}.remote`)
+      expect(getGitRemoteContext(dir)).toEqual(expect.objectContaining({
+        name: 'origin',
+        selectionReason: 'origin',
+      }))
+
+      git(dir, 'remote', 'remove', 'origin')
+      git(dir, 'remote', 'remove', 'upstream')
+      git(dir, 'remote', 'add', 'mirror', mirrorRemote.dir)
+
+      expect(getGitRemoteContext(dir)).toEqual(expect.objectContaining({
+        name: 'mirror',
+        selectionReason: 'first-configured',
+      }))
+
+      git(dir, 'config', '--unset', 'remote.mirror.url')
+      expect(getGitRemoteContext(dir)).toBeNull()
+    } finally {
+      cleanup()
+      upstreamRemote.cleanup()
+      originRemote.cleanup()
+      mirrorRemote.cleanup()
+    }
+  })
+
+  it('returns enriched info and branch metadata including remote-only branches', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const remote = makeBareRepo()
+    const currentBranch = getCurrentBranch(dir)
+
+    try {
+      git(dir, 'remote', 'add', 'origin', remote.dir)
+      git(dir, 'push', '-u', 'origin', currentBranch)
+      git(dir, 'checkout', '-b', 'remote-only')
+      writeFileSync(join(dir, 'remote-only.txt'), 'remote')
+      git(dir, 'add', '.')
+      git(dir, 'commit', '-m', 'remote only branch')
+      git(dir, 'push', '-u', 'origin', 'remote-only')
+      git(dir, 'checkout', currentBranch)
+      git(dir, 'branch', '-D', 'remote-only')
+      git(dir, 'fetch', 'origin')
+
+      const info = getInfo(dir)
+      expect(info.gitContext?.remote?.name).toBe('origin')
+
+      const branches = getBranches(dir)
+      expect(branches.find((branch) => branch.name === currentBranch)).toEqual(
+        expect.objectContaining({
+          scope: 'local',
+          hasLocalCheckout: true,
+          isCurrent: true,
+        }),
+      )
+      expect(branches.find((branch) => branch.name === 'remote-only')).toEqual(
+        expect.objectContaining({
+          scope: 'remote',
+          trackingRef: 'origin/remote-only',
+          hasLocalCheckout: false,
+        }),
+      )
+    } finally {
+      cleanup()
+      remote.cleanup()
+    }
+  })
+
+  it('finds READMEs inside nested folders for the working tree and other branches', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const branch = getCurrentBranch(dir)
+
+    try {
+      writeFileSync(join(dir, 'docs', 'README.md'), '# Docs')
+      expect(findReadme(dir, branch, 'docs')).toBe('docs/README.md')
+
+      git(dir, 'add', 'docs/README.md')
+      git(dir, 'commit', '-m', 'add nested readme')
+      git(dir, 'checkout', '-b', 'feature/readme')
+      writeFileSync(join(dir, 'docs', 'README.md'), '# Docs branch')
+      git(dir, 'add', 'docs/README.md')
+      git(dir, 'commit', '-m', 'update nested readme')
+
+      expect(findReadme(dir, 'feature/readme', 'docs')).toBe('docs/README.md')
+      git(dir, 'checkout', branch)
+      expect(findReadme(dir, 'feature/readme', 'docs')).toBe('docs/README.md')
+      expect(findReadme(dir, 'feature/readme', 'missing')).toBe('')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('reports tracked and untracked working tree changes', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      writeFileSync(join(dir, 'main.ts'), 'console.log("updated")')
+      writeFileSync(join(dir, 'scratch.txt'), 'scratch')
+
+      expect(getWorkingTreeChanges(dir)).toEqual({
+        trackedPaths: ['main.ts'],
+        untrackedPaths: ['scratch.txt'],
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('handles branch switching confirmation, commit, discard, and remote tracking flows', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const remote = makeBareRepo()
+    const mainBranch = getCurrentBranch(dir)
+
+    try {
+      git(dir, 'remote', 'add', 'origin', remote.dir)
+      git(dir, 'push', '-u', 'origin', mainBranch)
+
+      git(dir, 'checkout', '-b', 'feature')
+      writeFileSync(join(dir, 'feature.txt'), 'feature branch')
+      git(dir, 'add', '.')
+      git(dir, 'commit', '-m', 'feature branch')
+      git(dir, 'checkout', mainBranch)
+
+      const cleanSwitch = switchBranch(dir, { target: 'feature', resolution: 'preview' })
+      expect(cleanSwitch).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        currentBranch: 'feature',
+      }))
+      git(dir, 'checkout', mainBranch)
+
+      writeFileSync(join(dir, 'main.ts'), 'console.log("dirty")')
+      const preview = switchBranch(dir, { target: 'feature', resolution: 'preview' })
+      expect(preview).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'confirmation-required',
+        trackedChangeCount: 1,
+      }))
+
+      expect(switchBranch(dir, { target: '', resolution: 'preview' }).status).toBe('blocked')
+      expect(switchBranch(join(tmpdir(), 'missing-repo-for-switch'), { target: 'feature', resolution: 'preview' }).status).toBe('blocked')
+      expect(switchBranch(dir, { target: mainBranch, resolution: 'cancel' }).status).toBe('cancelled')
+      expect(switchBranch(dir, { target: mainBranch, resolution: 'preview' }).status).toBe('switched')
+      expect(switchBranch(dir, { target: 'feature', resolution: 'commit' }).status).toBe('blocked')
+
+      const committed = switchBranch(dir, {
+        target: 'feature',
+        resolution: 'commit',
+        commitMessage: 'save before switch',
+      })
+      expect(committed).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        currentBranch: 'feature',
+      }))
+
+      git(dir, 'checkout', mainBranch)
+      writeFileSync(join(dir, 'blocker.txt'), 'block main')
+      git(dir, 'checkout', '-b', 'blocked-branch')
+      writeFileSync(join(dir, 'blocker.txt'), 'tracked on branch')
+      git(dir, 'add', 'blocker.txt')
+      git(dir, 'commit', '-m', 'tracked blocker')
+      git(dir, 'push', '-u', 'origin', 'blocked-branch')
+      git(dir, 'checkout', mainBranch)
+      git(dir, 'branch', '-D', 'blocked-branch')
+      git(dir, 'fetch', 'origin')
+      writeFileSync(join(dir, 'blocker.txt'), 'local blocker')
+
+      const discard = switchBranch(dir, { target: 'origin/blocked-branch', resolution: 'discard' })
+      expect(discard).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'second-confirmation-required',
+      }))
+
+      expect(switchBranch(dir, {
+        target: 'origin/blocked-branch',
+        resolution: 'delete-untracked',
+      })).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+      }))
+
+      const deleted = switchBranch(dir, {
+        target: 'origin/blocked-branch',
+        resolution: 'delete-untracked',
+        allowDeleteUntracked: true,
+      })
+      expect(deleted).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        currentBranch: 'blocked-branch',
+        createdTrackingBranch: 'blocked-branch',
+      }))
+      expect(existsSync(join(dir, 'blocker.txt'))).toBe(true)
+
+      git(dir, 'checkout', mainBranch)
+      git(dir, 'checkout', '-b', 'broken-branch')
+      git(dir, 'remote', 'remove', 'origin')
+      const failed = switchBranch(dir, { target: 'origin/blocked-branch', resolution: 'preview' })
+      expect(failed.status).toBe('failed')
+    } finally {
+      cleanup()
+      remote.cleanup()
+    }
+  })
+
+  it('creates child folders, initializes git repositories, and clones into subfolders', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'gitlocal-setup-'))
+    const source = makeGitRepo()
+    const readOnlyDir = mkdtempSync(join(tmpdir(), 'gitlocal-readonly-'))
+
+    try {
+      const created = createChildFolder(workspace, 'child')
+      expect(created).toBe(join(workspace, 'child'))
+      expect(() => createChildFolder(workspace, 'child')).toThrow(/already exists/i)
+      expect(() => createChildFolder(workspace, '../escape')).toThrow(/path separators/i)
+      expect(() => createChildFolder(join(workspace, 'missing-parent'), 'child')).toThrow(/not available/i)
+
+      expect(initializeGitRepository(created)).toBe(created)
+      expect(validateRepo(created)).toBe(true)
+      expect(() => initializeGitRepository(created)).toThrow(/already a git repository/i)
+      expect(() => initializeGitRepository(join(workspace, 'missing-git'))).toThrow(/not available/i)
+
+      chmodSync(readOnlyDir, 0o500)
+      expect(() => initializeGitRepository(readOnlyDir)).toThrow()
+
+      const cloneTarget = cloneRepositoryInto(workspace, 'clone-target', source.dir)
+      expect(validateRepo(cloneTarget)).toBe(true)
+      expect(() => cloneRepositoryInto(workspace, 'clone-target', source.dir)).toThrow(/already exists/i)
+      expect(() => cloneRepositoryInto(workspace, 'another-clone', '')).toThrow(/repository URL is required/i)
+      expect(() => cloneRepositoryInto(join(workspace, 'missing-clone-parent'), 'clone', source.dir)).toThrow(/not available/i)
+      expect(() => cloneRepositoryInto(workspace, 'broken-clone', join(workspace, 'missing-source'))).toThrow(/does not exist|git clone failed/i)
+    } finally {
+      chmodSync(readOnlyDir, 0o700)
+      rmSync(readOnlyDir, { recursive: true, force: true })
+      rmSync(workspace, { recursive: true, force: true })
+      source.cleanup()
     }
   })
 })

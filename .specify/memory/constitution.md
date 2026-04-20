@@ -1,17 +1,17 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 2.0.0 → 2.1.0 (MINOR — added repo-relative path governance principle)
+  Version change: 2.1.0 → 3.0.0 (MAJOR — redefined the local-only principle to allow
+  user-initiated remote git activity through the local git executable)
   Modified principles:
-    - Principle VII: added "Repository-Relative Paths" to forbid local absolute filesystem paths
-      in repository documentation, specs, templates, and generated artifacts
-    - Governance: runtime guidance reference clarified to point at AGENTS.md and CLAUDE.md
+    - Principle III: renamed to "Local-First with Git Remote Exception" and updated to keep
+      all local-only flows fully supported while allowing explicit remote git operations via git
   Added sections: none
   Removed sections: none
   Templates requiring updates:
-    - .specify/templates/plan-template.md — ✅ updated
+    - .specify/templates/plan-template.md — ✅ no change needed
     - .specify/templates/spec-template.md — ✅ no change needed
-    - .specify/templates/tasks-template.md — ✅ updated
+    - .specify/templates/tasks-template.md — ✅ no change needed
     - .specify/templates/checklist-template.md — ✅ no change needed
     - .specify/templates/constitution-template.md — ✅ no change needed
     - README.md — ✅ no change needed
@@ -39,12 +39,23 @@ Coverage is measured per file, not as an aggregate. A release MUST NOT ship if a
 falls below this threshold. Frontend (React) code MUST also meet 90% coverage using the
 project's chosen JS testing framework. CI MUST enforce these gates automatically.
 
-### III. Fully Local
+### III. Local-First with Git Remote Exception
 
-GitLocal MUST operate entirely on the local machine. No network calls to remote services,
-no telemetry, no account registration, no license activation. The server starts, serves a
-local web UI, and reads the local filesystem. The only external runtime dependencies are
-Node.js 22+ and a web browser.
+GitLocal MUST remain fully functional for local-only use. Browsing, reading, editing,
+repository inspection, setup, and other core workflows MUST continue to work when the
+user stays entirely on the local machine. No telemetry, no account registration, no
+license activation, and no arbitrary remote-service APIs are permitted.
+
+The only allowed network exception is user-initiated remote Git activity performed through
+the locally installed `git` executable. When a repository has or is being given a remote
+Git relationship, and network connectivity is available, GitLocal MAY expose remote Git
+operations such as clone, fetch, pull, push, or similar remote-sync actions, but only by
+invoking local Git commands. GitLocal itself MUST NOT implement custom remote protocols or
+direct non-Git network integrations on the user's behalf.
+
+If connectivity is unavailable or a repository has no remote relationship, the product
+must still preserve its full local-only usability and fail remote Git actions clearly
+without compromising local workflows.
 
 ### IV. Node.js-Served React UI
 
@@ -120,4 +131,4 @@ implementation decisions, code reviews, and release gates MUST comply with these
 - **Runtime guidance**: See `AGENTS.md` and `CLAUDE.md` for development-time conventions and
   workflow details that supplement but do not override this constitution.
 
-**Version**: 2.1.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-03-29
+**Version**: 3.0.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-04-19

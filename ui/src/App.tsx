@@ -1,18 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
-import FileTree from './components/FileTree/FileTree'
 import Breadcrumb from './components/Breadcrumb/Breadcrumb'
 import ContentPanel from './components/ContentPanel/ContentPanel'
-import GitInfo from './components/GitInfo/GitInfo'
+import FileTree from './components/FileTree/FileTree'
 import PickerPage from './components/Picker/PickerPage'
+import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
+import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
 import SearchTrigger from './components/Search/SearchTrigger'
 import AppFooter from './components/AppFooter'
-import type { SearchPresentation, SearchResult, ViewerPathType } from './types'
+import { Button } from './components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './components/ui/dialog'
+import { Input } from './components/ui/input'
+import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import { readViewerState, writeViewerState } from './services/viewerState'
+import type {
+  Branch,
+  BranchSwitchResponse,
+  GitUserIdentity,
+  RepoInfo,
+  SearchPresentation,
+  SearchResult,
+  ViewerPathType,
+} from './types'
 
-type LandingAction = { label: string; action: 'create-file' | 'open-parent' }
+type LandingAction = { label: string; action: 'create-file' }
+type BranchScope = 'local' | 'remote'
+
+interface BranchSwitchDialogState {
+  target: string
+  targetLabel: string
+  targetScope: BranchScope
+  response: BranchSwitchResponse
+}
 
 function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
@@ -26,8 +54,86 @@ function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   )
 }
 
+function ErrorScreen({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-6 py-12">
+      <div className="w-full max-w-lg rounded-md border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">{title}</h2>
+        <p className="mt-2 text-sm text-[var(--muted-foreground)]">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function branchMatchesTarget(branch: Branch, target: string): boolean {
+  return branch.name === target || branch.trackingRef === target || branch.displayName === target
+}
+
+function describeBranchTarget(branches: Branch[] | undefined, target: string): { label: string; scope: BranchScope } {
+  const branch = branches?.find((option) => branchMatchesTarget(option, target))
+  return {
+    label: branch?.displayName ?? branch?.name ?? target,
+    scope: branch?.scope ?? 'local',
+  }
+}
+
+function sortBranchOptions(options: Branch[]): Branch[] {
+  return [...options].sort((a, b) => {
+    if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1
+    if ((a.scope ?? 'local') !== (b.scope ?? 'local')) return (a.scope ?? 'local') === 'local' ? -1 : 1
+    return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name)
+  })
+}
+
+function updateBranchCacheAfterSwitch(
+  previous: Branch[] | undefined,
+  target: string,
+  nextBranch: string,
+  result: BranchSwitchResponse,
+): Branch[] | undefined {
+  if (!previous) return previous
+
+  const targetOption = previous.find((option) => branchMatchesTarget(option, target))
+  let nextOptions = previous.map((option) => ({
+    ...option,
+    isCurrent: option.name === nextBranch,
+    hasLocalCheckout: option.name === nextBranch ? true : option.hasLocalCheckout,
+  }))
+
+  if (result.createdTrackingBranch) {
+    nextOptions = nextOptions.filter((option) =>
+      !(
+        option.name === nextBranch
+        || (option.scope === 'remote' && (option.trackingRef === target || option.name === nextBranch))
+      ),
+    )
+
+    nextOptions.push({
+      name: nextBranch,
+      displayName: nextBranch,
+      scope: 'local',
+      remoteName: targetOption?.remoteName,
+      trackingRef: targetOption?.trackingRef ?? (targetOption?.scope === 'remote' ? target : undefined),
+      hasLocalCheckout: true,
+      isCurrent: true,
+    })
+  }
+
+  return sortBranchOptions(nextOptions)
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message
+  if (error && typeof error === 'object') {
+    const maybePayload = error as { error?: string; message?: string }
+    return maybePayload.error ?? maybePayload.message ?? fallback
+  }
+  return fallback
+}
+
 export default function App() {
   const initialViewerState = readViewerState()
+  const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme())
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
   const [selectedPath, setSelectedPath] = useState(initialViewerState.path)
   const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>(initialViewerState.pathType)
@@ -37,10 +143,19 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
   const [searchPresentation, setSearchPresentation] = useState<SearchPresentation>(initialViewerState.searchPresentation)
   const [searchQuery, setSearchQuery] = useState(initialViewerState.searchQuery)
-  const [readmeMissing, setReadmeMissing] = useState(false)
   const [pickerLoading, setPickerLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showRepoBoundaryDialog, setShowRepoBoundaryDialog] = useState(false)
+  const [branchSwitchState, setBranchSwitchState] = useState<BranchSwitchDialogState | null>(null)
+  const [branchSwitchCommitMessage, setBranchSwitchCommitMessage] = useState('')
+  const [branchSwitchPending, setBranchSwitchPending] = useState(false)
+  const [branchSwitchError, setBranchSwitchError] = useState('')
+  const [gitIdentityDialogOpen, setGitIdentityDialogOpen] = useState(false)
+  const [gitIdentityName, setGitIdentityName] = useState('')
+  const [gitIdentityEmail, setGitIdentityEmail] = useState('')
+  const [gitIdentityPending, setGitIdentityPending] = useState(false)
+  const [gitIdentityError, setGitIdentityError] = useState('')
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
@@ -49,6 +164,7 @@ export default function App() {
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
+
   const hasRepoMismatch = Boolean(info?.isGitRepo && viewerRepoPath && info.path && viewerRepoPath !== info.path)
 
   const { data: branches } = useQuery({
@@ -64,12 +180,16 @@ export default function App() {
     refetchInterval: 3000,
   })
 
-  // Initialize branch from info
+  useEffect(() => {
+    applyTheme(theme)
+    writeStoredTheme(theme)
+  }, [theme])
+
   useEffect(() => {
     if (info?.currentBranch && !currentBranch) {
       setCurrentBranch(info.currentBranch)
     }
-  }, [info, currentBranch])
+  }, [currentBranch, info])
 
   useEffect(() => {
     if (!info?.isGitRepo || !branches) return
@@ -84,14 +204,17 @@ export default function App() {
 
     if (!currentBranch) return
 
-    const branchExists = branches.some((branch) => branch.name === currentBranch)
+    const branchExists = branches.some((branch) =>
+      branch.name === currentBranch || branch.trackingRef === currentBranch,
+    )
     if (branchExists) return
 
     const fallbackBranch =
-      info.currentBranch ||
-      branches.find((branch) => branch.isCurrent)?.name ||
-      branches[0]?.name ||
-      ''
+      info.currentBranch
+      || branches.find((branch) => branch.isCurrent)?.name
+      || branches[0]?.trackingRef
+      || branches[0]?.name
+      || ''
 
     if (!fallbackBranch || fallbackBranch === currentBranch) return
 
@@ -116,7 +239,6 @@ export default function App() {
     setShowRaw(false)
     setSearchPresentation('collapsed')
     setSearchQuery('')
-    setReadmeMissing(false)
     setStatusMessage('GitLocal reset the saved file context because you opened a different repository.')
     lastRevisionRef.current = ''
 
@@ -124,22 +246,6 @@ export default function App() {
       setCurrentBranch(info.currentBranch || '')
     }
   }, [currentBranch, info, viewerRepoPath])
-
-  // Auto-select README on first load (viewer mode only)
-  useEffect(() => {
-    if (!info || info.pickerMode || selectedPath || hasRepoMismatch) return
-    api.getReadme()
-      .then(({ path }) => {
-        if (path) {
-          handleSelectFile(path)
-        } else {
-          setReadmeMissing(true)
-        }
-      })
-      .catch(() => {
-        setReadmeMissing(true)
-      })
-  }, [hasRepoMismatch, info, selectedPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     writeViewerState({
@@ -205,7 +311,7 @@ export default function App() {
     if (selectedPath === syncStatus.currentPath && syncStatus.currentPathType !== 'missing') {
       setSelectedPathType(syncStatus.currentPathType === 'none' ? 'none' : syncStatus.currentPathType)
     }
-  }, [syncStatus, queryClient])
+  }, [queryClient, selectedPath, syncStatus])
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -251,61 +357,82 @@ export default function App() {
     setSearchQuery('')
   }
 
-  if (isLoading) {
-    return (
-      <>
-        <div className="error-screen">
-          <div className="error-card">
-            <h2>Loading repository…</h2>
-            <p>GitLocal is checking the current launch context.</p>
-          </div>
-        </div>
-      </>
-    )
-  }
-
-  // Picker mode: show the folder selector page
-  if (info?.pickerMode) {
-    return (
-      <>
-        <PickerPage />
-        <AppFooter version={info.version} />
-      </>
-    )
-  }
-
-  if (info && !info.isGitRepo) {
-    return (
-      <>
-        <div className="error-screen">
-          <div className="error-card">
-            <h2>Not a Git repository</h2>
-            <p>
-              This folder is not a git repository. Please point GitLocal at a folder
-              containing a <code>.git</code> directory.
-            </p>
-          </div>
-        </div>
-        <AppFooter version={info.version} />
-      </>
-    )
-  }
-
   async function handleBrowseParentFolder() {
     setPickerLoading(true)
     try {
       const result = await api.showParentPicker()
       if (result.ok) {
         window.location.reload()
+        return
       }
+      setStatusMessage(result.message || result.error || 'GitLocal could not open the parent folder.')
     } finally {
       setPickerLoading(false)
     }
   }
 
+  function handleBrowseParentRequest(): void {
+    if (!confirmDiscardChanges()) return
+    setShowRepoBoundaryDialog(true)
+  }
+
   function handleDismissSearch() {
     setSearchPresentation('collapsed')
     setSearchQuery('')
+  }
+
+  function openGitIdentityDialog(): void {
+    const gitUser = info?.gitContext?.user
+    setGitIdentityName(gitUser?.name ?? '')
+    setGitIdentityEmail(gitUser?.email ?? '')
+    setGitIdentityError('')
+    setGitIdentityDialogOpen(true)
+  }
+
+  function closeGitIdentityDialog(): void {
+    if (gitIdentityPending) return
+    setGitIdentityDialogOpen(false)
+    setGitIdentityError('')
+  }
+
+  async function saveGitIdentity(): Promise<void> {
+    const name = gitIdentityName.trim()
+    const email = gitIdentityEmail.trim()
+
+    if (!name) {
+      setGitIdentityError('Git name is required.')
+      return
+    }
+
+    if (!email) {
+      setGitIdentityError('Git email is required.')
+      return
+    }
+
+    setGitIdentityPending(true)
+    setGitIdentityError('')
+
+    try {
+      const result = await api.updateGitIdentity({ name, email })
+      queryClient.setQueryData<RepoInfo>(['info'], (previous) =>
+        previous
+          ? {
+              ...previous,
+              gitContext: {
+                user: result.user as GitUserIdentity,
+                remote: previous.gitContext?.remote ?? null,
+              },
+            }
+          : previous,
+      )
+      await queryClient.invalidateQueries({ queryKey: ['info'] })
+      setGitIdentityDialogOpen(false)
+      setStatusMessage(result.message)
+    } catch (error) {
+      setGitIdentityError(getErrorMessage(error, 'Could not update the repository identity.'))
+    } finally {
+      setGitIdentityPending(false)
+    }
   }
 
   const canMutateFiles = Boolean(
@@ -330,179 +457,435 @@ export default function App() {
     await queryClient.invalidateQueries({ queryKey: ['sync'] })
   }
 
+  function resetBranchSwitchDialog(): void {
+    setBranchSwitchState(null)
+    setBranchSwitchCommitMessage('')
+    setBranchSwitchPending(false)
+    setBranchSwitchError('')
+  }
+
+  function cancelBranchSwitch(): void {
+    if (branchSwitchPending) return
+    resetBranchSwitchDialog()
+    setStatusMessage('Branch switch canceled.')
+  }
+
+  async function finalizeBranchSwitch(target: string, result: BranchSwitchResponse): Promise<void> {
+    const nextBranch = result.currentBranch || target
+    let nextStatusMessage = result.createdTrackingBranch
+      ? `${result.message} GitLocal created local tracking branch ${result.createdTrackingBranch}.`
+      : result.message
+
+    queryClient.setQueryData<RepoInfo>(['info'], (previous) =>
+      previous
+        ? {
+            ...previous,
+            currentBranch: nextBranch,
+          }
+        : previous,
+    )
+    queryClient.setQueryData<Branch[]>(['branches'], (previous) =>
+      updateBranchCacheAfterSwitch(previous, target, nextBranch, result),
+    )
+
+    if (selectedPath) {
+      try {
+        const nextSyncStatus = await api.getSyncStatus(selectedPath, nextBranch)
+        if (nextSyncStatus.currentPathType === 'missing') {
+          const fallbackPath = nextSyncStatus.resolvedPath
+          const fallbackPathType = nextSyncStatus.resolvedPathType === 'missing'
+            ? 'none'
+            : nextSyncStatus.resolvedPathType
+
+          setSelectedPath(fallbackPath)
+          setSelectedPathType(fallbackPathType)
+          setSelectedPathLocalOnly(false)
+          setShowRaw(false)
+
+          const nextLocation = fallbackPath || 'the repository root'
+          nextStatusMessage = `${nextStatusMessage} ${selectedPath} is not available on ${nextBranch}, so GitLocal moved you to ${nextLocation}.`
+        } else if (nextSyncStatus.currentPathType !== 'none') {
+          setSelectedPathType(nextSyncStatus.currentPathType)
+        }
+      } catch {
+        // The regular sync query will still reconcile if this one-off refresh misses.
+      }
+    }
+
+    resetBranchSwitchDialog()
+    setHasUnsavedChanges(false)
+    setCurrentBranch(nextBranch)
+    setSelectedPathLocalOnly(false)
+    setStatusMessage(nextStatusMessage)
+    setTreeRefreshToken((value) => value + 1)
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['info'] }),
+      queryClient.invalidateQueries({ queryKey: ['branches'] }),
+      queryClient.invalidateQueries({ queryKey: ['tree'] }),
+      queryClient.invalidateQueries({ queryKey: ['file'] }),
+      queryClient.invalidateQueries({ queryKey: ['readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['sync'] }),
+    ])
+  }
+
+  async function submitBranchSwitch(resolution: 'commit' | 'discard' | 'delete-untracked'): Promise<void> {
+    if (!branchSwitchState) return
+
+    setBranchSwitchPending(true)
+    setBranchSwitchError('')
+
+    try {
+      const result = await api.switchBranch({
+        target: branchSwitchState.target,
+        resolution,
+        commitMessage: resolution === 'commit' ? branchSwitchCommitMessage : undefined,
+        allowDeleteUntracked: resolution === 'delete-untracked',
+      })
+
+      if (result.ok && result.status === 'switched') {
+        await finalizeBranchSwitch(branchSwitchState.target, result)
+        return
+      }
+
+      if (result.status === 'second-confirmation-required' || result.status === 'confirmation-required') {
+        setBranchSwitchState({
+          ...branchSwitchState,
+          response: result,
+        })
+        if (!branchSwitchCommitMessage.trim() && result.suggestedCommitMessage) {
+          setBranchSwitchCommitMessage(result.suggestedCommitMessage)
+        }
+        setBranchSwitchError('')
+        return
+      }
+
+      setBranchSwitchError(result.message)
+    } catch (error) {
+      setBranchSwitchError(getErrorMessage(error, 'Branch switch failed.'))
+    } finally {
+      setBranchSwitchPending(false)
+    }
+  }
+
+  async function handleBranchChange(nextBranch: string): Promise<void> {
+    if (nextBranch === currentBranch) return
+    if (!confirmDiscardChanges()) return
+
+    setBranchSwitchPending(true)
+    setBranchSwitchError('')
+    setStatusMessage('')
+
+    const targetDetails = describeBranchTarget(branches, nextBranch)
+
+    try {
+      const result = await api.switchBranch({
+        target: nextBranch,
+        resolution: 'preview',
+      })
+
+      if (result.ok && result.status === 'switched') {
+        await finalizeBranchSwitch(nextBranch, result)
+        return
+      }
+
+      if (result.status === 'confirmation-required' || result.status === 'second-confirmation-required') {
+        setBranchSwitchState({
+          target: nextBranch,
+          targetLabel: targetDetails.label,
+          targetScope: targetDetails.scope,
+          response: result,
+        })
+        setBranchSwitchCommitMessage(result.suggestedCommitMessage ?? `WIP before switching to ${targetDetails.label}`)
+        setBranchSwitchError('')
+        return
+      }
+
+      setStatusMessage(result.message)
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error, 'Branch switch failed.'))
+    } finally {
+      setBranchSwitchPending(false)
+    }
+  }
+
+  if (isLoading) {
+    return <ErrorScreen title="Loading repository..." description="GitLocal is checking the current launch context." />
+  }
+
+  if (info?.pickerMode) {
+    return (
+      <>
+        <PickerPage />
+        <AppFooter version={info.version} />
+      </>
+    )
+  }
+
+  if (info && !info.isGitRepo) {
+    return (
+      <>
+        <ErrorScreen
+          title="Not a Git repository"
+          description="This folder is not a git repository. Please point GitLocal at a folder containing a .git directory."
+        />
+        <AppFooter version={info.version} />
+      </>
+    )
+  }
+
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
   const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
+
   let emptyStateTitle: string | undefined
   let emptyStateDetail: string | undefined
   let emptyStateActions: LandingAction[] | undefined
 
   if (!visibleSelectedPath && !hasRepoMismatch) {
-    if (readmeMissing && isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
+    if (isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
       emptyStateTitle = 'This repository is ready for a first file'
       emptyStateDetail = 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
       emptyStateActions = canMutateFiles
-        ? [
-            { label: 'Create first file', action: 'create-file' },
-            { label: 'Browse parent folder', action: 'open-parent' },
-          ]
-        : [{ label: 'Browse parent folder', action: 'open-parent' }]
-    } else if (readmeMissing && isWorkingTreeBranchSelected) {
-      emptyStateTitle = 'No README yet'
-      emptyStateDetail = 'This repository has content, but there is no README to open by default. You can browse the repository tree, create a new file, or return to a parent folder.'
-      emptyStateActions = canMutateFiles
-        ? [
-            { label: 'Create new file', action: 'create-file' },
-            { label: 'Browse parent folder', action: 'open-parent' },
-          ]
-        : [{ label: 'Browse parent folder', action: 'open-parent' }]
+        ? [{ label: 'Create first file', action: 'create-file' }]
+        : undefined
+    } else if (!isWorkingTreeBranchSelected) {
+      emptyStateTitle = 'Browsing a non-current branch'
+      emptyStateDetail = 'This branch opens in read-only mode so you can compare tree contents without changing your working tree.'
     }
   }
 
   return (
     <>
-      <header className="app-header">
-        <span className="logo">GitLocal</span>
-        {info && <span className="repo-name">{info.name}</span>}
-        <div className="app-header-actions">
-          <button
-            type="button"
-            className="app-header-button"
-            onClick={() => handleBrowseParentFolder().catch(() => {})}
-            disabled={pickerLoading}
-          >
-            {pickerLoading ? 'Opening parent…' : 'Browse parent folder'}
-          </button>
-        </div>
-      </header>
-      <div className="app-body">
-        {sidebarCollapsed ? (
-          <aside className="sidebar-rail" aria-label="collapsed navigation">
-            <div className="sidebar-rail-toolbar">
-              <button
-                type="button"
-                className="panel-icon-button sidebar-toggle-button"
-                aria-label="Expand navigation"
-                title="Expand navigation"
-                onClick={() => setSidebarCollapsed(false)}
-              >
-                <PanelToggleIcon collapsed />
-              </button>
-            </div>
-          </aside>
-        ) : (
-          <aside className="sidebar">
-            <div className="sidebar-toolbar">
-              <button
-                type="button"
-                className="panel-icon-button sidebar-toggle-button"
-                aria-label="Collapse navigation"
-                title="Collapse navigation"
-                onClick={() => setSidebarCollapsed(true)}
-              >
-                <PanelToggleIcon collapsed={false} />
-              </button>
-            </div>
-            <FileTree
-              branch={currentBranch}
-              refreshToken={treeRefreshToken}
-              selectedPath={visibleSelectedPath}
-              selectedPathType={visibleSelectedPathType}
-              onSelect={(
-                path,
-                type,
-                localOnly,
-              ) => {
-                if (type === 'dir') {
-                  handleSelectFolder(path, localOnly)
-                  return
-                }
-                handleSelectFile(path, localOnly)
-              }}
-            />
-            <GitInfo
-              branch={currentBranch}
-              onBranchChange={(nextBranch) => {
-                if (!confirmDiscardChanges()) return
-                setCurrentBranch(nextBranch)
-              }}
-            />
-          </aside>
-        )}
-        <div className="content-area">
-          {statusMessage && (
-            <div className="status-banner" role="status">
-              {statusMessage}
-            </div>
-          )}
-          <div className="viewer-stage">
-            <div className="search-layer" data-testid="search-layer">
-              {searchPresentation === 'expanded' ? (
-                <SearchPanel
+      <div className="flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
+        <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
+          <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
+          {info ? <span className="repo-name truncate text-sm text-[var(--muted-foreground)]">{info.name}</span> : null}
+        </header>
+
+        <div className="app-body flex min-h-0 flex-1 pb-8">
+          {sidebarCollapsed ? (
+            <aside className="sidebar-rail flex w-14 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" aria-label="collapsed navigation">
+              <div className="sidebar-rail-toolbar flex justify-center p-3">
+                <button
+                  type="button"
+                  className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                  aria-label="Expand navigation"
+                  title="Expand navigation"
+                  onClick={() => setSidebarCollapsed(false)}
+                >
+                  <PanelToggleIcon collapsed />
+                </button>
+              </div>
+            </aside>
+          ) : (
+            <aside className="sidebar flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
+              <div className="sidebar-toolbar flex justify-end p-3 pb-2">
+                <button
+                  type="button"
+                  className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                  aria-label="Collapse navigation"
+                  title="Collapse navigation"
+                  onClick={() => setSidebarCollapsed(true)}
+                >
+                  <PanelToggleIcon collapsed={false} />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">
+                <FileTree
                   branch={currentBranch}
-                  query={searchQuery}
-                  autoFocus
-                  onQueryChange={(query) => {
-                    setSearchPresentation('expanded')
-                    setSearchQuery(query)
+                  refreshToken={treeRefreshToken}
+                  selectedPath={visibleSelectedPath}
+                  selectedPathType={visibleSelectedPathType}
+                  onSelect={(path, type, localOnly) => {
+                    if (type === 'dir') {
+                      handleSelectFolder(path, localOnly)
+                      return
+                    }
+
+                    handleSelectFile(path, localOnly)
                   }}
-                  onSelectResult={handleSelectSearchResult}
-                  onDismiss={handleDismissSearch}
                 />
-              ) : (
-                <SearchTrigger onOpen={() => setSearchPresentation('expanded')} />
-              )}
+              </div>
+            </aside>
+          )}
+
+          <main className="content-area flex min-w-0 flex-1 flex-col">
+            {statusMessage ? (
+              <div className="status-banner border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_45%,var(--background))] px-4 py-2 text-sm text-[var(--foreground)]" role="status">
+                {statusMessage}
+              </div>
+            ) : null}
+
+            <div className="viewer-stage flex min-h-0 flex-1 flex-col gap-3 p-4">
+              <RepoContextHeader
+                info={info}
+                branch={currentBranch}
+                branches={branches}
+                selectedPath={visibleSelectedPath}
+                selectedPathType={visibleSelectedPathType}
+                theme={theme}
+                onThemeChange={setTheme}
+                onBranchChange={(nextBranch) => {
+                  void handleBranchChange(nextBranch)
+                }}
+                onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
+                branchDisabled={branchSwitchPending}
+                branchSwitchDialog={
+                  <BranchSwitchDialog
+                    open={Boolean(branchSwitchState)}
+                    targetLabel={branchSwitchState?.targetLabel ?? ''}
+                    targetScope={branchSwitchState?.targetScope}
+                    response={branchSwitchState?.response ?? null}
+                    commitMessage={branchSwitchCommitMessage}
+                    pending={branchSwitchPending}
+                    errorMessage={branchSwitchError}
+                    onCommitMessageChange={setBranchSwitchCommitMessage}
+                    onCancel={cancelBranchSwitch}
+                    onCommit={() => { void submitBranchSwitch('commit') }}
+                    onDiscard={() => { void submitBranchSwitch('discard') }}
+                    onDeleteUntracked={() => { void submitBranchSwitch('delete-untracked') }}
+                  />
+                }
+              />
+
+              <div className="search-layer" data-testid="search-layer">
+                {searchPresentation === 'expanded' ? (
+                  <SearchPanel
+                    branch={currentBranch}
+                    query={searchQuery}
+                    autoFocus
+                    onQueryChange={(query) => {
+                      setSearchPresentation('expanded')
+                      setSearchQuery(query)
+                    }}
+                    onSelectResult={handleSelectSearchResult}
+                    onDismiss={handleDismissSearch}
+                  />
+                ) : (
+                  <SearchTrigger onOpen={() => setSearchPresentation('expanded')} />
+                )}
+              </div>
+
+              <Breadcrumb
+                path={visibleSelectedPath}
+                onNavigate={(path) => handleSelectFolder(path)}
+              />
+
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <ContentPanel
+                  canMutateFiles={canMutateFiles}
+                  refreshToken={treeRefreshToken}
+                  selectedPath={visibleSelectedPath}
+                  selectedPathType={visibleSelectedPathType}
+                  selectedPathLocalOnly={visibleSelectedPathLocalOnly}
+                  branch={currentBranch}
+                  isGitRepo={info?.isGitRepo}
+                  onNavigate={handleSelectFile}
+                  onOpenPath={(path, type, localOnly) => {
+                    if (type === 'dir') {
+                      handleSelectFolder(path, localOnly)
+                      return
+                    }
+                    handleSelectFile(path, localOnly)
+                  }}
+                  onDirtyChange={setHasUnsavedChanges}
+                  onMutationComplete={(event) => { void handleMutationComplete(event) }}
+                  emptyStateTitle={emptyStateTitle}
+                  emptyStateDetail={emptyStateDetail}
+                  emptyStateActions={emptyStateActions}
+                  onBrowseParent={handleBrowseParentRequest}
+                  raw={visibleShowRaw}
+                  onRawChange={setShowRaw}
+                  onStatusMessage={setStatusMessage}
+                />
+              </div>
             </div>
-            <Breadcrumb
-              path={visibleSelectedPath}
-              onNavigate={(path) => {
-                if (path === '') {
-                  handleSelectFile('')
-                } else {
-                  handleSelectFolder(path)
-                }
-              }}
-            />
-            <ContentPanel
-              canMutateFiles={canMutateFiles}
-              refreshToken={treeRefreshToken}
-              selectedPath={visibleSelectedPath}
-              selectedPathType={visibleSelectedPathType}
-              branch={currentBranch}
-              onNavigate={handleSelectFile}
-              onOpenPath={(path, type, localOnly) => {
-                if (type === 'dir') {
-                  handleSelectFolder(path, localOnly)
-                  return
-                }
-                handleSelectFile(path, localOnly)
-              }}
-              selectedPathLocalOnly={visibleSelectedPathLocalOnly}
-              onDirtyChange={setHasUnsavedChanges}
-              onMutationComplete={(event) => { void handleMutationComplete(event) }}
-              placeholder={
-                !visibleSelectedPath && readmeMissing
-                  ? (
-                      isWorkingTreeBranchSelected
-                        ? 'No README found in this repository.'
-                        : 'This branch does not have any visible files or folders yet.'
-                    )
-                  : undefined
-              }
-              emptyStateTitle={emptyStateTitle}
-              emptyStateDetail={emptyStateDetail}
-              emptyStateActions={emptyStateActions}
-              onBrowseParent={() => { void handleBrowseParentFolder() }}
-              raw={visibleShowRaw}
-              onRawChange={setShowRaw}
-              onStatusMessage={setStatusMessage}
-            />
-          </div>
+          </main>
         </div>
+
+        <AppFooter version={info?.version ?? ''} />
       </div>
-      <AppFooter version={info?.version ?? ''} />
+
+      <Dialog open={showRepoBoundaryDialog} onOpenChange={(open) => { if (!pickerLoading) setShowRepoBoundaryDialog(open) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave this repository?</DialogTitle>
+            <DialogDescription>
+              The <code>..</code> entry will move GitLocal up to the parent folder, outside the current repository. You will enter the folder browser so you can choose what to open next.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setShowRepoBoundaryDialog(false)} disabled={pickerLoading}>
+              Stay here
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setShowRepoBoundaryDialog(false)
+                void handleBrowseParentFolder()
+              }}
+              disabled={pickerLoading}
+            >
+              {pickerLoading ? 'Opening parent...' : 'Open parent folder'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={gitIdentityDialogOpen} onOpenChange={(open) => { if (!gitIdentityPending) setGitIdentityDialogOpen(open) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Repository Git Identity</DialogTitle>
+            <DialogDescription>
+              This updates <code>user.name</code> and <code>user.email</code> in this repository’s local git config only.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-[var(--foreground)]">Name</span>
+              <Input
+                value={gitIdentityName}
+                onChange={(event) => setGitIdentityName(event.target.value)}
+                placeholder="Jane Developer"
+                aria-label="Git user name"
+                disabled={gitIdentityPending}
+              />
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-[var(--foreground)]">Email</span>
+              <Input
+                type="email"
+                value={gitIdentityEmail}
+                onChange={(event) => setGitIdentityEmail(event.target.value)}
+                placeholder="jane@example.com"
+                aria-label="Git user email"
+                disabled={gitIdentityPending}
+              />
+            </label>
+
+            {gitIdentityError ? (
+              <p role="alert" className="text-sm text-[var(--danger)]">
+                {gitIdentityError}
+              </p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={closeGitIdentityDialog} disabled={gitIdentityPending}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => { void saveGitIdentity() }} disabled={gitIdentityPending}>
+              {gitIdentityPending ? 'Saving...' : 'Save identity'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

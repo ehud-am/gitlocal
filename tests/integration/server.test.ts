@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -18,6 +18,12 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   writeFileSync(join(dir, 'README.md'), '# Integration Test')
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+function makeBareRepo(): { dir: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), 'gitlocal-int-remote-'))
+  spawnSync('git', ['init', '--bare'], { cwd: dir })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
@@ -79,6 +85,30 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as unknown[]
     expect(Array.isArray(body)).toBe(true)
+  })
+
+  it('GET /api/info includes git context for the repo header', async () => {
+    const repo = makeGitRepo()
+    const remoteDir = mkdtempSync(join(tmpdir(), 'gitlocal-remote-context-'))
+    spawnSync('git', ['init', '--bare'], { cwd: remoteDir })
+    spawnSync('git', ['remote', 'add', 'origin', remoteDir], { cwd: repo.dir })
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/info'))
+      const body = await res.json() as {
+        gitContext?: {
+          user?: { name: string; email: string }
+          remote?: { name: string }
+        }
+      }
+
+      expect(body.gitContext?.user?.name).toBe('Test User')
+      expect(body.gitContext?.remote?.name).toBe('origin')
+    } finally {
+      repo.cleanup()
+      rmSync(remoteDir, { recursive: true, force: true })
+    }
   })
 
   it('GET /api/tree returns immediate child entries for content-panel folder browsing', async () => {
@@ -171,6 +201,134 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as { ok: boolean }
     expect(body.ok).toBe(true)
+  })
+
+  it('POST /api/branches/switch returns confirmation details for dirty working trees', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const currentBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      spawnSync('git', ['checkout', '-b', 'feature-switch'], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'feature-switch.txt'), 'feature')
+      spawnSync('git', ['add', '.'], { cwd: repo.dir })
+      spawnSync('git', ['commit', '-m', 'feature switch'], { cwd: repo.dir })
+      spawnSync('git', ['checkout', currentBranch], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'README.md'), '# Dirty')
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/branches/switch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: 'feature-switch', resolution: 'preview' }),
+      }))
+      expect(res.status).toBe(409)
+      const body = await res.json() as { status: string; trackedChangeCount: number }
+      expect(body.status).toBe('confirmation-required')
+      expect(body.trackedChangeCount).toBeGreaterThan(0)
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('POST /api/branches/switch creates a local tracking branch from a remote-only branch', async () => {
+    const repo = makeGitRepo()
+    const remote = makeBareRepo()
+
+    try {
+      const currentBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      spawnSync('git', ['remote', 'add', 'origin', remote.dir], { cwd: repo.dir })
+      spawnSync('git', ['push', '-u', 'origin', currentBranch], { cwd: repo.dir })
+      spawnSync('git', ['checkout', '-b', 'release'], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'release.txt'), 'release')
+      spawnSync('git', ['add', '.'], { cwd: repo.dir })
+      spawnSync('git', ['commit', '-m', 'release'], { cwd: repo.dir })
+      spawnSync('git', ['push', '-u', 'origin', 'release'], { cwd: repo.dir })
+      spawnSync('git', ['checkout', currentBranch], { cwd: repo.dir })
+      spawnSync('git', ['branch', '-D', 'release'], { cwd: repo.dir })
+      spawnSync('git', ['fetch', 'origin'], { cwd: repo.dir })
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/branches/switch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: 'origin/release', resolution: 'preview' }),
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { status: string; currentBranch: string; createdTrackingBranch?: string }
+      expect(body.status).toBe('switched')
+      expect(body.currentBranch).toBe('release')
+      expect(body.createdTrackingBranch).toBe('release')
+    } finally {
+      repo.cleanup()
+      remote.cleanup()
+    }
+  })
+
+  it('supports setup bootstrap routes for create-folder, init, and clone', async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), 'gitlocal-bootstrap-'))
+
+    try {
+      const app = createApp('')
+
+      const createRes = await app.fetch(new Request('http://localhost/api/pick/create-folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parentPath: parentDir, name: 'child' }),
+      }))
+      expect(createRes.status).toBe(200)
+      const createBody = await createRes.json() as { ok: boolean; path: string }
+      expect(createBody.ok).toBe(true)
+      expect(existsSync(createBody.path)).toBe(true)
+
+      const initRes = await app.fetch(new Request('http://localhost/api/pick/init', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: createBody.path }),
+      }))
+      expect(initRes.status).toBe(200)
+      const initBody = await initRes.json() as { ok: boolean }
+      expect(initBody.ok).toBe(true)
+
+      const cloneRes = await app.fetch(new Request('http://localhost/api/pick/clone', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parentPath: parentDir, name: 'clone-target', repositoryUrl: dir }),
+      }))
+      expect(cloneRes.status).toBe(200)
+      const cloneBody = await cloneRes.json() as { ok: boolean; path: string }
+      expect(cloneBody.ok).toBe(true)
+      expect(existsSync(join(cloneBody.path, '.git'))).toBe(true)
+    } finally {
+      rmSync(parentDir, { recursive: true, force: true })
+    }
+  })
+
+  it('supports updating the repository-local git identity', async () => {
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/git/identity', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Integration User',
+        email: 'integration@example.com',
+      }),
+    }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string } }
+    expect(body.ok).toBe(true)
+    expect(body.user).toEqual({
+      name: 'Integration User',
+      email: 'integration@example.com',
+      source: 'local',
+    })
   })
 
   it('GET /api/sync returns sync metadata for the current file path', async () => {

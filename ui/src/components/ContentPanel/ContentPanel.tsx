@@ -2,15 +2,15 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
-import CopyButton from './CopyButton'
 import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 type PanelMode = 'view' | 'edit' | 'create' | 'confirm-delete'
-type EmptyStateAction = 'create-file' | 'open-parent'
+type EmptyStateAction = 'create-file'
 
 interface FileMutationEvent {
   result: ManualFileOperationResult
@@ -25,6 +25,7 @@ interface Props {
   selectedPathType: ViewerPathType
   selectedPathLocalOnly?: boolean
   branch: string
+  isGitRepo?: boolean
   onNavigate: (path: string) => void
   onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
   onDirtyChange?: (value: boolean) => void
@@ -37,6 +38,26 @@ interface Props {
   raw?: boolean
   onRawChange?: (value: boolean) => void
   onStatusMessage?: (message: string) => void
+}
+
+interface DirectoryRow {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  localOnly: boolean
+  isParent: boolean
+  exitsRepo: boolean
+  displayPath: string
+}
+
+function KebabIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <circle cx="8" cy="3.5" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="12.5" r="1.25" fill="currentColor" />
+    </svg>
+  )
 }
 
 function parentPathOf(path: string): string {
@@ -83,6 +104,7 @@ export default function ContentPanel({
   selectedPathType,
   selectedPathLocalOnly = false,
   branch,
+  isGitRepo = false,
   onNavigate,
   onOpenPath,
   onDirtyChange,
@@ -119,6 +141,17 @@ export default function ContentPanel({
     queryKey: ['tree', directoryPath, branch, refreshToken, 'content-panel'],
     queryFn: () => api.getTree(directoryPath, branch),
     enabled: showingDirectoryView,
+  })
+  const { data: readmeLookup } = useQuery({
+    queryKey: ['readme', directoryPath, branch, refreshToken],
+    queryFn: () => api.getReadme(directoryPath, branch),
+    enabled: showingDirectoryView && isGitRepo,
+  })
+  const directoryReadmePath = readmeLookup?.path ?? ''
+  const { data: directoryReadme, isLoading: isDirectoryReadmeLoading } = useQuery({
+    queryKey: ['directory-readme', directoryReadmePath, branch, refreshToken],
+    queryFn: () => api.getFile(directoryReadmePath, branch, false),
+    enabled: showingDirectoryView && isGitRepo && Boolean(directoryReadmePath),
   })
 
   useEffect(() => {
@@ -248,42 +281,51 @@ export default function ContentPanel({
   const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
   const visibleDirectoryEntries = directoryEntries ?? []
 
-  function renderEmptyStateMessage(title?: string, detail?: string): JSX.Element {
-    return (
-      <div className="content-panel empty">
-        <div className="content-empty-stack">
-          {title ? <h2 className="content-empty-title">{title}</h2> : null}
-          <p>{detail ?? placeholder ?? 'Select a file to view its contents'}</p>
-          {emptyStateActions && emptyStateActions.length > 0 ? (
-            <div className="content-empty-actions">
-              {emptyStateActions.map(({ label, action }) =>
-                action === 'create-file' ? (
-                  <button key={label} type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
-                    {label}
-                  </button>
-                ) : (
-                  <button key={label} type="button" className="btn-raw" onClick={onBrowseParent}>
-                    {label}
-                  </button>
-                ),
-              )}
-            </div>
-          ) : canMutateFiles ? (
-            <button type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
-              New file
-            </button>
-          ) : null}
-        </div>
-      </div>
-    )
-  }
-
   function renderDirectoryList(path: string, entries: TreeNode[]): JSX.Element {
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
     const isRootView = selectedPathType === 'none'
     const emptyMessage = isRootView
       ? (emptyStateDetail ?? placeholder ?? 'This repository does not have any visible files yet.')
       : `This folder does not have any visible files or folders yet.`
+    const parentRow: DirectoryRow | null = path
+      ? {
+          name: '..',
+          path: parentPathOf(path),
+          type: 'dir',
+          localOnly: false,
+          isParent: true,
+          exitsRepo: false,
+          displayPath: parentPathOf(path) || 'repository root',
+        }
+      : onBrowseParent
+        ? {
+            name: '..',
+            path: '',
+            type: 'dir',
+            localOnly: false,
+            isParent: true,
+            exitsRepo: true,
+            displayPath: 'Leave the current repository scope',
+          }
+        : null
+    const rows: DirectoryRow[] = [
+      ...(parentRow ? [parentRow] : []),
+      ...entries.map((entry) => ({
+        ...entry,
+        isParent: false,
+        exitsRepo: false,
+        displayPath: entry.path,
+      })),
+    ]
+
+    function openDirectoryRow(entry: DirectoryRow): void {
+      if (entry.exitsRepo) {
+        onBrowseParent?.()
+        return
+      }
+
+      onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))
+    }
 
     return (
       <div className="content-panel">
@@ -293,17 +335,11 @@ export default function ContentPanel({
             {emptyStateDetail ? <p className="content-directory-detail">{emptyStateDetail}</p> : null}
             {emptyStateActions && emptyStateActions.length > 0 ? (
               <div className="content-empty-actions">
-                {emptyStateActions.map(({ label, action }) =>
-                  action === 'create-file' ? (
-                    <button key={label} type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
-                      {label}
-                    </button>
-                  ) : (
-                    <button key={label} type="button" className="btn-raw" onClick={onBrowseParent}>
-                      {label}
-                    </button>
-                  ),
-                )}
+                {emptyStateActions.map(({ label }) => (
+                  <button key={label} type="button" className="btn-raw btn-primary" onClick={() => { void beginCreateMode() }}>
+                    {label}
+                  </button>
+                ))}
               </div>
             ) : null}
           </div>
@@ -327,44 +363,91 @@ export default function ContentPanel({
 
           {isDirectoryLoading ? (
             <div className="content-skeleton" aria-label="loading content" />
-          ) : entries.length === 0 ? (
-            <div className="content-directory-empty">
-              <p>{emptyMessage}</p>
-            </div>
           ) : (
-            <div className="content-directory-list" role="list">
-              {entries.map((entry) => (
-                <div
-                  key={entry.path}
-                  className="content-directory-row"
-                  role="listitem"
-                  onDoubleClick={() => onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))}
-                >
-                  <div className="content-directory-entry">
-                    <span className={`content-directory-badge content-directory-badge-${entry.type}`}>
-                      {entry.type === 'dir' ? 'Folder' : 'File'}
-                    </span>
-                    <div className="content-directory-meta">
-                      <div className="content-directory-name-row">
-                        <span className="content-directory-name">{entry.name}</span>
-                        {entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
-                      </div>
-                      <span className="content-directory-path">{entry.path}</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-raw content-directory-open"
-                    onClick={() => onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))}
-                    aria-label={`Open ${entry.type === 'dir' ? 'folder' : 'file'} ${entry.name}`}
-                  >
-                    Open
-                  </button>
+            <>
+              {rows.length > 0 ? (
+                <div className="content-directory-table-wrap">
+                  <table className="content-directory-table" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
+                    <thead>
+                      <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Kind</th>
+                        <th scope="col">Path</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((entry) => (
+                        <tr
+                          key={entry.isParent ? `parent:${entry.displayPath}` : entry.path}
+                          className="content-directory-row"
+                          onDoubleClick={() => openDirectoryRow(entry)}
+                        >
+                          <td className="content-directory-cell content-directory-cell-name">
+                            <div className="content-directory-entry">
+                              <button
+                                type="button"
+                                className="content-directory-link"
+                                onClick={() => openDirectoryRow(entry)}
+                                aria-label={
+                                  entry.exitsRepo
+                                    ? 'Open parent folder outside this repository'
+                                    : entry.isParent
+                                      ? 'Open parent folder ..'
+                                      : `Open ${entry.type === 'dir' ? 'folder' : 'file'} ${entry.name}`
+                                }
+                              >
+                                <span className={`content-directory-badge content-directory-badge-${entry.type}`}>
+                                  {entry.isParent ? (entry.exitsRepo ? 'Browse' : 'Parent') : entry.type === 'dir' ? 'Folder' : 'File'}
+                                </span>
+                                <span className="content-directory-name">{entry.name}</span>
+                              </button>
+                              {!entry.isParent && entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+                            </div>
+                          </td>
+                          <td className="content-directory-cell">
+                            <span className="content-directory-kind">
+                              {entry.isParent ? (entry.exitsRepo ? 'Outside repo' : 'Parent') : entry.type === 'dir' ? 'Directory' : 'File'}
+                            </span>
+                          </td>
+                          <td className="content-directory-cell content-directory-cell-path">
+                            <span className="content-directory-path">{entry.displayPath}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+              ) : null}
+              {entries.length === 0 ? (
+                <div className="content-directory-empty">
+                  <p>{emptyMessage}</p>
+                </div>
+              ) : null}
+            </>
           )}
         </section>
+
+        {directoryReadmePath ? (
+          <section className="content-readme-panel" aria-label="folder readme">
+            <div className="content-directory-header">
+              <div>
+                <p className="content-directory-kicker">README</p>
+                <h2 className="content-directory-heading">{directoryReadmePath}</h2>
+              </div>
+            </div>
+            {isDirectoryReadmeLoading ? (
+              <div className="content-skeleton" aria-label="loading content" />
+            ) : directoryReadme?.type === 'markdown' ? (
+              <Suspense fallback={loadingFallback}>
+                <MarkdownRenderer content={directoryReadme.content} onNavigate={onNavigate} />
+              </Suspense>
+            ) : directoryReadme?.type === 'text' ? (
+              <Suspense fallback={loadingFallback}>
+                <CodeViewer content={directoryReadme.content} language={directoryReadme.language} />
+              </Suspense>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     )
   }
@@ -410,10 +493,6 @@ export default function ContentPanel({
       )
     }
 
-    if (visibleDirectoryEntries.length === 0) {
-      return renderEmptyStateMessage(emptyStateTitle, emptyStateDetail)
-    }
-
     return renderDirectoryList('', visibleDirectoryEntries)
   }
 
@@ -449,71 +528,72 @@ export default function ContentPanel({
   return (
     <div className={`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`}>
       <div className="content-active-context">
-        <p className="content-directory-kicker">File</p>
-        <div className="content-active-heading-row">
-          <h2 className="content-directory-heading">{selectedPath}</h2>
-          {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+        <div>
+          <p className="content-directory-kicker">File</p>
+          <div className="content-active-heading-row">
+            <h2 className="content-directory-heading">{selectedPath}</h2>
+            {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+          </div>
         </div>
-      </div>
-      <div className="content-toolbar">
-        {canMutateFiles && (
-          <>
-            <button
-              type="button"
-              className="btn-raw btn-primary"
-              onClick={() => {
-                if (mode === 'edit') return
-                setDraftContent(data.content)
-                setFormError('')
-                setMode('edit')
-              }}
-              disabled={!data.editable || mode !== 'view'}
-            >
-              Edit file
-            </button>
-            <button
-              type="button"
-              className="btn-raw"
-              onClick={() => { void beginCreateMode() }}
-              disabled={mode !== 'view'}
-            >
-              New file
-            </button>
-            <button
-              type="button"
-              className="btn-raw btn-danger"
-              onClick={() => {
-                if (!confirmDiscardIfNeeded()) return
-                setFormError('')
-                setMode('confirm-delete')
-              }}
-              disabled={!data.revisionToken || mode !== 'view'}
-            >
-              Delete file
-            </button>
-          </>
-        )}
-        {canToggleRaw && mode === 'view' && (
-          <button
-            className="btn-raw"
-            onClick={() => {
-              if (!confirmDiscardIfNeeded()) return
-              const next = !showRaw
-              setShowRaw(next)
-              onRawChange?.(next)
-            }}
-            aria-pressed={showRaw}
-          >
-            {showRaw ? 'View Rendered' : 'View Raw'}
-          </button>
-        )}
-        {showRaw && mode === 'view' && (
-          <CopyButton
-            getText={() => data.content}
-            className="copy-button raw-copy-button"
-            label="Copy raw file"
-          />
-        )}
+        {mode === 'view' ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="panel-icon-button content-actions-trigger"
+                aria-label="File actions"
+              >
+                <KebabIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canToggleRaw ? (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    if (!confirmDiscardIfNeeded()) return
+                    const next = !showRaw
+                    setShowRaw(next)
+                    onRawChange?.(next)
+                  }}
+                >
+                  {showRaw ? 'View rendered' : 'View raw'}
+                </DropdownMenuItem>
+              ) : null}
+              {canMutateFiles ? (
+                <DropdownMenuItem
+                  disabled={!data.editable}
+                  onSelect={() => {
+                    if (!data.editable) return
+                    setDraftContent(data.content)
+                    setFormError('')
+                    setMode('edit')
+                  }}
+                >
+                  Edit file
+                </DropdownMenuItem>
+              ) : null}
+              {canMutateFiles ? (
+                <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
+                  New file
+                </DropdownMenuItem>
+              ) : null}
+              {canMutateFiles ? (
+                <DropdownMenuItem
+                  className="dropdown-danger"
+                  disabled={!data.revisionToken}
+                  onSelect={() => {
+                    if (!data.revisionToken) return
+                    if (!confirmDiscardIfNeeded()) return
+                    setFormError('')
+                    setMode('confirm-delete')
+                  }}
+                >
+                  Delete file
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
 
       {mode === 'edit' ? (
