@@ -93,6 +93,97 @@ describe('infoHandler', () => {
   })
 })
 
+describe('gitIdentityUpdateHandler', () => {
+  it('returns blocked when no repository is open', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/git/identity', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Updated User',
+        email: 'updated@example.com',
+      }),
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json() as { ok: boolean; message: string }
+    expect(body.ok).toBe(false)
+    expect(body.message).toBe('No repository is currently open.')
+  })
+
+  it('rejects invalid JSON bodies', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/identity', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.message).toBe('Invalid JSON body.')
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('updates the repository-local git identity', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/identity', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Updated User',
+          email: 'updated@example.com',
+        }),
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string } }
+      expect(body.ok).toBe(true)
+      expect(body.user).toEqual({
+        name: 'Updated User',
+        email: 'updated@example.com',
+        source: 'local',
+      })
+      expect(spawnSync('git', ['config', '--local', 'user.name'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('Updated User')
+      expect(spawnSync('git', ['config', '--local', 'user.email'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('updated@example.com')
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('rejects invalid git identity payloads', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/identity', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: '',
+          email: 'updated@example.com',
+        }),
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.message).toBe('Git name is required.')
+    } finally {
+      repo.cleanup()
+    }
+  })
+})
+
 describe('branchesHandler — empty repoPath', () => {
   it('returns empty array when no repo loaded', async () => {
     const app = createApp('')
@@ -266,6 +357,138 @@ describe('readmeHandler', () => {
       expect(body.path).toBe('README.md')
     } finally {
       rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it('supports folder-scoped README lookup with explicit path and branch parameters', async () => {
+    const nestedRepo = makeGitRepo()
+
+    try {
+      mkdirSync(join(nestedRepo.dir, 'docs'), { recursive: true })
+      writeFileSync(join(nestedRepo.dir, 'docs', 'README.md'), '# Docs')
+      spawnSync('git', ['add', 'docs/README.md'], { cwd: nestedRepo.dir })
+      spawnSync('git', ['commit', '-m', 'add docs readme'], { cwd: nestedRepo.dir })
+
+      const app = createApp(nestedRepo.dir)
+      const client = testClient(app)
+      const branch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: nestedRepo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      const res = await client.api.readme.$get({ query: { path: 'docs', branch } })
+      const body = await res.json()
+
+      expect(body.path).toBe('docs/README.md')
+    } finally {
+      nestedRepo.cleanup()
+    }
+  })
+})
+
+describe('branchSwitchHandler', () => {
+  it('returns blocked when no repo is open', async () => {
+    const app = createApp('')
+    const client = testClient(app)
+    const res = await client.api.branches.switch.$post({
+      json: { target: 'main', resolution: 'preview' },
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual(expect.objectContaining({
+      ok: false,
+      status: 'blocked',
+    }))
+  })
+
+  it('returns blocked for invalid JSON bodies', async () => {
+    const repo = makeGitRepo()
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/branches/switch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+      }))
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('returns confirmation responses and switched responses with matching status codes', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const mainBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      spawnSync('git', ['checkout', '-b', 'feature'], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'feature.txt'), 'feature')
+      spawnSync('git', ['add', '.'], { cwd: repo.dir })
+      spawnSync('git', ['commit', '-m', 'feature'], { cwd: repo.dir })
+      spawnSync('git', ['checkout', mainBranch], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'main.ts'), 'dirty')
+
+      const app = createApp(repo.dir)
+      const client = testClient(app)
+
+      const confirmRes = await client.api.branches.switch.$post({
+        json: { target: 'feature', resolution: 'preview' },
+      })
+      expect(confirmRes.status).toBe(409)
+      expect(await confirmRes.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'confirmation-required',
+      }))
+
+      const cancelRes = await client.api.branches.switch.$post({
+        json: { target: mainBranch, resolution: 'cancel' },
+      })
+      expect(cancelRes.status).toBe(200)
+      expect(await cancelRes.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'cancelled',
+      }))
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('returns second-confirmation responses when untracked blockers still need deletion', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const mainBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      spawnSync('git', ['checkout', '-b', 'feature-blocked'], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'blocker.txt'), 'tracked on feature')
+      spawnSync('git', ['add', 'blocker.txt'], { cwd: repo.dir })
+      spawnSync('git', ['commit', '-m', 'add blocker'], { cwd: repo.dir })
+      spawnSync('git', ['checkout', mainBranch], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'blocker.txt'), 'local untracked blocker')
+
+      const app = createApp(repo.dir)
+      const client = testClient(app)
+
+      const res = await client.api.branches.switch.$post({
+        json: { target: 'feature-blocked', resolution: 'discard' },
+      })
+
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'second-confirmation-required',
+      }))
+    } finally {
+      repo.cleanup()
     }
   })
 })

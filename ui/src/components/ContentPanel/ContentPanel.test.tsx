@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { axe } from 'jest-axe'
@@ -40,6 +41,14 @@ function renderWithClient(ui: React.ReactElement, client?: QueryClient) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
 }
 
+async function openFileActionsMenu() {
+  const trigger = await screen.findByRole('button', { name: /file actions/i })
+  await userEvent.setup().click(trigger)
+  await waitFor(() => {
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+}
+
 function makeTextFile(overrides: Partial<Awaited<ReturnType<typeof api.getFile>>> = {}) {
   return {
     path: 'README.md',
@@ -60,7 +69,7 @@ describe('ContentPanel', () => {
     vi.mocked(api.getTree).mockResolvedValue([])
   })
 
-  it('shows empty state when no filePath', async () => {
+  it('shows the root directory table with a parent-scope row when no file is selected', async () => {
     const { container } = renderWithClient(
       <ContentPanel
         canMutateFiles={false}
@@ -70,9 +79,12 @@ describe('ContentPanel', () => {
         branch="main"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
+        onBrowseParent={vi.fn()}
       />,
     )
-    expect(await screen.findByText(/Select a file/i)).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open parent folder outside this repository/i })).toBeInTheDocument()
+    expect(screen.getByText(/does not have any visible files yet/i)).toBeInTheDocument()
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
@@ -143,7 +155,7 @@ describe('ContentPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/already exists/i)
 
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
-    expect(screen.getByText(/select a file/i)).toBeInTheDocument()
+    expect(screen.getByText(/does not have any visible files yet/i)).toBeInTheDocument()
   })
 
   it('suggests myfile names when README.md already exists in the folder', async () => {
@@ -460,7 +472,8 @@ describe('ContentPanel', () => {
     })
 
     expect(screen.getByTestId('line-number-gutter')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /view raw/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /view raw/i }))
     expect(onRawChange).toHaveBeenCalledWith(true)
   })
 
@@ -549,8 +562,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    await screen.findByRole('button', { name: /edit file/i })
-    fireEvent.click(screen.getByRole('button', { name: /edit file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
     expect(document.querySelector('.content-panel.content-panel-editing')).toBeTruthy()
     expect(document.querySelector('.manual-editor-card.manual-editor-expanded')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'updated text' } })
@@ -592,7 +605,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /edit file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'updated' } })
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -615,7 +629,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /edit file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty' } })
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
@@ -637,7 +652,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /edit file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty' } })
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
@@ -669,7 +685,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /delete file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
     const dialog = screen.getByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
@@ -704,7 +721,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /delete file/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
     const dialog = screen.getByRole('alertdialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
 
@@ -751,7 +769,7 @@ describe('ContentPanel', () => {
     expect(await screen.findByText('No README found in this repository.')).toBeInTheDocument()
   })
 
-  it('renders a structured landing state with title, detail, and actions when provided', async () => {
+  it('renders a structured landing state with title, detail, and the root parent row', async () => {
     const onBrowseParent = vi.fn()
 
     renderWithClient(
@@ -768,18 +786,17 @@ describe('ContentPanel', () => {
         emptyStateDetail="There is no README yet, so GitLocal is showing a guided landing state instead."
         emptyStateActions={[
           { label: 'Create first file', action: 'create-file' },
-          { label: 'Browse parent folder', action: 'open-parent' },
         ]}
         onBrowseParent={onBrowseParent}
       />,
     )
 
     expect(await screen.findByRole('heading', { name: /ready for a first file/i })).toBeInTheDocument()
-    expect(screen.getByText(/guided landing state/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/guided landing state/i)).not.toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: /create first file/i }))
     expect(screen.getByLabelText(/new file path/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
-    fireEvent.click(screen.getByRole('button', { name: /browse parent folder/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open parent folder outside this repository/i }))
     expect(onBrowseParent).toHaveBeenCalledTimes(1)
   })
 
@@ -838,7 +855,8 @@ describe('ContentPanel', () => {
     expect(screen.queryByText(/hidden comment/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/hidden reference/i)).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /view raw/i }))
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /view raw/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/hidden comment/i)).toBeInTheDocument()

@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { axe } from 'jest-axe'
 import PickerPage from './PickerPage'
@@ -7,10 +8,21 @@ vi.mock('../../services/api', () => ({
   api: {
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
+    createPickFolder: vi.fn(),
+    initPickGit: vi.fn(),
+    clonePickRepo: vi.fn(),
   },
 }))
 
 import { api } from '../../services/api'
+
+async function openFolderActionsMenu() {
+  const trigger = await screen.findByRole('button', { name: /folder actions/i })
+  await userEvent.setup().click(trigger)
+  await waitFor(() => {
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -29,6 +41,10 @@ beforeEach(() => {
       { name: 'gitlocal', path: '/Users/example/gitlocal', isGitRepo: true },
     ],
     error: '',
+    canOpen: false,
+    canCreateChild: true,
+    canInitGit: true,
+    canCloneIntoChild: true,
   })
 })
 
@@ -38,7 +54,7 @@ describe('PickerPage', () => {
 
     expect(await screen.findByText(/Choose the folder GitLocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(/started without a repository location/i)).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: /folders/i })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /folders/i })).toBeInTheDocument()
     expect((await axe(container)).violations).toHaveLength(0)
   })
 
@@ -61,16 +77,6 @@ describe('PickerPage', () => {
     expect(screen.getByRole('textbox', { name: /repository path/i })).toHaveValue('/Users/example/projects')
   })
 
-  it('browsing a normal folder uses the explicit browse button', async () => {
-    render(<PickerPage />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /^browse projects$/i }))
-
-    await waitFor(() => {
-      expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledWith('/Users/example/projects')
-    })
-  })
-
   it('double-clicking a normal folder browses into it', async () => {
     render(<PickerPage />)
 
@@ -79,19 +85,6 @@ describe('PickerPage', () => {
     await waitFor(() => {
       expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledWith('/Users/example/projects')
     })
-  })
-
-  it('opening a git repository uses the explicit open button', async () => {
-    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
-
-    render(<PickerPage />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /^open gitlocal$/i }))
-
-    await waitFor(() => {
-      expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/gitlocal')
-    })
-    expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledTimes(1)
   })
 
   it('double-clicking a repository opens it directly', async () => {
@@ -145,7 +138,7 @@ describe('PickerPage', () => {
       expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledWith('/')
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /up one level/i }))
+    fireEvent.doubleClick(screen.getByRole('button', { name: /open parent folder/i }))
 
     await waitFor(() => {
       expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledWith('/Users')
@@ -179,11 +172,15 @@ describe('PickerPage', () => {
   it('shows an empty-state message when no folders are available', async () => {
     vi.mocked(api.getPickBrowse).mockResolvedValueOnce({
       currentPath: '/empty',
-      parentPath: '/Users',
+      parentPath: null,
       homePath: '/Users/example',
       roots: [{ name: '/', path: '/' }],
       entries: [],
       error: '',
+      canOpen: false,
+      canCreateChild: false,
+      canInitGit: false,
+      canCloneIntoChild: false,
     })
 
     render(<PickerPage />)
@@ -229,6 +226,143 @@ describe('PickerPage', () => {
     await waitFor(() => {
       expect(window.location.reload).toHaveBeenCalled()
     })
+  })
+
+  it('creates a subfolder from the folder actions menu', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('notes')
+    vi.mocked(api.createPickFolder).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.createPickFolder)).toHaveBeenCalledWith({
+        parentPath: '/Users/example',
+        name: 'notes',
+      })
+    })
+    await waitFor(() => {
+      expect(vi.mocked(api.getPickBrowse)).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('shows create-subfolder errors from the folder actions menu', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('notes')
+    vi.mocked(api.createPickFolder).mockResolvedValue({ ok: false, error: 'folder already exists' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/folder already exists/i)
+  })
+
+  it('does nothing when create-subfolder prompt is canceled', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue(null)
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+
+    expect(vi.mocked(api.createPickFolder)).not.toHaveBeenCalled()
+  })
+
+  it('opens the current repository from the folder actions menu when allowed', async () => {
+    vi.mocked(api.getPickBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/gitlocal',
+      parentPath: '/Users/example',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [],
+      error: '',
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: false,
+      canCloneIntoChild: false,
+    })
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /open this repository/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/gitlocal')
+    })
+    expect(window.location.reload).toHaveBeenCalled()
+  })
+
+  it('runs git init from the folder actions menu and opens the initialized repository', async () => {
+    vi.mocked(api.initPickGit).mockResolvedValue({ ok: true, error: '', path: '/Users/example/projects/new-repo' })
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /run git init/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.initPickGit)).toHaveBeenCalledWith({ path: '/Users/example' })
+    })
+    await waitFor(() => {
+      expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/projects/new-repo')
+    })
+  })
+
+  it('shows git-init errors from the folder actions menu', async () => {
+    vi.mocked(api.initPickGit).mockResolvedValue({ ok: false, error: 'cannot initialize here', path: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /run git init/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot initialize here/i)
+  })
+
+  it('clones into a subfolder from the folder actions menu', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt')
+    promptSpy.mockReturnValueOnce('git@github.com:example/team-repo.git').mockReturnValueOnce('team-repo')
+    vi.mocked(api.clonePickRepo).mockResolvedValue({ ok: true, error: '', path: '/Users/example/team-repo' })
+    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /clone into subfolder/i }))
+
+    await waitFor(() => {
+      expect(promptSpy).toHaveBeenNthCalledWith(2, 'Clone into subfolder', 'team-repo')
+    })
+    await waitFor(() => {
+      expect(vi.mocked(api.clonePickRepo)).toHaveBeenCalledWith({
+        parentPath: '/Users/example',
+        name: 'team-repo',
+        repositoryUrl: 'git@github.com:example/team-repo.git',
+      })
+    })
+    await waitFor(() => {
+      expect(vi.mocked(api.submitPick)).toHaveBeenCalledWith('/Users/example/team-repo')
+    })
+  })
+
+  it('shows clone errors from the folder actions menu', async () => {
+    vi.spyOn(window, 'prompt')
+      .mockReturnValueOnce('https://github.com/example/project.git')
+      .mockReturnValueOnce('project')
+    vi.mocked(api.clonePickRepo).mockResolvedValue({ ok: false, error: 'clone failed', path: '' })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /clone into subfolder/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/clone failed/i)
   })
 
   it('shows a fallback error when the submit API returns ok:false without a message', async () => {

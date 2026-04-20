@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
-import './App.css'
+import { applyTheme, getInitialTheme } from './services/theme'
+import './styles/globals.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,6 +14,8 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+applyTheme(getInitialTheme())
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

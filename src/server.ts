@@ -1,9 +1,16 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { join, resolve } from 'node:path'
-import { infoHandler, branchesHandler, commitsHandler, readmeHandler } from './handlers/git.js'
+import { infoHandler, branchesHandler, branchSwitchHandler, commitsHandler, gitIdentityUpdateHandler, readmeHandler } from './handlers/git.js'
 import { treeHandler, fileHandler, createFileHandler, updateFileHandler, deleteFileHandler } from './handlers/files.js'
-import { pickBrowseHandler, pickHandler, pickParentHandler } from './handlers/pick.js'
+import {
+  pickBrowseHandler,
+  pickCloneHandler,
+  pickCreateFolderHandler,
+  pickHandler,
+  pickInitGitHandler,
+  pickParentHandler,
+} from './handlers/pick.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import { validateRepo } from './git/repo.js'
@@ -71,6 +78,8 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   // API routes
   app.get('/api/info', infoHandler)
   app.get('/api/branches', branchesHandler)
+  app.post('/api/branches/switch', branchSwitchHandler)
+  app.put('/api/git/identity', gitIdentityUpdateHandler)
   app.get('/api/commits', commitsHandler)
   app.get('/api/readme', readmeHandler)
   app.get('/api/tree', treeHandler)
@@ -82,6 +91,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/sync', syncHandler)
   app.get('/api/pick/browse', pickBrowseHandler)
   app.post('/api/pick', pickHandler)
+  app.post('/api/pick/create-folder', pickCreateFolderHandler)
+  app.post('/api/pick/init', pickInitGitHandler)
+  app.post('/api/pick/clone', pickCloneHandler)
   app.post('/api/pick/parent', pickParentHandler)
 
   // Static file serving with SPA fallback

@@ -1,0 +1,87 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import BranchSwitchDialog from './BranchSwitchDialog'
+
+describe('BranchSwitchDialog', () => {
+  it('renders the commit, discard, and cancel flow for confirmation-required responses', () => {
+    const onCancel = vi.fn()
+    const onCommit = vi.fn()
+    const onDiscard = vi.fn()
+    const onDeleteUntracked = vi.fn()
+    const onCommitMessageChange = vi.fn()
+
+    render(
+      <BranchSwitchDialog
+        open
+        targetLabel="release (origin)"
+        targetScope="remote"
+        response={{
+          ok: false,
+          status: 'confirmation-required',
+          message: 'This branch switch needs confirmation because your working tree has uncommitted changes.',
+          trackedChangeCount: 2,
+          untrackedChangeCount: 1,
+          blockingPaths: ['src/App.tsx', 'notes.txt'],
+          suggestedCommitMessage: 'WIP before switching to release',
+        }}
+        commitMessage="WIP before switching to release"
+        onCommitMessageChange={onCommitMessageChange}
+        onCancel={onCancel}
+        onCommit={onCommit}
+        onDiscard={onDiscard}
+        onDeleteUntracked={onDeleteUntracked}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: /switch branches/i })).toBeInTheDocument()
+    expect(screen.getByText(/create a local tracking branch/i)).toBeInTheDocument()
+    expect(screen.getByDisplayValue('WIP before switching to release')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/commit message/i), {
+      target: { value: 'save before switch' },
+    })
+    expect(onCommitMessageChange).toHaveBeenCalledWith('save before switch')
+
+    fireEvent.click(screen.getByRole('button', { name: /discard changes and switch/i }))
+    expect(onDiscard).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /commit and switch/i }))
+    expect(onCommit).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(onDeleteUntracked).not.toHaveBeenCalled()
+  })
+
+  it('renders the explicit delete confirmation for untracked blockers', () => {
+    const onDeleteUntracked = vi.fn()
+
+    render(
+      <BranchSwitchDialog
+        open
+        targetLabel="blocked-branch"
+        response={{
+          ok: false,
+          status: 'second-confirmation-required',
+          message: 'Untracked files would block this checkout. Delete those files to continue or cancel.',
+          trackedChangeCount: 0,
+          untrackedChangeCount: 1,
+          blockingPaths: ['scratch.txt'],
+        }}
+        commitMessage=""
+        onCommitMessageChange={vi.fn()}
+        onCancel={vi.fn()}
+        onCommit={vi.fn()}
+        onDiscard={vi.fn()}
+        onDeleteUntracked={onDeleteUntracked}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: /delete untracked files/i })).toBeInTheDocument()
+    expect(screen.getByText('scratch.txt')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/commit message/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /delete files and switch/i }))
+    expect(onDeleteUntracked).toHaveBeenCalledTimes(1)
+  })
+})

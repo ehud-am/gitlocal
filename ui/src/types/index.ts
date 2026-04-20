@@ -7,6 +7,38 @@ export interface RepoInfo {
   version: string
   hasCommits: boolean
   rootEntryCount: number
+  gitContext?: GitContext | null
+}
+
+export type GitUserSource = 'local' | 'global' | 'mixed'
+
+export interface GitUserIdentity {
+  name: string
+  email: string
+  source: GitUserSource
+}
+
+export interface RepoRemoteContext {
+  name: string
+  fetchUrl: string
+  webUrl: string
+  selectionReason: string
+}
+
+export interface GitContext {
+  user: GitUserIdentity | null
+  remote: RepoRemoteContext | null
+}
+
+export interface GitIdentityUpdateRequest {
+  name: string
+  email: string
+}
+
+export interface GitIdentityUpdateResponse {
+  ok: boolean
+  message: string
+  user: GitUserIdentity
 }
 
 export type SearchPresentation = 'collapsed' | 'expanded'
@@ -26,6 +58,39 @@ export interface ViewerState {
 export interface Branch {
   name: string
   isCurrent: boolean
+  displayName?: string
+  scope?: 'local' | 'remote'
+  remoteName?: string
+  trackingRef?: string
+  hasLocalCheckout?: boolean
+}
+
+export type BranchSwitchResolution = 'preview' | 'commit' | 'discard' | 'delete-untracked' | 'cancel'
+export type BranchSwitchStatus =
+  | 'switched'
+  | 'confirmation-required'
+  | 'second-confirmation-required'
+  | 'blocked'
+  | 'failed'
+  | 'cancelled'
+
+export interface BranchSwitchRequest {
+  target: string
+  resolution: BranchSwitchResolution
+  commitMessage?: string
+  allowDeleteUntracked?: boolean
+}
+
+export interface BranchSwitchResponse {
+  ok: boolean
+  status: BranchSwitchStatus
+  message: string
+  currentBranch?: string
+  createdTrackingBranch?: string
+  trackedChangeCount?: number
+  untrackedChangeCount?: number
+  blockingPaths?: string[]
+  suggestedCommitMessage?: string
 }
 
 export interface TreeNode {
@@ -96,6 +161,33 @@ export interface PickBrowseResponse {
   roots: PickBrowseRoot[]
   entries: PickBrowseEntry[]
   error: string
+  isGitRepo?: boolean
+  canOpen?: boolean
+  canCreateChild?: boolean
+  canInitGit?: boolean
+  canCloneIntoChild?: boolean
+}
+
+export interface PickResponse {
+  ok: boolean
+  error: string
+  path?: string
+  message?: string
+}
+
+export interface PickCreateFolderRequest {
+  parentPath: string
+  name: string
+}
+
+export interface PickInitGitRequest {
+  path: string
+}
+
+export interface PickCloneRequest {
+  parentPath: string
+  name: string
+  repositoryUrl: string
 }
 
 export interface SearchResult {

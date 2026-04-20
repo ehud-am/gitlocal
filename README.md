@@ -89,8 +89,9 @@ If the browser URL still contains a saved file or folder path from a previously 
 
 Select a folder in the picker, then:
 
-- click **Browse** for a normal folder to move deeper into it
-- click **Open** for a detected git repository to open it immediately
+- double-click a folder row to move deeper into it
+- double-click a detected git repository row to open it immediately
+- use the folder actions menu to create a subfolder, run `git init`, or clone into a child folder
 
 You can still paste a path manually in the selected-folder field when needed.
 
@@ -99,14 +100,17 @@ You can still paste a path manually in the selected-folder field when needed.
 ## What it does
 
 - **Browse the file tree** — expand and collapse folders lazily, just like GitHub
-- **Read files beautifully** — Markdown renders as formatted HTML with GitHub Flavored Markdown; code files get syntax highlighting; images display inline
+- **Read files beautifully** — Markdown renders with GitHub-like typography and tables; code files get syntax highlighting; images display inline
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **Make local file edits** — create, edit, and delete files from the viewer when you are on the repository's working branch
-- **See git status** — current branch, recent commits, and a branch switcher (read-only)
+- **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
+- **Manage repo identity locally** — update the repository-specific git `user.name` and `user.email` without touching your global git config
+- **See repo context clearly** — GitHub-like header with branch, local path, remote path, remote linkage, and repo-local identity
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
 - **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; otherwise GitLocal starts in the folder picker
-- **Clear folder actions** — non-git folders can be browsed deeper, while detected git repositories can be opened directly
+- **Clear folder actions** — non-git folders can be browsed deeper, initialized as git repos, or used as clone targets
+- **Light and dark themes** — GitHub-inspired light mode with matching dark mode support
 - **No internet required** — everything runs locally; no accounts, no telemetry, no registration
 
 The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
@@ -183,8 +187,8 @@ gitlocal/
     │   ├── FileTree/                — lazy expand/collapse tree
     │   ├── Breadcrumb/              — path navigation
     │   ├── ContentPanel/            — Markdown, code, image, binary rendering, and local file editing
-    │   ├── GitInfo/                 — branch switcher + commit list
-    │   └── Picker/                  — PickerPage folder browser with Browse/Open actions
+    │   ├── RepoContext/             — branch switcher, repo metadata, identity editing
+    │   └── Picker/                  — PickerPage table browser with setup actions
     └── services/api.ts              — typed fetch wrappers for all endpoints
 ```
 
@@ -193,7 +197,7 @@ gitlocal/
 - **No external runtime dependencies beyond Node.js** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
 - **Single npm toolchain** — build, test, and install all via `npm`; no Go, no Makefile, no shell scripts
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
-- **Local-first editing** — GitLocal can create, update, and delete working-tree files locally, while branch history and other repository metadata remain read-only in the UI
+- **Local-first editing** — GitLocal can create, update, and delete working-tree files locally while using git commands for branch and remote-aware repository actions
 
 ---
 
@@ -206,6 +210,7 @@ All endpoints are served under `/api/`:
 | `GET /api/info` | Repository metadata (name, branch, isGitRepo, pickerMode) |
 | `GET /api/readme` | Detects and returns the README filename for the current repo |
 | `GET /api/branches` | List of branches with `isCurrent` flag |
+| `PUT /api/git/identity` | Update `user.name` and `user.email` in the current repo's local git config |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
 | `POST /api/file` | Create a new file in the current repository working tree |
@@ -214,6 +219,9 @@ All endpoints are served under `/api/`:
 | `GET /api/commits?branch=&limit=` | Recent commits (default 10, max 100) |
 | `GET /api/pick/browse?path=` | Folder-picker directory listing with git-repo detection |
 | `POST /api/pick` | Set the repo path from the picker UI (body: `{"path":"..."}`) |
+| `POST /api/pick/create-folder` | Create a child folder from the picker setup flow |
+| `POST /api/pick/init` | Initialize git in the selected picker folder |
+| `POST /api/pick/clone` | Clone a repository into a child folder from the picker |
 
 ---
 
