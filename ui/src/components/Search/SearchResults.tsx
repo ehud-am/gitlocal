@@ -1,4 +1,5 @@
 import type { SearchResult } from '../../types'
+import { MetaTag } from '../ui/meta-tag'
 
 interface Props {
   results: SearchResult[]
@@ -18,7 +19,7 @@ export default function SearchResults({ results, onSelect }: Props) {
             <span className="search-result-path">{result.path}</span>
             <span className="search-result-meta">
               <span>{result.type === 'dir' ? 'Folder' : 'File'}</span>
-              {result.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+              {result.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
             </span>
           </button>
         </li>

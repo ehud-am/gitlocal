@@ -1,8 +1,10 @@
+import type { MetaTagIcon, MetaTagTone } from '../components/ui/meta-tag'
 import type { FileSyncState, RepoSyncState } from '../types'
 
 interface SyncPresentation {
   label: string
-  className: string
+  tone: MetaTagTone
+  icon: MetaTagIcon
 }
 
 export function describeFileSyncState(state?: FileSyncState): SyncPresentation | null {
@@ -10,22 +12,26 @@ export function describeFileSyncState(state?: FileSyncState): SyncPresentation |
     case 'local-uncommitted':
       return {
         label: 'Changed locally',
-        className: 'sync-badge sync-badge-local',
+        tone: 'info',
+        icon: 'local-change',
       }
     case 'local-committed':
       return {
         label: 'Local commit',
-        className: 'sync-badge sync-badge-ahead',
+        tone: 'success',
+        icon: 'local-commit',
       }
     case 'remote-committed':
       return {
         label: 'Remote update',
-        className: 'sync-badge sync-badge-behind',
+        tone: 'warning',
+        icon: 'remote-update',
       }
     case 'diverged':
       return {
         label: 'Diverged',
-        className: 'sync-badge sync-badge-diverged',
+        tone: 'danger',
+        icon: 'diverged',
       }
     default:
       return null
@@ -39,27 +45,32 @@ export function describeRepoSyncState(repoSync?: RepoSyncState): SyncPresentatio
     case 'ahead':
       return {
         label: `${repoSync.aheadCount} ahead`,
-        className: 'sync-badge sync-badge-ahead',
+        tone: 'success',
+        icon: 'local-commit',
       }
     case 'behind':
       return {
         label: `${repoSync.behindCount} behind`,
-        className: 'sync-badge sync-badge-behind',
+        tone: 'warning',
+        icon: 'remote-update',
       }
     case 'diverged':
       return {
         label: `${repoSync.aheadCount} ahead / ${repoSync.behindCount} behind`,
-        className: 'sync-badge sync-badge-diverged',
+        tone: 'danger',
+        icon: 'diverged',
       }
     case 'up-to-date':
       return {
         label: 'Up to date',
-        className: 'sync-badge sync-badge-clean',
+        tone: 'neutral',
+        icon: 'remote',
       }
     case 'local-only':
       return {
         label: 'No upstream',
-        className: 'sync-badge sync-badge-clean',
+        tone: 'neutral',
+        icon: 'git',
       }
     default:
       return null

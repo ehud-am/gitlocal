@@ -246,14 +246,19 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
-    expect(screen.getByText('/tmp/repo')).toBeInTheDocument()
-    expect(screen.getByText(/linked to remote git/i)).toBeInTheDocument()
-    expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
-    expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
+    expect(screen.getByText('Remote')).toBeInTheDocument()
+    expect(screen.queryByText('/tmp/repo')).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
     expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
+
+    expect(await screen.findByText('Repository details')).toBeInTheDocument()
+    expect(screen.getByText('/tmp/repo')).toBeInTheDocument()
+    expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
+    expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
   })
 
   it('opens an info modal before leaving the repository from the root .. row', async () => {
@@ -326,6 +331,7 @@ describe('App', () => {
 
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
     fireEvent.click(await screen.findByRole('button', { name: /edit repository git identity/i }))
 
     expect(await screen.findByRole('heading', { name: /edit repository git identity/i })).toBeInTheDocument()
@@ -355,7 +361,8 @@ describe('App', () => {
 
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('button', { name: /commit changes/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
     expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
 
     fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), {
@@ -390,6 +397,7 @@ describe('App', () => {
 
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
     fireEvent.click(await screen.findByRole('button', { name: /push to remote/i }))
 
     await waitFor(() => {

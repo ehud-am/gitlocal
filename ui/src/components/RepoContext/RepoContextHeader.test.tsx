@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import RepoContextHeader from './RepoContextHeader'
 
 describe('RepoContextHeader', () => {
-  it('renders repo metadata and branch controls', () => {
+  it('renders a compact repo toolbar and expands inline details on demand', () => {
     const onBranchChange = vi.fn()
     const onEditGitIdentity = vi.fn()
+    const onCommitChanges = vi.fn()
+    const onSyncWithRemote = vi.fn()
 
     render(
       <RepoContextHeader
@@ -51,23 +53,23 @@ describe('RepoContextHeader', () => {
         untrackedChangeCount={0}
         onBranchChange={onBranchChange}
         onEditGitIdentity={onEditGitIdentity}
-        onCommitChanges={vi.fn()}
-        onSyncWithRemote={vi.fn()}
+        onCommitChanges={onCommitChanges}
+        onSyncWithRemote={onSyncWithRemote}
+        onOpenSearch={vi.fn()}
         branchDisabled={false}
         branchSwitchDialog={<div>Branch switch dialog</div>}
       />,
     )
 
-    expect(screen.getByRole('heading', { name: 'App.tsx' })).toBeInTheDocument()
-    expect(screen.getByText('/tmp/gitlocal/src/App.tsx')).toBeInTheDocument()
-    expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
-    expect(screen.getByText(/linked to remote git/i)).toBeInTheDocument()
-    expect(screen.getByText(/test user <test@example.com>/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'gitlocal' })).toBeInTheDocument()
+    expect(screen.getByText('Remote')).toBeInTheDocument()
     expect(screen.getByText(/2 ahead/i)).toBeInTheDocument()
     expect(screen.getByText(/1 local change/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /commit changes/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sync with remote|push to remote/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
+    expect(screen.queryByText('/tmp/gitlocal/src/App.tsx')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open repository search/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /sync with remote|push to remote/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /expand repository details/i })).toBeInTheDocument()
     expect(screen.getByText('Branch switch dialog')).toBeInTheDocument()
 
     fireEvent.change(screen.getByRole('combobox', { name: /branch selector/i }), {
@@ -75,8 +77,27 @@ describe('RepoContextHeader', () => {
     })
     expect(onBranchChange).toHaveBeenCalledWith('origin/release')
 
+    fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
+    expect(screen.getByText('Repository details')).toBeInTheDocument()
+    expect(screen.getByText('/tmp/gitlocal/src/App.tsx')).toBeInTheDocument()
+    expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
+    expect(screen.getByText(/test user <test@example.com>/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^commit$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sync with remote|push to remote/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /collapse repository details/i })).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: /edit repository git identity/i }))
     expect(onEditGitIdentity).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /^commit$/i }))
+    expect(onCommitChanges).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /sync with remote|push to remote/i }))
+    expect(onSyncWithRemote).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /collapse repository details/i }))
+    expect(screen.queryByText('/tmp/gitlocal/src/App.tsx')).not.toBeInTheDocument()
   })
 
   it('disables branch switching while a branch mutation is running', () => {

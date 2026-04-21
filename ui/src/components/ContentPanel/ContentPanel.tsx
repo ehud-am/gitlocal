@@ -6,6 +6,7 @@ import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
@@ -360,7 +361,7 @@ export default function ContentPanel({
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
               <div className="content-active-heading-row">
                 <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly)}</h2>
-                {selectedPathLocalOnly && path ? <span className="local-only-badge">Local only</span> : null}
+                {selectedPathLocalOnly && path ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
               </div>
             </div>
             {canMutateFiles ? (
@@ -410,11 +411,11 @@ export default function ContentPanel({
                                 </span>
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
-                              {!entry.isParent && entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+                              {!entry.isParent && entry.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
                               {!entry.isParent && entry.syncState ? (
                                 (() => {
                                   const syncState = describeFileSyncState(entry.syncState)
-                                  return syncState ? <span className={syncState.className}>{syncState.label}</span> : null
+                                  return syncState ? <MetaTag label={syncState.label} icon={syncState.icon} tone={syncState.tone} compact /> : null
                                 })()
                               ) : null}
                             </div>
@@ -547,11 +548,11 @@ export default function ContentPanel({
           <p className="content-directory-kicker">File</p>
           <div className="content-active-heading-row">
             <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
-            {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+            {selectedPathLocalOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
             {selectedPathSyncState !== 'none'
               ? (() => {
                   const syncState = describeFileSyncState(selectedPathSyncState)
-                  return syncState ? <span className={syncState.className}>{syncState.label}</span> : null
+                  return syncState ? <MetaTag label={syncState.label} icon={syncState.icon} tone={syncState.tone} compact /> : null
                 })()
               : null}
           </div>

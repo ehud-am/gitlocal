@@ -8,7 +8,6 @@ import PickerPage from './components/Picker/PickerPage'
 import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
-import SearchTrigger from './components/Search/SearchTrigger'
 import AppFooter from './components/AppFooter'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
@@ -828,6 +827,7 @@ export default function App() {
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
                 onCommitChanges={isWorkingTreeBranchSelected ? openCommitDialog : undefined}
                 onSyncWithRemote={isWorkingTreeBranchSelected ? () => { void handleSyncWithRemote() } : undefined}
+                onOpenSearch={() => setSearchPresentation('expanded')}
                 branchDisabled={branchSwitchPending}
                 commitDisabled={!canCommitChanges}
                 syncDisabled={!canSyncWithRemote}
@@ -850,8 +850,8 @@ export default function App() {
                 }
               />
 
-              <div className="search-layer" data-testid="search-layer">
-                {searchPresentation === 'expanded' ? (
+              {searchPresentation === 'expanded' ? (
+                <div className="search-layer" data-testid="search-layer">
                   <SearchPanel
                     branch={currentBranch}
                     query={searchQuery}
@@ -863,10 +863,8 @@ export default function App() {
                     onSelectResult={handleSelectSearchResult}
                     onDismiss={handleDismissSearch}
                   />
-                ) : (
-                  <SearchTrigger onOpen={() => setSearchPresentation('expanded')} />
-                )}
-              </div>
+                </div>
+              ) : null}
 
               <Breadcrumb
                 path={visibleSelectedPath}
