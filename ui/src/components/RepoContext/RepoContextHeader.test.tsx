@@ -3,8 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import RepoContextHeader from './RepoContextHeader'
 
 describe('RepoContextHeader', () => {
-  it('renders repo metadata, branch options, and theme controls', () => {
-    const onThemeChange = vi.fn()
+  it('renders repo metadata and branch controls', () => {
     const onBranchChange = vi.fn()
     const onEditGitIdentity = vi.fn()
 
@@ -40,8 +39,6 @@ describe('RepoContextHeader', () => {
         ]}
         selectedPath="src/App.tsx"
         selectedPathType="file"
-        theme="light"
-        onThemeChange={onThemeChange}
         onBranchChange={onBranchChange}
         onEditGitIdentity={onEditGitIdentity}
         branchDisabled={false}
@@ -61,9 +58,6 @@ describe('RepoContextHeader', () => {
       target: { value: 'origin/release' },
     })
     expect(onBranchChange).toHaveBeenCalledWith('origin/release')
-
-    fireEvent.click(screen.getByRole('switch', { name: /toggle dark theme/i }))
-    expect(onThemeChange).toHaveBeenCalledWith('dark')
 
     fireEvent.click(screen.getByRole('button', { name: /edit repository git identity/i }))
     expect(onEditGitIdentity).toHaveBeenCalledTimes(1)
@@ -89,8 +83,6 @@ describe('RepoContextHeader', () => {
         ]}
         selectedPath=""
         selectedPathType="none"
-        theme="dark"
-        onThemeChange={vi.fn()}
         onBranchChange={vi.fn()}
         branchDisabled
       />,

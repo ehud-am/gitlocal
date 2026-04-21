@@ -259,7 +259,7 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/local only/i)).toHaveLength(3)
     })
-    expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'root/docs' })).toBeInTheDocument()
   })
 
   it('shows a local-only cue in the active file context for ignored files', async () => {
@@ -279,7 +279,7 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByText(/local only/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '.env' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'root/.env' })).toBeInTheDocument()
   })
 
   it('cancels create mode from the draft form', async () => {
@@ -475,6 +475,28 @@ describe('ContentPanel', () => {
     await openFileActionsMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: /view raw/i }))
     expect(onRawChange).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps file actions scoped to the current file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFileActionsMenu()
+
+    expect(screen.getByRole('menuitem', { name: /edit file/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^delete file$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^new file$/i })).not.toBeInTheDocument()
   })
 
   it('shows binary and image presentations without inline editing', async () => {

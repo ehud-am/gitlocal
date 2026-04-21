@@ -11,6 +11,7 @@ import SearchPanel from './components/Search/SearchPanel'
 import SearchTrigger from './components/Search/SearchTrigger'
 import AppFooter from './components/AppFooter'
 import { Button } from './components/ui/button'
+import { Switch } from './components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -640,6 +641,7 @@ export default function App() {
   const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
+  const darkMode = theme === 'dark'
 
   let emptyStateTitle: string | undefined
   let emptyStateDetail: string | undefined
@@ -664,6 +666,14 @@ export default function App() {
         <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
           <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
           {info ? <span className="repo-name truncate text-sm text-[var(--muted-foreground)]">{info.name}</span> : null}
+          <label className="ml-auto inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
+            <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
+            <Switch
+              checked={darkMode}
+              aria-label="Toggle dark theme"
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            />
+          </label>
         </header>
 
         <div className="app-body flex min-h-0 flex-1 pb-8">
@@ -727,8 +737,6 @@ export default function App() {
                 branches={branches}
                 selectedPath={visibleSelectedPath}
                 selectedPathType={visibleSelectedPathType}
-                theme={theme}
-                onThemeChange={setTheme}
                 onBranchChange={(nextBranch) => {
                   void handleBranchChange(nextBranch)
                 }}

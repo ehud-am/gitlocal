@@ -97,6 +97,11 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
+function formatActivePathLabel(path: string, localOnly: boolean): string {
+  if (!path) return 'root'
+  return localOnly ? `root/${path}` : path
+}
+
 export default function ContentPanel({
   canMutateFiles,
   refreshToken,
@@ -350,7 +355,7 @@ export default function ContentPanel({
             <div>
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
               <div className="content-active-heading-row">
-                <h2 className="content-directory-heading">{path || 'root'}</h2>
+                <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly)}</h2>
                 {selectedPathLocalOnly && path ? <span className="local-only-badge">Local only</span> : null}
               </div>
             </div>
@@ -531,7 +536,7 @@ export default function ContentPanel({
         <div>
           <p className="content-directory-kicker">File</p>
           <div className="content-active-heading-row">
-            <h2 className="content-directory-heading">{selectedPath}</h2>
+            <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
             {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
           </div>
         </div>
@@ -570,11 +575,6 @@ export default function ContentPanel({
                   }}
                 >
                   Edit file
-                </DropdownMenuItem>
-              ) : null}
-              {canMutateFiles ? (
-                <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
-                  New file
                 </DropdownMenuItem>
               ) : null}
               {canMutateFiles ? (

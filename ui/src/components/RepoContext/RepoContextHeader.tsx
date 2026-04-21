@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Branch, RepoInfo, ViewerPathType } from '../../types'
-import type { ThemeMode } from '../../services/theme'
 import { Button } from '../ui/button'
-import { Switch } from '../ui/switch'
 
 interface Props {
   info?: RepoInfo
@@ -10,8 +8,6 @@ interface Props {
   branches?: Branch[]
   selectedPath: string
   selectedPathType: ViewerPathType
-  theme: ThemeMode
-  onThemeChange: (theme: ThemeMode) => void
   onBranchChange: (branch: string) => void
   onEditGitIdentity?: () => void
   branchDisabled?: boolean
@@ -46,8 +42,6 @@ export default function RepoContextHeader({
   branches,
   selectedPath,
   selectedPathType,
-  theme,
-  onThemeChange,
   onBranchChange,
   onEditGitIdentity,
   branchDisabled = false,
@@ -57,7 +51,6 @@ export default function RepoContextHeader({
   const displayPath = buildDisplayPath(info, selectedPath)
   const gitUser = info?.gitContext?.user
   const remote = info?.gitContext?.remote
-  const darkMode = theme === 'dark'
   const remoteWebUrl = remote?.webUrl ?? ''
   const remotePath = remote?.webUrl || remote?.fetchUrl || ''
 
@@ -106,14 +99,6 @@ export default function RepoContextHeader({
             </div>
           </div>
 
-          <label className="flex items-center gap-3 self-start rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--foreground)]">
-            <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
-            <Switch
-              checked={darkMode}
-              aria-label="Toggle dark theme"
-              onCheckedChange={(checked) => onThemeChange(checked ? 'dark' : 'light')}
-            />
-          </label>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
