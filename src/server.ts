@@ -1,7 +1,16 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { join, resolve } from 'node:path'
-import { infoHandler, branchesHandler, branchSwitchHandler, commitsHandler, gitIdentityUpdateHandler, readmeHandler } from './handlers/git.js'
+import {
+  infoHandler,
+  branchesHandler,
+  branchSwitchHandler,
+  commitChangesHandler,
+  commitsHandler,
+  gitIdentityUpdateHandler,
+  readmeHandler,
+  remoteSyncHandler,
+} from './handlers/git.js'
 import { treeHandler, fileHandler, createFileHandler, updateFileHandler, deleteFileHandler } from './handlers/files.js'
 import {
   pickBrowseHandler,
@@ -79,7 +88,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/info', infoHandler)
   app.get('/api/branches', branchesHandler)
   app.post('/api/branches/switch', branchSwitchHandler)
+  app.post('/api/git/commit', commitChangesHandler)
   app.put('/api/git/identity', gitIdentityUpdateHandler)
+  app.post('/api/git/sync', remoteSyncHandler)
   app.get('/api/commits', commitsHandler)
   app.get('/api/readme', readmeHandler)
   app.get('/api/tree', treeHandler)

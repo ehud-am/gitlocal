@@ -17,6 +17,17 @@ export async function syncHandler(c: Context<{ Variables: Variables }>): Promise
       resolvedPath: '',
       currentPathType: 'none',
       resolvedPathType: 'none',
+      pathSyncState: 'none',
+      trackedChangeCount: 0,
+      untrackedChangeCount: 0,
+      repoSync: {
+        mode: 'unavailable',
+        aheadCount: 0,
+        behindCount: 0,
+        hasUpstream: false,
+        upstreamRef: '',
+        remoteName: '',
+      },
       statusMessage: '',
       checkedAt: new Date().toISOString(),
     })

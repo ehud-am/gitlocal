@@ -433,6 +433,7 @@ pre {
   display: flex;
   min-width: 0;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.45rem;
 }
 
@@ -894,6 +895,40 @@ pre {
 
 .local-only-badge-compact {
   padding: 0.12rem 0.45rem;
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sync-badge-local {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.sync-badge-ahead {
+  background: color-mix(in srgb, #1a7f37 14%, transparent);
+  color: #1a7f37;
+}
+
+.sync-badge-behind {
+  background: color-mix(in srgb, #9a6700 14%, transparent);
+  color: #9a6700;
+}
+
+.sync-badge-diverged {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.sync-badge-clean {
+  background: color-mix(in srgb, var(--muted-strong) 80%, transparent);
+  color: var(--muted-foreground);
 }
 
 .manual-editor-card {

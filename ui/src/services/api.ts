@@ -3,6 +3,8 @@ import type {
   Branch,
   BranchSwitchRequest,
   BranchSwitchResponse,
+  CommitChangesRequest,
+  CommitChangesResponse,
   Commit,
   FileContent,
   GitIdentityUpdateRequest,
@@ -15,6 +17,7 @@ import type {
   PickInitGitRequest,
   PickResponse,
   RepoInfo,
+  RemoteSyncResponse,
   SearchResponse,
   SyncStatus,
   TreeNode,
@@ -123,8 +126,14 @@ export const api = {
   switchBranch: (payload: BranchSwitchRequest): Promise<BranchSwitchResponse> =>
     branchSwitchRequest(payload),
 
+  commitChanges: (payload: CommitChangesRequest): Promise<CommitChangesResponse> =>
+    mutate('/api/git/commit', 'POST', payload),
+
   updateGitIdentity: (payload: GitIdentityUpdateRequest): Promise<GitIdentityUpdateResponse> =>
     mutate('/api/git/identity', 'PUT', payload),
+
+  syncWithRemote: (): Promise<RemoteSyncResponse> =>
+    mutate('/api/git/sync', 'POST', {}),
 
   getSearchResults: (query: string, branch?: string): Promise<SearchResponse> => {
     const params = new URLSearchParams({ query, mode: 'name' })

@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { spawnSync } from 'node:child_process'
 import {
+  applyFileSyncStates,
   deleteWorkingTreeFile,
   detectFileType,
   getEditableState,
@@ -38,7 +39,8 @@ export async function treeHandler(c: Context<{ Variables: Variables }>): Promise
   const path = c.req.query('path') ?? ''
   const branch = c.req.query('branch') ?? 'HEAD'
   const nodes = isWorkingTreeBranch(repoPath, branch) ? listWorkingTreeDir(repoPath, path) : listDir(repoPath, branch, path)
-  return c.json(nodes)
+  const responseNodes = isWorkingTreeBranch(repoPath, branch) ? applyFileSyncStates(repoPath, nodes) : nodes
+  return c.json(responseNodes)
 }
 
 export async function fileHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

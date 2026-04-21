@@ -20,17 +20,19 @@ A local git repository viewer that gives you a GitHub-like browsing experience â
 
 ## Install
 
+Choose the workflow that fits how you want to use GitLocal:
+
+### Install globally
+
 ```bash
 npm install -g gitlocal
 ```
 
-Or run without installing:
+### Run without installing
 
 ```bash
 npx gitlocal
 ```
-
-If you run `gitlocal` with no explicit path from inside an existing git repository, GitLocal now opens that repository directly instead of sending you to the folder picker first.
 
 ### From source
 
@@ -42,11 +44,32 @@ npm --prefix ui ci
 npm run build
 ```
 
+Run the built CLI from the repository root:
+
+```bash
+# Open the current repository
+node dist/cli.js .
+
+# Open a specific repository
+node dist/cli.js ~/projects/my-app
+
+# Open the folder picker
+node dist/cli.js
+```
+
 ---
 
 ## Usage
 
-### Open a specific repository
+GitLocal starts a local HTTP server on a random available port, prints the URL, and opens your default browser automatically.
+
+```text
+gitlocal listening on http://localhost:54321
+```
+
+Press **Ctrl+C** to stop the server.
+
+### Open a repository
 
 ```bash
 gitlocal <path-to-git-repo>
@@ -65,35 +88,25 @@ gitlocal ~/projects/my-app
 gitlocal /tmp/not-a-repo
 ```
 
-GitLocal starts an HTTP server on a random available port, prints the URL, and opens your default browser automatically. The README is shown immediately if one is found.
+When a repository opens, GitLocal shows the README immediately if one is found.
 
-```
-gitlocal listening on http://localhost:54321
-```
+### Open the folder picker
 
-Press **Ctrl+C** to stop the server.
-
-### Open with a folder picker
-
-Run `gitlocal` with no arguments to open a browser-based folder picker when your current working directory is not already a git repository:
+Run `gitlocal` with no arguments:
 
 ```bash
 gitlocal
 ```
 
-If your current shell is already inside a git repository, `gitlocal` opens that repository immediately.
+If your current shell is already inside a git repository, GitLocal opens that repository immediately instead of showing the picker.
 
-If the browser URL still contains a saved branch from a previously opened repository, GitLocal now automatically falls back to a valid branch in the newly opened repo instead of failing to load.
-
-If the browser URL still contains a saved file or folder path from a previously opened repository, GitLocal now clears that stale location and falls back to the new repository's README or default landing state instead of opening the same relative path in the new repo.
-
-Select a folder in the picker, then:
+From the picker you can:
 
 - double-click a folder row to move deeper into it
 - double-click a detected git repository row to open it immediately
 - use the folder actions menu to create a subfolder, run `git init`, or clone into a child folder
 
-You can still paste a path manually in the selected-folder field when needed.
+GitLocal also clears stale saved branch and path state when you switch repositories, so reopening the app does not strand you on an invalid branch or file from a previous repo.
 
 ---
 
@@ -126,12 +139,17 @@ The fixed footer now shows the actual running GitLocal release version instead o
 ### Run in dev mode
 
 ```bash
-# Terminal 1: Vite dev server for the frontend (hot-reload)
-npm run dev:ui
-
-# Terminal 2: Backend with auto-restart on changes
+# Terminal 1: backend with auto-restart on changes
 npm run dev:server
+
+# Terminal 2: Vite dev server for the frontend
+npm run dev:ui
 ```
+
+Use both commands together during development:
+
+- `npm run dev:server` starts the backend in watch mode
+- `npm run dev:ui` starts the Vite frontend with hot reload
 
 ### Run tests
 
@@ -153,7 +171,7 @@ npm run test:server
 npm run build
 ```
 
-Builds the React frontend (Vite) and compiles the Node.js backend (esbuild) into `dist/cli.js`.
+Builds the React frontend and compiles the Node.js CLI into `dist/cli.js`.
 
 ### Full verification
 

@@ -530,9 +530,67 @@ describe('treeHandler', () => {
       const body = await res.json()
       expect(body).toEqual([
         { name: 'nested', path: 'docs/nested', type: 'dir', localOnly: false },
-        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
-        { name: 'notes.md', path: 'docs/notes.md', type: 'file', localOnly: false },
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
+        { name: 'notes.md', path: 'docs/notes.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
       ])
+    } finally {
+      repo.cleanup()
+    }
+  })
+})
+
+describe('commitChangesHandler', () => {
+  it('creates a local commit for current repository changes', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      writeFileSync(join(repo.dir, 'README.md'), '# committed from handler')
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'Save from handler' }),
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { ok: boolean; status: string; shortHash?: string }
+      expect(body.ok).toBe(true)
+      expect(body.status).toBe('committed')
+      expect(body.shortHash).toBeTruthy()
+      expect(spawnSync('git', ['log', '-1', '--pretty=%s'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('Save from handler')
+    } finally {
+      repo.cleanup()
+    }
+  })
+})
+
+describe('remoteSyncHandler', () => {
+  it('blocks sync when the working tree is dirty', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const remoteDir = mkdtempSync(join(tmpdir(), 'gitlocal-handler-remote-'))
+      spawnSync('git', ['init', '--bare'], { cwd: remoteDir })
+      const currentBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()
+      spawnSync('git', ['remote', 'add', 'origin', remoteDir], { cwd: repo.dir })
+      spawnSync('git', ['push', '-u', 'origin', currentBranch], { cwd: repo.dir })
+      writeFileSync(join(repo.dir, 'README.md'), '# dirty sync')
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; status: string; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.status).toBe('blocked')
+      expect(body.message).toMatch(/commit or discard local changes/i)
+
+      rmSync(remoteDir, { recursive: true, force: true })
     } finally {
       repo.cleanup()
     }

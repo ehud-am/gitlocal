@@ -120,8 +120,8 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as Array<{ name: string; path: string; type: 'file' | 'dir' }>
     expect(body).toEqual([
-      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
-      { name: 'tree-view.md', path: 'docs/tree-view.md', type: 'file', localOnly: false },
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
+      { name: 'tree-view.md', path: 'docs/tree-view.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
     ])
   })
 
@@ -335,9 +335,11 @@ describe('Server integration', () => {
     const app = createApp(dir)
     const res = await app.fetch(new Request('http://localhost/api/sync?path=README.md'))
     expect(res.status).toBe(200)
-    const body = await res.json() as { currentPath: string; workingTreeRevision: string }
+    const body = await res.json() as { currentPath: string; workingTreeRevision: string; pathSyncState: string; repoSync: { mode: string } }
     expect(body.currentPath).toBe('README.md')
     expect(body.workingTreeRevision).toBeTruthy()
+    expect(body.pathSyncState).toBe('clean')
+    expect(body.repoSync.mode).toBeTruthy()
   })
 
   it('GET /api/sync respects an explicitly requested branch', async () => {
@@ -352,9 +354,27 @@ describe('Server integration', () => {
     const app = createApp('')
     const res = await app.fetch(new Request('http://localhost/api/sync'))
     expect(res.status).toBe(200)
-    const body = await res.json() as { repoPath: string; fileStatus: string }
+    const body = await res.json() as { repoPath: string; fileStatus: string; repoSync: { mode: string } }
     expect(body.repoPath).toBe('')
     expect(body.fileStatus).toBe('unavailable')
+    expect(body.repoSync.mode).toBe('unavailable')
+  })
+
+  it('POST /api/git/commit creates a local commit', async () => {
+    writeFileSync(join(dir, 'README.md'), '# Integration commit')
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'integration commit' }),
+    }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean; status: string; shortHash?: string }
+    expect(body.ok).toBe(true)
+    expect(body.status).toBe('committed')
+    expect(body.shortHash).toBeTruthy()
+    expect(spawnSync('git', ['log', '-1', '--pretty=%s'], { cwd: dir, encoding: 'utf-8' }).stdout.trim()).toBe('integration commit')
   })
 
   it('supports create, update, and delete through /api/file mutation routes', async () => {

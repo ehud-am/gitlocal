@@ -1,4 +1,5 @@
 import type { TreeNode } from '../../types'
+import { describeFileSyncState } from '../../lib/sync'
 
 interface Props {
   node: TreeNode
@@ -31,6 +32,8 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 )
 
 export default function FileTreeNode({ node, isExpanded, isSelected, depth, onClick }: Props) {
+  const syncState = describeFileSyncState(node.syncState)
+
   return (
     <div
       className={`file-tree-node${isSelected ? ' selected' : ''}`}
@@ -47,6 +50,7 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, onCl
       <div className="file-tree-node-label">
         <span className="file-tree-node-name" title={node.name}>{node.name}</span>
         {node.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+        {syncState ? <span className={syncState.className}>{syncState.label}</span> : null}
       </div>
     </div>
   )

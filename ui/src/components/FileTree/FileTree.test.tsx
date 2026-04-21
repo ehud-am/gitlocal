@@ -97,6 +97,18 @@ describe('FileTree', () => {
     expect(screen.queryAllByText(/local only/i)).toHaveLength(1)
   })
 
+  it('shows sync badges for changed files', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
+      { name: 'guide.md', path: 'guide.md', type: 'file', localOnly: false, syncState: 'remote-committed' },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    expect(await screen.findByText(/changed locally/i)).toBeInTheDocument()
+    expect(screen.getByText(/remote update/i)).toBeInTheDocument()
+  })
+
   it('has no obvious accessibility violations for the loaded tree', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: 'src', path: 'src', type: 'dir', localOnly: false },

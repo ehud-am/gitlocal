@@ -4,14 +4,18 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import {
+  applyFileSyncStates,
   cloneRepositoryInto,
+  commitWorkingTreeChanges,
   convertGitRemoteToWebUrl,
   createChildFolder,
   spawnGit,
   validateRepo,
   getInfo,
+  getPathSyncState,
   getGitRemoteContext,
   getGitUserIdentity,
+  getRepoSyncState,
   setRepoGitIdentity,
   hasCommits,
   getBrowseableRootEntryCount,
@@ -29,7 +33,9 @@ import {
   nearestExistingTrackedRepoPath,
   readWorkingTreeFile,
   getWorkingTreeChanges,
+  getWorkingTreeSyncSummary,
   normalizeRepoRelativePath,
+  syncCurrentBranchWithRemote,
   isPathInsideRepo,
   resolveSafeRepoPath,
   isIgnoredPath,
@@ -524,6 +530,117 @@ describe('working tree helpers', () => {
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
     } finally {
       cleanup()
+    }
+  })
+
+  it('classifies file sync states from working tree and upstream differences', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const remote = makeBareRepo('gitlocal-sync-remote-')
+    const cloneParent = mkdtempSync(join(tmpdir(), 'gitlocal-sync-clone-'))
+    const cloneDir = join(cloneParent, 'clone')
+
+    try {
+      const currentBranch = getCurrentBranch(dir)
+      git(dir, 'remote', 'add', 'origin', remote.dir)
+      git(dir, 'push', '-u', 'origin', currentBranch)
+
+      writeFileSync(join(dir, 'notes.txt'), 'local committed')
+      git(dir, 'add', 'notes.txt')
+      git(dir, 'commit', '-m', 'local ahead change')
+
+      spawnSync('git', ['clone', remote.dir, cloneDir], { encoding: 'utf-8' })
+      spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: cloneDir })
+      spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: cloneDir })
+      writeFileSync(join(cloneDir, 'docs', 'guide.md'), 'remote committed')
+      spawnSync('git', ['add', 'docs/guide.md'], { cwd: cloneDir })
+      spawnSync('git', ['commit', '-m', 'remote behind change'], { cwd: cloneDir })
+      spawnSync('git', ['push'], { cwd: cloneDir })
+      git(dir, 'fetch', 'origin')
+
+      writeFileSync(join(dir, 'README.md'), '# local dirty')
+
+      expect(getRepoSyncState(dir)).toEqual(expect.objectContaining({
+        mode: 'diverged',
+        aheadCount: 1,
+        behindCount: 1,
+        hasUpstream: true,
+      }))
+      expect(getWorkingTreeSyncSummary(dir)).toEqual(expect.objectContaining({
+        trackedChangeCount: 1,
+        untrackedChangeCount: 0,
+      }))
+      expect(getPathSyncState(dir, 'README.md')).toBe('local-uncommitted')
+      expect(getPathSyncState(dir, 'notes.txt')).toBe('local-committed')
+      expect(getPathSyncState(dir, 'docs/guide.md')).toBe('remote-committed')
+
+      expect(applyFileSyncStates(dir, [
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+        { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false },
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+      ])).toEqual([
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
+        { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false, syncState: 'local-committed' },
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false, syncState: 'remote-committed' },
+      ])
+    } finally {
+      rmSync(cloneParent, { recursive: true, force: true })
+      cleanup()
+      remote.cleanup()
+    }
+  })
+
+  it('creates a local commit from working-tree changes', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# updated')
+      const result = commitWorkingTreeChanges(dir, 'Save work')
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'committed',
+        shortHash: expect.any(String),
+      }))
+      expect(git(dir, 'log', '-1', '--pretty=%s')).toBe('Save work')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('pushes ahead-only branches and fast-forward pulls behind-only branches', () => {
+    const remote = makeBareRepo('gitlocal-sync-roundtrip-')
+    const first = makeGitRepo()
+    const secondParent = mkdtempSync(join(tmpdir(), 'gitlocal-sync-second-'))
+    const second = join(secondParent, 'clone')
+
+    try {
+      const branch = getCurrentBranch(first.dir)
+      git(first.dir, 'remote', 'add', 'origin', remote.dir)
+      git(first.dir, 'push', '-u', 'origin', branch)
+
+      writeFileSync(join(first.dir, 'notes.txt'), 'push me')
+      git(first.dir, 'add', 'notes.txt')
+      git(first.dir, 'commit', '-m', 'ahead commit')
+      expect(syncCurrentBranchWithRemote(first.dir)).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'pushed',
+      }))
+
+      spawnSync('git', ['clone', remote.dir, second], { encoding: 'utf-8' })
+      spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: second })
+      spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: second })
+      writeFileSync(join(second, 'README.md'), '# pulled')
+      spawnSync('git', ['add', 'README.md'], { cwd: second })
+      spawnSync('git', ['commit', '-m', 'behind commit'], { cwd: second })
+      spawnSync('git', ['push'], { cwd: second })
+
+      expect(syncCurrentBranchWithRemote(first.dir)).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'pulled',
+      }))
+      expect(readWorkingTreeFile(first.dir, 'README.md')?.toString('utf-8')).toBe('# pulled')
+    } finally {
+      rmSync(secondParent, { recursive: true, force: true })
+      first.cleanup()
+      remote.cleanup()
     }
   })
 

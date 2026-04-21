@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
+import type { FileSyncState, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
 import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { describeFileSyncState } from '../../lib/sync'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
@@ -24,6 +25,7 @@ interface Props {
   selectedPath: string
   selectedPathType: ViewerPathType
   selectedPathLocalOnly?: boolean
+  selectedPathSyncState?: FileSyncState | 'none'
   branch: string
   isGitRepo?: boolean
   onNavigate: (path: string) => void
@@ -45,6 +47,7 @@ interface DirectoryRow {
   path: string
   type: 'file' | 'dir'
   localOnly: boolean
+  syncState?: FileSyncState
   isParent: boolean
   exitsRepo: boolean
   displayPath: string
@@ -108,6 +111,7 @@ export default function ContentPanel({
   selectedPath,
   selectedPathType,
   selectedPathLocalOnly = false,
+  selectedPathSyncState = 'none',
   branch,
   isGitRepo = false,
   onNavigate,
@@ -407,6 +411,12 @@ export default function ContentPanel({
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
                               {!entry.isParent && entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+                              {!entry.isParent && entry.syncState ? (
+                                (() => {
+                                  const syncState = describeFileSyncState(entry.syncState)
+                                  return syncState ? <span className={syncState.className}>{syncState.label}</span> : null
+                                })()
+                              ) : null}
                             </div>
                           </td>
                           <td className="content-directory-cell">
@@ -538,6 +548,12 @@ export default function ContentPanel({
           <div className="content-active-heading-row">
             <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
             {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+            {selectedPathSyncState !== 'none'
+              ? (() => {
+                  const syncState = describeFileSyncState(selectedPathSyncState)
+                  return syncState ? <span className={syncState.className}>{syncState.label}</span> : null
+                })()
+              : null}
           </div>
         </div>
         {mode === 'view' ? (

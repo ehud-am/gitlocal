@@ -14,6 +14,7 @@ vi.mock('./services/api', () => ({
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
+    commitChanges: vi.fn(),
     getFile: vi.fn(),
     createFile: vi.fn(),
     updateFile: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('./services/api', () => ({
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
     switchBranch: vi.fn(),
+    syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
     createPickFolder: vi.fn(),
     initPickGit: vi.fn(),
@@ -84,6 +86,34 @@ function buildBranches(currentBranch: string) {
   return branches
 }
 
+function buildSyncStatus(overrides: Partial<Awaited<ReturnType<typeof api.getSyncStatus>>> = {}) {
+  return {
+    branch: 'main',
+    repoPath: '/tmp/repo',
+    workingTreeRevision: 'abc',
+    treeStatus: 'unchanged' as const,
+    fileStatus: 'unchanged' as const,
+    currentPath: '',
+    resolvedPath: '',
+    currentPathType: 'none' as const,
+    resolvedPathType: 'none' as const,
+    pathSyncState: 'none' as const,
+    trackedChangeCount: 0,
+    untrackedChangeCount: 0,
+    repoSync: {
+      mode: 'up-to-date' as const,
+      aheadCount: 0,
+      behindCount: 0,
+      hasUpstream: true,
+      upstreamRef: 'origin/main',
+      remoteName: 'origin',
+    },
+    statusMessage: '',
+    checkedAt: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 function renderWithClient() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchInterval: false } },
@@ -124,19 +154,7 @@ describe('App', () => {
     vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
       path: path === 'docs' ? 'docs/README.md' : 'README.md',
     }))
-    vi.mocked(api.getSyncStatus).mockResolvedValue({
-      branch: 'main',
-      repoPath: '/tmp/repo',
-      workingTreeRevision: 'abc',
-      treeStatus: 'unchanged',
-      fileStatus: 'unchanged',
-      currentPath: '',
-      resolvedPath: '',
-      currentPathType: 'none',
-      resolvedPathType: 'none',
-      statusMessage: '',
-      checkedAt: new Date().toISOString(),
-    })
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
     vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
       if (path === 'docs') {
         return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
@@ -183,6 +201,20 @@ describe('App', () => {
       ok: false,
       status: 'blocked',
       message: 'Branch switching is not configured for this test.',
+    })
+    vi.mocked(api.commitChanges).mockResolvedValue({
+      ok: true,
+      status: 'committed',
+      message: 'Committed changes as abc1234.',
+      commitHash: 'abc1234567890',
+      shortHash: 'abc1234',
+    })
+    vi.mocked(api.syncWithRemote).mockResolvedValue({
+      ok: true,
+      status: 'up-to-date',
+      message: 'This branch is already up to date with its upstream.',
+      aheadCount: 0,
+      behindCount: 0,
     })
     vi.mocked(api.showParentPicker).mockResolvedValue({ ok: true, error: '' })
     vi.mocked(api.getPickBrowse).mockResolvedValue({
@@ -315,6 +347,57 @@ describe('App', () => {
     expect(await screen.findByText(/updated user <updated@example.com>/i)).toBeInTheDocument()
   })
 
+  it('commits local changes from the repo header action', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      trackedChangeCount: 1,
+      pathSyncState: 'clean',
+    }))
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /commit changes/i }))
+    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), {
+      target: { value: 'Save current work' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^commit changes$/i }))
+
+    await waitFor(() => {
+      expect(api.commitChanges).toHaveBeenCalledWith({ message: 'Save current work' })
+    })
+    expect(await screen.findByText(/committed changes as abc1234/i)).toBeInTheDocument()
+  })
+
+  it('syncs with the remote from the repo header action', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      repoSync: {
+        mode: 'ahead',
+        aheadCount: 1,
+        behindCount: 0,
+        hasUpstream: true,
+        upstreamRef: 'origin/main',
+        remoteName: 'origin',
+      },
+    }))
+    vi.mocked(api.syncWithRemote).mockResolvedValue({
+      ok: true,
+      status: 'pushed',
+      message: 'Pushed main to origin/main.',
+      aheadCount: 0,
+      behindCount: 0,
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /push to remote/i }))
+
+    await waitFor(() => {
+      expect(api.syncWithRemote).toHaveBeenCalledTimes(1)
+    })
+    expect(await screen.findByText(/pushed main to origin\/main/i)).toBeInTheDocument()
+  })
+
   it('opens search from the compact trigger and with the keyboard shortcut', async () => {
     renderWithClient()
 
@@ -367,33 +450,44 @@ describe('App', () => {
     vi.mocked(api.getSyncStatus).mockImplementation(async (path, branch) => {
       if (path === 'docs/guide.md' && branch === 'release') {
         return {
-          branch: 'release',
-          repoPath: '/tmp/repo',
-          workingTreeRevision: 'release-rev',
-          treeStatus: 'invalid',
-          fileStatus: 'deleted',
-          currentPath: 'docs/guide.md',
-          resolvedPath: 'docs',
-          currentPathType: 'missing',
-          resolvedPathType: 'dir',
-          statusMessage: '',
-          checkedAt: new Date().toISOString(),
+          ...buildSyncStatus({
+            branch: 'release',
+            workingTreeRevision: 'release-rev',
+            treeStatus: 'invalid',
+            fileStatus: 'deleted',
+            currentPath: 'docs/guide.md',
+            resolvedPath: 'docs',
+            currentPathType: 'missing',
+            resolvedPathType: 'dir',
+            repoSync: {
+              mode: 'up-to-date',
+              aheadCount: 0,
+              behindCount: 0,
+              hasUpstream: true,
+              upstreamRef: 'origin/release',
+              remoteName: 'origin',
+            },
+          }),
         }
       }
 
-      return {
+      return buildSyncStatus({
         branch: branch ?? currentBranch,
-        repoPath: '/tmp/repo',
         workingTreeRevision: `${branch ?? currentBranch}-rev`,
-        treeStatus: 'unchanged',
-        fileStatus: 'unchanged',
         currentPath: path ?? '',
         resolvedPath: path ?? '',
         currentPathType: path ? 'file' : 'none',
         resolvedPathType: path ? 'file' : 'none',
-        statusMessage: '',
-        checkedAt: new Date().toISOString(),
-      }
+        pathSyncState: path ? 'clean' : 'none',
+        repoSync: {
+          mode: 'up-to-date',
+          aheadCount: 0,
+          behindCount: 0,
+          hasUpstream: true,
+          upstreamRef: `origin/${branch ?? currentBranch}`,
+          remoteName: 'origin',
+        },
+      })
     })
 
     renderWithClient()

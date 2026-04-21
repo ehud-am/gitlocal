@@ -92,6 +92,54 @@ export interface BranchSwitchResponse {
   suggestedCommitMessage?: string
 }
 
+export type FileSyncState =
+  | 'clean'
+  | 'local-uncommitted'
+  | 'local-committed'
+  | 'remote-committed'
+  | 'diverged'
+
+export type RepoSyncMode =
+  | 'local-only'
+  | 'up-to-date'
+  | 'ahead'
+  | 'behind'
+  | 'diverged'
+  | 'unavailable'
+
+export interface RepoSyncState {
+  mode: RepoSyncMode
+  aheadCount: number
+  behindCount: number
+  hasUpstream: boolean
+  upstreamRef: string
+  remoteName: string
+}
+
+export interface CommitChangesRequest {
+  message: string
+}
+
+export type CommitChangesStatus = 'committed' | 'blocked' | 'failed'
+
+export interface CommitChangesResponse {
+  ok: boolean
+  status: CommitChangesStatus
+  message: string
+  commitHash?: string
+  shortHash?: string
+}
+
+export type RemoteSyncStatus = 'pushed' | 'pulled' | 'up-to-date' | 'blocked' | 'failed'
+
+export interface RemoteSyncResponse {
+  ok: boolean
+  status: RemoteSyncStatus
+  message: string
+  aheadCount?: number
+  behindCount?: number
+}
+
 export interface Commit {
   hash: string
   shortHash: string
@@ -105,6 +153,7 @@ export interface TreeNode {
   path: string
   type: 'file' | 'dir'
   localOnly: boolean
+  syncState?: FileSyncState
 }
 
 export type FileEncoding = 'utf-8' | 'base64' | 'none'
@@ -224,6 +273,10 @@ export interface SyncStatus {
   resolvedPath: string
   currentPathType: 'file' | 'dir' | 'missing' | 'none'
   resolvedPathType: 'file' | 'dir' | 'missing' | 'none'
+  pathSyncState: FileSyncState | 'none'
+  trackedChangeCount: number
+  untrackedChangeCount: number
+  repoSync: RepoSyncState
   statusMessage: string
   checkedAt: string
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import type { Branch, RepoInfo, ViewerPathType } from '../../types'
+import type { Branch, RepoInfo, RepoSyncState, ViewerPathType } from '../../types'
+import { describeRepoSyncState } from '../../lib/sync'
 import { Button } from '../ui/button'
 
 interface Props {
@@ -8,9 +9,17 @@ interface Props {
   branches?: Branch[]
   selectedPath: string
   selectedPathType: ViewerPathType
+  repoSync?: RepoSyncState
+  trackedChangeCount?: number
+  untrackedChangeCount?: number
   onBranchChange: (branch: string) => void
   onEditGitIdentity?: () => void
+  onCommitChanges?: () => void
+  onSyncWithRemote?: () => void
   branchDisabled?: boolean
+  commitDisabled?: boolean
+  syncDisabled?: boolean
+  syncActionLabel?: string
   branchSwitchDialog?: ReactNode
 }
 
@@ -42,9 +51,17 @@ export default function RepoContextHeader({
   branches,
   selectedPath,
   selectedPathType,
+  repoSync,
+  trackedChangeCount = 0,
+  untrackedChangeCount = 0,
   onBranchChange,
   onEditGitIdentity,
+  onCommitChanges,
+  onSyncWithRemote,
   branchDisabled = false,
+  commitDisabled = false,
+  syncDisabled = false,
+  syncActionLabel = 'Sync with remote',
   branchSwitchDialog,
 }: Props) {
   const title = buildTitle(info, selectedPath, selectedPathType)
@@ -53,6 +70,8 @@ export default function RepoContextHeader({
   const remote = info?.gitContext?.remote
   const remoteWebUrl = remote?.webUrl ?? ''
   const remotePath = remote?.webUrl || remote?.fetchUrl || ''
+  const repoSyncBadge = describeRepoSyncState(repoSync)
+  const changeSummary = trackedChangeCount + untrackedChangeCount
 
   return (
     <section className="repo-context-header rounded-md border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
@@ -153,6 +172,49 @@ export default function RepoContextHeader({
                   ? `${gitUser.name} <${gitUser.email}>`
                   : 'Git user is not configured'}
             </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_auto]">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                Repository sync
+              </p>
+              {repoSyncBadge ? <span className={repoSyncBadge.className}>{repoSyncBadge.label}</span> : null}
+              {changeSummary > 0 ? (
+                <span className="sync-badge sync-badge-local">
+                  {changeSummary} local {changeSummary === 1 ? 'change' : 'changes'}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm text-[var(--foreground)]">
+              {repoSync?.hasUpstream
+                ? `Tracking ${repoSync.upstreamRef || 'the upstream branch'}${repoSync.remoteName ? ` via ${repoSync.remoteName}` : ''}.`
+                : 'This branch does not currently track an upstream remote.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-start gap-2">
+            {onCommitChanges ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onCommitChanges}
+                disabled={commitDisabled}
+              >
+                Commit changes
+              </Button>
+            ) : null}
+            {onSyncWithRemote ? (
+              <Button
+                type="button"
+                onClick={onSyncWithRemote}
+                disabled={syncDisabled}
+              >
+                {syncActionLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

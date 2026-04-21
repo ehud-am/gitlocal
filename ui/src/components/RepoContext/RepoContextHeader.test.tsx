@@ -39,8 +39,20 @@ describe('RepoContextHeader', () => {
         ]}
         selectedPath="src/App.tsx"
         selectedPathType="file"
+        repoSync={{
+          mode: 'ahead',
+          aheadCount: 2,
+          behindCount: 0,
+          hasUpstream: true,
+          upstreamRef: 'origin/main',
+          remoteName: 'origin',
+        }}
+        trackedChangeCount={1}
+        untrackedChangeCount={0}
         onBranchChange={onBranchChange}
         onEditGitIdentity={onEditGitIdentity}
+        onCommitChanges={vi.fn()}
+        onSyncWithRemote={vi.fn()}
         branchDisabled={false}
         branchSwitchDialog={<div>Branch switch dialog</div>}
       />,
@@ -51,6 +63,10 @@ describe('RepoContextHeader', () => {
     expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
     expect(screen.getByText(/linked to remote git/i)).toBeInTheDocument()
     expect(screen.getByText(/test user <test@example.com>/i)).toBeInTheDocument()
+    expect(screen.getByText(/2 ahead/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 local change/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /commit changes/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sync with remote|push to remote/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
     expect(screen.getByText('Branch switch dialog')).toBeInTheDocument()
 

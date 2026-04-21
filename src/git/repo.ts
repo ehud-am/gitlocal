@@ -6,10 +6,14 @@ import type {
   Branch,
   BranchSwitchRequest,
   BranchSwitchResponse,
+  CommitChangesResponse,
   Commit,
+  FileSyncState,
   GitContext,
   GitIdentityUpdateResponse,
   GitUserIdentity,
+  RemoteSyncResponse,
+  RepoSyncState,
   RepoInfo,
   RepoRemoteContext,
   TreeNode,
@@ -18,6 +22,13 @@ import type {
 interface WorkingTreeChangeSummary {
   trackedPaths: string[]
   untrackedPaths: string[]
+}
+
+interface FileSyncAnalysis {
+  changes: WorkingTreeChangeSummary
+  repoSync: RepoSyncState
+  localCommittedPaths: Set<string>
+  remoteCommittedPaths: Set<string>
 }
 
 let cachedAppVersion = ''
@@ -88,6 +99,10 @@ function getConfiguredRemotes(repoPath: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
+}
+
+function uniqueNormalizedPaths(paths: string[]): string[] {
+  return [...new Set(paths.map((path) => normalizeRepoRelativePath(path)).filter(Boolean))]
 }
 
 function stripGitSuffix(value: string): string {
@@ -185,10 +200,9 @@ export function getGitRemoteContext(repoPath: string): RepoRemoteContext | null 
   if (remotes.length === 0) return null
 
   const currentBranch = getCurrentBranch(repoPath)
-  const upstreamRemote =
-    currentBranch && currentBranch !== 'HEAD'
-      ? readGitConfig(repoPath, '--local', `branch.${currentBranch}.remote`)
-      : ''
+  const upstreamRemote = currentBranch && currentBranch !== 'HEAD'
+    ? readGitConfig(repoPath, '--local', `branch.${currentBranch}.remote`)
+    : ''
 
   const selectedRemote =
     (upstreamRemote && remotes.includes(upstreamRemote) ? upstreamRemote : '')
@@ -511,6 +525,10 @@ export function getWorkingTreeRevision(repoPath: string): string {
     hash.update(String(stats.mtimeMs))
   }
 
+  const changes = getWorkingTreeChanges(repoPath)
+  hash.update(changes.trackedPaths.join('\0'))
+  hash.update(changes.untrackedPaths.join('\0'))
+
   return hash.digest('hex')
 }
 
@@ -537,7 +555,149 @@ export function getWorkingTreeChanges(repoPath: string): WorkingTreeChangeSummar
     trackedPaths.push(extractPorcelainPath(line))
   }
 
-  return { trackedPaths, untrackedPaths }
+  return {
+    trackedPaths: uniqueNormalizedPaths(trackedPaths),
+    untrackedPaths: uniqueNormalizedPaths(untrackedPaths),
+  }
+}
+
+export function getCurrentUpstreamRef(repoPath: string): string {
+  const result = runGitCapture(repoPath, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}')
+  return result.status === 0 ? result.stdout.trim() : ''
+}
+
+export function getRepoSyncState(repoPath: string): RepoSyncState {
+  if (!validateRepo(repoPath)) {
+    return {
+      mode: 'unavailable',
+      aheadCount: 0,
+      behindCount: 0,
+      hasUpstream: false,
+      upstreamRef: '',
+      remoteName: '',
+    }
+  }
+
+  const upstreamRef = getCurrentUpstreamRef(repoPath)
+  if (!upstreamRef) {
+    return {
+      mode: 'local-only',
+      aheadCount: 0,
+      behindCount: 0,
+      hasUpstream: false,
+      upstreamRef: '',
+      remoteName: '',
+    }
+  }
+
+  const remoteName = upstreamRef.includes('/') ? upstreamRef.split('/')[0] : ''
+  const counts = runGitCapture(repoPath, 'rev-list', '--left-right', '--count', `HEAD...${upstreamRef}`)
+  if (counts.status !== 0) {
+    return {
+      mode: 'unavailable',
+      aheadCount: 0,
+      behindCount: 0,
+      hasUpstream: true,
+      upstreamRef,
+      remoteName,
+    }
+  }
+
+  const [aheadRaw = '0', behindRaw = '0'] = counts.stdout.trim().split(/\s+/)
+  const aheadCount = Number.parseInt(aheadRaw, 10) || 0
+  const behindCount = Number.parseInt(behindRaw, 10) || 0
+  const mode: RepoSyncState['mode'] =
+    aheadCount > 0 && behindCount > 0
+      ? 'diverged'
+      : aheadCount > 0
+        ? 'ahead'
+        : behindCount > 0
+          ? 'behind'
+          : 'up-to-date'
+
+  return {
+    mode,
+    aheadCount,
+    behindCount,
+    hasUpstream: true,
+    upstreamRef,
+    remoteName,
+  }
+}
+
+function listChangedPathsBetween(repoPath: string, fromRef: string, toRef: string): string[] {
+  const result = runGitCapture(repoPath, 'log', '--format=', '--name-only', `${fromRef}..${toRef}`)
+  if (result.status !== 0 || !result.stdout) return []
+  return uniqueNormalizedPaths(result.stdout.split('\n'))
+}
+
+function buildFileSyncAnalysis(repoPath: string): FileSyncAnalysis {
+  const changes = getWorkingTreeChanges(repoPath)
+  const repoSync = getRepoSyncState(repoPath)
+  const localCommittedPaths = repoSync.hasUpstream
+    ? new Set(listChangedPathsBetween(repoPath, repoSync.upstreamRef, 'HEAD'))
+    : new Set<string>()
+  const remoteCommittedPaths = repoSync.hasUpstream
+    ? new Set(listChangedPathsBetween(repoPath, 'HEAD', repoSync.upstreamRef))
+    : new Set<string>()
+
+  return {
+    changes,
+    repoSync,
+    localCommittedPaths,
+    remoteCommittedPaths,
+  }
+}
+
+function classifyFileSyncState(path: string, analysis: FileSyncAnalysis): FileSyncState {
+  const normalizedPath = normalizeRepoRelativePath(path)
+  if (!normalizedPath) return 'clean'
+
+  if (
+    analysis.changes.trackedPaths.includes(normalizedPath)
+    || analysis.changes.untrackedPaths.includes(normalizedPath)
+  ) {
+    return 'local-uncommitted'
+  }
+
+  const localCommitted = analysis.localCommittedPaths.has(normalizedPath)
+  const remoteCommitted = analysis.remoteCommittedPaths.has(normalizedPath)
+
+  if (localCommitted && remoteCommitted) return 'diverged'
+  if (localCommitted) return 'local-committed'
+  if (remoteCommitted) return 'remote-committed'
+  return 'clean'
+}
+
+export function applyFileSyncStates(repoPath: string, nodes: TreeNode[]): TreeNode[] {
+  const analysis = buildFileSyncAnalysis(repoPath)
+  return nodes.map((node) =>
+    node.type === 'file'
+      ? {
+          ...node,
+          syncState: classifyFileSyncState(node.path, analysis),
+        }
+      : node,
+  )
+}
+
+export function getPathSyncState(repoPath: string, path: string): FileSyncState | 'none' {
+  const normalizedPath = normalizeRepoRelativePath(path)
+  if (!normalizedPath || getPathType(repoPath, normalizedPath) !== 'file') return 'none'
+  return classifyFileSyncState(normalizedPath, buildFileSyncAnalysis(repoPath))
+}
+
+export function getWorkingTreeSyncSummary(repoPath: string): {
+  trackedChangeCount: number
+  untrackedChangeCount: number
+  repoSync: RepoSyncState
+} {
+  const analysis = buildFileSyncAnalysis(repoPath)
+  return {
+    trackedChangeCount: analysis.changes.trackedPaths.length,
+    untrackedChangeCount: analysis.changes.untrackedPaths.length,
+    repoSync: analysis.repoSync,
+  }
 }
 
 function resolveBranchSelection(repoPath: string, target: string): {
@@ -751,6 +911,162 @@ export function switchBranch(repoPath: string, request: BranchSwitchRequest): Br
       message: error instanceof Error ? error.message : 'Branch switch failed.',
       currentBranch,
       ...summary,
+    }
+  }
+}
+
+export function commitWorkingTreeChanges(repoPath: string, message: string): CommitChangesResponse {
+  if (!validateRepo(repoPath)) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'No git repository is currently open.',
+    }
+  }
+
+  const commitMessage = message.trim()
+  if (!commitMessage) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'Enter a commit message before committing changes.',
+    }
+  }
+
+  const changes = getWorkingTreeChanges(repoPath)
+  if (changes.trackedPaths.length === 0 && changes.untrackedPaths.length === 0) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'There are no local changes to commit.',
+    }
+  }
+
+  try {
+    spawnGit(repoPath, 'add', '-A')
+    spawnGit(repoPath, 'commit', '-m', commitMessage)
+    const commitHash = spawnGit(repoPath, 'rev-parse', 'HEAD')
+    return {
+      ok: true,
+      status: 'committed',
+      message: `Committed changes as ${commitHash.slice(0, 7)}.`,
+      commitHash,
+      shortHash: commitHash.slice(0, 7),
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'failed',
+      message: error instanceof Error ? error.message : 'Commit failed.',
+    }
+  }
+}
+
+export function syncCurrentBranchWithRemote(repoPath: string): RemoteSyncResponse {
+  if (!validateRepo(repoPath)) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'No git repository is currently open.',
+    }
+  }
+
+  const currentBranch = getCurrentBranch(repoPath)
+  if (!currentBranch || currentBranch === 'HEAD') {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'Sync is only available on a named current branch.',
+    }
+  }
+
+  const changes = getWorkingTreeChanges(repoPath)
+  if (changes.trackedPaths.length > 0 || changes.untrackedPaths.length > 0) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'Commit or discard local changes before syncing with remote.',
+    }
+  }
+
+  const initialSync = getRepoSyncState(repoPath)
+  if (!initialSync.hasUpstream) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'This branch does not have an upstream remote to sync with.',
+    }
+  }
+
+  const fetchResult = runGitCapture(repoPath, 'fetch', initialSync.remoteName || '--all', '--prune')
+  if (fetchResult.status !== 0) {
+    return {
+      ok: false,
+      status: 'failed',
+      message: fetchResult.stderr.trim() || 'Remote sync failed while fetching.',
+    }
+  }
+
+  const repoSync = getRepoSyncState(repoPath)
+  if (repoSync.mode === 'diverged') {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'Local and remote history diverged. Resolve it manually before syncing in GitLocal.',
+      aheadCount: repoSync.aheadCount,
+      behindCount: repoSync.behindCount,
+    }
+  }
+
+  if (repoSync.mode === 'up-to-date') {
+    return {
+      ok: true,
+      status: 'up-to-date',
+      message: 'This branch is already up to date with its upstream.',
+      aheadCount: 0,
+      behindCount: 0,
+    }
+  }
+
+  try {
+    if (repoSync.mode === 'ahead') {
+      spawnGit(repoPath, 'push')
+      const refreshed = getRepoSyncState(repoPath)
+      return {
+        ok: true,
+        status: 'pushed',
+        message: `Pushed ${currentBranch} to ${repoSync.upstreamRef}.`,
+        aheadCount: refreshed.aheadCount,
+        behindCount: refreshed.behindCount,
+      }
+    }
+
+    if (repoSync.mode === 'behind') {
+      spawnGit(repoPath, 'pull', '--ff-only')
+      const refreshed = getRepoSyncState(repoPath)
+      return {
+        ok: true,
+        status: 'pulled',
+        message: `Fast-forwarded ${currentBranch} from ${repoSync.upstreamRef}.`,
+        aheadCount: refreshed.aheadCount,
+        behindCount: refreshed.behindCount,
+      }
+    }
+
+    return {
+      ok: false,
+      status: 'blocked',
+      message: 'This branch is not in a syncable state.',
+      aheadCount: repoSync.aheadCount,
+      behindCount: repoSync.behindCount,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'failed',
+      message: error instanceof Error ? error.message : 'Remote sync failed.',
+      aheadCount: repoSync.aheadCount,
+      behindCount: repoSync.behindCount,
     }
   }
 }

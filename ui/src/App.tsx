@@ -26,12 +26,15 @@ import { readViewerState, writeViewerState } from './services/viewerState'
 import type {
   Branch,
   BranchSwitchResponse,
+  FileSyncState,
   GitUserIdentity,
   RepoInfo,
+  RepoSyncState,
   SearchPresentation,
   SearchResult,
   ViewerPathType,
 } from './types'
+import { getRepoSyncActionLabel } from './lib/sync'
 
 type LandingAction = { label: string; action: 'create-file' }
 type BranchScope = 'local' | 'remote'
@@ -157,6 +160,11 @@ export default function App() {
   const [gitIdentityEmail, setGitIdentityEmail] = useState('')
   const [gitIdentityPending, setGitIdentityPending] = useState(false)
   const [gitIdentityError, setGitIdentityError] = useState('')
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false)
+  const [commitMessage, setCommitMessage] = useState('')
+  const [commitPending, setCommitPending] = useState(false)
+  const [commitError, setCommitError] = useState('')
+  const [syncPending, setSyncPending] = useState(false)
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
@@ -396,6 +404,18 @@ export default function App() {
     setGitIdentityError('')
   }
 
+  function openCommitDialog(): void {
+    setCommitMessage(`WIP: ${info?.name ?? 'local changes'}`)
+    setCommitError('')
+    setCommitDialogOpen(true)
+  }
+
+  function closeCommitDialog(): void {
+    if (commitPending) return
+    setCommitDialogOpen(false)
+    setCommitError('')
+  }
+
   async function saveGitIdentity(): Promise<void> {
     const name = gitIdentityName.trim()
     const email = gitIdentityEmail.trim()
@@ -441,6 +461,19 @@ export default function App() {
     && !hasRepoMismatch
     && (!info.currentBranch || currentBranch === info.currentBranch),
   )
+  const repoSync: RepoSyncState | undefined = syncStatus?.repoSync
+  const selectedPathSyncState: FileSyncState | 'none' = syncStatus?.pathSyncState ?? 'none'
+  const trackedChangeCount = syncStatus?.trackedChangeCount ?? 0
+  const untrackedChangeCount = syncStatus?.untrackedChangeCount ?? 0
+  const hasLocalChanges = trackedChangeCount + untrackedChangeCount > 0
+  const canCommitChanges = canMutateFiles && hasLocalChanges && !hasUnsavedChanges && !branchSwitchPending && !syncPending
+  const canSyncWithRemote = canMutateFiles
+    && !hasUnsavedChanges
+    && !branchSwitchPending
+    && !commitPending
+    && !syncPending
+    && repoSync?.mode !== 'unavailable'
+    && repoSync?.mode !== 'local-only'
 
   async function handleMutationComplete(event: {
     nextPath: string
@@ -456,6 +489,55 @@ export default function App() {
     setTreeRefreshToken((value) => value + 1)
     await queryClient.invalidateQueries({ queryKey: ['tree'] })
     await queryClient.invalidateQueries({ queryKey: ['sync'] })
+  }
+
+  async function refreshRepoAfterGitAction(message: string): Promise<void> {
+    setStatusMessage(message)
+    setTreeRefreshToken((value) => value + 1)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['info'] }),
+      queryClient.invalidateQueries({ queryKey: ['branches'] }),
+      queryClient.invalidateQueries({ queryKey: ['tree'] }),
+      queryClient.invalidateQueries({ queryKey: ['file'] }),
+      queryClient.invalidateQueries({ queryKey: ['commits'] }),
+      queryClient.invalidateQueries({ queryKey: ['readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['sync'] }),
+    ])
+  }
+
+  async function submitCommitChanges(): Promise<void> {
+    const nextMessage = commitMessage.trim()
+    if (!nextMessage) {
+      setCommitError('Enter a commit message before committing changes.')
+      return
+    }
+
+    setCommitPending(true)
+    setCommitError('')
+    try {
+      const result = await api.commitChanges({ message: nextMessage })
+      setCommitDialogOpen(false)
+      setHasUnsavedChanges(false)
+      await refreshRepoAfterGitAction(result.message)
+    } catch (error) {
+      setCommitError(getErrorMessage(error, 'Could not create the local commit.'))
+    } finally {
+      setCommitPending(false)
+    }
+  }
+
+  async function handleSyncWithRemote(): Promise<void> {
+    setSyncPending(true)
+    try {
+      const result = await api.syncWithRemote()
+      setHasUnsavedChanges(false)
+      await refreshRepoAfterGitAction(result.message)
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error, 'Remote sync failed.'))
+    } finally {
+      setSyncPending(false)
+    }
   }
 
   function resetBranchSwitchDialog(): void {
@@ -737,11 +819,19 @@ export default function App() {
                 branches={branches}
                 selectedPath={visibleSelectedPath}
                 selectedPathType={visibleSelectedPathType}
+                repoSync={repoSync}
+                trackedChangeCount={trackedChangeCount}
+                untrackedChangeCount={untrackedChangeCount}
                 onBranchChange={(nextBranch) => {
                   void handleBranchChange(nextBranch)
                 }}
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
+                onCommitChanges={isWorkingTreeBranchSelected ? openCommitDialog : undefined}
+                onSyncWithRemote={isWorkingTreeBranchSelected ? () => { void handleSyncWithRemote() } : undefined}
                 branchDisabled={branchSwitchPending}
+                commitDisabled={!canCommitChanges}
+                syncDisabled={!canSyncWithRemote}
+                syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 branchSwitchDialog={
                   <BranchSwitchDialog
                     open={Boolean(branchSwitchState)}
@@ -790,6 +880,7 @@ export default function App() {
                   selectedPath={visibleSelectedPath}
                   selectedPathType={visibleSelectedPathType}
                   selectedPathLocalOnly={visibleSelectedPathLocalOnly}
+                  selectedPathSyncState={selectedPathSyncState}
                   branch={currentBranch}
                   isGitRepo={info?.isGitRepo}
                   onNavigate={handleSelectFile}
@@ -890,6 +981,45 @@ export default function App() {
             </Button>
             <Button type="button" onClick={() => { void saveGitIdentity() }} disabled={gitIdentityPending}>
               {gitIdentityPending ? 'Saving...' : 'Save identity'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={commitDialogOpen} onOpenChange={(open) => { if (!commitPending) setCommitDialogOpen(open) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Commit local changes</DialogTitle>
+            <DialogDescription>
+              GitLocal will stage all current repository changes and create a local commit.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-[var(--foreground)]">Commit message</span>
+              <Input
+                value={commitMessage}
+                onChange={(event) => setCommitMessage(event.target.value)}
+                placeholder="Describe the current work"
+                aria-label="Commit message"
+                disabled={commitPending}
+              />
+            </label>
+
+            {commitError ? (
+              <p role="alert" className="text-sm text-[var(--danger)]">
+                {commitError}
+              </p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={closeCommitDialog} disabled={commitPending}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => { void submitCommitChanges() }} disabled={commitPending}>
+              {commitPending ? 'Committing...' : 'Commit changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
