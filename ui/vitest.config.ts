@@ -20,7 +20,6 @@ export default defineConfig({
         'src/components/FileTree/**/*.tsx',
         'src/components/Breadcrumb/**/*.tsx',
         'src/components/ContentPanel/ContentPanel.tsx',
-        'src/components/GitInfo/**/*.tsx',
         'src/components/Picker/**/*.tsx',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts'],

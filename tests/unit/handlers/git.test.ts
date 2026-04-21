@@ -491,6 +491,26 @@ describe('branchSwitchHandler', () => {
       repo.cleanup()
     }
   })
+
+  it('returns a 400 response for blocked branch switch results', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const client = testClient(app)
+      const res = await client.api.branches.switch.$post({
+        json: { target: '', resolution: 'preview' },
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+      }))
+    } finally {
+      repo.cleanup()
+    }
+  })
 })
 
 describe('tree responses', () => {
@@ -540,6 +560,43 @@ describe('treeHandler', () => {
 })
 
 describe('commitChangesHandler', () => {
+  it('returns blocked when no repository is open', async () => {
+    const app = createApp('')
+
+    const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'Save from handler' }),
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json() as { ok: boolean; status: string; message: string }
+    expect(body.ok).toBe(false)
+    expect(body.status).toBe('blocked')
+    expect(body.message).toBe('No repository is currently open.')
+  })
+
+  it('rejects invalid JSON bodies', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; status: string; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.status).toBe('blocked')
+      expect(body.message).toBe('Invalid JSON body.')
+    } finally {
+      repo.cleanup()
+    }
+  })
+
   it('creates a local commit for current repository changes', async () => {
     const repo = makeGitRepo()
 
@@ -563,9 +620,44 @@ describe('commitChangesHandler', () => {
       repo.cleanup()
     }
   })
+
+  it('returns a blocked response when there is nothing to commit', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'Nothing changed' }),
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; status: string; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.status).toBe('blocked')
+      expect(body.message).toMatch(/no local changes/i)
+    } finally {
+      repo.cleanup()
+    }
+  })
 })
 
 describe('remoteSyncHandler', () => {
+  it('returns blocked when no repository is open', async () => {
+    const app = createApp('')
+
+    const res = await app.fetch(new Request('http://localhost/api/git/sync', {
+      method: 'POST',
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json() as { ok: boolean; status: string; message: string }
+    expect(body.ok).toBe(false)
+    expect(body.status).toBe('blocked')
+    expect(body.message).toBe('No repository is currently open.')
+  })
+
   it('blocks sync when the working tree is dirty', async () => {
     const repo = makeGitRepo()
 
@@ -592,6 +684,31 @@ describe('remoteSyncHandler', () => {
 
       rmSync(remoteDir, { recursive: true, force: true })
     } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('accepts sync requests without a JSON body when the branch is up to date', async () => {
+    const repo = makeGitRepo()
+    const remoteDir = mkdtempSync(join(tmpdir(), 'gitlocal-handler-sync-clean-'))
+    spawnSync('git', ['init', '--bare'], { cwd: remoteDir })
+
+    try {
+      const currentBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()
+      spawnSync('git', ['remote', 'add', 'origin', remoteDir], { cwd: repo.dir })
+      spawnSync('git', ['push', '-u', 'origin', currentBranch], { cwd: repo.dir })
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/sync', {
+        method: 'POST',
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { ok: boolean; status: string }
+      expect(body.ok).toBe(true)
+      expect(body.status).toBe('up-to-date')
+    } finally {
+      rmSync(remoteDir, { recursive: true, force: true })
       repo.cleanup()
     }
   })

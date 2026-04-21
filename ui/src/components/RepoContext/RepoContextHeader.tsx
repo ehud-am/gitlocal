@@ -235,13 +235,12 @@ export default function RepoContextHeader({
 
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-2 border-t border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+        className="flex w-full items-center justify-center border-t border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-2 text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
         aria-expanded={detailsExpanded}
         aria-label={detailsExpanded ? 'Collapse repository details' : 'Expand repository details'}
         onClick={() => setDetailsExpanded((value) => !value)}
       >
         <ChevronIcon expanded={detailsExpanded} />
-        <span>{detailsExpanded ? 'Collapse repository details' : 'Expand repository details'}</span>
       </button>
 
       {branchSwitchDialog}

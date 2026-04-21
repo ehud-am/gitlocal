@@ -161,7 +161,6 @@ export async function remoteSyncHandler(c: Context<{ Variables: Variables }>): P
     }, 400)
   }
 
-  await c.req.json().catch(() => ({}))
   const result = syncCurrentBranchWithRemote(repoPath)
   return c.json(result, result.ok ? 200 : 400)
 }

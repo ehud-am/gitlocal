@@ -1,13 +1,12 @@
 interface Props {
   onOpen: () => void
-  className?: string
 }
 
-export default function SearchTrigger({ onOpen, className }: Props) {
+export default function SearchTrigger({ onOpen }: Props) {
   return (
     <button
       type="button"
-      className={className ?? 'search-trigger-button'}
+      className="search-trigger-button"
       aria-label="Open repository search"
       title="Open repository search (Command+F / Control+F)"
       onClick={onOpen}
