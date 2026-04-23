@@ -97,6 +97,18 @@ describe('FileTree', () => {
     expect(screen.queryAllByText(/local only/i)).toHaveLength(1)
   })
 
+  it('shows sync badges for changed files', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, syncState: 'local-uncommitted' },
+      { name: 'guide.md', path: 'guide.md', type: 'file', localOnly: false, syncState: 'remote-committed' },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    expect(await screen.findByText(/changed locally/i)).toBeInTheDocument()
+    expect(screen.getByText(/remote update/i)).toBeInTheDocument()
+  })
+
   it('has no obvious accessibility violations for the loaded tree', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: 'src', path: 'src', type: 'dir', localOnly: false },
@@ -365,5 +377,26 @@ describe('FileTree', () => {
       const treeItem = screen.getByRole('treeitem', { name: /src/i })
       expect(treeItem).toHaveAttribute('aria-expanded', 'false')
     })
+  })
+
+  it('auto-expands a saved selected directory path on first load', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'components', path: 'src/components', type: 'dir', localOnly: false }])
+
+    renderWithClient(
+      <FileTree
+        {...defaultProps}
+        selectedPath="src/components"
+        selectedPathType="dir"
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('components')).toBeInTheDocument()
+    })
+
+    const treeItem = screen.getByRole('treeitem', { name: /src/i })
+    expect(treeItem).toHaveAttribute('aria-expanded', 'true')
   })
 })

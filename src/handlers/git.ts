@@ -1,6 +1,16 @@
 import type { Context } from 'hono'
-import { getAppVersion, getInfo, getBranches, getCommits, findReadme, setRepoGitIdentity, switchBranch } from '../git/repo.js'
-import type { BranchSwitchRequest, GitIdentityUpdateRequest } from '../types.js'
+import {
+  commitWorkingTreeChanges,
+  getAppVersion,
+  getBranches,
+  getCommits,
+  getInfo,
+  findReadme,
+  setRepoGitIdentity,
+  switchBranch,
+  syncCurrentBranchWithRemote,
+} from '../git/repo.js'
+import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
 
@@ -114,4 +124,43 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
       message: error instanceof Error ? error.message : 'Could not update the repository identity.',
     }, 400)
   }
+}
+
+export async function commitChangesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      ok: false,
+      status: 'blocked',
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  let payload: CommitChangesRequest
+  try {
+    payload = await c.req.json<CommitChangesRequest>()
+  } catch {
+    return c.json({
+      ok: false,
+      status: 'blocked',
+      message: 'Invalid JSON body.',
+    }, 400)
+  }
+
+  const result = commitWorkingTreeChanges(repoPath, payload.message ?? '')
+  return c.json(result, result.ok ? 200 : 400)
+}
+
+export async function remoteSyncHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      ok: false,
+      status: 'blocked',
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  const result = syncCurrentBranchWithRemote(repoPath)
+  return c.json(result, result.ok ? 200 : 400)
 }

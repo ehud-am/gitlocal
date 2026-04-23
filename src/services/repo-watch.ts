@@ -1,5 +1,9 @@
 import {
+  getPathSyncState,
+  getRepoSyncState,
   getPathType,
+  getWorkingTreeChanges,
+  getWorkingTreeSyncSummary,
   getWorkingTreeRevision,
   isWorkingTreeBranch,
   nearestExistingRepoPath,
@@ -19,6 +23,17 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
       resolvedPath: currentPath,
       currentPathType: currentPath ? 'file' : 'none',
       resolvedPathType: currentPath ? 'file' : 'none',
+      pathSyncState: 'none',
+      trackedChangeCount: 0,
+      untrackedChangeCount: 0,
+      repoSync: {
+        mode: 'unavailable',
+        aheadCount: 0,
+        behindCount: 0,
+        hasUpstream: false,
+        upstreamRef: '',
+        remoteName: '',
+      },
       statusMessage: '',
       checkedAt,
     }
@@ -35,6 +50,8 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     currentPathType === 'missing'
       ? 'deleted'
       : 'unchanged'
+  const syncSummary = getWorkingTreeSyncSummary(repoPath)
+  const pathSyncState = currentPathType === 'file' ? getPathSyncState(repoPath, currentPath) : 'none'
 
   return {
     branch,
@@ -46,6 +63,10 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     resolvedPath,
     currentPathType,
     resolvedPathType,
+    pathSyncState,
+    trackedChangeCount: syncSummary.trackedChangeCount,
+    untrackedChangeCount: syncSummary.untrackedChangeCount,
+    repoSync: syncSummary.repoSync,
     statusMessage: '',
     checkedAt,
   }

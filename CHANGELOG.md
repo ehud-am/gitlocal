@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+- Added file-level sync indicators so repository views can show uncommitted local changes, local-only commits, remote-only updates, and diverged file states while you browse.
+- Added repository-level commit and safe remote sync actions so GitLocal can stage and commit current work, push ahead branches, and fast-forward pull behind branches directly through the local `git` executable.
+- Expanded repository context details with upstream tracking and remote path cues, and clarified local-only state in the viewer header.
+- Removed dead UI code and tightened the verification path so the release candidate meets the per-file coverage gate more reliably.
+
 ## 0.4.9
 
 - Reissued the ignored-file visibility release from the updated trusted-publishing workflow on `main` after the previous `0.4.8` release still ran the older tag-scoped publish flow.

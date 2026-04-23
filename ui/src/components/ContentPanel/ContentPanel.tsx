@@ -1,11 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
+import type { FileSyncState, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
 import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { MetaTag } from '../ui/meta-tag'
+import { describeFileSyncState } from '../../lib/sync'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
@@ -24,6 +26,7 @@ interface Props {
   selectedPath: string
   selectedPathType: ViewerPathType
   selectedPathLocalOnly?: boolean
+  selectedPathSyncState?: FileSyncState | 'none'
   branch: string
   isGitRepo?: boolean
   onNavigate: (path: string) => void
@@ -45,6 +48,7 @@ interface DirectoryRow {
   path: string
   type: 'file' | 'dir'
   localOnly: boolean
+  syncState?: FileSyncState
   isParent: boolean
   exitsRepo: boolean
   displayPath: string
@@ -97,12 +101,18 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
+function formatActivePathLabel(path: string, localOnly: boolean): string {
+  if (!path) return 'root'
+  return localOnly ? `root/${path}` : path
+}
+
 export default function ContentPanel({
   canMutateFiles,
   refreshToken,
   selectedPath,
   selectedPathType,
   selectedPathLocalOnly = false,
+  selectedPathSyncState = 'none',
   branch,
   isGitRepo = false,
   onNavigate,
@@ -258,18 +268,10 @@ export default function ContentPanel({
     }
   }
 
-  async function beginCreateMode(): Promise<void> {
+  function beginCreateMode(): void {
     if (!confirmDiscardIfNeeded()) return
-    const folderPath = selectedPathType === 'dir' ? selectedPath : selectedPathType === 'file' ? parentPathOf(selectedPath) : ''
-    let entries = folderPath === directoryPath ? visibleDirectoryEntries : null
-
-    if (!entries) {
-      try {
-        entries = await api.getTree(folderPath, branch)
-      } catch {
-        entries = []
-      }
-    }
+    const folderPath = selectedPathType === 'dir' ? selectedPath : ''
+    const entries = visibleDirectoryEntries
 
     setDraftPath(buildSuggestedDraftPath(folderPath, entries).replace(/^\/+/, ''))
     setDraftContent('')
@@ -350,8 +352,8 @@ export default function ContentPanel({
             <div>
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
               <div className="content-active-heading-row">
-                <h2 className="content-directory-heading">{path || 'root'}</h2>
-                {selectedPathLocalOnly && path ? <span className="local-only-badge">Local only</span> : null}
+                <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly)}</h2>
+                {selectedPathLocalOnly && path ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
               </div>
             </div>
             {canMutateFiles ? (
@@ -376,12 +378,14 @@ export default function ContentPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((entry) => (
-                        <tr
-                          key={entry.isParent ? `parent:${entry.displayPath}` : entry.path}
-                          className="content-directory-row"
-                          onDoubleClick={() => openDirectoryRow(entry)}
-                        >
+                      {rows.map((entry) => {
+                        const syncBadge = !entry.isParent ? describeFileSyncState(entry.syncState) : null
+                        return (
+                          <tr
+                            key={entry.isParent ? `parent:${entry.displayPath}` : entry.path}
+                            className="content-directory-row"
+                            onDoubleClick={() => openDirectoryRow(entry)}
+                          >
                           <td className="content-directory-cell content-directory-cell-name">
                             <div className="content-directory-entry">
                               <button
@@ -401,7 +405,8 @@ export default function ContentPanel({
                                 </span>
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
-                              {!entry.isParent && entry.localOnly ? <span className="local-only-badge local-only-badge-compact">Local only</span> : null}
+                              {!entry.isParent && entry.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
+                              {syncBadge ? <MetaTag label={syncBadge.label} icon={syncBadge.icon} tone={syncBadge.tone} compact /> : null}
                             </div>
                           </td>
                           <td className="content-directory-cell">
@@ -412,8 +417,9 @@ export default function ContentPanel({
                           <td className="content-directory-cell content-directory-cell-path">
                             <span className="content-directory-path">{entry.displayPath}</span>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -525,14 +531,20 @@ export default function ContentPanel({
     )
   }
 
+  const selectedPathSyncBadge =
+    selectedPathSyncState !== 'none'
+      ? describeFileSyncState(selectedPathSyncState)
+      : null
+
   return (
     <div className={`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`}>
       <div className="content-active-context">
         <div>
           <p className="content-directory-kicker">File</p>
           <div className="content-active-heading-row">
-            <h2 className="content-directory-heading">{selectedPath}</h2>
-            {selectedPathLocalOnly ? <span className="local-only-badge">Local only</span> : null}
+            <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
+            {selectedPathLocalOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
+            {selectedPathSyncBadge ? <MetaTag label={selectedPathSyncBadge.label} icon={selectedPathSyncBadge.icon} tone={selectedPathSyncBadge.tone} compact /> : null}
           </div>
         </div>
         {mode === 'view' ? (
@@ -563,7 +575,6 @@ export default function ContentPanel({
                 <DropdownMenuItem
                   disabled={!data.editable}
                   onSelect={() => {
-                    if (!data.editable) return
                     setDraftContent(data.content)
                     setFormError('')
                     setMode('edit')
@@ -573,16 +584,10 @@ export default function ContentPanel({
                 </DropdownMenuItem>
               ) : null}
               {canMutateFiles ? (
-                <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
-                  New file
-                </DropdownMenuItem>
-              ) : null}
-              {canMutateFiles ? (
                 <DropdownMenuItem
                   className="dropdown-danger"
                   disabled={!data.revisionToken}
                   onSelect={() => {
-                    if (!data.revisionToken) return
                     if (!confirmDiscardIfNeeded()) return
                     setFormError('')
                     setMode('confirm-delete')

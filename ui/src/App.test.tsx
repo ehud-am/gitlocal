@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -14,6 +15,7 @@ vi.mock('./services/api', () => ({
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
+    commitChanges: vi.fn(),
     getFile: vi.fn(),
     createFile: vi.fn(),
     updateFile: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('./services/api', () => ({
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
     switchBranch: vi.fn(),
+    syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
     createPickFolder: vi.fn(),
     initPickGit: vi.fn(),
@@ -84,6 +87,34 @@ function buildBranches(currentBranch: string) {
   return branches
 }
 
+function buildSyncStatus(overrides: Partial<Awaited<ReturnType<typeof api.getSyncStatus>>> = {}) {
+  return {
+    branch: 'main',
+    repoPath: '/tmp/repo',
+    workingTreeRevision: 'abc',
+    treeStatus: 'unchanged' as const,
+    fileStatus: 'unchanged' as const,
+    currentPath: '',
+    resolvedPath: '',
+    currentPathType: 'none' as const,
+    resolvedPathType: 'none' as const,
+    pathSyncState: 'none' as const,
+    trackedChangeCount: 0,
+    untrackedChangeCount: 0,
+    repoSync: {
+      mode: 'up-to-date' as const,
+      aheadCount: 0,
+      behindCount: 0,
+      hasUpstream: true,
+      upstreamRef: 'origin/main',
+      remoteName: 'origin',
+    },
+    statusMessage: '',
+    checkedAt: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 function renderWithClient() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchInterval: false } },
@@ -124,19 +155,7 @@ describe('App', () => {
     vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
       path: path === 'docs' ? 'docs/README.md' : 'README.md',
     }))
-    vi.mocked(api.getSyncStatus).mockResolvedValue({
-      branch: 'main',
-      repoPath: '/tmp/repo',
-      workingTreeRevision: 'abc',
-      treeStatus: 'unchanged',
-      fileStatus: 'unchanged',
-      currentPath: '',
-      resolvedPath: '',
-      currentPathType: 'none',
-      resolvedPathType: 'none',
-      statusMessage: '',
-      checkedAt: new Date().toISOString(),
-    })
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
     vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
       if (path === 'docs') {
         return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
@@ -184,6 +203,20 @@ describe('App', () => {
       status: 'blocked',
       message: 'Branch switching is not configured for this test.',
     })
+    vi.mocked(api.commitChanges).mockResolvedValue({
+      ok: true,
+      status: 'committed',
+      message: 'Committed changes as abc1234.',
+      commitHash: 'abc1234567890',
+      shortHash: 'abc1234',
+    })
+    vi.mocked(api.syncWithRemote).mockResolvedValue({
+      ok: true,
+      status: 'up-to-date',
+      message: 'This branch is already up to date with its upstream.',
+      aheadCount: 0,
+      behindCount: 0,
+    })
     vi.mocked(api.showParentPicker).mockResolvedValue({ ok: true, error: '' })
     vi.mocked(api.getPickBrowse).mockResolvedValue({
       currentPath: '/tmp',
@@ -214,14 +247,18 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+    expect(screen.getByText('Remote')).toBeInTheDocument()
+    expect(screen.queryByText('/tmp/repo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
+
+    expect(await screen.findByText('Repository details')).toBeInTheDocument()
     expect(screen.getByText('/tmp/repo')).toBeInTheDocument()
-    expect(screen.getByText(/linked to remote git/i)).toBeInTheDocument()
     expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
     expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
-    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
   })
 
   it('opens an info modal before leaving the repository from the root .. row', async () => {
@@ -294,6 +331,7 @@ describe('App', () => {
 
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
     fireEvent.click(await screen.findByRole('button', { name: /edit repository git identity/i }))
 
     expect(await screen.findByRole('heading', { name: /edit repository git identity/i })).toBeInTheDocument()
@@ -313,6 +351,73 @@ describe('App', () => {
     })
     expect(await screen.findByText(/repository git identity updated\./i)).toBeInTheDocument()
     expect(await screen.findByText(/updated user <updated@example.com>/i)).toBeInTheDocument()
+  })
+
+  it('commits local changes from the repo header action', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      trackedChangeCount: 1,
+      pathSyncState: 'clean',
+    }))
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
+    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), {
+      target: { value: 'Save current work' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^commit changes$/i }))
+
+    await waitFor(() => {
+      expect(api.commitChanges).toHaveBeenCalledWith({ message: 'Save current work' })
+    })
+    expect(await screen.findByText(/committed changes as abc1234/i)).toBeInTheDocument()
+  })
+
+  it('has no obvious accessibility violations for the commit dialog flow', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      trackedChangeCount: 1,
+      pathSyncState: 'clean',
+    }))
+
+    const { container } = renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
+    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
+    expect((await axe(container)).violations).toHaveLength(0)
+  })
+
+  it('syncs with the remote from the repo header action', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      repoSync: {
+        mode: 'ahead',
+        aheadCount: 1,
+        behindCount: 0,
+        hasUpstream: true,
+        upstreamRef: 'origin/main',
+        remoteName: 'origin',
+      },
+    }))
+    vi.mocked(api.syncWithRemote).mockResolvedValue({
+      ok: true,
+      status: 'pushed',
+      message: 'Pushed main to origin/main.',
+      aheadCount: 0,
+      behindCount: 0,
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /push to remote/i }))
+
+    await waitFor(() => {
+      expect(api.syncWithRemote).toHaveBeenCalledTimes(1)
+    })
+    expect(await screen.findByText(/pushed main to origin\/main/i)).toBeInTheDocument()
   })
 
   it('opens search from the compact trigger and with the keyboard shortcut', async () => {
@@ -367,33 +472,44 @@ describe('App', () => {
     vi.mocked(api.getSyncStatus).mockImplementation(async (path, branch) => {
       if (path === 'docs/guide.md' && branch === 'release') {
         return {
-          branch: 'release',
-          repoPath: '/tmp/repo',
-          workingTreeRevision: 'release-rev',
-          treeStatus: 'invalid',
-          fileStatus: 'deleted',
-          currentPath: 'docs/guide.md',
-          resolvedPath: 'docs',
-          currentPathType: 'missing',
-          resolvedPathType: 'dir',
-          statusMessage: '',
-          checkedAt: new Date().toISOString(),
+          ...buildSyncStatus({
+            branch: 'release',
+            workingTreeRevision: 'release-rev',
+            treeStatus: 'invalid',
+            fileStatus: 'deleted',
+            currentPath: 'docs/guide.md',
+            resolvedPath: 'docs',
+            currentPathType: 'missing',
+            resolvedPathType: 'dir',
+            repoSync: {
+              mode: 'up-to-date',
+              aheadCount: 0,
+              behindCount: 0,
+              hasUpstream: true,
+              upstreamRef: 'origin/release',
+              remoteName: 'origin',
+            },
+          }),
         }
       }
 
-      return {
+      return buildSyncStatus({
         branch: branch ?? currentBranch,
-        repoPath: '/tmp/repo',
         workingTreeRevision: `${branch ?? currentBranch}-rev`,
-        treeStatus: 'unchanged',
-        fileStatus: 'unchanged',
         currentPath: path ?? '',
         resolvedPath: path ?? '',
         currentPathType: path ? 'file' : 'none',
         resolvedPathType: path ? 'file' : 'none',
-        statusMessage: '',
-        checkedAt: new Date().toISOString(),
-      }
+        pathSyncState: path ? 'clean' : 'none',
+        repoSync: {
+          mode: 'up-to-date',
+          aheadCount: 0,
+          behindCount: 0,
+          hasUpstream: true,
+          upstreamRef: `origin/${branch ?? currentBranch}`,
+          remoteName: 'origin',
+        },
+      })
     })
 
     renderWithClient()

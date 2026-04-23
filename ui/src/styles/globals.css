@@ -433,6 +433,7 @@ pre {
   display: flex;
   min-width: 0;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.45rem;
 }
 

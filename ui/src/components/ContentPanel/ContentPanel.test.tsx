@@ -9,6 +9,7 @@ vi.mock('../../services/api', () => ({
   api: {
     getFile: vi.fn(),
     getTree: vi.fn(),
+    getReadme: vi.fn(),
     createFile: vi.fn(),
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
@@ -158,6 +159,28 @@ describe('ContentPanel', () => {
     expect(screen.getByText(/does not have any visible files yet/i)).toBeInTheDocument()
   })
 
+  it('falls back to a generic create error message for non-object failures', async () => {
+    vi.mocked(api.createFile).mockRejectedValue('boom')
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
+    fireEvent.click(screen.getByRole('button', { name: /create file/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/failed to create the file/i)
+  })
+
   it('suggests myfile names when README.md already exists in the folder', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
@@ -179,6 +202,27 @@ describe('ContentPanel', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('myfile 2.md')
+  })
+
+  it('suggests myfile.md when README.md exists but myfile.md does not', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    expect(screen.getByLabelText(/new file path/i)).toHaveValue('myfile.md')
   })
 
   it('shows a directory list for folders and supports creating a file in that folder', async () => {
@@ -259,7 +303,47 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/local only/i)).toHaveLength(3)
     })
-    expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'root/docs' })).toBeInTheDocument()
+  })
+
+  it('shows sync badges in directory rows and the active file context', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'notes.md', path: 'docs/notes.md', type: 'file', localOnly: false, syncState: 'diverged' },
+    ])
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'docs/notes.md' }))
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    expect(await screen.findByText(/diverged/i)).toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          selectedPath="docs/notes.md"
+          selectedPathType="file"
+          selectedPathSyncState="local-committed"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText(/local commit/i)).toBeInTheDocument()
   })
 
   it('shows a local-only cue in the active file context for ignored files', async () => {
@@ -279,7 +363,7 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByText(/local only/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '.env' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'root/.env' })).toBeInTheDocument()
   })
 
   it('cancels create mode from the draft form', async () => {
@@ -373,6 +457,32 @@ describe('ContentPanel', () => {
     expect(screen.queryByText(/does not have any visible files or folders yet/i)).not.toBeInTheDocument()
   })
 
+  it('renders a folder README when browsing a repository directory', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+    ])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: 'docs/README.md' })
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'docs/README.md', type: 'markdown', language: '', content: '# Folder readme' }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        isGitRepo
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Folder readme' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'docs/README.md' })).toBeInTheDocument()
+  })
+
   it('shows loading skeleton while fetching', async () => {
     vi.mocked(api.getFile).mockReturnValue(new Promise(() => {}))
 
@@ -428,6 +538,25 @@ describe('ContentPanel', () => {
     expect(await screen.findByText(/local-only file is no longer available/i)).toBeInTheDocument()
   })
 
+  it('shows an unavailable message when an ignored local folder disappears', async () => {
+    vi.mocked(api.getTree).mockRejectedValue(new Error('boom'))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="generated"
+        selectedPathType="dir"
+        selectedPathLocalOnly
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/local-only folder is no longer available/i)).toBeInTheDocument()
+  })
+
   it('shows markdown renderer for markdown files', async () => {
     vi.mocked(api.getFile).mockResolvedValue(
       makeTextFile({ type: 'markdown', language: '', content: '# Hello' }),
@@ -475,6 +604,28 @@ describe('ContentPanel', () => {
     await openFileActionsMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: /view raw/i }))
     expect(onRawChange).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps file actions scoped to the current file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFileActionsMenu()
+
+    expect(screen.getByRole('menuitem', { name: /edit file/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^delete file$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^new file$/i })).not.toBeInTheDocument()
   })
 
   it('shows binary and image presentations without inline editing', async () => {
@@ -701,6 +852,50 @@ describe('ContentPanel', () => {
       expect.objectContaining({
         nextPath: '',
         nextPathType: 'none',
+      }),
+    )
+  })
+
+  it('returns to the parent directory after deleting a nested file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'docs/README.md' }))
+    vi.mocked(api.deleteFile).mockResolvedValue({
+      ok: true,
+      operation: 'delete',
+      path: 'docs/README.md',
+      status: 'deleted',
+      message: 'File deleted successfully.',
+    })
+
+    const onMutationComplete = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="docs/README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onMutationComplete={onMutationComplete}
+      />,
+    )
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^delete file$/i }))
+
+    await waitFor(() => {
+      expect(api.deleteFile).toHaveBeenCalledWith({
+        path: 'docs/README.md',
+        revisionToken: 'rev-1',
+      })
+    })
+
+    expect(onMutationComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nextPath: 'docs',
+        nextPathType: 'dir',
       }),
     )
   })
