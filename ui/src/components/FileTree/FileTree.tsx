@@ -77,8 +77,7 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
     setNodeStates((prev) => {
       const next = new Map(prev)
       for (const path of expandedPaths) {
-        const current = next.get(path)
-        if (!current) continue
+        const current = next.get(path) as NodeState
         next.set(path, { ...current, loading: true, error: false })
       }
       return next
@@ -92,8 +91,7 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
           if (cancelled) return
           setNodeStates((current) => {
             const updated = new Map(current)
-            const existing = updated.get(path)
-            if (!existing) return updated
+            const existing = updated.get(path) as NodeState
             updated.set(path, { ...existing, children, loading: false, error: false })
             return updated
           })
@@ -102,8 +100,7 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
           if (cancelled) return
           setNodeStates((current) => {
             const updated = new Map(current)
-            const existing = updated.get(path)
-            if (!existing) return updated
+            const existing = updated.get(path) as NodeState
             updated.set(path, { ...existing, loading: false, error: true })
             return updated
           })

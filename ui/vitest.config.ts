@@ -17,16 +17,24 @@ export default defineConfig({
       //   - api.ts         : HTTP client, mocked in all component tests
       //   - MarkdownRenderer / CodeViewer: mocked in ContentPanel tests
       include: [
+        'src/App.tsx',
         'src/components/FileTree/**/*.tsx',
         'src/components/Breadcrumb/**/*.tsx',
         'src/components/ContentPanel/ContentPanel.tsx',
+        'src/components/RepoContext/**/*.tsx',
+        'src/components/Search/**/*.tsx',
         'src/components/Picker/**/*.tsx',
+        'src/components/ui/button.tsx',
+        'src/components/ui/dialog.tsx',
+        'src/components/ui/meta-tag.tsx',
+        'src/lib/sync.ts',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts'],
       thresholds: {
+        perFile: true,
         lines: 90,
         functions: 90,
-        branches: 85,
+        branches: 90,
         statements: 90,
       },
     },

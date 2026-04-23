@@ -54,7 +54,7 @@ describe('PickerPage', () => {
 
     expect(await screen.findByText(/Choose the folder GitLocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(/started without a repository location/i)).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: /folders/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /folders/i })).toBeInTheDocument()
     expect((await axe(container)).violations).toHaveLength(0)
   })
 

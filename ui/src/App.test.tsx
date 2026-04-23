@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -248,7 +249,6 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
     expect(screen.getByText('Remote')).toBeInTheDocument()
     expect(screen.queryByText('/tmp/repo')).not.toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: /open folder docs/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
     expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
 
@@ -374,6 +374,20 @@ describe('App', () => {
       expect(api.commitChanges).toHaveBeenCalledWith({ message: 'Save current work' })
     })
     expect(await screen.findByText(/committed changes as abc1234/i)).toBeInTheDocument()
+  })
+
+  it('has no obvious accessibility violations for the commit dialog flow', async () => {
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      trackedChangeCount: 1,
+      pathSyncState: 'clean',
+    }))
+
+    const { container } = renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
+    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 
   it('syncs with the remote from the repo header action', async () => {

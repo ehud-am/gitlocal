@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
-A local git repository viewer that gives you a GitHub-like browsing experience — without leaving your machine. Built for non-developers who use tools like [Claude Code](https://claude.ai/code) to work in git repositories and want a clean way to read, navigate, and review their code without a full IDE. Everything runs locally; no accounts, no telemetry, no internet required.
+A local git repository viewer that gives you a GitHub-like browsing experience — without leaving your machine. Built for non-developers who use tools like [Claude Code](https://claude.ai/code) to work in git repositories and want a clean way to read, navigate, and review their code without a full IDE. Everything runs locally, there are no accounts or telemetry, and any clone, fetch, pull, or push action goes through your installed `git` only when you choose it.
 
 ---
 
@@ -115,7 +115,9 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Browse the file tree** — expand and collapse folders lazily, just like GitHub
 - **Read files beautifully** — Markdown renders with GitHub-like typography and tables; code files get syntax highlighting; images display inline
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
+- **Track file sync state** — file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
 - **Make local file edits** — create, edit, and delete files from the viewer when you are on the repository's working branch
+- **Commit and sync safely** — create local commits, push ahead branches, and fast-forward pull behind branches from the repository header
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — update the repository-specific git `user.name` and `user.email` without touching your global git config
 - **See repo context clearly** — GitHub-like header with branch, local path, remote path, remote linkage, and repo-local identity
@@ -124,7 +126,7 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; otherwise GitLocal starts in the folder picker
 - **Clear folder actions** — non-git folders can be browsed deeper, initialized as git repos, or used as clone targets
 - **Light and dark themes** — GitHub-inspired light mode with matching dark mode support
-- **No internet required** — everything runs locally; no accounts, no telemetry, no registration
+- **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone and sync actions use the local `git` executable when a repo has a remote configured
 
 The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
 
@@ -158,6 +160,7 @@ npm test
 ```
 
 Runs backend tests (Vitest + coverage) and frontend tests. All source files must maintain **≥90% branch coverage** per file.
+Frontend component tests also include automated accessibility checks for key browsing surfaces.
 
 ### Backend tests only
 
@@ -193,19 +196,22 @@ gitlocal/
 │   ├── cli.ts           — entry point: arg parsing, server start, browser open
 │   ├── server.ts        — Hono app, route registration, static serving + SPA fallback
 │   ├── git/
-│   │   ├── repo.ts      — getInfo, getBranches, getCommits, findReadme, detectFileType
+│   │   ├── repo.ts      — repo metadata, branch/sync actions, commit helpers, README lookup, and file sync state
 │   │   └── tree.ts      — listDir (git ls-tree wrapper, sorted dirs-first)
+│   ├── services/
+│   │   └── repo-watch.ts — working-tree revision and sync status snapshots for the UI
 │   └── handlers/
-│       ├── git.ts       — /api/info, /api/readme, /api/branches, /api/commits
+│       ├── git.ts       — /api/info, /api/readme, /api/branches, /api/commits, /api/git/commit, /api/git/sync
 │       ├── files.ts     — /api/tree, /api/file
+│       ├── sync.ts      — /api/sync
 │       └── pick.ts      — /api/pick and /api/pick/browse for the folder picker
 └── ui/src/
-    ├── App.tsx                      — layout, state, README auto-load, picker mode
+    ├── App.tsx                      — layout, repo sync polling, dialogs, README auto-load, picker mode
     ├── components/
     │   ├── FileTree/                — lazy expand/collapse tree
     │   ├── Breadcrumb/              — path navigation
     │   ├── ContentPanel/            — Markdown, code, image, binary rendering, and local file editing
-    │   ├── RepoContext/             — branch switcher, repo metadata, identity editing
+    │   ├── RepoContext/             — branch switcher, sync summary, repo metadata, identity editing, commit/sync actions
     │   └── Picker/                  — PickerPage table browser with setup actions
     └── services/api.ts              — typed fetch wrappers for all endpoints
 ```
@@ -215,7 +221,7 @@ gitlocal/
 - **No external runtime dependencies beyond Node.js** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
 - **Single npm toolchain** — build, test, and install all via `npm`; no Go, no Makefile, no shell scripts
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
-- **Local-first editing** — GitLocal can create, update, and delete working-tree files locally while using git commands for branch and remote-aware repository actions
+- **Local-first editing and sync awareness** — GitLocal can create, update, and delete working-tree files locally while using git commands for branch, commit, and remote-aware repository actions
 
 ---
 
@@ -228,6 +234,9 @@ All endpoints are served under `/api/`:
 | `GET /api/info` | Repository metadata (name, branch, isGitRepo, pickerMode) |
 | `GET /api/readme` | Detects and returns the README filename for the current repo |
 | `GET /api/branches` | List of branches with `isCurrent` flag |
+| `POST /api/branches/switch` | Switch branches with dirty-tree confirmation flows |
+| `POST /api/git/commit` | Stage all current changes and create a local commit |
+| `POST /api/git/sync` | Push ahead branches or fast-forward pull behind branches |
 | `PUT /api/git/identity` | Update `user.name` and `user.email` in the current repo's local git config |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
@@ -235,6 +244,7 @@ All endpoints are served under `/api/`:
 | `PUT /api/file` | Update an existing file using its revision token |
 | `DELETE /api/file` | Delete an existing file using its revision token |
 | `GET /api/commits?branch=&limit=` | Recent commits (default 10, max 100) |
+| `GET /api/sync?path=&branch=` | Working-tree and upstream sync summary for the current path and branch |
 | `GET /api/pick/browse?path=` | Folder-picker directory listing with git-repo detection |
 | `POST /api/pick` | Set the repo path from the picker UI (body: `{"path":"..."}`) |
 | `POST /api/pick/create-folder` | Create a child folder from the picker setup flow |

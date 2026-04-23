@@ -1,11 +1,14 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 2.1.0 → 3.0.0 (MAJOR — redefined the local-only principle to allow
-  user-initiated remote git activity through the local git executable)
+  Version change: 3.0.0 → 3.1.0 (MINOR — added explicit pre-GA release governance,
+  branch/version discipline, and a mandatory contrarian QA review gate before releases)
   Modified principles:
-    - Principle III: renamed to "Local-First with Git Remote Exception" and updated to keep
-      all local-only flows fully supported while allowing explicit remote git operations via git
+    - Principle II: expanded release coverage language to restate the 90% per-file gate
+    - Principle VII: renamed to "Repository-Relative Paths and Release Documentation" and
+      updated to require changelog updates and README review for every release
+  Added principles:
+    - Principle VIII: "Release Branches, Pre-GA Versioning, and Contrarian QA"
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -37,7 +40,8 @@ justified by clear need — avoid dependency bloat.
 Every TypeScript source file MUST maintain a minimum of 90% test coverage.
 Coverage is measured per file, not as an aggregate. A release MUST NOT ship if any file
 falls below this threshold. Frontend (React) code MUST also meet 90% coverage using the
-project's chosen JS testing framework. CI MUST enforce these gates automatically.
+project's chosen JS testing framework. This 90% minimum applies to every release candidate
+and final release without exception. CI MUST enforce these gates automatically.
 
 ### III. Local-First with Git Remote Exception
 
@@ -79,7 +83,7 @@ GitLocal is released under the MIT License. All dependencies MUST be compatible 
 No proprietary components, no paid tiers, no feature gating. Contributions are welcome
 under the same license.
 
-### VII. Repository-Relative Paths
+### VII. Repository-Relative Paths and Release Documentation
 
 Repository documentation, specifications, templates, generated planning artifacts, and
 Markdown links MUST use repository-relative paths rather than contributor-local absolute
@@ -87,6 +91,25 @@ filesystem paths. Local absolute paths such as `/Users/...` or platform-specific
 MUST NOT be committed because they do not resolve on GitHub or on other contributors' machines.
 Absolute paths remain acceptable only for local runtime behavior that genuinely requires them,
 such as user-provided CLI arguments or operating-system file selection.
+
+Every release MUST include an updated `CHANGELOG.md` entry that describes the shipped changes.
+Every release MUST also include a full README review, with any needed corrections, workflow
+updates, screenshots, usage notes, or version references applied before approval.
+
+### VIII. Release Branches, Pre-GA Versioning, and Contrarian QA
+
+Each release branch MUST represent exactly one planned release increment: MAJOR, MINOR, or
+PATCH. That branch MUST update `package.json` version metadata to the intended release version
+before release approval. Until GitLocal formally reaches general availability (GA), all releases
+MUST use the `0.x.y` version format. No `1.0.0` or higher release may be cut until the project
+explicitly amends this constitution to declare GA readiness.
+
+Before every release, the team MUST run a contrarian QA sub-agent review that assumes regressions
+may exist and attempts to disprove release readiness. This review MUST examine the full change set
+for newly introduced bugs, performance regressions, security issues, accessibility problems,
+dead code, and implementation inefficiencies. The review MUST run accessibility testing, produce
+an explicit report of findings, and consolidate all results into a single release-review artifact
+for human approval before the release can be finalized.
 
 ## Technology Stack
 
@@ -125,10 +148,11 @@ implementation decisions, code reviews, and release gates MUST comply with these
   require PATCH.
 - **Compliance**: Every pull request MUST pass CI checks that enforce test coverage
   thresholds and build integrity. Reviewers MUST verify alignment with constitution
-  principles.
+  principles. Every release review MUST also confirm that the package version, changelog,
+  README review, and contrarian QA report are complete.
 - **Documentation paths**: Reviews for specs, plans, task lists, README updates, and other
   committed documentation MUST reject newly introduced absolute contributor-local paths.
 - **Runtime guidance**: See `AGENTS.md` and `CLAUDE.md` for development-time conventions and
   workflow details that supplement but do not override this constitution.
 
-**Version**: 3.0.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-04-19
+**Version**: 3.1.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-04-23

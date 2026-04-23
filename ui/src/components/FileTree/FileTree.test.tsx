@@ -378,4 +378,25 @@ describe('FileTree', () => {
       expect(treeItem).toHaveAttribute('aria-expanded', 'false')
     })
   })
+
+  it('auto-expands a saved selected directory path on first load', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])
+      .mockResolvedValueOnce([{ name: 'components', path: 'src/components', type: 'dir', localOnly: false }])
+
+    renderWithClient(
+      <FileTree
+        {...defaultProps}
+        selectedPath="src/components"
+        selectedPathType="dir"
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('components')).toBeInTheDocument()
+    })
+
+    const treeItem = screen.getByRole('treeitem', { name: /src/i })
+    expect(treeItem).toHaveAttribute('aria-expanded', 'true')
+  })
 })

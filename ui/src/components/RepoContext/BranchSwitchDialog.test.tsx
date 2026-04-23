@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
 import BranchSwitchDialog from './BranchSwitchDialog'
 
@@ -83,5 +84,38 @@ describe('BranchSwitchDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /delete files and switch/i }))
     expect(onDeleteUntracked).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables actions while pending and has no obvious a11y violations', async () => {
+    const onCancel = vi.fn()
+    const { container } = render(
+      <BranchSwitchDialog
+        open
+        targetLabel="feature"
+        response={{
+          ok: false,
+          status: 'confirmation-required',
+          message: 'Choose how to continue.',
+          trackedChangeCount: 1,
+          untrackedChangeCount: 2,
+        }}
+        commitMessage=""
+        pending
+        errorMessage="Branch switch failed."
+        onCommitMessageChange={vi.fn()}
+        onCancel={onCancel}
+        onCommit={vi.fn()}
+        onDiscard={vi.fn()}
+        onDeleteUntracked={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /discarding/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /committing/i })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/branch switch failed/i)
+    expect((await axe(container)).violations).toHaveLength(0)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onCancel).not.toHaveBeenCalled()
   })
 })

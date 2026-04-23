@@ -9,17 +9,12 @@ import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
 import AppFooter from './components/AppFooter'
-import { Button } from './components/ui/button'
-import { Switch } from './components/ui/switch'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './components/ui/dialog'
-import { Input } from './components/ui/input'
+  CommitChangesDialog,
+  GitIdentityDialog,
+  RepoBoundaryDialog,
+} from './components/AppDialogs'
+import { Switch } from './components/ui/switch'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import { readViewerState, writeViewerState } from './services/viewerState'
 import type {
@@ -33,17 +28,15 @@ import type {
   SearchResult,
   ViewerPathType,
 } from './types'
+import {
+  describeBranchTarget,
+  getErrorMessage,
+  updateBranchCacheAfterSwitch,
+} from './lib/app-helpers'
 import { getRepoSyncActionLabel } from './lib/sync'
 
 type LandingAction = { label: string; action: 'create-file' }
 type BranchScope = 'local' | 'remote'
-
-interface BranchSwitchDialogState {
-  target: string
-  targetLabel: string
-  targetScope: BranchScope
-  response: BranchSwitchResponse
-}
 
 function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
@@ -57,6 +50,13 @@ function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   )
 }
 
+interface BranchSwitchDialogState {
+  target: string
+  targetLabel: string
+  targetScope: BranchScope
+  response: BranchSwitchResponse
+}
+
 function ErrorScreen({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-6 py-12">
@@ -66,72 +66,6 @@ function ErrorScreen({ title, description }: { title: string; description: strin
       </div>
     </div>
   )
-}
-
-function branchMatchesTarget(branch: Branch, target: string): boolean {
-  return branch.name === target || branch.trackingRef === target || branch.displayName === target
-}
-
-function describeBranchTarget(branches: Branch[] | undefined, target: string): { label: string; scope: BranchScope } {
-  const branch = branches?.find((option) => branchMatchesTarget(option, target))
-  return {
-    label: branch?.displayName ?? branch?.name ?? target,
-    scope: branch?.scope ?? 'local',
-  }
-}
-
-function sortBranchOptions(options: Branch[]): Branch[] {
-  return [...options].sort((a, b) => {
-    if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1
-    if ((a.scope ?? 'local') !== (b.scope ?? 'local')) return (a.scope ?? 'local') === 'local' ? -1 : 1
-    return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name)
-  })
-}
-
-function updateBranchCacheAfterSwitch(
-  previous: Branch[] | undefined,
-  target: string,
-  nextBranch: string,
-  result: BranchSwitchResponse,
-): Branch[] | undefined {
-  if (!previous) return previous
-
-  const targetOption = previous.find((option) => branchMatchesTarget(option, target))
-  let nextOptions = previous.map((option) => ({
-    ...option,
-    isCurrent: option.name === nextBranch,
-    hasLocalCheckout: option.name === nextBranch ? true : option.hasLocalCheckout,
-  }))
-
-  if (result.createdTrackingBranch) {
-    nextOptions = nextOptions.filter((option) =>
-      !(
-        option.name === nextBranch
-        || (option.scope === 'remote' && (option.trackingRef === target || option.name === nextBranch))
-      ),
-    )
-
-    nextOptions.push({
-      name: nextBranch,
-      displayName: nextBranch,
-      scope: 'local',
-      remoteName: targetOption?.remoteName,
-      trackingRef: targetOption?.trackingRef ?? (targetOption?.scope === 'remote' ? target : undefined),
-      hasLocalCheckout: true,
-      isCurrent: true,
-    })
-  }
-
-  return sortBranchOptions(nextOptions)
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message
-  if (error && typeof error === 'object') {
-    const maybePayload = error as { error?: string; message?: string }
-    return maybePayload.error ?? maybePayload.message ?? fallback
-  }
-  return fallback
 }
 
 export default function App() {
@@ -907,121 +841,45 @@ export default function App() {
         <AppFooter version={info?.version ?? ''} />
       </div>
 
-      <Dialog open={showRepoBoundaryDialog} onOpenChange={(open) => { if (!pickerLoading) setShowRepoBoundaryDialog(open) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Leave this repository?</DialogTitle>
-            <DialogDescription>
-              The <code>..</code> entry will move GitLocal up to the parent folder, outside the current repository. You will enter the folder browser so you can choose what to open next.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => setShowRepoBoundaryDialog(false)} disabled={pickerLoading}>
-              Stay here
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setShowRepoBoundaryDialog(false)
-                void handleBrowseParentFolder()
-              }}
-              disabled={pickerLoading}
-            >
-              {pickerLoading ? 'Opening parent...' : 'Open parent folder'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RepoBoundaryDialog
+        open={showRepoBoundaryDialog}
+        pending={pickerLoading}
+        onOpenChange={(open) => {
+          if (!pickerLoading) setShowRepoBoundaryDialog(open)
+        }}
+        onConfirm={() => {
+          setShowRepoBoundaryDialog(false)
+          void handleBrowseParentFolder()
+        }}
+      />
 
-      <Dialog open={gitIdentityDialogOpen} onOpenChange={(open) => { if (!gitIdentityPending) setGitIdentityDialogOpen(open) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Repository Git Identity</DialogTitle>
-            <DialogDescription>
-              This updates <code>user.name</code> and <code>user.email</code> in this repository’s local git config only.
-            </DialogDescription>
-          </DialogHeader>
+      <GitIdentityDialog
+        open={gitIdentityDialogOpen}
+        pending={gitIdentityPending}
+        error={gitIdentityError}
+        name={gitIdentityName}
+        email={gitIdentityEmail}
+        onOpenChange={(open) => {
+          if (!gitIdentityPending) setGitIdentityDialogOpen(open)
+        }}
+        onNameChange={setGitIdentityName}
+        onEmailChange={setGitIdentityEmail}
+        onCancel={closeGitIdentityDialog}
+        onSave={() => { void saveGitIdentity() }}
+      />
 
-          <div className="grid gap-4">
-            <label className="grid gap-1.5">
-              <span className="text-sm font-medium text-[var(--foreground)]">Name</span>
-              <Input
-                value={gitIdentityName}
-                onChange={(event) => setGitIdentityName(event.target.value)}
-                placeholder="Jane Developer"
-                aria-label="Git user name"
-                disabled={gitIdentityPending}
-              />
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="text-sm font-medium text-[var(--foreground)]">Email</span>
-              <Input
-                type="email"
-                value={gitIdentityEmail}
-                onChange={(event) => setGitIdentityEmail(event.target.value)}
-                placeholder="jane@example.com"
-                aria-label="Git user email"
-                disabled={gitIdentityPending}
-              />
-            </label>
-
-            {gitIdentityError ? (
-              <p role="alert" className="text-sm text-[var(--danger)]">
-                {gitIdentityError}
-              </p>
-            ) : null}
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={closeGitIdentityDialog} disabled={gitIdentityPending}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => { void saveGitIdentity() }} disabled={gitIdentityPending}>
-              {gitIdentityPending ? 'Saving...' : 'Save identity'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={commitDialogOpen} onOpenChange={(open) => { if (!commitPending) setCommitDialogOpen(open) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Commit local changes</DialogTitle>
-            <DialogDescription>
-              GitLocal will stage all current repository changes and create a local commit.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <label className="grid gap-1.5">
-              <span className="text-sm font-medium text-[var(--foreground)]">Commit message</span>
-              <Input
-                value={commitMessage}
-                onChange={(event) => setCommitMessage(event.target.value)}
-                placeholder="Describe the current work"
-                aria-label="Commit message"
-                disabled={commitPending}
-              />
-            </label>
-
-            {commitError ? (
-              <p role="alert" className="text-sm text-[var(--danger)]">
-                {commitError}
-              </p>
-            ) : null}
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={closeCommitDialog} disabled={commitPending}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => { void submitCommitChanges() }} disabled={commitPending}>
-              {commitPending ? 'Committing...' : 'Commit changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CommitChangesDialog
+        open={commitDialogOpen}
+        pending={commitPending}
+        error={commitError}
+        message={commitMessage}
+        onOpenChange={(open) => {
+          if (!commitPending) setCommitDialogOpen(open)
+        }}
+        onMessageChange={setCommitMessage}
+        onCancel={closeCommitDialog}
+        onCommit={() => { void submitCommitChanges() }}
+      />
     </>
   )
 }

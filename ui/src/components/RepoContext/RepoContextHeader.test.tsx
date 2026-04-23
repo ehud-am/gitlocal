@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
 import RepoContextHeader from './RepoContextHeader'
 
@@ -100,6 +101,56 @@ describe('RepoContextHeader', () => {
     expect(screen.queryByText('/tmp/gitlocal/src/App.tsx')).not.toBeInTheDocument()
   })
 
+  it('supports remote branch labels, local-only upstream messaging, and has no obvious a11y violations', async () => {
+    const { container } = render(
+      <RepoContextHeader
+        info={{
+          name: '',
+          path: '',
+          currentBranch: '',
+          isGitRepo: false,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: false,
+          rootEntryCount: 0,
+          gitContext: {
+            user: null,
+            remote: {
+              name: 'origin',
+              fetchUrl: 'git@github.com:ehud-am/gitlocal.git',
+              webUrl: '',
+              selectionReason: 'origin',
+            },
+          },
+        }}
+        branch=""
+        branches={[
+          { name: 'release', scope: 'remote', remoteName: 'origin', trackingRef: 'origin/release', isCurrent: false },
+        ]}
+        selectedPath=""
+        selectedPathType="none"
+        repoSync={{
+          mode: 'local-only',
+          aheadCount: 0,
+          behindCount: 0,
+          hasUpstream: false,
+          upstreamRef: '',
+          remoteName: '',
+        }}
+        onBranchChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Repository' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
+    expect(screen.getByText(/this branch does not currently track an upstream remote/i)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('release (origin)')
+    expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit identity/i })).not.toBeInTheDocument()
+    expect(screen.getByText('git@github.com:ehud-am/gitlocal.git')).toBeInTheDocument()
+    expect((await axe(container)).violations).toHaveLength(0)
+  })
+
   it('disables branch switching while a branch mutation is running', () => {
     render(
       <RepoContextHeader
@@ -126,5 +177,57 @@ describe('RepoContextHeader', () => {
     )
 
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toBeDisabled()
+  })
+
+  it('covers fallback branch labels and hides optional details when metadata is unavailable', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'fallback-repo',
+          path: '/tmp/fallback-repo',
+          currentBranch: 'fallback',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: true,
+          rootEntryCount: 1,
+          gitContext: {
+            user: {
+              name: '',
+              email: '',
+              source: 'global',
+            },
+            remote: null,
+          },
+        }}
+        branch="fallback"
+        branches={[
+          { name: 'fallback', isCurrent: true },
+          { name: 'remote-only', scope: 'remote', isCurrent: false },
+        ]}
+        selectedPath=""
+        selectedPathType="none"
+        repoSync={{
+          mode: 'up-to-date',
+          aheadCount: 0,
+          behindCount: 0,
+          hasUpstream: true,
+          upstreamRef: '',
+          remoteName: '',
+        }}
+        trackedChangeCount={2}
+        untrackedChangeCount={1}
+        onBranchChange={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
+
+    expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('remote-only')
+    expect(screen.getByText(/3 local changes/i)).toBeInTheDocument()
+    expect(screen.getByText(/git user is not configured/i)).toBeInTheDocument()
+    expect(screen.getByText(/tracking the upstream branch\./i)).toBeInTheDocument()
+    expect(screen.queryByText('Remote path')).not.toBeInTheDocument()
+    expect(screen.queryByText('Repository actions')).not.toBeInTheDocument()
   })
 })
