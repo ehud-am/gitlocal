@@ -87,7 +87,7 @@ export async function branchSwitchHandler(c: Context<{ Variables: Variables }>):
   const status =
     result.status === 'switched'
       ? 200
-      : result.status === 'confirmation-required' || result.status === 'second-confirmation-required'
+      : result.status === 'confirmation-required'
         ? 409
         : result.status === 'cancelled'
           ? 200

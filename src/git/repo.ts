@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -29,6 +29,11 @@ interface FileSyncAnalysis {
   repoSync: RepoSyncState
   localCommittedPaths: Set<string>
   remoteCommittedPaths: Set<string>
+}
+
+interface GitWorktreeEntry {
+  path: string
+  branchRef: string
 }
 
 let cachedAppVersion = ''
@@ -738,37 +743,68 @@ function resolveBranchSelection(repoPath: string, target: string): {
   }
 }
 
-function getCheckoutBlockingUntrackedPaths(
-  repoPath: string,
-  targetRef: string,
-  untrackedPaths: string[],
-): string[] {
-  if (untrackedPaths.length === 0) return []
-
-  const result = runGitCapture(repoPath, 'ls-tree', '-r', '--name-only', targetRef)
+function getGitWorktreeEntries(repoPath: string): GitWorktreeEntry[] {
+  const result = runGitCapture(repoPath, 'worktree', 'list', '--porcelain')
   if (result.status !== 0 || !result.stdout) return []
 
-  const targetPaths = result.stdout.split('\n').map((line) => line.trim()).filter(Boolean)
-  return untrackedPaths.filter((untrackedPath) =>
-    targetPaths.some((targetPath) =>
-      targetPath === untrackedPath
-      || targetPath.startsWith(`${untrackedPath}/`)
-      || untrackedPath.startsWith(`${targetPath}/`),
-    ),
-  )
+  const entries: GitWorktreeEntry[] = []
+  let currentPath = ''
+  let currentBranchRef = ''
+
+  for (const line of result.stdout.split('\n')) {
+    if (!line.trim()) {
+      if (currentPath) {
+        entries.push({
+          path: currentPath,
+          branchRef: currentBranchRef,
+        })
+      }
+      currentPath = ''
+      currentBranchRef = ''
+      continue
+    }
+
+    if (line.startsWith('worktree ')) {
+      currentPath = line.slice('worktree '.length).trim()
+      continue
+    }
+
+    if (line.startsWith('branch ')) {
+      currentBranchRef = line.slice('branch '.length).trim()
+    }
+  }
+
+  if (currentPath) {
+    entries.push({
+      path: currentPath,
+      branchRef: currentBranchRef,
+    })
+  }
+
+  return entries
+}
+
+function getOtherWorktreePathForBranch(repoPath: string, branchName: string): string {
+  const targetBranchRef = `refs/heads/${branchName}`
+  const currentWorktreePath = resolve(repoPath)
+
+  return getGitWorktreeEntries(repoPath)
+    .find((entry) => entry.branchRef === targetBranchRef && resolve(entry.path) !== currentWorktreePath)
+    ?.path ?? ''
+}
+
+function formatBranchInUseByWorktreeMessage(branchName: string, worktreePath: string): string {
+  return `Branch ${branchName} is already checked out in another worktree at ${worktreePath}. Switch there or choose a different branch.`
+}
+
+function parseWorktreeInUseErrorPath(message: string): string {
+  const match = message.match(/already used by worktree at '([^']+)'/)
+  return match?.[1]?.trim() ?? ''
 }
 
 function discardTrackedChanges(repoPath: string): void {
   if (!hasCommits(repoPath)) return
   spawnGit(repoPath, 'reset', '--hard', 'HEAD')
-}
-
-function deleteRepoPaths(repoPath: string, paths: string[]): void {
-  for (const filePath of paths) {
-    const fullPath = resolveSafeRepoPath(repoPath, filePath)
-    if (!fullPath || !existsSync(fullPath)) continue
-    rmSync(fullPath, { recursive: true, force: true })
-  }
 }
 
 function performBranchCheckout(
@@ -827,19 +863,25 @@ export function switchBranch(repoPath: string, request: BranchSwitchRequest): Br
     }
   }
 
+  const otherWorktreePath = getOtherWorktreePathForBranch(repoPath, target.localName)
+  if (otherWorktreePath) {
+    return {
+      ok: false,
+      status: 'blocked',
+      message: formatBranchInUseByWorktreeMessage(target.localName, otherWorktreePath),
+      currentBranch,
+    }
+  }
+
   const changes = getWorkingTreeChanges(repoPath)
-  const blockingUntrackedPaths = getCheckoutBlockingUntrackedPaths(repoPath, target.checkoutRef, changes.untrackedPaths)
   const summary: Pick<BranchSwitchResponse, 'trackedChangeCount' | 'untrackedChangeCount' | 'blockingPaths' | 'suggestedCommitMessage'> = {
     trackedChangeCount: changes.trackedPaths.length,
     untrackedChangeCount: changes.untrackedPaths.length,
-    blockingPaths: [...changes.trackedPaths, ...blockingUntrackedPaths],
+    blockingPaths: changes.trackedPaths,
     suggestedCommitMessage: `WIP before switching to ${target.localName}`,
   }
 
-  if (
-    request.resolution === 'preview'
-    && (changes.trackedPaths.length > 0 || changes.untrackedPaths.length > 0)
-  ) {
+  if (request.resolution === 'preview' && changes.trackedPaths.length > 0) {
     return {
       ok: false,
       status: 'confirmation-required',
@@ -866,34 +908,8 @@ export function switchBranch(repoPath: string, request: BranchSwitchRequest): Br
       spawnGit(repoPath, 'commit', '-m', commitMessage)
     }
 
-    if (request.resolution === 'discard' || request.resolution === 'delete-untracked') {
+    if (request.resolution === 'discard') {
       discardTrackedChanges(repoPath)
-    }
-
-    if (request.resolution === 'discard' && blockingUntrackedPaths.length > 0 && !request.allowDeleteUntracked) {
-      return {
-        ok: false,
-        status: 'second-confirmation-required',
-        message: 'Untracked files would block this checkout. Delete those files to continue or cancel.',
-        currentBranch,
-        ...summary,
-        blockingPaths: blockingUntrackedPaths,
-      }
-    }
-
-    if (request.resolution === 'delete-untracked' && blockingUntrackedPaths.length > 0 && !request.allowDeleteUntracked) {
-      return {
-        ok: false,
-        status: 'blocked',
-        message: 'Confirm untracked file deletion before continuing.',
-        currentBranch,
-        ...summary,
-        blockingPaths: blockingUntrackedPaths,
-      }
-    }
-
-    if (request.resolution === 'delete-untracked') {
-      deleteRepoPaths(repoPath, blockingUntrackedPaths)
     }
 
     const checkout = performBranchCheckout(repoPath, target)
@@ -905,10 +921,14 @@ export function switchBranch(repoPath: string, request: BranchSwitchRequest): Br
       createdTrackingBranch: checkout.createdTrackingBranch,
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Branch switch failed.'
+    const worktreeInUsePath = parseWorktreeInUseErrorPath(errorMessage)
     return {
       ok: false,
-      status: 'failed',
-      message: error instanceof Error ? error.message : 'Branch switch failed.',
+      status: worktreeInUsePath ? 'blocked' : 'failed',
+      message: worktreeInUsePath
+        ? formatBranchInUseByWorktreeMessage(target.localName, worktreeInUsePath)
+        : errorMessage,
       currentBranch,
       ...summary,
     }

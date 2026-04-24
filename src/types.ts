@@ -64,11 +64,10 @@ export interface Branch {
   hasLocalCheckout?: boolean
 }
 
-export type BranchSwitchResolution = 'preview' | 'commit' | 'discard' | 'delete-untracked' | 'cancel'
+export type BranchSwitchResolution = 'preview' | 'commit' | 'discard' | 'cancel'
 export type BranchSwitchStatus =
   | 'switched'
   | 'confirmation-required'
-  | 'second-confirmation-required'
   | 'blocked'
   | 'failed'
   | 'cancelled'
@@ -77,7 +76,6 @@ export interface BranchSwitchRequest {
   target: string
   resolution: BranchSwitchResolution
   commitMessage?: string
-  allowDeleteUntracked?: boolean
 }
 
 export interface BranchSwitchResponse {
@@ -237,7 +235,8 @@ export interface PickCloneRequest {
   repositoryUrl: string
 }
 
-export type SearchMode = 'name' | 'content'
+export type SearchMode = 'name' | 'content' | 'both'
+export type SearchMatchType = 'name' | 'content'
 
 export interface SearchRequest {
   query: string
@@ -249,7 +248,7 @@ export interface SearchRequest {
 export interface SearchResult {
   path: string
   type: 'file' | 'dir'
-  matchType: SearchMode
+  matchType: SearchMatchType
   snippet?: string
   line?: number
   localOnly: boolean

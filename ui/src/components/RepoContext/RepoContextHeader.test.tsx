@@ -86,6 +86,7 @@ describe('RepoContextHeader', () => {
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^commit$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sync with remote|push to remote/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit repository git identity/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /collapse repository details/i })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /edit repository git identity/i }))
@@ -146,7 +147,7 @@ describe('RepoContextHeader', () => {
     expect(screen.getByText(/this branch does not currently track an upstream remote/i)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('release (origin)')
     expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /edit identity/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit repository git identity/i })).not.toBeInTheDocument()
     expect(screen.getByText('git@github.com:ehud-am/gitlocal.git')).toBeInTheDocument()
     expect((await axe(container)).violations).toHaveLength(0)
   })

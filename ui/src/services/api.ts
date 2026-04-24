@@ -18,6 +18,7 @@ import type {
   PickResponse,
   RepoInfo,
   RemoteSyncResponse,
+  SearchMode,
   SearchResponse,
   SyncStatus,
   TreeNode,
@@ -135,9 +136,15 @@ export const api = {
   syncWithRemote: (): Promise<RemoteSyncResponse> =>
     mutate('/api/git/sync', 'POST', {}),
 
-  getSearchResults: (query: string, branch?: string): Promise<SearchResponse> => {
-    const params = new URLSearchParams({ query, mode: 'name' })
+  getSearchResults: (
+    query: string,
+    branch?: string,
+    mode: SearchMode = 'both',
+    caseSensitive = false,
+  ): Promise<SearchResponse> => {
+    const params = new URLSearchParams({ query, mode })
     if (branch) params.set('branch', branch)
+    if (caseSensitive) params.set('caseSensitive', 'true')
     return request(`/api/search?${params.toString()}`)
   },
 

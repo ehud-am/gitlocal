@@ -58,6 +58,18 @@ describe('searchHandler', () => {
     expect(body.results[0].snippet).toContain('Searchable')
   })
 
+  it('returns combined name and content matches when both modes are requested', async () => {
+    const client = testClient(createApp(dir))
+    const res = await client.api.search.$get({
+      query: { query: 'feature', branch: 'feature-search', mode: 'both' },
+    })
+    const body = await res.json()
+
+    expect(body.mode).toBe('both')
+    expect(body.results.some((result: { matchType: string; path: string }) => result.matchType === 'name' && result.path === 'docs/feature.md')).toBe(true)
+    expect(body.results.some((result: { matchType: string; path: string }) => result.matchType === 'content' && result.path === 'docs/feature.md')).toBe(true)
+  })
+
   it('excludes untracked files from current-branch searches', async () => {
     writeFileSync(join(dir, 'draft-notes.md'), 'draft content')
     const client = testClient(createApp(dir))
@@ -135,12 +147,16 @@ describe('searchHandler', () => {
     expect((await res.json()).results[0].path).toBe('docs/feature.md')
   })
 
-  it('returns an empty result set for blank queries', async () => {
+  it('returns an empty result set for blank or too-short queries', async () => {
     const client = testClient(createApp(dir))
-    const res = await client.api.search.$get({
+    const blankRes = await client.api.search.$get({
       query: { query: '   ', branch, mode: 'name' },
     })
-    expect((await res.json()).results).toEqual([])
+    const shortRes = await client.api.search.$get({
+      query: { query: 'hi', branch, mode: 'both' },
+    })
+    expect((await blankRes.json()).results).toEqual([])
+    expect((await shortRes.json()).results).toEqual([])
   })
 
   it('returns 400 when no repository is loaded', async () => {
@@ -159,11 +175,11 @@ describe('searchHandler', () => {
     expect((await res.json()).results).toEqual([])
   })
 
-  it('defaults to name mode when mode is omitted', async () => {
+  it('defaults to both mode when mode is omitted', async () => {
     const client = testClient(createApp(dir))
     const res = await client.api.search.$get({
       query: { query: 'readme' },
     })
-    expect((await res.json()).mode).toBe('name')
+    expect((await res.json()).mode).toBe('both')
   })
 })

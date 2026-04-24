@@ -74,20 +74,20 @@ function iconFor(name: MetaTagIcon): ReactNode {
 }
 
 const toneClassNames: Record<MetaTagTone, string> = {
-  neutral: 'border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted-foreground)]',
-  info: 'border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[color-mix(in_srgb,var(--primary)_9%,transparent)] text-[var(--primary)]',
-  success: 'border-[color-mix(in_srgb,#1a7f37_28%,var(--border))] bg-[color-mix(in_srgb,#1a7f37_10%,transparent)] text-[#1a7f37]',
-  warning: 'border-[color-mix(in_srgb,#9a6700_30%,var(--border))] bg-[color-mix(in_srgb,#9a6700_12%,transparent)] text-[#9a6700]',
-  danger: 'border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)]',
+  neutral: 'bg-[color-mix(in_srgb,var(--surface-subtle)_92%,transparent)] text-[var(--muted-foreground)] ring-1 ring-inset ring-[var(--border)]',
+  info: 'bg-[color-mix(in_srgb,var(--primary)_12%,transparent)] text-[color-mix(in_srgb,var(--primary)_88%,black)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--primary)_26%,transparent)]',
+  success: 'bg-[color-mix(in_srgb,#1a7f37_12%,transparent)] text-[#176c31] ring-1 ring-inset ring-[color-mix(in_srgb,#1a7f37_24%,transparent)]',
+  warning: 'bg-[color-mix(in_srgb,#9a6700_14%,transparent)] text-[#8a5d00] ring-1 ring-inset ring-[color-mix(in_srgb,#9a6700_24%,transparent)]',
+  danger: 'bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--danger)_24%,transparent)]',
 }
 
 export function MetaTag({ label, icon, tone = 'neutral', compact = false, className }: Props) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold tracking-[0.02em]',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] leading-none font-semibold uppercase tracking-[0.08em]',
         toneClassNames[tone],
-        compact && 'px-1.5 py-0.5 text-[10px]',
+        compact && 'px-2 py-[0.3rem] text-[10px]',
         className,
       )}
     >

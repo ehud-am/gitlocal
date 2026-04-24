@@ -22,7 +22,6 @@ interface Props {
   onCancel: () => void
   onCommit: () => void
   onDiscard: () => void
-  onDeleteUntracked: () => void
 }
 
 function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
@@ -41,26 +40,17 @@ export default function BranchSwitchDialog({
   onCancel,
   onCommit,
   onDiscard,
-  onDeleteUntracked,
 }: Props) {
   const trackedChangeCount = response?.trackedChangeCount ?? 0
-  const untrackedChangeCount = response?.untrackedChangeCount ?? 0
   const blockingPaths = response?.blockingPaths ?? []
-  const isSecondConfirmation = response?.status === 'second-confirmation-required'
   const commitDisabled = pending || commitMessage.trim().length === 0
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !pending) onCancel() }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {isSecondConfirmation ? 'Delete untracked files?' : 'Switch branches?'}
-          </DialogTitle>
-          <DialogDescription>
-            {isSecondConfirmation
-              ? `These untracked files still block switching to ${targetLabel}. Deleting them will permanently remove local content.`
-              : `GitLocal needs a decision before it can switch to ${targetLabel}.`}
-          </DialogDescription>
+          <DialogTitle>Switch branches?</DialogTitle>
+          <DialogDescription>{`GitLocal needs a decision before it can switch to ${targetLabel}.`}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -77,13 +67,11 @@ export default function BranchSwitchDialog({
               </p>
               <p className="mt-1 text-sm text-[var(--foreground)]">
                 {pluralize(trackedChangeCount, 'tracked change')}
-                {' and '}
-                {pluralize(untrackedChangeCount, 'untracked file')}
               </p>
             </div>
           </div>
 
-          {targetScope === 'remote' && !isSecondConfirmation ? (
+          {targetScope === 'remote' ? (
             <p className="rounded-md border border-[var(--border)] bg-[var(--accent)] px-3 py-2 text-sm text-[var(--foreground)]">
               GitLocal will create a local tracking branch for this remote branch.
             </p>
@@ -91,9 +79,7 @@ export default function BranchSwitchDialog({
 
           {blockingPaths.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-[var(--foreground)]">
-                {isSecondConfirmation ? 'Files to delete' : 'Paths involved'}
-              </p>
+              <p className="text-sm font-medium text-[var(--foreground)]">Tracked paths</p>
               <ul className="max-h-40 space-y-1 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2 text-sm text-[var(--foreground)]">
                 {blockingPaths.map((path) => (
                   <li key={path} className="break-all">{path}</li>
@@ -102,23 +88,21 @@ export default function BranchSwitchDialog({
             </div>
           ) : null}
 
-          {!isSecondConfirmation ? (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-[var(--foreground)]" htmlFor="branch-switch-commit-message">
-                Commit message
-              </label>
-              <Input
-                id="branch-switch-commit-message"
-                value={commitMessage}
-                onChange={(event) => onCommitMessageChange(event.target.value)}
-                placeholder="WIP before switching branches"
-                disabled={pending}
-              />
-              <p className="text-xs text-[var(--muted-foreground)]">
-                GitLocal stages every current change before creating the commit.
-              </p>
-            </div>
-          ) : null}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-[var(--foreground)]" htmlFor="branch-switch-commit-message">
+              Commit message
+            </label>
+            <Input
+              id="branch-switch-commit-message"
+              value={commitMessage}
+              onChange={(event) => onCommitMessageChange(event.target.value)}
+              placeholder="WIP before switching branches"
+              disabled={pending}
+            />
+            <p className="text-xs text-[var(--muted-foreground)]">
+              GitLocal stages every current change before creating the commit.
+            </p>
+          </div>
 
           {(errorMessage || response?.message) ? (
             <p
@@ -134,20 +118,12 @@ export default function BranchSwitchDialog({
           <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
             Cancel
           </Button>
-          {isSecondConfirmation ? (
-            <Button type="button" variant="danger" onClick={onDeleteUntracked} disabled={pending}>
-              {pending ? 'Deleting...' : 'Delete files and switch'}
-            </Button>
-          ) : (
-            <>
-              <Button type="button" variant="secondary" onClick={onDiscard} disabled={pending}>
-                {pending ? 'Discarding...' : 'Discard changes and switch'}
-              </Button>
-              <Button type="button" onClick={onCommit} disabled={commitDisabled}>
-                {pending ? 'Committing...' : 'Commit and switch'}
-              </Button>
-            </>
-          )}
+          <Button type="button" variant="secondary" onClick={onDiscard} disabled={pending}>
+            {pending ? 'Discarding...' : 'Discard changes and switch'}
+          </Button>
+          <Button type="button" onClick={onCommit} disabled={commitDisabled}>
+            {pending ? 'Committing...' : 'Commit and switch'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

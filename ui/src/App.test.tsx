@@ -194,7 +194,7 @@ describe('App', () => {
     vi.mocked(api.getSearchResults).mockResolvedValue({
       query: '',
       branch: 'main',
-      mode: 'name',
+      mode: 'both',
       caseSensitive: false,
       results: [],
     })
@@ -430,6 +430,32 @@ describe('App', () => {
     expect(screen.getByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
   })
 
+  it('runs repository search only after explicit submit and uses the default combined mode', async () => {
+    vi.mocked(api.getSearchResults).mockResolvedValueOnce({
+      query: 'docs',
+      branch: 'main',
+      mode: 'both',
+      caseSensitive: false,
+      results: [{ path: 'docs', type: 'dir', matchType: 'name', localOnly: false }],
+    })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /search query/i }), {
+      target: { value: 'docs' },
+    })
+
+    expect(api.getSearchResults).not.toHaveBeenCalledWith('docs', 'main', 'both', false)
+
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    await waitFor(() => {
+      expect(api.getSearchResults).toHaveBeenCalledWith('docs', 'main', 'both', false)
+    })
+    expect(await screen.findByRole('button', { name: /docs/i })).toBeInTheDocument()
+  })
+
   it('collapses and restores the repository tree rail', async () => {
     renderWithClient()
 
@@ -564,7 +590,6 @@ describe('App', () => {
         target: 'feature',
         resolution: 'commit',
         commitMessage: 'save before switch',
-        allowDeleteUntracked: false,
       })
       currentBranch = 'feature'
       return {

@@ -1,4 +1,4 @@
-import type { SearchPresentation, ViewerState } from '../types'
+import type { SearchMode, SearchPresentation, ViewerState } from '../types'
 
 const DEFAULTS: ViewerState = {
   repoPath: '',
@@ -9,6 +9,8 @@ const DEFAULTS: ViewerState = {
   sidebarCollapsed: false,
   searchPresentation: 'collapsed',
   searchQuery: '',
+  searchMode: 'both',
+  searchCaseSensitive: false,
 }
 
 function parseBoolean(value: string | null, fallback: boolean): boolean {
@@ -30,6 +32,11 @@ export function readViewerState(): ViewerState {
   const params = getParams()
   const presentation = params.get('searchPresentation')
   const searchPresentation: SearchPresentation = presentation === 'expanded' ? 'expanded' : 'collapsed'
+  const searchModeParam = params.get('searchMode')
+  const searchMode: SearchMode =
+    searchModeParam === 'name' || searchModeParam === 'content' || searchModeParam === 'both'
+      ? searchModeParam
+      : DEFAULTS.searchMode
 
   return {
     repoPath: params.get('repoPath') ?? DEFAULTS.repoPath,
@@ -45,6 +52,8 @@ export function readViewerState(): ViewerState {
     sidebarCollapsed: parseBoolean(params.get('sidebarCollapsed'), DEFAULTS.sidebarCollapsed),
     searchPresentation,
     searchQuery: params.get('searchQuery') ?? DEFAULTS.searchQuery,
+    searchMode,
+    searchCaseSensitive: parseBoolean(params.get('searchCaseSensitive'), DEFAULTS.searchCaseSensitive),
   }
 }
 
@@ -60,6 +69,8 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
   if (next.sidebarCollapsed) params.set('sidebarCollapsed', 'true')
   if (next.searchPresentation !== DEFAULTS.searchPresentation) params.set('searchPresentation', next.searchPresentation)
   if (next.searchQuery) params.set('searchQuery', next.searchQuery)
+  if (next.searchMode !== DEFAULTS.searchMode) params.set('searchMode', next.searchMode)
+  if (next.searchCaseSensitive) params.set('searchCaseSensitive', 'true')
 
   writeParams(params)
   return next
