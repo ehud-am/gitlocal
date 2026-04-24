@@ -64,7 +64,9 @@ function getSearchableWorkingTreeEntries(repoPath: string, subpath: string = '')
 
     results.push(entry)
 
-    if (entry.type === 'dir' && (entry.localOnly || trackedType === 'dir')) {
+    // Avoid crawling ignored/local-only directories like node_modules or nested worktrees.
+    // We still surface the directory itself as a name match from the parent listing.
+    if (entry.type === 'dir' && trackedType === 'dir') {
       results.push(...getSearchableWorkingTreeEntries(repoPath, entry.path))
     }
   }

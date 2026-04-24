@@ -178,6 +178,20 @@ describe('working tree tree helpers', () => {
     )
   })
 
+  it('does not recurse into ignored directories during search', () => {
+    writeFileSync(join(dir, '.gitignore'), 'ignored-huge-dir/\n')
+    mkdirSync(join(dir, 'ignored-huge-dir'))
+    writeFileSync(join(dir, 'ignored-huge-dir', 'nested.md'), 'nested search target')
+
+    expect(searchWorkingTreeByName(dir, 'ignored-huge-dir', false)).toContainEqual(
+      expect.objectContaining({ path: 'ignored-huge-dir', localOnly: true }),
+    )
+    expect(searchWorkingTreeByName(dir, 'nested', false)).toEqual([])
+    expect(searchWorkingTreeByContent(dir, 'search target', false)).not.toContainEqual(
+      expect.objectContaining({ path: 'ignored-huge-dir/nested.md' }),
+    )
+  })
+
   it('returns no matches for an empty name query', () => {
     expect(searchWorkingTreeByName(dir, '', false)).toEqual([])
   })
