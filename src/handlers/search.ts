@@ -5,7 +5,7 @@ import type { SearchMode, SearchResponse, SearchResult } from '../types.js'
 
 type Variables = { repoPath: string }
 
-function normalizeMode(value: string | undefined): SearchMode {
+export function normalizeMode(value: string | undefined): SearchMode {
   if (value === 'name' || value === 'content' || value === 'both') return value
   return 'both'
 }
@@ -14,7 +14,7 @@ function parseCaseSensitive(value: string | undefined): boolean {
   return value === 'true'
 }
 
-function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
+export function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
   const seen = new Set<string>()
   const deduped: SearchResult[] = []
 
@@ -28,7 +28,7 @@ function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
   return deduped
 }
 
-function sortSearchResults(results: SearchResult[]): SearchResult[] {
+export function sortSearchResults(results: SearchResult[]): SearchResult[] {
   return [...results].sort((left, right) => {
     if (left.matchType !== right.matchType) return left.matchType === 'name' ? -1 : 1
     if (left.type !== right.type) return left.type === 'dir' ? -1 : 1

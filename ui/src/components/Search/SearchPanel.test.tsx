@@ -199,4 +199,35 @@ describe('SearchPanel', () => {
 
     expect(await screen.findByText(/no file names or file contents matched the current search/i)).toBeInTheDocument()
   })
+
+  it('updates guidance when search targets change and requires at least one target', async () => {
+    const onDismiss = vi.fn()
+
+    renderWithClient(
+      <SearchPanelHarness
+        initialQuery="guide"
+        initialMode="both"
+        onDismiss={onDismiss}
+      />,
+    )
+
+    expect(await screen.findByText('docs/guide.md')).toBeInTheDocument()
+    expect(screen.getByText(/showing submitted matches/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /close search/i }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByLabelText(/file names/i))
+    expect(screen.getByText(/press search or enter to run the updated query/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText(/file contents/i))
+    expect(screen.getByText(/choose at least one search target\./i)).toBeInTheDocument()
+    expect(screen.getByText(/choose at least one search target to search\./i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^search$/i })).toBeDisabled()
+    expect(vi.mocked(api.getSearchResults)).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByLabelText(/file names/i))
+    expect(screen.getByText(/press search or enter to run the updated query/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^search$/i })).toBeEnabled()
+  })
 })

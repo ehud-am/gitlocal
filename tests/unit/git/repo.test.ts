@@ -1197,6 +1197,16 @@ describe('working tree helpers', () => {
         trackedChangeCount: 1,
       }))
 
+      const discarded = switchBranch(dir, { target: 'feature', resolution: 'discard' })
+      expect(discarded).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        currentBranch: 'feature',
+      }))
+      expect(git(dir, 'status', '--porcelain')).toBe('')
+      git(dir, 'checkout', mainBranch)
+      writeFileSync(join(dir, 'main.ts'), 'console.log("dirty")')
+
       expect(switchBranch(dir, { target: '', resolution: 'preview' }).status).toBe('blocked')
       expect(switchBranch(join(tmpdir(), 'missing-repo-for-switch'), { target: 'feature', resolution: 'preview' }).status).toBe('blocked')
       expect(switchBranch(dir, { target: mainBranch, resolution: 'cancel' }).status).toBe('cancelled')
@@ -1289,6 +1299,34 @@ describe('working tree helpers', () => {
       spawnSync('git', ['worktree', 'remove', '--force', linkedWorktreePath], { cwd: dir })
       rmSync(workspace, { recursive: true, force: true })
       cleanup()
+    }
+  })
+
+  it('allows discard-based switching in repositories without commits', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-switch-'))
+
+    try {
+      git(dir, 'init')
+      git(dir, 'config', 'user.email', 'test@test.com')
+      git(dir, 'config', 'user.name', 'Test User')
+      writeFileSync(join(dir, 'draft.txt'), 'draft')
+      git(dir, 'checkout', '-b', 'feature-empty')
+      git(dir, 'checkout', '-b', 'main-empty')
+      writeFileSync(join(dir, 'draft.txt'), 'still draft')
+
+      const result = switchBranch(dir, {
+        target: 'feature-empty',
+        resolution: 'discard',
+      })
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'failed',
+        currentBranch: '',
+      }))
+      expect(result.message).toContain("pathspec 'feature-empty'")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

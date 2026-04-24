@@ -110,4 +110,30 @@ describe('BranchSwitchDialog', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).not.toHaveBeenCalled()
   })
+
+  it('allows escape to dismiss the dialog when no action is pending', () => {
+    const onCancel = vi.fn()
+
+    render(
+      <BranchSwitchDialog
+        open
+        targetLabel="feature"
+        response={{
+          ok: false,
+          status: 'confirmation-required',
+          message: 'Choose how to continue.',
+          trackedChangeCount: 1,
+          blockingPaths: ['README.md'],
+        }}
+        commitMessage="keep this"
+        onCommitMessageChange={vi.fn()}
+        onCancel={onCancel}
+        onCommit={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalled()
+  })
 })

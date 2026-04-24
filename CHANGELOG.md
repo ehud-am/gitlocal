@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3
+
+- Fixed branch switching so untracked files no longer trigger GitLocal confirmation flows, and branches already checked out in another git worktree now fail early with a clearer blocked message.
+- Refined the expanded repository header so the git identity edit action sits inline as an icon control, and restyled metadata tags to read more like badges than mini buttons.
+- Rebuilt repository search so it runs on explicit submit, supports file-name search, content search, or both, supports case-sensitive matching, and ignores queries shorter than three characters.
+- Fixed current-branch search hangs by stopping recursive crawls into ignored local-only directories such as dependency folders or nested worktrees.
+
 ## 0.5.2
 
 - Added file-level sync indicators so repository views can show uncommitted local changes, local-only commits, remote-only updates, and diverged file states while you browse.

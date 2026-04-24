@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
 import { createApp } from '../../../src/server.js'
+import { dedupeSearchResults, normalizeMode, sortSearchResults } from '../../../src/handlers/search.js'
 
 function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-search-test-'))
@@ -17,7 +18,7 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
   spawnSync('git', ['checkout', '-b', 'feature-search'], { cwd: dir })
-  writeFileSync(join(dir, 'docs', 'feature.md'), 'Feature branch content')
+  writeFileSync(join(dir, 'docs', 'feature.md'), 'Feature branch content\nFeature branch content again')
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'feature'], { cwd: dir })
   spawnSync('git', ['checkout', '-'], { cwd: dir })
@@ -68,6 +69,19 @@ describe('searchHandler', () => {
     expect(body.mode).toBe('both')
     expect(body.results.some((result: { matchType: string; path: string }) => result.matchType === 'name' && result.path === 'docs/feature.md')).toBe(true)
     expect(body.results.some((result: { matchType: string; path: string }) => result.matchType === 'content' && result.path === 'docs/feature.md')).toBe(true)
+  })
+
+  it('sorts repeated content matches in the same file by line number', async () => {
+    const client = testClient(createApp(dir))
+    const res = await client.api.search.$get({
+      query: { query: 'Feature branch content', branch: 'feature-search', mode: 'content' },
+    })
+    const body = await res.json()
+    const featureMatches = body.results
+      .filter((result: { path: string; matchType: string }) => result.path === 'docs/feature.md' && result.matchType === 'content')
+      .map((result: { line: number }) => result.line)
+
+    expect(featureMatches).toEqual([1, 2])
   })
 
   it('excludes untracked files from current-branch searches', async () => {
@@ -181,5 +195,56 @@ describe('searchHandler', () => {
       query: { query: 'readme' },
     })
     expect((await res.json()).mode).toBe('both')
+  })
+
+  it('falls back to both mode when an unsupported mode is provided', async () => {
+    const client = testClient(createApp(dir))
+    const res = await client.api.search.$get({
+      query: { query: 'feature', branch: 'feature-search', mode: 'invalid-mode' as never },
+    })
+    const body = await res.json()
+
+    expect(body.mode).toBe('both')
+    expect(body.results.some((result: { matchType: string }) => result.matchType === 'name')).toBe(true)
+    expect(body.results.some((result: { matchType: string }) => result.matchType === 'content')).toBe(true)
+  })
+})
+
+describe('search helper utilities', () => {
+  it('normalizes supported modes and falls back to both', () => {
+    expect(normalizeMode('name')).toBe('name')
+    expect(normalizeMode('content')).toBe('content')
+    expect(normalizeMode('both')).toBe('both')
+    expect(normalizeMode('unexpected')).toBe('both')
+    expect(normalizeMode(undefined)).toBe('both')
+  })
+
+  it('deduplicates equivalent search results while keeping unique ones', () => {
+    expect(dedupeSearchResults([
+      { path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: false },
+      { path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: false },
+      { path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: true },
+      { path: 'docs/guide.md', type: 'file', matchType: 'content', line: 3, snippet: 'guide', localOnly: false },
+    ])).toEqual([
+      { path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: false },
+      { path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: true },
+      { path: 'docs/guide.md', type: 'file', matchType: 'content', line: 3, snippet: 'guide', localOnly: false },
+    ])
+  })
+
+  it('sorts search results by match type, node type, path, and line number', () => {
+    expect(sortSearchResults([
+      { path: 'src/zeta.ts', type: 'file', matchType: 'content', line: 9, localOnly: false },
+      { path: 'src/alpha.ts', type: 'file', matchType: 'content', line: 12, localOnly: false },
+      { path: 'src/alpha.ts', type: 'file', matchType: 'content', line: 4, localOnly: false },
+      { path: 'src', type: 'dir', matchType: 'name', localOnly: false },
+      { path: 'README.md', type: 'file', matchType: 'name', localOnly: false },
+    ])).toEqual([
+      { path: 'src', type: 'dir', matchType: 'name', localOnly: false },
+      { path: 'README.md', type: 'file', matchType: 'name', localOnly: false },
+      { path: 'src/alpha.ts', type: 'file', matchType: 'content', line: 4, localOnly: false },
+      { path: 'src/alpha.ts', type: 'file', matchType: 'content', line: 12, localOnly: false },
+      { path: 'src/zeta.ts', type: 'file', matchType: 'content', line: 9, localOnly: false },
+    ])
   })
 })
