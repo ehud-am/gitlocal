@@ -398,7 +398,7 @@ describe('App logic', () => {
     expect(await screen.findByRole('heading', { name: /not a git repository/i })).toBeInTheDocument()
   })
 
-  it('expands search from saved state, keyboard shortcut, selection, and dismissal', async () => {
+  it('expands search from saved state, the header trigger, selection, and dismissal', async () => {
     readViewerState.mockReturnValue(buildViewerState({ searchQuery: 'guide' }))
 
     renderApp()
@@ -409,7 +409,7 @@ describe('App logic', () => {
       expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: 'f', metaKey: true })
+    fireEvent.click(screen.getByRole('button', { name: 'open-search' }))
     expect(await screen.findByTestId('search-panel')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'select-search' }))
 

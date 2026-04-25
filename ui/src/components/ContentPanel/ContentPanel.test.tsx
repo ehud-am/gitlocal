@@ -606,6 +606,50 @@ describe('ContentPanel', () => {
     expect(onRawChange).toHaveBeenCalledWith(true)
   })
 
+  it('offers an explicit find-in-file panel for searchable files', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'notes.txt', language: 'text', content: 'Alpha beta\nalpha Beta\nbeta alpha' }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="notes.txt"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await screen.findByTestId('code-viewer')
+    fireEvent.click(screen.getByRole('button', { name: /find in file/i }))
+
+    expect(screen.getByRole('searchbox', { name: /find in file query/i })).toBeInTheDocument()
+    expect(screen.getByText(/enter text to search within this file/i)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /find in file query/i }), {
+      target: { value: 'alpha' },
+    })
+
+    expect(screen.getByText(/3 matches in this file/i)).toBeInTheDocument()
+    expect(screen.getByText(/match 1 of 3: line 1, column 1/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByText(/match 2 of 3: line 2, column 1/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText(/case sensitive/i))
+    expect(screen.getByText(/2 matches in this file/i)).toBeInTheDocument()
+    expect(screen.getByText(/match 1 of 2: line 2, column 1/i)).toBeInTheDocument()
+
+    const matches = within(screen.getByRole('list', { name: /find in file matches/i })).getAllByRole('button')
+    expect(matches).toHaveLength(2)
+
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: /find in file query/i }), { key: 'Escape' })
+    expect(screen.queryByRole('searchbox', { name: /find in file query/i })).not.toBeInTheDocument()
+  })
+
   it('keeps file actions scoped to the current file', async () => {
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
 
@@ -664,6 +708,7 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/Binary file/i)).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: /find in file/i })).not.toBeInTheDocument()
 
     rerender(
       <QueryClientProvider client={makeClient()}>
@@ -684,6 +729,7 @@ describe('ContentPanel', () => {
       expect(img).toBeInTheDocument()
       expect(img.getAttribute('src')).toContain('abc123')
     })
+    expect(screen.queryByRole('button', { name: /find in file/i })).not.toBeInTheDocument()
   })
 
   it('enters edit mode, tracks dirty state, and saves updates', async () => {

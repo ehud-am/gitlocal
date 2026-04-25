@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.4
+
+- Changed repository search so it opens only from the repository search button and no longer overrides the browser's native `Cmd/Ctrl+F` behavior.
+- Added an explicit in-file find panel for the currently viewed file, with match counts, previous/next navigation, and optional case-sensitive matching.
+- Pinned patched `postcss` transitive versions through npm overrides so the release verification audit passes cleanly.
+
 ## 0.5.3
 
 - Fixed branch switching so untracked files no longer trigger GitLocal confirmation flows, and branches already checked out in another git worktree now fail early with a clearer blocked message.

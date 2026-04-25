@@ -6,6 +6,7 @@ import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
 
@@ -52,6 +53,15 @@ interface DirectoryRow {
   isParent: boolean
   exitsRepo: boolean
   displayPath: string
+}
+
+interface InFileMatch {
+  id: string
+  line: number
+  column: number
+  before: string
+  match: string
+  after: string
 }
 
 function KebabIcon() {
@@ -106,6 +116,41 @@ function formatActivePathLabel(path: string, localOnly: boolean): string {
   return localOnly ? `root/${path}` : path
 }
 
+function findInFileMatches(content: string, query: string, caseSensitive: boolean): InFileMatch[] {
+  const trimmedQuery = query.trim()
+  if (!trimmedQuery) return []
+
+  const normalizedNeedle = caseSensitive ? trimmedQuery : trimmedQuery.toLowerCase()
+
+  return content.split('\n').flatMap((lineText, index) => {
+    const haystack = caseSensitive ? lineText : lineText.toLowerCase()
+    const matches: InFileMatch[] = []
+    let searchFrom = 0
+
+    while (searchFrom <= haystack.length - normalizedNeedle.length) {
+      const foundAt = haystack.indexOf(normalizedNeedle, searchFrom)
+      if (foundAt < 0) break
+
+      const matchEnd = foundAt + trimmedQuery.length
+      const snippetStart = Math.max(0, foundAt - 28)
+      const snippetEnd = Math.min(lineText.length, matchEnd + 36)
+
+      matches.push({
+        id: `${index + 1}:${foundAt}`,
+        line: index + 1,
+        column: foundAt + 1,
+        before: `${snippetStart > 0 ? '…' : ''}${lineText.slice(snippetStart, foundAt)}`,
+        match: lineText.slice(foundAt, matchEnd),
+        after: `${lineText.slice(matchEnd, snippetEnd)}${snippetEnd < lineText.length ? '…' : ''}`,
+      })
+
+      searchFrom = foundAt + Math.max(trimmedQuery.length, 1)
+    }
+
+    return matches
+  })
+}
+
 export default function ContentPanel({
   canMutateFiles,
   refreshToken,
@@ -135,6 +180,10 @@ export default function ContentPanel({
   const [draftContent, setDraftContent] = useState('')
   const [formError, setFormError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fileFindOpen, setFileFindOpen] = useState(false)
+  const [fileFindQuery, setFileFindQuery] = useState('')
+  const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
+  const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -172,6 +221,10 @@ export default function ContentPanel({
     setMode('view')
     setFormError('')
     setBusy(false)
+    setFileFindOpen(false)
+    setFileFindQuery('')
+    setFileFindCaseSensitive(false)
+    setActiveFileFindIndex(0)
   }, [branch, selectedPath, selectedPathType])
 
   useEffect(() => {
@@ -185,13 +238,36 @@ export default function ContentPanel({
     return false
   }, [data?.content, draftContent, draftPath, mode])
 
+  const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image')
+  const trimmedFileFindQuery = fileFindQuery.trim()
+  const fileFindMatches = useMemo(
+    () => (canSearchCurrentFile ? findInFileMatches(data?.content ?? '', trimmedFileFindQuery, fileFindCaseSensitive) : []),
+    [canSearchCurrentFile, data?.content, fileFindCaseSensitive, trimmedFileFindQuery],
+  )
+  const activeFileFindMatch = fileFindMatches[activeFileFindIndex] ?? null
+  const visibleFileFindMatches = fileFindMatches.slice(0, 12)
+
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
 
+  useEffect(() => {
+    setActiveFileFindIndex(0)
+  }, [fileFindCaseSensitive, trimmedFileFindQuery])
+
+  useEffect(() => {
+    if (activeFileFindIndex < fileFindMatches.length) return
+    setActiveFileFindIndex(0)
+  }, [activeFileFindIndex, fileFindMatches.length])
+
   function confirmDiscardIfNeeded(): boolean {
     if (!dirty) return true
     return window.confirm('Discard your unsaved file changes?')
+  }
+
+  function cycleFileFindMatch(direction: 1 | -1): void {
+    if (fileFindMatches.length === 0) return
+    setActiveFileFindIndex((currentIndex) => (currentIndex + direction + fileFindMatches.length) % fileFindMatches.length)
   }
 
   async function refreshFileQueries(): Promise<void> {
@@ -535,6 +611,12 @@ export default function ContentPanel({
     selectedPathSyncState !== 'none'
       ? describeFileSyncState(selectedPathSyncState)
       : null
+  const fileFindSummary =
+    trimmedFileFindQuery.length === 0
+      ? 'Enter text to search within this file.'
+      : fileFindMatches.length === 0
+        ? `No matches for "${trimmedFileFindQuery}" in this file.`
+        : `${fileFindMatches.length} ${fileFindMatches.length === 1 ? 'match' : 'matches'} in this file.`
 
   return (
     <div className={`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`}>
@@ -548,58 +630,189 @@ export default function ContentPanel({
           </div>
         </div>
         {mode === 'view' ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
+          <div className="flex flex-wrap items-center gap-2">
+            {canSearchCurrentFile ? (
+              <Button
                 type="button"
-                className="panel-icon-button content-actions-trigger"
-                aria-label="File actions"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFileFindOpen((currentValue) => !currentValue)
+                  setFileFindQuery('')
+                  setFileFindCaseSensitive(false)
+                  setActiveFileFindIndex(0)
+                }}
+                aria-pressed={fileFindOpen}
               >
-                <KebabIcon />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canToggleRaw ? (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    if (!confirmDiscardIfNeeded()) return
-                    const next = !showRaw
-                    setShowRaw(next)
-                    onRawChange?.(next)
-                  }}
+                Find in file
+              </Button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="panel-icon-button content-actions-trigger"
+                  aria-label="File actions"
                 >
-                  {showRaw ? 'View rendered' : 'View raw'}
-                </DropdownMenuItem>
-              ) : null}
-              {canMutateFiles ? (
-                <DropdownMenuItem
-                  disabled={!data.editable}
-                  onSelect={() => {
-                    setDraftContent(data.content)
-                    setFormError('')
-                    setMode('edit')
-                  }}
-                >
-                  Edit file
-                </DropdownMenuItem>
-              ) : null}
-              {canMutateFiles ? (
-                <DropdownMenuItem
-                  className="dropdown-danger"
-                  disabled={!data.revisionToken}
-                  onSelect={() => {
-                    if (!confirmDiscardIfNeeded()) return
-                    setFormError('')
-                    setMode('confirm-delete')
-                  }}
-                >
-                  Delete file
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <KebabIcon />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canToggleRaw ? (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      if (!confirmDiscardIfNeeded()) return
+                      const next = !showRaw
+                      setShowRaw(next)
+                      onRawChange?.(next)
+                    }}
+                  >
+                    {showRaw ? 'View rendered' : 'View raw'}
+                  </DropdownMenuItem>
+                ) : null}
+                {canMutateFiles ? (
+                  <DropdownMenuItem
+                    disabled={!data.editable}
+                    onSelect={() => {
+                      setDraftContent(data.content)
+                      setFormError('')
+                      setMode('edit')
+                    }}
+                  >
+                    Edit file
+                  </DropdownMenuItem>
+                ) : null}
+                {canMutateFiles ? (
+                  <DropdownMenuItem
+                    className="dropdown-danger"
+                    disabled={!data.revisionToken}
+                    onSelect={() => {
+                      if (!confirmDiscardIfNeeded()) return
+                      setFormError('')
+                      setMode('confirm-delete')
+                    }}
+                  >
+                    Delete file
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ) : null}
       </div>
+
+      {mode === 'view' && fileFindOpen ? (
+        <section
+          className="mb-4 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
+          aria-label="find in current file"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <label className="block text-sm font-medium text-[var(--foreground)]" htmlFor="content-file-find">
+                Find in this file
+              </label>
+              <input
+                id="content-file-find"
+                type="search"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] outline-none ring-offset-2 ring-offset-[var(--background)] placeholder:text-[var(--muted-foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                placeholder="Search the current file"
+                value={fileFindQuery}
+                onChange={(event) => setFileFindQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    cycleFileFindMatch(1)
+                  }
+                  if (event.key === 'Escape') {
+                    setFileFindOpen(false)
+                    setFileFindQuery('')
+                    setFileFindCaseSensitive(false)
+                    setActiveFileFindIndex(0)
+                  }
+                }}
+                aria-label="find in file query"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  checked={fileFindCaseSensitive}
+                  onChange={(event) => setFileFindCaseSensitive(event.target.checked)}
+                />
+                <span>Case sensitive</span>
+              </label>
+              <Button type="button" variant="secondary" size="sm" disabled={fileFindMatches.length === 0} onClick={() => cycleFileFindMatch(-1)}>
+                Previous
+              </Button>
+              <Button type="button" variant="secondary" size="sm" disabled={fileFindMatches.length === 0} onClick={() => cycleFileFindMatch(1)}>
+                Next
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close find in file"
+                onClick={() => {
+                  setFileFindOpen(false)
+                  setFileFindQuery('')
+                  setFileFindCaseSensitive(false)
+                  setActiveFileFindIndex(0)
+                }}
+              >
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </Button>
+            </div>
+          </div>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">{fileFindSummary}</p>
+          {activeFileFindMatch ? (
+            <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+              Match {activeFileFindIndex + 1} of {fileFindMatches.length}: line {activeFileFindMatch.line}, column {activeFileFindMatch.column}
+            </p>
+          ) : null}
+          {trimmedFileFindQuery.length > 0 && fileFindMatches.length > 0 ? (
+            <div className="mt-3 max-h-56 overflow-auto rounded-md border border-[var(--border)] bg-[var(--background)]">
+              <ul className="divide-y divide-[var(--border)]" aria-label="find in file matches">
+                {visibleFileFindMatches.map((match, index) => {
+                  const isActive = index === activeFileFindIndex
+                  return (
+                    <li key={match.id}>
+                      <button
+                        type="button"
+                        className={`flex w-full items-start justify-between gap-3 px-3 py-2 text-left text-sm ${
+                          isActive ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                        }`}
+                        onClick={() => setActiveFileFindIndex(index)}
+                        aria-pressed={isActive}
+                      >
+                        <span className="min-w-0 flex-1 break-words">
+                          {match.before}
+                          <mark className="rounded bg-[var(--warning-soft)] px-0.5 text-[var(--foreground)]">
+                            {match.match}
+                          </mark>
+                          {match.after}
+                        </span>
+                        <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
+                          Ln {match.line}, Col {match.column}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              {fileFindMatches.length > visibleFileFindMatches.length ? (
+                <p className="border-t border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
+                  Showing the first {visibleFileFindMatches.length} matches of {fileFindMatches.length}.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {mode === 'edit' ? (
         <InlineFileEditor

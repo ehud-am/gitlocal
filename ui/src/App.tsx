@@ -221,21 +221,6 @@ export default function App() {
   }, [currentBranch, info?.currentBranch])
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-      const isShortcut = key === 'f' && (event.metaKey || event.ctrlKey)
-      if (!isShortcut) return
-      if (info?.pickerMode || info?.isGitRepo === false) return
-
-      event.preventDefault()
-      setSearchPresentation('expanded')
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [info?.isGitRepo, info?.pickerMode])
-
-  useEffect(() => {
     if (!syncStatus) return
 
     if (lastRevisionRef.current && lastRevisionRef.current !== syncStatus.workingTreeRevision) {

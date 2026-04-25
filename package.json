@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Browse any local git repository in your browser",
   "keywords": [
     "git",
@@ -55,6 +55,9 @@
     "esbuild": "^0.27.4",
     "typescript": "^5.8.3",
     "vitest": "^4.1.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   },
   "license": "MIT",
   "repository": {

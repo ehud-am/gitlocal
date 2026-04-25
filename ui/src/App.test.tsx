@@ -420,14 +420,11 @@ describe('App', () => {
     expect(await screen.findByText(/pushed main to origin\/main/i)).toBeInTheDocument()
   })
 
-  it('opens search from the compact trigger and with the keyboard shortcut', async () => {
+  it('opens search from the compact trigger only', async () => {
     renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
     expect(await screen.findByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
-
-    fireEvent.keyDown(window, { key: 'f', metaKey: true })
-    expect(screen.getByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
   })
 
   it('runs repository search only after explicit submit and uses the default combined mode', async () => {

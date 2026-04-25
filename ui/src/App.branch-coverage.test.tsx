@@ -442,13 +442,17 @@ describe('App branch coverage', () => {
     })
   })
 
-  it('supports ctrl+f, ignores non-shortcuts, and keeps picker mode out of search flow', async () => {
+  it('opens repository search only from the explicit trigger and keeps picker mode out of search flow', async () => {
     const standard = renderApp()
+    await screen.findByTestId('content-props')
 
     fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
     expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
+    expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'open-search' }))
     expect(await screen.findByTestId('search-panel')).toBeInTheDocument()
     standard.unmount()
 
@@ -458,7 +462,7 @@ describe('App branch coverage', () => {
     expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
   })
 
-  it('suppresses the search shortcut for non-git launch contexts', async () => {
+  it('does not open repository search from keyboard shortcuts in non-git launch contexts', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({ isGitRepo: false }))
 
     renderApp()

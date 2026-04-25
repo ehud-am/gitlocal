@@ -8,7 +8,7 @@ export default function SearchTrigger({ onOpen }: Props) {
       type="button"
       className="search-trigger-button"
       aria-label="Open repository search"
-      title="Open repository search (Command+F / Control+F)"
+      title="Open repository search"
       onClick={onOpen}
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">

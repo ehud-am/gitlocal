@@ -169,7 +169,6 @@ export default function SearchPanel({
       </form>
       <div className="search-controls">
         <span className="search-guidance">{guidanceMessage}</span>
-        <span className="search-shortcut-hint" aria-hidden="true">Cmd/Ctrl + F</span>
       </div>
       {!readyForResults || isDraftDirty ? (
         <p className="search-empty">
