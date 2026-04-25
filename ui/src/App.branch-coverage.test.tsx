@@ -109,7 +109,6 @@ vi.mock('./components/RepoContext/BranchSwitchDialog', () => ({
     onCancel: () => void
     onCommit: () => void
     onDiscard: () => void
-    onDeleteUntracked: () => void
   }) => (
     <div data-testid={props.open ? 'branch-switch-dialog' : 'branch-switch-dialog-closed'}>
       {props.open ? (
@@ -125,7 +124,6 @@ vi.mock('./components/RepoContext/BranchSwitchDialog', () => ({
       ) : null}
       <button type="button" onClick={props.onCommit}>commit-branch-switch</button>
       <button type="button" onClick={props.onDiscard}>discard-branch-switch</button>
-      <button type="button" onClick={props.onDeleteUntracked}>delete-branch-switch</button>
     </div>
   ),
 }))
@@ -134,12 +132,12 @@ vi.mock('./components/Search/SearchPanel', () => ({
   default: (props: {
     query: string
     onDismiss: () => void
-    onQueryChange: (query: string) => void
+    onSearch: (value: { query: string; mode: 'name' | 'content' | 'both'; caseSensitive: boolean }) => void
     onSelectResult: (result: { path: string; type: 'file' | 'dir'; localOnly: boolean; matchType: 'name' }) => void
   }) => (
     <div data-testid="search-panel">
       <span>{props.query}</span>
-      <button type="button" onClick={() => props.onQueryChange('query-from-panel')}>change-search-query</button>
+      <button type="button" onClick={() => props.onSearch({ query: 'query-from-panel', mode: 'both', caseSensitive: false })}>change-search-query</button>
       <button type="button" onClick={() => props.onSelectResult({ path: '', type: 'dir', localOnly: true, matchType: 'name' })}>select-empty-dir</button>
       <button type="button" onClick={() => props.onSelectResult({ path: 'notes.txt', type: 'file', localOnly: false, matchType: 'name' })}>select-file-result</button>
       <button type="button" onClick={props.onDismiss}>dismiss-search</button>
@@ -306,6 +304,8 @@ function buildViewerState(overrides: Record<string, unknown> = {}) {
     sidebarCollapsed: false,
     searchPresentation: 'collapsed',
     searchQuery: '',
+    searchMode: 'both',
+    searchCaseSensitive: false,
     ...overrides,
   }
 }
@@ -442,13 +442,17 @@ describe('App branch coverage', () => {
     })
   })
 
-  it('supports ctrl+f, ignores non-shortcuts, and keeps picker mode out of search flow', async () => {
+  it('opens repository search only from the explicit trigger and keeps picker mode out of search flow', async () => {
     const standard = renderApp()
+    await screen.findByTestId('content-props')
 
     fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
     expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
+    expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'open-search' }))
     expect(await screen.findByTestId('search-panel')).toBeInTheDocument()
     standard.unmount()
 
@@ -458,7 +462,7 @@ describe('App branch coverage', () => {
     expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
   })
 
-  it('suppresses the search shortcut for non-git launch contexts', async () => {
+  it('does not open repository search from keyboard shortcuts in non-git launch contexts', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({ isGitRepo: false }))
 
     renderApp()
@@ -592,15 +596,6 @@ describe('App branch coverage', () => {
         suggestedCommitMessage: 'Save before switching',
       })
       .mockResolvedValueOnce({
-        ok: false,
-        status: 'second-confirmation-required',
-        message: 'Need another confirmation.',
-        trackedChangeCount: 1,
-        untrackedChangeCount: 1,
-        blockingPaths: ['README.md', 'scratch.txt'],
-        suggestedCommitMessage: 'Second suggestion',
-      })
-      .mockResolvedValueOnce({
         ok: true,
         status: 'switched',
         message: 'Switched with preserved path.',
@@ -622,12 +617,7 @@ describe('App branch coverage', () => {
     expect(await screen.findByTestId('branch-switch-dialog')).toBeInTheDocument()
 
     fireEvent.change(screen.getByRole('textbox', { name: /branch switch commit message/i }), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'commit-branch-switch' }))
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /branch switch commit message/i })).toHaveValue('Second suggestion')
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'delete-branch-switch' }))
+    fireEvent.click(screen.getByRole('button', { name: 'discard-branch-switch' }))
     await waitFor(() => {
       expect(screen.getByTestId('header-branch')).toHaveTextContent('release')
     })
@@ -666,8 +656,8 @@ describe('App branch coverage', () => {
 
     pendingSwitch.resolve({
       ok: false,
-      status: 'second-confirmation-required',
-      message: 'Need another confirmation.',
+      status: 'confirmation-required',
+      message: 'Need confirmation again.',
       trackedChangeCount: 1,
       untrackedChangeCount: 0,
       blockingPaths: ['README.md'],
@@ -698,7 +688,7 @@ describe('App branch coverage', () => {
         status: 'blocked',
         message: 'Still blocked.',
       })
-      .mockRejectedValueOnce(new Error('Delete failed hard'))
+      .mockRejectedValueOnce(new Error('Discard failed hard'))
 
     fireEvent.click(screen.getByRole('button', { name: 'switch-branch' }))
     expect(await screen.findByTestId('branch-switch-dialog')).toBeInTheDocument()
@@ -706,8 +696,8 @@ describe('App branch coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'discard-branch-switch' }))
     expect(await screen.findByText(/still blocked/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'delete-branch-switch' }))
-    expect(await screen.findByText(/delete failed hard/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'discard-branch-switch' }))
+    expect(await screen.findByText(/discard failed hard/i)).toBeInTheDocument()
   })
 
   it('applies sync status messages without missing-path fallback and keeps search expanded on query updates', async () => {

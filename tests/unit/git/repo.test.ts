@@ -1197,6 +1197,16 @@ describe('working tree helpers', () => {
         trackedChangeCount: 1,
       }))
 
+      const discarded = switchBranch(dir, { target: 'feature', resolution: 'discard' })
+      expect(discarded).toEqual(expect.objectContaining({
+        ok: true,
+        status: 'switched',
+        currentBranch: 'feature',
+      }))
+      expect(git(dir, 'status', '--porcelain')).toBe('')
+      git(dir, 'checkout', mainBranch)
+      writeFileSync(join(dir, 'main.ts'), 'console.log("dirty")')
+
       expect(switchBranch(dir, { target: '', resolution: 'preview' }).status).toBe('blocked')
       expect(switchBranch(join(tmpdir(), 'missing-repo-for-switch'), { target: 'feature', resolution: 'preview' }).status).toBe('blocked')
       expect(switchBranch(dir, { target: mainBranch, resolution: 'cancel' }).status).toBe('cancelled')
@@ -1226,30 +1236,14 @@ describe('working tree helpers', () => {
       git(dir, 'fetch', 'origin')
       writeFileSync(join(dir, 'blocker.txt'), 'local blocker')
 
-      const discard = switchBranch(dir, { target: 'origin/blocked-branch', resolution: 'discard' })
-      expect(discard).toEqual(expect.objectContaining({
-        ok: false,
-        status: 'second-confirmation-required',
-      }))
-
-      expect(switchBranch(dir, {
+      const blockedByUntracked = switchBranch(dir, {
         target: 'origin/blocked-branch',
-        resolution: 'delete-untracked',
-      })).toEqual(expect.objectContaining({
-        ok: false,
-        status: 'blocked',
-      }))
-
-      const deleted = switchBranch(dir, {
-        target: 'origin/blocked-branch',
-        resolution: 'delete-untracked',
-        allowDeleteUntracked: true,
+        resolution: 'preview',
       })
-      expect(deleted).toEqual(expect.objectContaining({
-        ok: true,
-        status: 'switched',
-        currentBranch: 'blocked-branch',
-        createdTrackingBranch: 'blocked-branch',
+      expect(blockedByUntracked).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'failed',
+        currentBranch: mainBranch,
       }))
       expect(existsSync(join(dir, 'blocker.txt'))).toBe(true)
 
@@ -1261,6 +1255,78 @@ describe('working tree helpers', () => {
     } finally {
       cleanup()
       remote.cleanup()
+    }
+  })
+
+  it('blocks branch switches to branches already checked out in another worktree before mutating local state', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const workspace = mkdtempSync(join(tmpdir(), 'gitlocal-worktree-parent-'))
+    const linkedWorktreePath = join(workspace, 'linked')
+    const mainBranch = getCurrentBranch(dir)
+
+    try {
+      git(dir, 'checkout', '-b', 'feature/worktree-lock')
+      git(dir, 'checkout', mainBranch)
+      git(dir, 'worktree', 'add', linkedWorktreePath, 'feature/worktree-lock')
+
+      writeFileSync(join(dir, 'README.md'), '# dirty but uncommitted')
+
+      const blockedPreview = switchBranch(dir, {
+        target: 'feature/worktree-lock',
+        resolution: 'preview',
+      })
+      expect(blockedPreview).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+        currentBranch: mainBranch,
+      }))
+      expect(blockedPreview.message).toContain('feature/worktree-lock')
+      expect(blockedPreview.message).toContain(linkedWorktreePath)
+
+      const blockedCommit = switchBranch(dir, {
+        target: 'feature/worktree-lock',
+        resolution: 'commit',
+        commitMessage: 'this should not be committed',
+      })
+      expect(blockedCommit).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+        currentBranch: mainBranch,
+      }))
+      expect(git(dir, 'status', '--porcelain')).toContain('README.md')
+      expect(git(dir, 'log', '-1', '--format=%s')).toBe('initial commit')
+    } finally {
+      spawnSync('git', ['worktree', 'remove', '--force', linkedWorktreePath], { cwd: dir })
+      rmSync(workspace, { recursive: true, force: true })
+      cleanup()
+    }
+  })
+
+  it('allows discard-based switching in repositories without commits', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-switch-'))
+
+    try {
+      git(dir, 'init')
+      git(dir, 'config', 'user.email', 'test@test.com')
+      git(dir, 'config', 'user.name', 'Test User')
+      writeFileSync(join(dir, 'draft.txt'), 'draft')
+      git(dir, 'checkout', '-b', 'feature-empty')
+      git(dir, 'checkout', '-b', 'main-empty')
+      writeFileSync(join(dir, 'draft.txt'), 'still draft')
+
+      const result = switchBranch(dir, {
+        target: 'feature-empty',
+        resolution: 'discard',
+      })
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'failed',
+        currentBranch: '',
+      }))
+      expect(result.message).toContain("pathspec 'feature-empty'")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

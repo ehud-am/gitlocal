@@ -58,6 +58,17 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
   )
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M11.8 1.8a1.6 1.6 0 0 1 2.3 2.3l-7.4 7.4-2.9.6.6-2.9 7.4-7.4Zm1.6 1.6a.6.6 0 0 0-.9-.9l-.8.8.9.9.8-.8ZM5 9.7l1.3 1.3 5.6-5.6-1.3-1.3L5 9.7Zm-.4 1 1 .9-1.3.3.3-1.2Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
 export default function RepoContextHeader({
   info,
   branch,
@@ -162,11 +173,26 @@ export default function RepoContextHeader({
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Git identity</p>
                 {gitUser?.source ? <MetaTag label={gitUser.source} icon="user" tone="neutral" compact /> : null}
               </div>
-              <p className="text-sm text-[var(--foreground)]">
-                {gitUser?.name && gitUser?.email
-                  ? `${gitUser.name} <${gitUser.email}>`
-                  : 'Git user is not configured'}
-              </p>
+              <div className="flex flex-wrap items-center gap-1">
+                <p className="break-all text-sm text-[var(--foreground)]">
+                  {gitUser?.name && gitUser?.email
+                    ? `${gitUser.name} <${gitUser.email}>`
+                    : 'Git user is not configured'}
+                </p>
+                {onEditGitIdentity ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={onEditGitIdentity}
+                    aria-label="Edit repository git identity"
+                    title="Edit repository git identity"
+                  >
+                    <EditIcon />
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Upstream sync</p>
@@ -214,16 +240,6 @@ export default function RepoContextHeader({
                       disabled={syncDisabled}
                     >
                       {syncActionLabel}
-                    </Button>
-                  ) : null}
-                  {onEditGitIdentity ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={onEditGitIdentity}
-                      aria-label="Edit repository git identity"
-                    >
-                      Edit identity
                     </Button>
                   ) : null}
                 </div>

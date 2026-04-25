@@ -121,6 +121,7 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — update the repository-specific git `user.name` and `user.email` without touching your global git config
 - **See repo context clearly** — GitHub-like header with branch, local path, remote path, remote linkage, and repo-local identity
+- **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker
 - **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; otherwise GitLocal starts in the folder picker
@@ -129,6 +130,7 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone and sync actions use the local `git` executable when a repo has a remote configured
 
 The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
+Repository-wide search no longer takes over `Cmd/Ctrl+F`, so the browser's native page find stays available while GitLocal offers its own explicit repository search and current-file find tools.
 
 ---
 
@@ -240,6 +242,7 @@ All endpoints are served under `/api/`:
 | `PUT /api/git/identity` | Update `user.name` and `user.email` in the current repo's local git config |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
+| `GET /api/search?query=&branch=&mode=&caseSensitive=` | Repository search across file names, file contents, or both |
 | `POST /api/file` | Create a new file in the current repository working tree |
 | `PUT /api/file` | Update an existing file using its revision token |
 | `DELETE /api/file` | Delete an existing file using its revision token |

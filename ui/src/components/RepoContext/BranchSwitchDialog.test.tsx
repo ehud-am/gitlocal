@@ -8,7 +8,6 @@ describe('BranchSwitchDialog', () => {
     const onCancel = vi.fn()
     const onCommit = vi.fn()
     const onDiscard = vi.fn()
-    const onDeleteUntracked = vi.fn()
     const onCommitMessageChange = vi.fn()
 
     render(
@@ -30,7 +29,6 @@ describe('BranchSwitchDialog', () => {
         onCancel={onCancel}
         onCommit={onCommit}
         onDiscard={onDiscard}
-        onDeleteUntracked={onDeleteUntracked}
       />,
     )
 
@@ -51,39 +49,34 @@ describe('BranchSwitchDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)
-    expect(onDeleteUntracked).not.toHaveBeenCalled()
   })
 
-  it('renders the explicit delete confirmation for untracked blockers', () => {
-    const onDeleteUntracked = vi.fn()
-
+  it('focuses the dialog on tracked changes only', () => {
     render(
       <BranchSwitchDialog
         open
         targetLabel="blocked-branch"
         response={{
           ok: false,
-          status: 'second-confirmation-required',
-          message: 'Untracked files would block this checkout. Delete those files to continue or cancel.',
-          trackedChangeCount: 0,
-          untrackedChangeCount: 1,
-          blockingPaths: ['scratch.txt'],
+          status: 'confirmation-required',
+          message: 'Tracked changes need confirmation.',
+          trackedChangeCount: 1,
+          untrackedChangeCount: 3,
+          blockingPaths: ['src/App.tsx'],
         }}
         commitMessage=""
         onCommitMessageChange={vi.fn()}
         onCancel={vi.fn()}
         onCommit={vi.fn()}
         onDiscard={vi.fn()}
-        onDeleteUntracked={onDeleteUntracked}
       />,
     )
 
-    expect(screen.getByRole('heading', { name: /delete untracked files/i })).toBeInTheDocument()
-    expect(screen.getByText('scratch.txt')).toBeInTheDocument()
-    expect(screen.queryByLabelText(/commit message/i)).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /delete files and switch/i }))
-    expect(onDeleteUntracked).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('heading', { name: /switch branches/i })).toBeInTheDocument()
+    expect(screen.getByText(/1 tracked change/i)).toBeInTheDocument()
+    expect(screen.queryByText(/untracked file/i)).not.toBeInTheDocument()
+    expect(screen.getByText('src/App.tsx')).toBeInTheDocument()
+    expect(screen.getByLabelText(/commit message/i)).toBeInTheDocument()
   })
 
   it('disables actions while pending and has no obvious a11y violations', async () => {
@@ -106,7 +99,6 @@ describe('BranchSwitchDialog', () => {
         onCancel={onCancel}
         onCommit={vi.fn()}
         onDiscard={vi.fn()}
-        onDeleteUntracked={vi.fn()}
       />,
     )
 
@@ -117,5 +109,31 @@ describe('BranchSwitchDialog', () => {
     expect((await axe(container)).violations).toHaveLength(0)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('allows escape to dismiss the dialog when no action is pending', () => {
+    const onCancel = vi.fn()
+
+    render(
+      <BranchSwitchDialog
+        open
+        targetLabel="feature"
+        response={{
+          ok: false,
+          status: 'confirmation-required',
+          message: 'Choose how to continue.',
+          trackedChangeCount: 1,
+          blockingPaths: ['README.md'],
+        }}
+        commitMessage="keep this"
+        onCommitMessageChange={vi.fn()}
+        onCancel={onCancel}
+        onCommit={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalled()
   })
 })

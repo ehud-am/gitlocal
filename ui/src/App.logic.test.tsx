@@ -121,13 +121,13 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
 vi.mock('./components/Search/SearchPanel', () => ({
   default: (props: {
     query: string
-    onQueryChange: (query: string) => void
+    onSearch: (value: { query: string; mode: 'name' | 'content' | 'both'; caseSensitive: boolean }) => void
     onDismiss: () => void
     onSelectResult: (result: { path: string; type: 'file' | 'dir'; matchType: 'name'; localOnly: boolean }) => void
   }) => (
     <div data-testid="search-panel">
       <span>query:{props.query}</span>
-      <button type="button" onClick={() => props.onQueryChange('docs')}>change-search</button>
+      <button type="button" onClick={() => props.onSearch({ query: 'docs', mode: 'both', caseSensitive: false })}>change-search</button>
       <button
         type="button"
         onClick={() => props.onSelectResult({ path: 'docs', type: 'dir', matchType: 'name', localOnly: true })}
@@ -240,6 +240,8 @@ function buildViewerState(overrides: Record<string, unknown> = {}) {
     sidebarCollapsed: false,
     searchPresentation: 'collapsed',
     searchQuery: '',
+    searchMode: 'both',
+    searchCaseSensitive: false,
     ...overrides,
   }
 }
@@ -396,7 +398,7 @@ describe('App logic', () => {
     expect(await screen.findByRole('heading', { name: /not a git repository/i })).toBeInTheDocument()
   })
 
-  it('expands search from saved state, keyboard shortcut, selection, and dismissal', async () => {
+  it('expands search from saved state, the header trigger, selection, and dismissal', async () => {
     readViewerState.mockReturnValue(buildViewerState({ searchQuery: 'guide' }))
 
     renderApp()
@@ -407,7 +409,7 @@ describe('App logic', () => {
       expect(screen.queryByTestId('search-panel')).not.toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: 'f', metaKey: true })
+    fireEvent.click(screen.getByRole('button', { name: 'open-search' }))
     expect(await screen.findByTestId('search-panel')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'select-search' }))
 
@@ -499,7 +501,7 @@ describe('App logic', () => {
     expect(await screen.findByText(/parent unavailable/i)).toBeInTheDocument()
   })
 
-  it('handles blocked branch switches and second confirmation delete flows', async () => {
+  it('handles blocked branch switches and tracked-change confirmation flows', async () => {
     vi.mocked(api.switchBranch)
       .mockResolvedValueOnce({
         ok: false,
@@ -508,11 +510,11 @@ describe('App logic', () => {
       })
       .mockResolvedValueOnce({
         ok: false,
-        status: 'second-confirmation-required',
-        message: 'Delete blockers first.',
-        trackedChangeCount: 0,
+        status: 'confirmation-required',
+        message: 'Confirm tracked changes first.',
+        trackedChangeCount: 1,
         untrackedChangeCount: 1,
-        blockingPaths: ['scratch.txt'],
+        blockingPaths: ['README.md'],
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -527,8 +529,8 @@ describe('App logic', () => {
     expect(await screen.findByText(/switch blocked/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'switch-branch' }))
-    expect(await screen.findByRole('heading', { name: /delete untracked files/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /delete files and switch/i }))
+    expect(await screen.findByRole('heading', { name: /switch branches/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /discard changes and switch/i }))
 
     await waitFor(() => {
       expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":"release"')

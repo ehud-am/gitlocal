@@ -24,6 +24,7 @@ import type {
   GitUserIdentity,
   RepoInfo,
   RepoSyncState,
+  SearchMode,
   SearchPresentation,
   SearchResult,
   ViewerPathType,
@@ -80,6 +81,8 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
   const [searchPresentation, setSearchPresentation] = useState<SearchPresentation>(initialViewerState.searchPresentation)
   const [searchQuery, setSearchQuery] = useState(initialViewerState.searchQuery)
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialViewerState.searchMode)
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState(initialViewerState.searchCaseSensitive)
   const [pickerLoading, setPickerLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -181,6 +184,8 @@ export default function App() {
     setShowRaw(false)
     setSearchPresentation('collapsed')
     setSearchQuery('')
+    setSearchMode('both')
+    setSearchCaseSensitive(false)
     setStatusMessage('GitLocal reset the saved file context because you opened a different repository.')
     lastRevisionRef.current = ''
 
@@ -199,8 +204,10 @@ export default function App() {
       sidebarCollapsed,
       searchPresentation,
       searchQuery,
+      searchMode,
+      searchCaseSensitive,
     })
-  }, [currentBranch, searchPresentation, searchQuery, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath])
+  }, [currentBranch, searchCaseSensitive, searchMode, searchPresentation, searchQuery, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath])
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
@@ -212,21 +219,6 @@ export default function App() {
     if (!info?.currentBranch || currentBranch === info.currentBranch) return
     setSelectedPathLocalOnly(false)
   }, [currentBranch, info?.currentBranch])
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-      const isShortcut = key === 'f' && (event.metaKey || event.ctrlKey)
-      if (!isShortcut) return
-      if (info?.pickerMode || info?.isGitRepo === false) return
-
-      event.preventDefault()
-      setSearchPresentation('expanded')
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [info?.isGitRepo, info?.pickerMode])
 
   useEffect(() => {
     if (!syncStatus) return
@@ -546,7 +538,7 @@ export default function App() {
     ])
   }
 
-  async function submitBranchSwitch(resolution: 'commit' | 'discard' | 'delete-untracked'): Promise<void> {
+  async function submitBranchSwitch(resolution: 'commit' | 'discard'): Promise<void> {
     if (!branchSwitchState) return
 
     setBranchSwitchPending(true)
@@ -557,7 +549,6 @@ export default function App() {
         target: branchSwitchState.target,
         resolution,
         commitMessage: resolution === 'commit' ? branchSwitchCommitMessage : undefined,
-        allowDeleteUntracked: resolution === 'delete-untracked',
       })
 
       if (result.ok && result.status === 'switched') {
@@ -565,7 +556,7 @@ export default function App() {
         return
       }
 
-      if (result.status === 'second-confirmation-required' || result.status === 'confirmation-required') {
+      if (result.status === 'confirmation-required') {
         setBranchSwitchState({
           ...branchSwitchState,
           response: result,
@@ -606,7 +597,7 @@ export default function App() {
         return
       }
 
-      if (result.status === 'confirmation-required' || result.status === 'second-confirmation-required') {
+      if (result.status === 'confirmation-required') {
         setBranchSwitchState({
           target: nextBranch,
           targetLabel: targetDetails.label,
@@ -779,7 +770,6 @@ export default function App() {
                     onCancel={cancelBranchSwitch}
                     onCommit={() => { void submitBranchSwitch('commit') }}
                     onDiscard={() => { void submitBranchSwitch('discard') }}
-                    onDeleteUntracked={() => { void submitBranchSwitch('delete-untracked') }}
                   />
                 }
               />
@@ -789,10 +779,14 @@ export default function App() {
                   <SearchPanel
                     branch={currentBranch}
                     query={searchQuery}
+                    mode={searchMode}
+                    caseSensitive={searchCaseSensitive}
                     autoFocus
-                    onQueryChange={(query) => {
+                    onSearch={({ query, mode, caseSensitive }) => {
                       setSearchPresentation('expanded')
                       setSearchQuery(query)
+                      setSearchMode(mode)
+                      setSearchCaseSensitive(caseSensitive)
                     }}
                     onSelectResult={handleSelectSearchResult}
                     onDismiss={handleDismissSearch}

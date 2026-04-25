@@ -433,7 +433,7 @@ describe('branchSwitchHandler', () => {
       spawnSync('git', ['add', '.'], { cwd: repo.dir })
       spawnSync('git', ['commit', '-m', 'feature'], { cwd: repo.dir })
       spawnSync('git', ['checkout', mainBranch], { cwd: repo.dir })
-      writeFileSync(join(repo.dir, 'main.ts'), 'dirty')
+      writeFileSync(join(repo.dir, 'README.md'), 'dirty')
 
       const app = createApp(repo.dir)
       const client = testClient(app)
@@ -460,7 +460,7 @@ describe('branchSwitchHandler', () => {
     }
   })
 
-  it('returns second-confirmation responses when untracked blockers still need deletion', async () => {
+  it('returns failed responses when untracked files block the checkout itself', async () => {
     const repo = makeGitRepo()
 
     try {
@@ -479,15 +479,47 @@ describe('branchSwitchHandler', () => {
       const client = testClient(app)
 
       const res = await client.api.branches.switch.$post({
-        json: { target: 'feature-blocked', resolution: 'discard' },
+        json: { target: 'feature-blocked', resolution: 'preview' },
       })
 
-      expect(res.status).toBe(409)
+      expect(res.status).toBe(400)
       expect(await res.json()).toEqual(expect.objectContaining({
         ok: false,
-        status: 'second-confirmation-required',
+        status: 'failed',
       }))
     } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('returns blocked responses when the target branch is already checked out in another worktree', async () => {
+    const repo = makeGitRepo()
+    const workspace = mkdtempSync(join(tmpdir(), 'gitlocal-handler-worktree-'))
+    const linkedWorktreePath = join(workspace, 'linked')
+
+    try {
+      const mainBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+      }).stdout.trim()
+      spawnSync('git', ['checkout', '-b', 'feature-worktree'], { cwd: repo.dir })
+      spawnSync('git', ['checkout', mainBranch], { cwd: repo.dir })
+      spawnSync('git', ['worktree', 'add', linkedWorktreePath, 'feature-worktree'], { cwd: repo.dir })
+
+      const app = createApp(repo.dir)
+      const client = testClient(app)
+      const res = await client.api.branches.switch.$post({
+        json: { target: 'feature-worktree', resolution: 'preview' },
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: false,
+        status: 'blocked',
+      }))
+    } finally {
+      spawnSync('git', ['worktree', 'remove', '--force', linkedWorktreePath], { cwd: repo.dir })
+      rmSync(workspace, { recursive: true, force: true })
       repo.cleanup()
     }
   })

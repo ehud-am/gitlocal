@@ -16,6 +16,8 @@ describe('viewerState', () => {
       sidebarCollapsed: false,
       searchPresentation: 'collapsed',
       searchQuery: '',
+      searchMode: 'both',
+      searchCaseSensitive: false,
     })
   })
 
@@ -29,6 +31,8 @@ describe('viewerState', () => {
       sidebarCollapsed: true,
       searchPresentation: 'expanded',
       searchQuery: 'hello',
+      searchMode: 'content',
+      searchCaseSensitive: true,
     })
 
     expect(readViewerState()).toEqual({
@@ -40,6 +44,8 @@ describe('viewerState', () => {
       sidebarCollapsed: true,
       searchPresentation: 'expanded',
       searchQuery: 'hello',
+      searchMode: 'content',
+      searchCaseSensitive: true,
     })
   })
 
@@ -69,11 +75,19 @@ describe('viewerState', () => {
       sidebarCollapsed: false,
       searchPresentation: 'collapsed',
       searchQuery: '',
+      searchMode: 'both',
+      searchCaseSensitive: false,
     })
   })
 
   it('persists expanded search presentation separately from query text', () => {
     writeViewerState({ searchPresentation: 'expanded' })
     expect(readViewerState().searchPresentation).toBe('expanded')
+  })
+
+  it('persists search mode and case sensitivity flags', () => {
+    writeViewerState({ searchMode: 'name', searchCaseSensitive: true })
+    expect(readViewerState().searchMode).toBe('name')
+    expect(readViewerState().searchCaseSensitive).toBe(true)
   })
 })

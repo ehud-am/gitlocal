@@ -5,12 +5,36 @@ import type { SearchMode, SearchResponse, SearchResult } from '../types.js'
 
 type Variables = { repoPath: string }
 
-function normalizeMode(value: string | undefined): SearchMode {
-  return value === 'content' ? 'content' : 'name'
+export function normalizeMode(value: string | undefined): SearchMode {
+  if (value === 'name' || value === 'content' || value === 'both') return value
+  return 'both'
 }
 
 function parseCaseSensitive(value: string | undefined): boolean {
   return value === 'true'
+}
+
+export function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>()
+  const deduped: SearchResult[] = []
+
+  for (const result of results) {
+    const key = `${result.matchType}:${result.path}:${result.line ?? 0}:${result.localOnly ? 'local' : 'tracked'}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(result)
+  }
+
+  return deduped
+}
+
+export function sortSearchResults(results: SearchResult[]): SearchResult[] {
+  return [...results].sort((left, right) => {
+    if (left.matchType !== right.matchType) return left.matchType === 'name' ? -1 : 1
+    if (left.type !== right.type) return left.type === 'dir' ? -1 : 1
+    if (left.path !== right.path) return left.path.localeCompare(right.path)
+    return (left.line ?? 0) - (right.line ?? 0)
+  })
 }
 
 function searchGitTreeByName(repoPath: string, branch: string, query: string, caseSensitive: boolean): SearchResult[] {
@@ -95,20 +119,31 @@ export async function searchHandler(c: Context<{ Variables: Variables }>): Promi
   const mode = normalizeMode(c.req.query('mode'))
   const caseSensitive = parseCaseSensitive(c.req.query('caseSensitive'))
 
-  if (!query) {
+  if (query.length < 3) {
     const empty: SearchResponse = { query, branch, mode, caseSensitive, results: [] }
     return c.json(empty)
   }
 
-  const results =
-    mode === 'name'
-      ? isWorkingTreeBranch(repoPath, branch)
+  const searchWorkingTree = isWorkingTreeBranch(repoPath, branch)
+  const nameResults =
+    mode === 'content'
+      ? []
+      : searchWorkingTree
         ? searchWorkingTreeByTrackedName(repoPath, query, caseSensitive)
         : searchGitTreeByName(repoPath, branch, query, caseSensitive)
-      : isWorkingTreeBranch(repoPath, branch)
+  const contentResults =
+    mode === 'name'
+      ? []
+      : searchWorkingTree
         ? searchWorkingTreeByTrackedContent(repoPath, query, caseSensitive)
         : searchGitTreeByContent(repoPath, branch, query, caseSensitive)
 
-  const response: SearchResponse = { query, branch, mode, caseSensitive, results }
+  const response: SearchResponse = {
+    query,
+    branch,
+    mode,
+    caseSensitive,
+    results: sortSearchResults(dedupeSearchResults([...nameResults, ...contentResults])),
+  }
   return c.json(response)
 }
