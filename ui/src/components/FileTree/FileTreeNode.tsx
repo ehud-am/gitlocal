@@ -8,6 +8,8 @@ interface Props {
   isSelected: boolean
   depth: number
   onClick: () => void
+  onDeleteFolder?: () => void
+  canDeleteFolder?: boolean
 }
 
 const FolderIcon = ({ open }: { open: boolean }) => (
@@ -32,7 +34,7 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
   </svg>
 )
 
-export default function FileTreeNode({ node, isExpanded, isSelected, depth, onClick }: Props) {
+export default function FileTreeNode({ node, isExpanded, isSelected, depth, onClick, onDeleteFolder, canDeleteFolder = false }: Props) {
   const syncState = describeFileSyncState(node.syncState)
 
   return (
@@ -53,6 +55,20 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, onCl
         {node.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
         {syncState ? <MetaTag label={syncState.label} icon={syncState.icon} tone={syncState.tone} compact /> : null}
       </div>
+      {canDeleteFolder && node.type === 'dir' ? (
+        <button
+          type="button"
+          className="panel-icon-button ml-auto"
+          aria-label={`Delete folder ${node.name}`}
+          title={`Delete folder ${node.name}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDeleteFolder?.()
+          }}
+        >
+          ×
+        </button>
+      ) : null}
     </div>
   )
 }

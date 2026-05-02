@@ -11,6 +11,7 @@ import SearchPanel from './components/Search/SearchPanel'
 import AppFooter from './components/AppFooter'
 import {
   CommitChangesDialog,
+  FolderDeleteDialog,
   GitIdentityDialog,
   RepoBoundaryDialog,
 } from './components/AppDialogs'
@@ -21,6 +22,7 @@ import type {
   Branch,
   BranchSwitchResponse,
   FileSyncState,
+  FolderOperationResult,
   GitUserIdentity,
   RepoInfo,
   RepoSyncState,
@@ -101,6 +103,10 @@ export default function App() {
   const [commitPending, setCommitPending] = useState(false)
   const [commitError, setCommitError] = useState('')
   const [syncPending, setSyncPending] = useState(false)
+  const [folderDeletePreview, setFolderDeletePreview] = useState<FolderOperationResult | null>(null)
+  const [folderDeleteConfirmationName, setFolderDeleteConfirmationName] = useState('')
+  const [folderDeletePending, setFolderDeletePending] = useState(false)
+  const [folderDeleteError, setFolderDeleteError] = useState('')
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
@@ -416,6 +422,60 @@ export default function App() {
     await queryClient.invalidateQueries({ queryKey: ['sync'] })
   }
 
+  async function openFolderDeleteDialog(path: string): Promise<void> {
+    if (!confirmDiscardChanges()) return
+    setFolderDeletePending(true)
+    setFolderDeleteError('')
+    setFolderDeleteConfirmationName('')
+    try {
+      const preview = await api.getFolderDeletePreview(path)
+      setFolderDeletePreview(preview)
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error, 'Could not inspect the folder before deletion.'))
+    } finally {
+      setFolderDeletePending(false)
+    }
+  }
+
+  function closeFolderDeleteDialog(): void {
+    if (folderDeletePending) return
+    setFolderDeletePreview(null)
+    setFolderDeleteConfirmationName('')
+    setFolderDeleteError('')
+  }
+
+  async function submitFolderDelete(): Promise<void> {
+    if (!folderDeletePreview) return
+    setFolderDeletePending(true)
+    setFolderDeleteError('')
+    try {
+      const result = await api.deleteFolder({
+        path: folderDeletePreview.path,
+        confirmationName: folderDeleteConfirmationName,
+      })
+      setFolderDeletePreview(null)
+      setFolderDeleteConfirmationName('')
+      setHasUnsavedChanges(false)
+      setSelectedPath(result.parentPath)
+      setSelectedPathType(result.parentPath ? 'dir' : 'none')
+      setSelectedPathLocalOnly(false)
+      setShowRaw(false)
+      setStatusMessage(result.message)
+      setTreeRefreshToken((value) => value + 1)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['tree'] }),
+        queryClient.invalidateQueries({ queryKey: ['file'] }),
+        queryClient.invalidateQueries({ queryKey: ['readme'] }),
+        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
+        queryClient.invalidateQueries({ queryKey: ['sync'] }),
+      ])
+    } catch (error) {
+      setFolderDeleteError(getErrorMessage(error, 'Could not delete the folder.'))
+    } finally {
+      setFolderDeletePending(false)
+    }
+  }
+
   async function refreshRepoAfterGitAction(message: string): Promise<void> {
     setStatusMessage(message)
     setTreeRefreshToken((value) => value + 1)
@@ -724,6 +784,8 @@ export default function App() {
 
                     handleSelectFile(path, localOnly)
                   }}
+                  onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
+                  canDeleteFolders={canMutateFiles}
                 />
               </div>
             </aside>
@@ -819,6 +881,8 @@ export default function App() {
                   }}
                   onDirtyChange={setHasUnsavedChanges}
                   onMutationComplete={(event) => { void handleMutationComplete(event) }}
+                  onCreateFolderComplete={(event) => { void handleMutationComplete(event) }}
+                  onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
                   emptyStateTitle={emptyStateTitle}
                   emptyStateDetail={emptyStateDetail}
                   emptyStateActions={emptyStateActions}
@@ -873,6 +937,24 @@ export default function App() {
         onMessageChange={setCommitMessage}
         onCancel={closeCommitDialog}
         onCommit={() => { void submitCommitChanges() }}
+      />
+
+      <FolderDeleteDialog
+        open={Boolean(folderDeletePreview)}
+        pending={folderDeletePending}
+        error={folderDeleteError}
+        path={folderDeletePreview?.path ?? ''}
+        name={folderDeletePreview?.name ?? ''}
+        fileCount={folderDeletePreview?.fileCount ?? 0}
+        folderCount={folderDeletePreview?.folderCount ?? 0}
+        message={folderDeletePreview?.message ?? ''}
+        confirmationName={folderDeleteConfirmationName}
+        onOpenChange={(open) => {
+          if (!open) closeFolderDeleteDialog()
+        }}
+        onConfirmationNameChange={setFolderDeleteConfirmationName}
+        onCancel={closeFolderDeleteDialog}
+        onDelete={() => { void submitFolderDelete() }}
       />
     </>
   )

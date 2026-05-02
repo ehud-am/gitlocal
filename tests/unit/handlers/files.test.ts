@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -543,5 +543,266 @@ describe('fileHandler', () => {
     const client = testClient(app)
     const res = await client.api.file.$get({ query: { path: 'missing.txt', branch: 'feature-files' } })
     expect(res.status).toBe(404)
+  })
+})
+
+describe('folder operation handlers', () => {
+  it('creates a direct child folder and rejects duplicate names', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const created = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parentPath: 'src', name: 'components' }),
+      }))
+      expect(created.status).toBe(201)
+      const body = await created.json()
+      expect(body).toEqual(expect.objectContaining({
+        ok: true,
+        operation: 'create-folder',
+        status: 'created',
+        path: 'src/components',
+        parentPath: 'src',
+      }))
+
+      const duplicate = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parentPath: 'src', name: 'components' }),
+      }))
+      expect(duplicate.status).toBe(400)
+      expect((await duplicate.json()).status).toBe('blocked')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('blocks invalid create-folder requests', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      for (const payload of [
+        { parentPath: '', name: '' },
+        { parentPath: '', name: '../escape' },
+        { parentPath: '', name: '/absolute' },
+        { parentPath: '', name: 'a/b' },
+        { parentPath: 'missing', name: 'child' },
+        { parentPath: 'README.md', name: 'child' },
+      ]) {
+        const res = await app.fetch(new Request('http://localhost/api/folder', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        }))
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.ok).toBe(false)
+        expect(body.status).toBe('blocked')
+      }
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('handles invalid JSON payloads for folder create and delete requests', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const create = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{',
+      }))
+      expect(create.status).toBe(400)
+
+      const deleted = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: '{',
+      }))
+      expect(deleted.status).toBe(409)
+      expect((await deleted.json()).message).toMatch(/exact folder name/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns 400 for folder operations when no repository is loaded', async () => {
+    const app = createApp('')
+
+    const create = await app.fetch(new Request('http://localhost/api/folder', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ parentPath: '', name: 'notes' }),
+    }))
+    expect(create.status).toBe(400)
+
+    const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=docs'))
+    expect(preview.status).toBe(400)
+
+    const deleted = await app.fetch(new Request('http://localhost/api/folder', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'docs', confirmationName: 'docs' }),
+    }))
+    expect(deleted.status).toBe(400)
+  })
+
+  it('blocks folder preview and deletion on non-current branches', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src&branch=feature-files'))
+      expect(preview.status).toBe(409)
+
+      const deleted = await app.fetch(new Request('http://localhost/api/folder?branch=feature-files', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+      }))
+      expect(deleted.status).toBe(409)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('previews recursive folder deletion impact including ignored and hidden files', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      mkdirSync(join(dir, 'src', 'nested'))
+      writeFileSync(join(dir, 'src', 'nested', 'deep.txt'), 'deep')
+      writeFileSync(join(dir, 'src', '.hidden'), 'hidden')
+      writeFileSync(join(dir, '.gitignore'), '*.tmp\n')
+      writeFileSync(join(dir, 'src', 'ignored.tmp'), 'ignored')
+
+      const app = createApp(dir)
+      const res = await app.fetch(new Request(`http://localhost/api/folder/delete-preview?path=${encodeURIComponent('src')}`))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual(expect.objectContaining({
+        ok: true,
+        operation: 'preview-delete-folder',
+        status: 'previewed',
+        path: 'src',
+        name: 'src',
+        parentPath: '',
+        fileCount: 4,
+        folderCount: 1,
+      }))
+      expect(body.message).toContain('4 files')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('previews empty folders and disambiguates duplicate folder names by path', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      mkdirSync(join(dir, 'empty'))
+      mkdirSync(join(dir, 'src', 'empty'))
+
+      const app = createApp(dir)
+      const rootPreview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=empty'))
+      expect(rootPreview.status).toBe(200)
+      const rootBody = await rootPreview.json()
+      expect(rootBody).toEqual(expect.objectContaining({
+        name: 'empty',
+        path: 'empty',
+        parentPath: '',
+        fileCount: 0,
+        folderCount: 0,
+      }))
+      expect(rootBody.message).toContain('0 files')
+
+      const nestedPreview = await app.fetch(new Request(`http://localhost/api/folder/delete-preview?path=${encodeURIComponent('src/empty')}`))
+      expect(nestedPreview.status).toBe(200)
+      expect(await nestedPreview.json()).toEqual(expect.objectContaining({
+        name: 'empty',
+        path: 'src/empty',
+        parentPath: 'src',
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('uses singular file wording in folder delete previews', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src'))
+      expect(res.status).toBe(200)
+      expect((await res.json()).message).toContain('1 file')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('blocks folder delete preview for repository root and unsafe paths', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const root = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path='))
+      expect(root.status).toBe(400)
+      expect((await root.json()).message).toMatch(/root/i)
+
+      const escape = await app.fetch(new Request(`http://localhost/api/folder/delete-preview?path=${encodeURIComponent('../escape')}`))
+      expect(escape.status).toBe(400)
+      expect((await escape.json()).message).toMatch(/inside the repository/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('requires exact folder-name confirmation and revalidates at delete time', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const mismatch = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'src', confirmationName: 'wrong' }),
+      }))
+      expect(mismatch.status).toBe(409)
+      expect((await mismatch.json()).message).toMatch(/exact folder name/i)
+
+      rmSync(join(dir, 'src'), { recursive: true, force: true })
+      const stale = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+      }))
+      expect(stale.status).toBe(400)
+      expect((await stale.json()).message).toMatch(/no longer available/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('deletes a confirmed folder and returns the parent path', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      mkdirSync(join(dir, 'src', 'nested'))
+      writeFileSync(join(dir, 'src', 'nested', 'deep.txt'), 'deep')
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+      }))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual(expect.objectContaining({
+        ok: true,
+        operation: 'delete-folder',
+        status: 'deleted',
+        path: 'src',
+        parentPath: '',
+      }))
+      expect(existsSync(join(dir, 'src'))).toBe(false)
+    } finally {
+      cleanup()
+    }
   })
 })

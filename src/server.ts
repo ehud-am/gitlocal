@@ -11,7 +11,16 @@ import {
   readmeHandler,
   remoteSyncHandler,
 } from './handlers/git.js'
-import { treeHandler, fileHandler, createFileHandler, updateFileHandler, deleteFileHandler } from './handlers/files.js'
+import {
+  treeHandler,
+  fileHandler,
+  createFileHandler,
+  updateFileHandler,
+  deleteFileHandler,
+  createFolderHandler,
+  folderDeletePreviewHandler,
+  deleteFolderHandler,
+} from './handlers/files.js'
 import {
   pickBrowseHandler,
   pickCloneHandler,
@@ -98,6 +107,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/file', createFileHandler)
   app.put('/api/file', updateFileHandler)
   app.delete('/api/file', deleteFileHandler)
+  app.post('/api/folder', createFolderHandler)
+  app.get('/api/folder/delete-preview', folderDeletePreviewHandler)
+  app.delete('/api/folder', deleteFolderHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
   app.get('/api/pick/browse', pickBrowseHandler)

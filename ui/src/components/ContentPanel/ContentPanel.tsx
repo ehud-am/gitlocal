@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { FileSyncState, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
+import type { FileSyncState, FolderOperationResult, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
 import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
@@ -12,11 +12,17 @@ import { describeFileSyncState } from '../../lib/sync'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
-type PanelMode = 'view' | 'edit' | 'create' | 'confirm-delete'
+type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
 type EmptyStateAction = 'create-file'
 
 interface FileMutationEvent {
   result: ManualFileOperationResult
+  nextPath: string
+  nextPathType: ViewerPathType
+}
+
+interface FolderMutationEvent {
+  result: FolderOperationResult
   nextPath: string
   nextPathType: ViewerPathType
 }
@@ -34,6 +40,8 @@ interface Props {
   onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
   onDirtyChange?: (value: boolean) => void
   onMutationComplete?: (event: FileMutationEvent) => void
+  onCreateFolderComplete?: (event: FolderMutationEvent) => void
+  onDeleteFolder?: (path: string) => void
   placeholder?: string
   emptyStateTitle?: string
   emptyStateDetail?: string
@@ -164,6 +172,8 @@ export default function ContentPanel({
   onOpenPath,
   onDirtyChange,
   onMutationComplete,
+  onCreateFolderComplete,
+  onDeleteFolder,
   placeholder,
   emptyStateTitle,
   emptyStateDetail,
@@ -178,6 +188,7 @@ export default function ContentPanel({
   const [mode, setMode] = useState<PanelMode>('view')
   const [draftPath, setDraftPath] = useState('')
   const [draftContent, setDraftContent] = useState('')
+  const [draftFolderName, setDraftFolderName] = useState('')
   const [formError, setFormError] = useState('')
   const [busy, setBusy] = useState(false)
   const [fileFindOpen, setFileFindOpen] = useState(false)
@@ -235,8 +246,9 @@ export default function ContentPanel({
   const dirty = useMemo(() => {
     if (mode === 'edit') return draftContent !== (data?.content ?? '')
     if (mode === 'create') return draftPath.trim().length > 0 || draftContent.length > 0
+    if (mode === 'create-folder') return draftFolderName.trim().length > 0
     return false
-  }, [data?.content, draftContent, draftPath, mode])
+  }, [data?.content, draftContent, draftFolderName, draftPath, mode])
 
   const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image')
   const trimmedFileFindQuery = fileFindQuery.trim()
@@ -321,6 +333,30 @@ export default function ContentPanel({
     }
   }
 
+  async function handleCreateFolder(): Promise<void> {
+    setBusy(true)
+    setFormError('')
+    try {
+      const parentPath = selectedPathType === 'dir' ? selectedPath : ''
+      const result = await api.createFolder({
+        parentPath,
+        name: draftFolderName.trim(),
+      })
+      await queryClient.invalidateQueries({ queryKey: ['tree'] })
+      await queryClient.invalidateQueries({ queryKey: ['sync'] })
+      setMode('view')
+      setDraftFolderName('')
+      onStatusMessage?.(result.message)
+      onCreateFolderComplete?.({ result, nextPath: result.path, nextPathType: 'dir' })
+    } catch (error) {
+      const message = getMutationErrorMessage(error, 'Failed to create the folder.')
+      setFormError(message)
+      onStatusMessage?.(message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleDeleteFile(): Promise<void> {
     if (!data?.revisionToken) return
     setBusy(true)
@@ -353,6 +389,13 @@ export default function ContentPanel({
     setDraftContent('')
     setFormError('')
     setMode('create')
+  }
+
+  function beginCreateFolderMode(): void {
+    if (!confirmDiscardIfNeeded()) return
+    setDraftFolderName('')
+    setFormError('')
+    setMode('create-folder')
   }
 
   const canToggleRaw = data?.type === 'markdown' || data?.type === 'text'
@@ -433,9 +476,14 @@ export default function ContentPanel({
               </div>
             </div>
             {canMutateFiles ? (
-              <button type="button" className="btn-raw" onClick={() => { void beginCreateMode() }}>
-                {path ? 'New file here' : 'New file'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn-raw" onClick={() => { void beginCreateMode() }}>
+                  {path ? 'New file here' : 'New file'}
+                </button>
+                <button type="button" className="btn-raw" onClick={() => { void beginCreateFolderMode() }}>
+                  {path ? 'New folder here' : 'New folder'}
+                </button>
+              </div>
             ) : null}
           </div>
 
@@ -491,7 +539,22 @@ export default function ContentPanel({
                             </span>
                           </td>
                           <td className="content-directory-cell content-directory-cell-path">
-                            <span className="content-directory-path">{entry.displayPath}</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="content-directory-path">{entry.displayPath}</span>
+                              {canMutateFiles && !entry.isParent && entry.type === 'dir' ? (
+                                <button
+                                  type="button"
+                                  className="btn-raw"
+                                  aria-label={`Delete folder ${entry.name}`}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    onDeleteFolder?.(entry.path)
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
                           </tr>
                         )
@@ -562,6 +625,58 @@ export default function ContentPanel({
             setDraftPath('')
           }}
         />
+      </div>
+    )
+  }
+
+  if (mode === 'create-folder') {
+    const parentPath = selectedPathType === 'dir' ? selectedPath : ''
+    return (
+      <div className="content-panel">
+        <div className="content-toolbar">
+          <button type="button" className="btn-raw" onClick={() => {
+            if (!confirmDiscardIfNeeded()) return
+            setMode('view')
+            setDraftFolderName('')
+            setFormError('')
+          }}>
+            Back to viewer
+          </button>
+        </div>
+        <section className="content-directory-panel" aria-label="create folder">
+          <div className="content-directory-header">
+            <div>
+              <p className="content-directory-kicker">New folder</p>
+              <h2 className="content-directory-heading">{parentPath || 'repository root'}</h2>
+            </div>
+          </div>
+          <div className="grid max-w-lg gap-4 p-4">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-[var(--foreground)]">Folder name</span>
+              <input
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                value={draftFolderName}
+                onChange={(event) => setDraftFolderName(event.target.value)}
+                aria-label="Folder name"
+                disabled={busy}
+                autoFocus
+              />
+            </label>
+            {formError ? <p role="alert" className="text-sm text-[var(--danger)]">{formError}</p> : null}
+            <div className="flex gap-2">
+              <button type="button" className="btn-raw btn-primary" disabled={busy} onClick={() => { void handleCreateFolder() }}>
+                {busy ? 'Creating folder...' : 'Create folder'}
+              </button>
+              <button type="button" className="btn-raw" disabled={busy} onClick={() => {
+                setMode('view')
+                setDraftFolderName('')
+                setFormError('')
+              }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     )
   }

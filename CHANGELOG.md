@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- Added folder creation from repository and folder views so direct subfolders can be created inside GitLocal.
+- Added recursive folder deletion with a strong confirmation dialog that explains the impact, shows file and nested-folder counts, and requires typing the folder name before deletion.
+- Added backend safety checks and coverage for folder path validation, stale delete previews, duplicate names, ignored content, and recursive deletion boundaries.
+
 ## 0.5.4
 
 - Changed repository search so it opens only from the repository search button and no longer overrides the browser's native `Cmd/Ctrl+F` behavior.

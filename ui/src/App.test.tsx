@@ -20,6 +20,9 @@ vi.mock('./services/api', () => ({
     createFile: vi.fn(),
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
+    createFolder: vi.fn(),
+    getFolderDeletePreview: vi.fn(),
+    deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
@@ -197,6 +200,37 @@ describe('App', () => {
       mode: 'both',
       caseSensitive: false,
       results: [],
+    })
+    vi.mocked(api.createFolder).mockResolvedValue({
+      ok: true,
+      operation: 'create-folder',
+      path: 'docs/new-folder',
+      parentPath: 'docs',
+      name: 'new-folder',
+      status: 'created',
+      message: 'Folder created successfully.',
+    })
+    vi.mocked(api.getFolderDeletePreview).mockResolvedValue({
+      ok: true,
+      operation: 'preview-delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      fileCount: 2,
+      folderCount: 1,
+      status: 'previewed',
+      message: 'This will permanently delete docs and all of its contents, including 2 files and 1 nested folder.',
+    })
+    vi.mocked(api.deleteFolder).mockResolvedValue({
+      ok: true,
+      operation: 'delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      fileCount: 2,
+      folderCount: 1,
+      status: 'deleted',
+      message: 'Folder deleted successfully.',
     })
     vi.mocked(api.switchBranch).mockResolvedValue({
       ok: false,
@@ -450,7 +484,8 @@ describe('App', () => {
     await waitFor(() => {
       expect(api.getSearchResults).toHaveBeenCalledWith('docs', 'main', 'both', false)
     })
-    expect(await screen.findByRole('button', { name: /docs/i })).toBeInTheDocument()
+    const searchLayer = await screen.findByTestId('search-layer')
+    expect(await within(searchLayer).findByRole('button', { name: /docs/i })).toBeInTheDocument()
   })
 
   it('collapses and restores the repository tree rail', async () => {
@@ -615,6 +650,53 @@ describe('App', () => {
       expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('feature')
     })
     expect(await screen.findByText(/switched to feature/i)).toBeInTheDocument()
+  })
+
+  it('creates a folder from the current folder view', async () => {
+    renderWithClient()
+
+    const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
+    fireEvent.click(docsButtons[0])
+
+    fireEvent.click(await screen.findByRole('button', { name: /new folder here/i }))
+    fireEvent.change(screen.getByLabelText(/folder name/i), {
+      target: { value: 'new-folder' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }))
+
+    await waitFor(() => {
+      expect(api.createFolder).toHaveBeenCalledWith({ parentPath: 'docs', name: 'new-folder' })
+    })
+    expect(await screen.findByText(/folder created successfully/i)).toBeInTheDocument()
+  })
+
+  it('requires exact typed confirmation before deleting a folder', async () => {
+    renderWithClient()
+
+    const deleteButtons = await screen.findAllByRole('button', { name: /delete folder docs/i })
+    fireEvent.click(deleteButtons[0])
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByText(/2 files/i).length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText(/1 nested folder/i).length).toBeGreaterThan(0)
+    const deleteButton = within(dialog).getByRole('button', { name: /^delete folder$/i })
+    expect(deleteButton).toBeDisabled()
+
+    fireEvent.change(within(dialog).getByLabelText(/folder deletion confirmation name/i), {
+      target: { value: 'wrong' },
+    })
+    expect(deleteButton).toBeDisabled()
+
+    fireEvent.change(within(dialog).getByLabelText(/folder deletion confirmation name/i), {
+      target: { value: 'docs' },
+    })
+    expect(deleteButton).not.toBeDisabled()
+    fireEvent.click(deleteButton)
+
+    await waitFor(() => {
+      expect(api.deleteFolder).toHaveBeenCalledWith({ path: 'docs', confirmationName: 'docs' })
+    })
+    expect(await screen.findByText(/folder deleted successfully/i)).toBeInTheDocument()
   })
 
   it('opens the picker page and footer in picker mode', async () => {

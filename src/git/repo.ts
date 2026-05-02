@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -460,6 +460,137 @@ export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' 
   if (!existsSync(fullPath)) return 'missing'
   const stats = statSync(fullPath)
   return stats.isDirectory() ? 'dir' : 'file'
+}
+
+export function validateRepoChildFolderName(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    throw new Error('Folder name is required.')
+  }
+
+  const normalized = trimmed.replaceAll('\\', '/')
+  if (
+    normalized === '.'
+    || normalized === '..'
+    || normalized.includes('/')
+    || normalized.includes('\0')
+    || isAbsolute(normalized)
+  ) {
+    throw new Error('Folder name must be one direct child name.')
+  }
+
+  return normalized
+}
+
+export function getRepoParentPath(filePath: string): string {
+  const normalized = normalizeRepoRelativePath(filePath)
+  if (!normalized || !normalized.includes('/')) return ''
+  return normalized.slice(0, normalized.lastIndexOf('/'))
+}
+
+export function resolveWorkingTreeFolderParent(repoPath: string, parentPath: string): string {
+  const normalizedParent = normalizeRepoRelativePath(parentPath)
+  const fullParentPath = normalizedParent ? resolveSafeRepoPath(repoPath, normalizedParent) : repoPath
+  if (!fullParentPath) {
+    throw new Error('Parent folder must be inside the repository.')
+  }
+
+  if (!existsSync(fullParentPath) || !statSync(fullParentPath).isDirectory()) {
+    throw new Error('Parent folder is no longer available.')
+  }
+
+  return normalizedParent
+}
+
+export function resolveWorkingTreeSubfolder(repoPath: string, folderPath: string): string {
+  const normalizedPath = normalizeRepoRelativePath(folderPath)
+  if (!normalizedPath) {
+    throw new Error('Repository root cannot be deleted.')
+  }
+
+  const fullPath = resolveSafeRepoPath(repoPath, normalizedPath)
+  if (!fullPath) {
+    throw new Error('Folder must be inside the repository.')
+  }
+
+  if (!existsSync(fullPath) || !statSync(fullPath).isDirectory()) {
+    throw new Error('The selected folder is no longer available.')
+  }
+
+  return normalizedPath
+}
+
+export function createWorkingTreeFolder(repoPath: string, parentPath: string, name: string): string {
+  const normalizedParent = resolveWorkingTreeFolderParent(repoPath, parentPath)
+  const childName = validateRepoChildFolderName(name)
+  const targetPath = normalizedParent ? `${normalizedParent}/${childName}` : childName
+  const fullTargetPath = resolveSafeRepoPath(repoPath, targetPath)
+
+  if (!fullTargetPath) {
+    throw new Error('Folder must be created inside the repository.')
+  }
+
+  if (existsSync(fullTargetPath)) {
+    throw new Error('That path already exists in the repository.')
+  }
+
+  mkdirSync(fullTargetPath)
+  return targetPath
+}
+
+export interface FolderDeleteImpact {
+  path: string
+  name: string
+  parentPath: string
+  fileCount: number
+  folderCount: number
+}
+
+export function countWorkingTreeFolderImpact(repoPath: string, folderPath: string): FolderDeleteImpact {
+  const normalizedPath = resolveWorkingTreeSubfolder(repoPath, folderPath)
+  const fullPath = resolveSafeRepoPath(repoPath, normalizedPath)
+  if (!fullPath) {
+    throw new Error('Folder must be inside the repository.')
+  }
+
+  let fileCount = 0
+  let folderCount = 0
+  const visit = (dirPath: string): void => {
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      const childPath = resolve(dirPath, entry.name)
+      if (entry.isDirectory()) {
+        folderCount += 1
+        visit(childPath)
+        continue
+      }
+      fileCount += 1
+    }
+  }
+
+  visit(fullPath)
+
+  return {
+    path: normalizedPath,
+    name: basename(normalizedPath),
+    parentPath: getRepoParentPath(normalizedPath),
+    fileCount,
+    folderCount,
+  }
+}
+
+export function deleteWorkingTreeFolder(repoPath: string, folderPath: string): FolderDeleteImpact {
+  const impact = countWorkingTreeFolderImpact(repoPath, folderPath)
+  const fullPath = resolveSafeRepoPath(repoPath, impact.path)
+  if (!fullPath) {
+    throw new Error('Folder must be inside the repository.')
+  }
+
+  rmSync(fullPath, { recursive: true, force: false })
+  if (existsSync(fullPath)) {
+    throw new Error('GitLocal could not remove the selected folder completely.')
+  }
+
+  return impact
 }
 
 export function nearestExistingRepoPath(repoPath: string, filePath: string): string {

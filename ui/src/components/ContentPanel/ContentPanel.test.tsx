@@ -11,6 +11,7 @@ vi.mock('../../services/api', () => ({
     getTree: vi.fn(),
     getReadme: vi.fn(),
     createFile: vi.fn(),
+    createFolder: vi.fn(),
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
   },
@@ -252,6 +253,112 @@ describe('ContentPanel', () => {
     expect(await screen.findByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /new file here/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/README.md')
+  })
+
+  it('creates folders from the current directory and reports mutation completion', async () => {
+    vi.mocked(api.createFolder).mockResolvedValue({
+      ok: true,
+      operation: 'create-folder',
+      path: 'docs/assets',
+      parentPath: 'docs',
+      name: 'assets',
+      status: 'created',
+      message: 'Folder created successfully.',
+    })
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+    ])
+
+    const onCreateFolderComplete = vi.fn()
+    const onStatusMessage = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onCreateFolderComplete={onCreateFolderComplete}
+        onStatusMessage={onStatusMessage}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /new folder here/i }))
+    fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: ' assets ' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }))
+
+    await waitFor(() => {
+      expect(api.createFolder).toHaveBeenCalledWith({ parentPath: 'docs', name: 'assets' })
+    })
+    expect(onStatusMessage).toHaveBeenCalledWith('Folder created successfully.')
+    expect(onCreateFolderComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nextPath: 'docs/assets',
+        nextPathType: 'dir',
+      }),
+    )
+  })
+
+  it('shows create-folder errors, tracks dirty state, and supports canceling folder creation', async () => {
+    vi.mocked(api.createFolder).mockRejectedValue({ error: 'Folder already exists.' })
+
+    const onDirtyChange = vi.fn()
+    const onStatusMessage = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onDirtyChange={onDirtyChange}
+        onStatusMessage={onStatusMessage}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /^new folder$/i }))
+    fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: 'docs' } })
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+
+    fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/folder already exists/i)
+    expect(onStatusMessage).toHaveBeenCalledWith('Folder already exists.')
+
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
+    expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
+  })
+
+  it('requests folder deletion from directory rows without opening the row', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'assets', path: 'docs/assets', type: 'dir', localOnly: false },
+    ])
+
+    const onDeleteFolder = vi.fn()
+    const onOpenPath = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+        onDeleteFolder={onDeleteFolder}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /delete folder assets/i }))
+
+    expect(onDeleteFolder).toHaveBeenCalledWith('docs/assets')
+    expect(onOpenPath).not.toHaveBeenCalled()
   })
 
   it('shows ignored files and folders in directory listings and opens them normally', async () => {
@@ -636,6 +743,12 @@ describe('ContentPanel', () => {
     expect(screen.getByText(/3 matches in this file/i)).toBeInTheDocument()
     expect(screen.getByText(/match 1 of 3: line 1, column 1/i)).toBeInTheDocument()
 
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: /find in file query/i }), { key: 'Enter' })
+    expect(screen.getByText(/match 2 of 3: line 2, column 1/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /previous/i }))
+    expect(screen.getByText(/match 1 of 3: line 1, column 1/i)).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     expect(screen.getByText(/match 2 of 3: line 2, column 1/i)).toBeInTheDocument()
 
@@ -645,6 +758,16 @@ describe('ContentPanel', () => {
 
     const matches = within(screen.getByRole('list', { name: /find in file matches/i })).getAllByRole('button')
     expect(matches).toHaveLength(2)
+    fireEvent.click(matches[1])
+    expect(screen.getByText(/match 2 of 2: line 3, column 6/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /close find in file/i }))
+    expect(screen.queryByRole('searchbox', { name: /find in file query/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /find in file/i }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /find in file query/i }), {
+      target: { value: 'alpha' },
+    })
 
     fireEvent.keyDown(screen.getByRole('searchbox', { name: /find in file query/i }), { key: 'Escape' })
     expect(screen.queryByRole('searchbox', { name: /find in file query/i })).not.toBeInTheDocument()
