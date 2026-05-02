@@ -85,14 +85,14 @@ export function MetaTag({ label, icon, tone = 'neutral', compact = false, classN
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] leading-none font-semibold uppercase tracking-[0.08em]',
+        'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] leading-none font-semibold uppercase tracking-[0.08em]',
         toneClassNames[tone],
-        compact && 'px-2 py-[0.3rem] text-[10px]',
+        compact && 'gap-1 px-1.5 py-[0.22rem] text-[9px]',
         className,
       )}
     >
-      <span className="shrink-0">{iconFor(icon)}</span>
-      <span>{label}</span>
+      <span className="shrink-0 scale-90">{iconFor(icon)}</span>
+      <span className="truncate">{label}</span>
     </span>
   )
 }

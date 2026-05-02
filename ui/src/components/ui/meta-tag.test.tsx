@@ -28,6 +28,7 @@ describe('MetaTag', () => {
 
     const tag = screen.getByText('Local commit').closest('.custom-tag')
     expect(tag).toBeTruthy()
-    expect(tag?.className).toContain('text-[10px]')
+    expect(tag?.className).toContain('text-[9px]')
+    expect(tag?.className).toContain('px-1.5')
   })
 })

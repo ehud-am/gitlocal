@@ -787,8 +787,6 @@ export default function App() {
 
                     handleSelectFile(path, localOnly)
                   }}
-                  onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
-                  canDeleteFolders={canMutateFiles}
                 />
               </div>
             </aside>

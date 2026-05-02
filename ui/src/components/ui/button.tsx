@@ -13,6 +13,7 @@ const buttonVariants = cva(
         ghost: 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]',
         outline: 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)]',
         danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
+        dangerOutline: 'border border-[color-mix(in_srgb,var(--danger)_65%,var(--border))] bg-[var(--card)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,var(--background))]',
       },
       size: {
         default: 'h-9 px-3.5',

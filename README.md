@@ -117,7 +117,7 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **Track file sync state** — file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
 - **Make local file edits** — create, edit, and delete files from the viewer when you are on the repository's working branch
-- **Manage folders in the repo view** — create direct child folders and delete subfolders recursively with a typed-name confirmation that shows the affected file and folder counts
+- **Manage folders in the repo view** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Commit and sync safely** — create local commits, push ahead branches, and fast-forward pull behind branches from the repository header
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — update the repository-specific git `user.name` and `user.email` without touching your global git config

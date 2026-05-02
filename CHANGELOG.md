@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- Moved folder deletion from the left navigation row icon into the main folder view action area.
+- Styled the main folder delete action as a destructive outline control with red text and border while preserving the typed-name confirmation flow.
+- Shortened local-only tags to `local` in the repository tree and folder views, with smaller compact tag styling for denser navigation.
+
 ## 0.6.0
 
 - Added folder creation from repository and folder views so direct subfolders can be created inside GitLocal.

@@ -93,8 +93,20 @@ describe('FileTree', () => {
     renderWithClient(<FileTree {...defaultProps} />)
 
     const ignoredEntry = await screen.findByRole('treeitem', { name: /\.env/i })
-    expect(within(ignoredEntry).getByText(/local only/i)).toBeInTheDocument()
-    expect(screen.queryAllByText(/local only/i)).toHaveLength(1)
+    expect(within(ignoredEntry).getByText(/^local$/i)).toBeInTheDocument()
+    expect(screen.queryByText(/local only/i)).not.toBeInTheDocument()
+    expect(screen.queryAllByText(/^local$/i)).toHaveLength(1)
+  })
+
+  it('does not render folder delete controls in the left tree', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    expect(await screen.findByRole('treeitem', { name: /src/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete folder src/i })).not.toBeInTheDocument()
   })
 
   it('shows sync badges for changed files', async () => {

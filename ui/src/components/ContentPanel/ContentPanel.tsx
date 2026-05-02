@@ -251,6 +251,7 @@ export default function ContentPanel({
   }, [data?.content, draftContent, draftFolderName, draftPath, mode])
 
   const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image')
+  const canDeleteCurrentFolder = canMutateFiles && selectedPathType === 'dir' && Boolean(selectedPath)
   const trimmedFileFindQuery = fileFindQuery.trim()
   const fileFindMatches = useMemo(
     () => (canSearchCurrentFile ? findInFileMatches(data?.content ?? '', trimmedFileFindQuery, fileFindCaseSensitive) : []),
@@ -472,7 +473,7 @@ export default function ContentPanel({
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
               <div className="content-active-heading-row">
                 <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly)}</h2>
-                {selectedPathLocalOnly && path ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
+                {selectedPathLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
               </div>
             </div>
             {canMutateFiles ? (
@@ -483,6 +484,16 @@ export default function ContentPanel({
                 <button type="button" className="btn-raw" onClick={() => { void beginCreateFolderMode() }}>
                   {path ? 'New folder here' : 'New folder'}
                 </button>
+                {canDeleteCurrentFolder ? (
+                  <Button
+                    type="button"
+                    variant="dangerOutline"
+                    size="sm"
+                    onClick={() => onDeleteFolder?.(path)}
+                  >
+                    Delete folder
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -529,7 +540,7 @@ export default function ContentPanel({
                                 </span>
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
-                              {!entry.isParent && entry.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
+                              {!entry.isParent && entry.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
                               {syncBadge ? <MetaTag label={syncBadge.label} icon={syncBadge.icon} tone={syncBadge.tone} compact /> : null}
                             </div>
                           </td>
@@ -541,19 +552,6 @@ export default function ContentPanel({
                           <td className="content-directory-cell content-directory-cell-path">
                             <div className="flex items-center justify-between gap-2">
                               <span className="content-directory-path">{entry.displayPath}</span>
-                              {canMutateFiles && !entry.isParent && entry.type === 'dir' ? (
-                                <button
-                                  type="button"
-                                  className="btn-raw"
-                                  aria-label={`Delete folder ${entry.name}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    onDeleteFolder?.(entry.path)
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              ) : null}
                             </div>
                           </td>
                           </tr>
@@ -740,7 +738,7 @@ export default function ContentPanel({
           <p className="content-directory-kicker">File</p>
           <div className="content-active-heading-row">
             <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
-            {selectedPathLocalOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
+            {selectedPathLocalOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
             {selectedPathSyncBadge ? <MetaTag label={selectedPathSyncBadge.label} icon={selectedPathSyncBadge.icon} tone={selectedPathSyncBadge.tone} compact /> : null}
           </div>
         </div>

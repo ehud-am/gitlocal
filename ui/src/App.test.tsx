@@ -674,8 +674,9 @@ describe('App', () => {
   it('requires exact typed confirmation before deleting a folder', async () => {
     renderWithClient()
 
-    const deleteButtons = await screen.findAllByRole('button', { name: /delete folder docs/i })
-    fireEvent.click(deleteButtons[0])
+    const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
+    fireEvent.click(docsButtons[0])
+    fireEvent.click(await screen.findByRole('button', { name: /^delete folder$/i }))
 
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getAllByText(/2 files/i).length).toBeGreaterThan(0)
