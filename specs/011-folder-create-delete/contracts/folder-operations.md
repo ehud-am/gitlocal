@@ -23,7 +23,7 @@ Folder operations are available only for the current working tree of the opened 
 - Query parameters:
   - `path`: repository-relative folder path selected for deletion.
 - Success behavior:
-  - Returns `ok: true`, `operation: "preview-delete-folder"`, `status: "previewed"`, `path`, `name`, `parentPath`, `fileCount`, `folderCount`, and a user-facing warning message.
+  - Returns `ok: true`, `operation: "preview-delete-folder"`, `status: "previewed"`, `path`, `name`, `parentPath`, `fileCount`, `folderCount`, `impactToken`, and a user-facing warning message.
   - `fileCount` includes all nested files inside the selected folder, including tracked, untracked, ignored, hidden, modified, and deeply nested files.
   - `folderCount` includes nested folders inside the selected folder and excludes the selected folder itself.
 - Failure behavior:
@@ -36,13 +36,18 @@ Folder operations are available only for the current working tree of the opened 
 - Request body:
   - `path`: repository-relative folder path selected for deletion.
   - `confirmationName`: exact folder name typed by the user.
+  - `previewFileCount`: file count shown in the latest delete preview.
+  - `previewFolderCount`: nested folder count shown in the latest delete preview.
+  - `previewImpactToken`: opaque impact token returned by the latest delete preview.
 - Success behavior:
-  - Revalidates the selected folder and recounts nested impact before deletion.
+  - Revalidates the selected folder and recalculates nested impact before deletion.
+  - Rejects the request when the current impact differs from the previewed counts or impact token, requiring the user to refresh and review the changed impact.
   - Deletes the selected folder and all nested contents.
   - Returns `ok: true`, `operation: "delete-folder"`, `status: "deleted"`, `path`, `parentPath`, `fileCount`, `folderCount`, and a user-facing message.
   - The UI navigates to or refreshes `parentPath` and the deleted folder is absent from refreshed listings.
 - Failure behavior:
   - Returns `status: "blocked"` when the confirmation name does not exactly match the selected folder name.
+  - Returns `status: "blocked"` when preview counts or the preview impact token are missing or stale.
   - Blocks repository root deletion, unsafe paths, missing selected folder, and non-working-tree contexts.
   - Returns `status: "failed"` when deletion cannot complete due to permissions, file locks, or external filesystem changes.
   - The UI must not claim deletion success unless the selected folder is gone.
@@ -77,7 +82,7 @@ Folder operations are available only for the current working tree of the opened 
   - Generating delete previews with recursive file counts for tracked, untracked, ignored, hidden, and nested files.
   - Blocking repository root deletion.
   - Blocking delete confirmation when the typed name does not match.
-  - Revalidating impact at confirmation time.
+  - Revalidating impact at confirmation time, including same-count content changes.
   - Reporting failed deletion without claiming success.
 - UI tests must cover:
   - Create-folder controls from the current folder view.

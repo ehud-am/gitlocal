@@ -117,6 +117,7 @@ GitLocal also clears stale saved branch and path state when you switch repositor
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **Track file sync state** — file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
 - **Make local file edits** — create, edit, and delete files from the viewer when you are on the repository's working branch
+- **Manage folders in the repo view** — create direct child folders and delete subfolders recursively with a typed-name confirmation that shows the affected file and folder counts
 - **Commit and sync safely** — create local commits, push ahead branches, and fast-forward pull behind branches from the repository header
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — update the repository-specific git `user.name` and `user.email` without touching your global git config
@@ -204,7 +205,7 @@ gitlocal/
 │   │   └── repo-watch.ts — working-tree revision and sync status snapshots for the UI
 │   └── handlers/
 │       ├── git.ts       — /api/info, /api/readme, /api/branches, /api/commits, /api/git/commit, /api/git/sync
-│       ├── files.ts     — /api/tree, /api/file
+│       ├── files.ts     — /api/tree, /api/file, /api/folder
 │       ├── sync.ts      — /api/sync
 │       └── pick.ts      — /api/pick and /api/pick/browse for the folder picker
 └── ui/src/
@@ -246,6 +247,9 @@ All endpoints are served under `/api/`:
 | `POST /api/file` | Create a new file in the current repository working tree |
 | `PUT /api/file` | Update an existing file using its revision token |
 | `DELETE /api/file` | Delete an existing file using its revision token |
+| `POST /api/folder` | Create a direct child folder in the current repository working tree |
+| `GET /api/folder/delete-preview?path=` | Preview recursive folder deletion impact before confirmation |
+| `DELETE /api/folder` | Delete a subfolder after exact typed-name confirmation and preview-impact validation |
 | `GET /api/commits?branch=&limit=` | Recent commits (default 10, max 100) |
 | `GET /api/sync?path=&branch=` | Working-tree and upstream sync summary for the current path and branch |
 | `GET /api/pick/browse?path=` | Folder-picker directory listing with git-repo detection |

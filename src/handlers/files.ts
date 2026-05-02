@@ -23,6 +23,7 @@ import type {
   FolderCreateRequest,
   FolderDeleteRequest,
   FolderOperation,
+  FolderOperationStatus,
   FolderOperationResult,
   ManualFileMutationRequest,
   ManualFileOperationResult,
@@ -47,17 +48,30 @@ function folderMutationBlocked(
   message: string,
   status: number,
   parentPath = '',
+  resultStatus: FolderOperationStatus = status >= 500 ? 'failed' : 'blocked',
 ): Response {
   const body: FolderOperationResult = {
     ok: false,
     operation,
     path,
-    /* v8 ignore next -- current folder handlers return blocked client errors */
-    status: status >= 500 ? 'failed' : 'blocked',
+    status: resultStatus,
     message,
     parentPath,
   }
   return Response.json(body, { status })
+}
+
+function isFilesystemError(error: unknown): boolean {
+  return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === 'string'
+}
+
+function hasDeletePreviewImpact(payload: FolderDeleteRequest): boolean {
+  return Number.isInteger(payload.previewFileCount)
+    && payload.previewFileCount >= 0
+    && Number.isInteger(payload.previewFolderCount)
+    && payload.previewFolderCount >= 0
+    && typeof payload.previewImpactToken === 'string'
+    && payload.previewImpactToken.length > 0
 }
 
 function buildDeleteWarning(name: string, fileCount: number, folderCount: number): string {
@@ -217,12 +231,14 @@ export async function createFolderHandler(c: Context<{ Variables: Variables }>):
     }
     return c.json(result, 201)
   } catch (error) {
+    const failed = isFilesystemError(error)
     return folderMutationBlocked(
       'create-folder',
       parentPath,
       error instanceof Error ? error.message : 'Failed to create the folder.',
-      400,
+      failed ? 500 : 400,
       parentPath,
+      failed ? 'failed' : 'blocked',
     )
   }
 }
@@ -370,6 +386,22 @@ export async function deleteFolderHandler(c: Context<{ Variables: Variables }>):
   }
 
   try {
+    const previewImpact = countWorkingTreeFolderImpact(repoPath, path)
+    if (
+      !hasDeletePreviewImpact(payload)
+      || payload.previewFileCount !== previewImpact.fileCount
+      || payload.previewFolderCount !== previewImpact.folderCount
+      || payload.previewImpactToken !== previewImpact.impactToken
+    ) {
+      return folderMutationBlocked(
+        'delete-folder',
+        path,
+        'The folder contents changed after the preview. Refresh the delete confirmation before deleting.',
+        409,
+        previewImpact.parentPath,
+      )
+    }
+
     const impact = deleteWorkingTreeFolder(repoPath, path)
     const result: FolderOperationResult = {
       ok: true,
@@ -380,13 +412,15 @@ export async function deleteFolderHandler(c: Context<{ Variables: Variables }>):
     }
     return c.json(result)
   } catch (error) {
+    const failed = isFilesystemError(error)
     return folderMutationBlocked(
       'delete-folder',
       path,
       /* v8 ignore next -- filesystem helpers throw Error instances */
       error instanceof Error ? error.message : 'Failed to delete the folder.',
-      400,
+      failed ? 500 : 400,
       getRepoParentPath(path),
+      failed ? 'failed' : 'blocked',
     )
   }
 }

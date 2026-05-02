@@ -166,14 +166,21 @@ describe('Server integration', () => {
       const app = createApp(repo.dir)
       const previewRes = await app.fetch(new Request(`http://localhost/api/folder/delete-preview?path=${encodeURIComponent('docs')}`))
       expect(previewRes.status).toBe(200)
-      const preview = await previewRes.json() as { fileCount: number; name: string }
+      const preview = await previewRes.json() as { fileCount: number; folderCount: number; impactToken: string; name: string }
       expect(preview.fileCount).toBe(2)
       expect(preview.name).toBe('docs')
+      expect(preview.impactToken).toEqual(expect.any(String))
 
       const deleteRes = await app.fetch(new Request('http://localhost/api/folder', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'docs', confirmationName: 'docs' }),
+        body: JSON.stringify({
+          path: 'docs',
+          confirmationName: 'docs',
+          previewFileCount: preview.fileCount,
+          previewFolderCount: preview.folderCount,
+          previewImpactToken: preview.impactToken,
+        }),
       }))
       expect(deleteRes.status).toBe(200)
 

@@ -223,48 +223,50 @@ export function FolderDeleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete folder?</DialogTitle>
-          <DialogDescription>
-            {message || `This will permanently delete ${name || 'this folder'} and all of its contents.`}
-          </DialogDescription>
-        </DialogHeader>
-
+      <DialogContent role="alertdialog">
         <div className="grid gap-4">
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3 text-sm text-[var(--foreground)]">
-            <p><strong>Folder:</strong> {name || 'Unknown folder'}</p>
-            <p><strong>Location:</strong> {path || 'repository root'}</p>
-            <p><strong>Contents:</strong> {fileText}, {folderText}</p>
+          <DialogHeader>
+            <DialogTitle>Delete folder?</DialogTitle>
+            <DialogDescription>
+              {message || `This will permanently delete ${name || 'this folder'} and all of its contents.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3 text-sm text-[var(--foreground)]">
+              <p><strong>Folder:</strong> {name || 'Unknown folder'}</p>
+              <p><strong>Location:</strong> {path || 'repository root'}</p>
+              <p><strong>Contents:</strong> {fileText}, {folderText}</p>
+            </div>
+
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                Type <code>{name}</code> to confirm
+              </span>
+              <Input
+                value={confirmationName}
+                onChange={(event) => onConfirmationNameChange(event.target.value)}
+                aria-label="Folder deletion confirmation name"
+                disabled={pending}
+              />
+            </label>
+
+            {error ? (
+              <p role="alert" className="text-sm text-[var(--danger)]">
+                {error}
+              </p>
+            ) : null}
           </div>
 
-          <label className="grid gap-1.5">
-            <span className="text-sm font-medium text-[var(--foreground)]">
-              Type <code>{name}</code> to confirm
-            </span>
-            <Input
-              value={confirmationName}
-              onChange={(event) => onConfirmationNameChange(event.target.value)}
-              aria-label="Folder deletion confirmation name"
-              disabled={pending}
-            />
-          </label>
-
-          {error ? (
-            <p role="alert" className="text-sm text-[var(--danger)]">
-              {error}
-            </p>
-          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={onDelete} disabled={pending || !canDelete}>
+              {pending ? 'Deleting...' : 'Delete folder'}
+            </Button>
+          </DialogFooter>
         </div>
-
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
-            Cancel
-          </Button>
-          <Button type="button" variant="danger" onClick={onDelete} disabled={pending || !canDelete}>
-            {pending ? 'Deleting...' : 'Delete folder'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

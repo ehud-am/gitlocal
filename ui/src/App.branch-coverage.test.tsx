@@ -425,6 +425,7 @@ describe('App branch coverage', () => {
       name: 'docs',
       fileCount: 1,
       folderCount: 0,
+      impactToken: 'impact-docs',
       status: 'previewed',
       message: 'This will permanently delete docs and all of its contents, including 1 file.',
     })
@@ -786,6 +787,7 @@ describe('App branch coverage', () => {
         name: 'docs',
         fileCount: 1,
         folderCount: 0,
+        impactToken: 'impact-docs',
         status: 'previewed',
         message: 'This will permanently delete docs and all of its contents, including 1 file.',
       })
@@ -802,6 +804,37 @@ describe('App branch coverage', () => {
     expect(await screen.findByText(/delete failed/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'close-folder-delete' }))
     expect(screen.queryByTestId('folder-delete-dialog')).not.toBeInTheDocument()
+  })
+
+  it('defaults missing folder preview impact data when submitting deletion', async () => {
+    vi.mocked(api.getFolderDeletePreview).mockResolvedValueOnce({
+      ok: true,
+      operation: 'preview-delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      status: 'previewed',
+      message: 'This will permanently delete docs and all of its contents.',
+    })
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'request-delete-folder' }))
+    expect(await screen.findByTestId('folder-delete-dialog')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: /folder delete confirmation/i }), {
+      target: { value: 'docs' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'confirm-folder-delete' }))
+
+    await waitFor(() => {
+      expect(api.deleteFolder).toHaveBeenCalledWith({
+        path: 'docs',
+        confirmationName: 'docs',
+        previewFileCount: 0,
+        previewFolderCount: 0,
+        previewImpactToken: '',
+      })
+    })
   })
 
   it('surfaces identity, commit, and follow-up branch switch errors', async () => {

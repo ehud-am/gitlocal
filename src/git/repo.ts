@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -469,14 +469,18 @@ export function validateRepoChildFolderName(name: string): string {
   }
 
   const normalized = trimmed.replaceAll('\\', '/')
+  const reservedWindowsName = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i
   if (
     normalized === '.'
     || normalized === '..'
     || normalized.includes('/')
     || normalized.includes('\0')
+    || /[<>:"|?*]/.test(normalized)
+    || normalized.endsWith('.')
+    || reservedWindowsName.test(normalized)
     || isAbsolute(normalized)
   ) {
-    throw new Error('Folder name must be one direct child name.')
+    throw new Error('Folder name must be one safe direct child name.')
   }
 
   return normalized
@@ -544,6 +548,7 @@ export interface FolderDeleteImpact {
   parentPath: string
   fileCount: number
   folderCount: number
+  impactToken: string
 }
 
 export function countWorkingTreeFolderImpact(repoPath: string, folderPath: string): FolderDeleteImpact {
@@ -555,15 +560,33 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
 
   let fileCount = 0
   let folderCount = 0
+  const impactHash = createHash('sha1')
   const visit = (dirPath: string): void => {
-    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const entries = readdirSync(dirPath, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name))
+
+    for (const entry of entries) {
       const childPath = resolve(dirPath, entry.name)
+      const childRelativePath = relative(fullPath, childPath).split('\\').join('/')
       if (entry.isDirectory()) {
         folderCount += 1
+        impactHash.update(`dir\0${childRelativePath}\0`)
         visit(childPath)
         continue
       }
       fileCount += 1
+      const stat = lstatSync(childPath)
+      if (stat.isSymbolicLink()) {
+        impactHash.update(`symlink\0${childRelativePath}\0${readlinkSync(childPath)}\0`)
+        continue
+      }
+      impactHash.update(`file\0${childRelativePath}\0`)
+      if (stat.isFile()) {
+        impactHash.update(readFileSync(childPath))
+      } else {
+        impactHash.update(`${stat.mode}\0${stat.size}\0${stat.mtimeMs}`)
+      }
+      impactHash.update('\0')
     }
   }
 
@@ -575,6 +598,7 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
     parentPath: getRepoParentPath(normalizedPath),
     fileCount,
     folderCount,
+    impactToken: impactHash.digest('hex'),
   }
 }
 

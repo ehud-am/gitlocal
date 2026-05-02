@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -1376,8 +1376,12 @@ describe('working tree helpers', () => {
     try {
       expect(validateRepoChildFolderName(' notes ')).toBe('notes')
       expect(() => validateRepoChildFolderName('')).toThrow(/required/i)
-      expect(() => validateRepoChildFolderName('../escape')).toThrow(/direct child/i)
-      expect(() => validateRepoChildFolderName('a/b')).toThrow(/direct child/i)
+      expect(() => validateRepoChildFolderName('../escape')).toThrow(/safe direct child/i)
+      expect(() => validateRepoChildFolderName('a/b')).toThrow(/safe direct child/i)
+      expect(() => validateRepoChildFolderName('CON')).toThrow(/safe direct child/i)
+      expect(() => validateRepoChildFolderName('aux.txt')).toThrow(/safe direct child/i)
+      expect(() => validateRepoChildFolderName('name:bad')).toThrow(/safe direct child/i)
+      expect(() => validateRepoChildFolderName('trailing.')).toThrow(/safe direct child/i)
 
       expect(resolveWorkingTreeFolderParent(dir, '')).toBe('')
       expect(resolveWorkingTreeFolderParent(dir, 'docs')).toBe('docs')
@@ -1402,23 +1406,30 @@ describe('working tree helpers', () => {
       writeFileSync(join(dir, 'docs', 'nested', 'deep.txt'), 'deep')
       writeFileSync(join(dir, 'docs', '.hidden'), 'hidden')
       writeFileSync(join(dir, 'docs', 'scratch.tmp'), 'ignored maybe')
+      writeFileSync(join(dir, 'outside-target.txt'), 'outside')
+      symlinkSync('../outside-target.txt', join(dir, 'docs', 'outside-link.txt'))
 
       const impact = countWorkingTreeFolderImpact(dir, 'docs')
       expect(impact).toEqual({
         path: 'docs',
         name: 'docs',
         parentPath: '',
-        fileCount: 4,
+        fileCount: 5,
         folderCount: 1,
+        impactToken: expect.any(String),
       })
+
+      writeFileSync(join(dir, 'docs', 'guide.md'), 'changed guide')
+      expect(countWorkingTreeFolderImpact(dir, 'docs').impactToken).not.toBe(impact.impactToken)
 
       expect(resolveWorkingTreeSubfolder(dir, 'docs')).toBe('docs')
       expect(() => resolveWorkingTreeSubfolder(dir, '')).toThrow(/root cannot be deleted/i)
       expect(() => countWorkingTreeFolderImpact(dir, '../escape')).toThrow(/inside the repository/i)
 
       const deleted = deleteWorkingTreeFolder(dir, 'docs')
-      expect(deleted.fileCount).toBe(4)
+      expect(deleted.fileCount).toBe(5)
       expect(existsSync(join(dir, 'docs'))).toBe(false)
+      expect(existsSync(join(dir, 'outside-target.txt'))).toBe(true)
     } finally {
       cleanup()
     }
