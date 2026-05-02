@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-folder-create-delete`  
 **Created**: 2026-05-02  
-**Status**: Draft  
+**Status**: Released in v0.6.0
 **Input**: User description: "minro release. Add the ability to create and delete folders. The use case: I'm in a git folder and i want to create a new subfolder, i should be able to do that from gitlocal directly. a second use case, i'm in a folder and i want to delete the folder and all of the content inside it. In this case we need a strong confirmation that explains what will happen, how many files (that are inside the folder) will be deleted, and the confirmation is not just a click of a button, but something that actually requires me to type the name of the content (similar to how you delete a repo in github)."
 
 ## User Scenarios & Testing *(mandatory)*

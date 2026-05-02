@@ -25,4 +25,4 @@
 7. Cancel the dialog and verify the `docs` folder and all nested contents remain.
 8. Reopen the delete action, type `docs`, confirm deletion, and verify GitLocal returns to the nearest remaining parent folder.
 9. Verify `docs` is absent after refresh and the comparison folder remains untouched.
-10. Attempt to delete the repository root and confirm GitLocal blocks the action.
+10. Confirm the repository root has no delete control in the UI, then verify the folder delete API/helper blocks an empty root path.

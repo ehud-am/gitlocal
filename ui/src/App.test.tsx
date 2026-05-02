@@ -218,6 +218,7 @@ describe('App', () => {
       name: 'docs',
       fileCount: 2,
       folderCount: 1,
+      impactToken: 'impact-docs',
       status: 'previewed',
       message: 'This will permanently delete docs and all of its contents, including 2 files and 1 nested folder.',
     })
@@ -676,7 +677,7 @@ describe('App', () => {
     const deleteButtons = await screen.findAllByRole('button', { name: /delete folder docs/i })
     fireEvent.click(deleteButtons[0])
 
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getAllByText(/2 files/i).length).toBeGreaterThan(0)
     expect(within(dialog).getAllByText(/1 nested folder/i).length).toBeGreaterThan(0)
     const deleteButton = within(dialog).getByRole('button', { name: /^delete folder$/i })
@@ -694,7 +695,13 @@ describe('App', () => {
     fireEvent.click(deleteButton)
 
     await waitFor(() => {
-      expect(api.deleteFolder).toHaveBeenCalledWith({ path: 'docs', confirmationName: 'docs' })
+      expect(api.deleteFolder).toHaveBeenCalledWith({
+        path: 'docs',
+        confirmationName: 'docs',
+        previewFileCount: 2,
+        previewFolderCount: 1,
+        previewImpactToken: 'impact-docs',
+      })
     })
     expect(await screen.findByText(/folder deleted successfully/i)).toBeInTheDocument()
   })

@@ -452,6 +452,9 @@ export default function App() {
       const result = await api.deleteFolder({
         path: folderDeletePreview.path,
         confirmationName: folderDeleteConfirmationName,
+        previewFileCount: folderDeletePreview.fileCount ?? 0,
+        previewFolderCount: folderDeletePreview.folderCount ?? 0,
+        previewImpactToken: folderDeletePreview.impactToken ?? '',
       })
       setFolderDeletePreview(null)
       setFolderDeleteConfirmationName('')

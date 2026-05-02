@@ -201,6 +201,9 @@ export interface FolderCreateRequest {
 export interface FolderDeleteRequest {
   path: string
   confirmationName: string
+  previewFileCount: number
+  previewFolderCount: number
+  previewImpactToken: string
 }
 
 export type FolderOperation = 'create-folder' | 'preview-delete-folder' | 'delete-folder'
@@ -216,6 +219,7 @@ export interface FolderOperationResult {
   name?: string
   fileCount?: number
   folderCount?: number
+  impactToken?: string
 }
 
 export interface PickBrowseEntry {

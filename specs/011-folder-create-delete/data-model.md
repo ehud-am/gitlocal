@@ -45,6 +45,7 @@
   - `parentPath`: Repository-relative parent folder path.
   - `fileCount`: Number of files contained recursively inside the folder.
   - `folderCount`: Number of nested folders contained recursively inside the folder, excluding the selected folder.
+  - `impactToken`: Opaque token representing the previewed recursive folder contents.
   - `message`: User-facing explanation of what will be deleted.
 - **Validation rules**:
   - `path` must resolve to an existing subfolder inside the current working tree.
@@ -59,13 +60,17 @@
 - **Fields**:
   - `path`: Repository-relative folder path selected for deletion.
   - `confirmationName`: User-entered folder name.
+  - `previewFileCount`: File count from the latest delete preview the user reviewed.
+  - `previewFolderCount`: Nested folder count from the latest delete preview the user reviewed.
+  - `previewImpactToken`: Opaque impact token from the latest delete preview the user reviewed.
 - **Validation rules**:
   - `path` must still resolve to an existing subfolder at confirmation time.
   - `confirmationName` must exactly match the selected folder's displayed name.
   - The selected folder's impact must be recalculated at confirmation time before deletion.
+  - The recalculated impact must match `previewFileCount`, `previewFolderCount`, and `previewImpactToken`; otherwise the user must refresh the preview before deleting.
   - Repository root deletion is always blocked.
 - **State transitions**:
-  - `previewed` -> `blocked` when the confirmation name does not match or the folder is no longer valid.
+  - `previewed` -> `blocked` when the confirmation name does not match, preview impact data is stale, or the folder is no longer valid.
   - `previewed` -> `deleted` when recursive deletion completes and the selected folder is gone.
   - `previewed` -> `failed` when deletion cannot complete.
 

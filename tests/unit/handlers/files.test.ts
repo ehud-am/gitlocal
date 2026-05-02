@@ -644,7 +644,13 @@ describe('folder operation handlers', () => {
     const deleted = await app.fetch(new Request('http://localhost/api/folder', {
       method: 'DELETE',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: 'docs', confirmationName: 'docs' }),
+      body: JSON.stringify({
+        path: 'docs',
+        confirmationName: 'docs',
+        previewFileCount: 0,
+        previewFolderCount: 0,
+        previewImpactToken: 'missing-repo-preview',
+      }),
     }))
     expect(deleted.status).toBe(400)
   })
@@ -659,7 +665,13 @@ describe('folder operation handlers', () => {
       const deleted = await app.fetch(new Request('http://localhost/api/folder?branch=feature-files', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: 1,
+          previewFolderCount: 0,
+          previewImpactToken: 'non-current-branch-preview',
+        }),
       }))
       expect(deleted.status).toBe(409)
     } finally {
@@ -689,6 +701,7 @@ describe('folder operation handlers', () => {
         parentPath: '',
         fileCount: 4,
         folderCount: 1,
+        impactToken: expect.any(String),
       }))
       expect(body.message).toContain('4 files')
     } finally {
@@ -712,6 +725,7 @@ describe('folder operation handlers', () => {
         parentPath: '',
         fileCount: 0,
         folderCount: 0,
+        impactToken: expect.any(String),
       }))
       expect(rootBody.message).toContain('0 files')
 
@@ -721,6 +735,7 @@ describe('folder operation handlers', () => {
         name: 'empty',
         path: 'src/empty',
         parentPath: 'src',
+        impactToken: expect.any(String),
       }))
     } finally {
       cleanup()
@@ -771,10 +786,81 @@ describe('folder operation handlers', () => {
       const stale = await app.fetch(new Request('http://localhost/api/folder', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: 1,
+          previewFolderCount: 0,
+          previewImpactToken: 'stale-preview',
+        }),
       }))
       expect(stale.status).toBe(400)
       expect((await stale.json()).message).toMatch(/no longer available/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('requires a refreshed confirmation when folder impact changes after preview', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src'))
+      expect(preview.status).toBe(200)
+      const previewBody = await preview.json()
+      expect(previewBody.fileCount).toBe(1)
+      expect(previewBody.folderCount).toBe(0)
+      expect(previewBody.impactToken).toEqual(expect.any(String))
+
+      writeFileSync(join(dir, 'src', 'new-after-preview.txt'), 'changed')
+
+      const stale = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: previewBody.fileCount,
+          previewFolderCount: previewBody.folderCount,
+          previewImpactToken: previewBody.impactToken,
+        }),
+      }))
+      expect(stale.status).toBe(409)
+      const body = await stale.json()
+      expect(body.status).toBe('blocked')
+      expect(body.message).toMatch(/changed after the preview/i)
+      expect(existsSync(join(dir, 'src'))).toBe(true)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('requires a refreshed confirmation when folder contents change but counts stay the same', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src'))
+      expect(preview.status).toBe(200)
+      const previewBody = await preview.json()
+
+      rmSync(join(dir, 'src', 'index.ts'))
+      writeFileSync(join(dir, 'src', 'renamed.ts'), 'export const x = 2')
+
+      const stale = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: previewBody.fileCount,
+          previewFolderCount: previewBody.folderCount,
+          previewImpactToken: previewBody.impactToken,
+        }),
+      }))
+
+      expect(stale.status).toBe(409)
+      expect((await stale.json()).message).toMatch(/changed after the preview/i)
+      expect(existsSync(join(dir, 'src'))).toBe(true)
     } finally {
       cleanup()
     }
@@ -786,10 +872,19 @@ describe('folder operation handlers', () => {
       mkdirSync(join(dir, 'src', 'nested'))
       writeFileSync(join(dir, 'src', 'nested', 'deep.txt'), 'deep')
       const app = createApp(dir)
+      const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src'))
+      expect(preview.status).toBe(200)
+      const previewBody = await preview.json()
       const res = await app.fetch(new Request('http://localhost/api/folder', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'src', confirmationName: 'src' }),
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: previewBody.fileCount,
+          previewFolderCount: previewBody.folderCount,
+          previewImpactToken: previewBody.impactToken,
+        }),
       }))
       expect(res.status).toBe(200)
       const body = await res.json()
@@ -802,6 +897,35 @@ describe('folder operation handlers', () => {
       }))
       expect(existsSync(join(dir, 'src'))).toBe(false)
     } finally {
+      cleanup()
+    }
+  })
+
+  it('reports folder delete filesystem errors as failed results', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const preview = await app.fetch(new Request('http://localhost/api/folder/delete-preview?path=src'))
+      expect(preview.status).toBe(200)
+      const previewBody = await preview.json()
+
+      chmodSync(dir, 0o500)
+      const failed = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src',
+          confirmationName: 'src',
+          previewFileCount: previewBody.fileCount,
+          previewFolderCount: previewBody.folderCount,
+          previewImpactToken: previewBody.impactToken,
+        }),
+      }))
+
+      expect(failed.status).toBe(500)
+      expect((await failed.json()).status).toBe('failed')
+    } finally {
+      chmodSync(dir, 0o700)
       cleanup()
     }
   })
