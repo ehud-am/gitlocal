@@ -7,6 +7,9 @@ import type {
   CommitChangesResponse,
   Commit,
   FileContent,
+  FolderCreateRequest,
+  FolderDeleteRequest,
+  FolderOperationResult,
   GitIdentityUpdateRequest,
   GitIdentityUpdateResponse,
   ManualFileMutationRequest,
@@ -107,6 +110,17 @@ export const api = {
 
   deleteFile: (payload: ManualFileMutationRequest): Promise<ManualFileOperationResult> =>
     mutate('/api/file', 'DELETE', payload),
+
+  createFolder: (payload: FolderCreateRequest): Promise<FolderOperationResult> =>
+    mutate('/api/folder', 'POST', payload),
+
+  getFolderDeletePreview: (path: string): Promise<FolderOperationResult> => {
+    const params = new URLSearchParams({ path })
+    return request(`/api/folder/delete-preview?${params.toString()}`)
+  },
+
+  deleteFolder: (payload: FolderDeleteRequest): Promise<FolderOperationResult> =>
+    mutate('/api/folder', 'DELETE', payload),
 
   getCommits: (branch?: string, limit?: number): Promise<Commit[]> => {
     const params = new URLSearchParams()

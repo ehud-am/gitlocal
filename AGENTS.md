@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-08
+Auto-generated from all feature plans. Last updated: 2026-05-02
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -21,6 +21,8 @@ Auto-generated from all feature plans. Last updated: 2026-04-08
 - None; runtime state is derived from local filesystem metadata, git metadata, browser URL state, and in-memory server/UI state (007-editor-empty-repo)
 - TypeScript 5.x on Node.js 22+ + Hono, React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library (008-ignored-files-visibility)
 - None; runtime state is derived from local filesystem contents, git metadata, browser URL state, and in-memory server/UI state (008-ignored-files-visibility)
+- TypeScript 5.x on Node.js 22+ + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, Radix UI primitives (011-folder-create-delete)
+- None; folder state is derived from local filesystem contents, git metadata, browser URL state, and in-memory server/UI state (011-folder-create-delete)
 
 ## Project Structure
 
@@ -46,9 +48,15 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). No Go, no Makefile, no shell scripts.
 
 ## Recent Changes
+- 011-folder-create-delete: Added TypeScript 5.x on Node.js 22+ + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, Radix UI primitives
 - 008-ignored-files-visibility: Added TypeScript 5.x on Node.js 22+ + Hono, React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library
 - 007-editor-empty-repo: Added TypeScript 5.x on Node.js 22+ + Hono, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, Vitest, React Testing Library
-- 007-editor-empty-repo: Added TypeScript 5.x on Node.js 22+ for server and CLI, TypeScript + React 18 for the UI + Hono, @hono/node-server, React 18, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, Vite 7, Vitest, React Testing Library, esbuild
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan:
+`specs/011-folder-create-delete/plan.md`
+<!-- SPECKIT END -->

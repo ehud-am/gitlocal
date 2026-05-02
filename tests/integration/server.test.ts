@@ -135,6 +135,56 @@ describe('Server integration', () => {
     expect(body).toContainEqual(expect.objectContaining({ path: 'ignored.txt', localOnly: true }))
   })
 
+  it('POST /api/folder creates a folder visible through GET /api/tree', async () => {
+    const repo = makeGitRepo()
+    try {
+      const app = createApp(repo.dir)
+      const createRes = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parentPath: '', name: 'notes' }),
+      }))
+      expect(createRes.status).toBe(201)
+
+      const treeRes = await app.fetch(new Request('http://localhost/api/tree'))
+      expect(treeRes.status).toBe(200)
+      const tree = await treeRes.json() as Array<{ path: string; type: string }>
+      expect(tree).toContainEqual(expect.objectContaining({ path: 'notes', type: 'dir' }))
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('previews and deletes folders through the public folder endpoints', async () => {
+    const repo = makeGitRepo()
+    try {
+      mkdirSync(join(repo.dir, 'docs'))
+      writeFileSync(join(repo.dir, 'docs', 'guide.md'), '# Guide')
+      mkdirSync(join(repo.dir, 'docs', 'nested'))
+      writeFileSync(join(repo.dir, 'docs', 'nested', 'deep.md'), '# Deep')
+
+      const app = createApp(repo.dir)
+      const previewRes = await app.fetch(new Request(`http://localhost/api/folder/delete-preview?path=${encodeURIComponent('docs')}`))
+      expect(previewRes.status).toBe(200)
+      const preview = await previewRes.json() as { fileCount: number; name: string }
+      expect(preview.fileCount).toBe(2)
+      expect(preview.name).toBe('docs')
+
+      const deleteRes = await app.fetch(new Request('http://localhost/api/folder', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'docs', confirmationName: 'docs' }),
+      }))
+      expect(deleteRes.status).toBe(200)
+
+      const treeRes = await app.fetch(new Request('http://localhost/api/tree'))
+      const tree = await treeRes.json() as Array<{ path: string }>
+      expect(tree.some((entry) => entry.path === 'docs')).toBe(false)
+    } finally {
+      repo.cleanup()
+    }
+  })
+
   it('GET /api/search includes ignored local matches with localOnly metadata', async () => {
     writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
     writeFileSync(join(dir, 'ignored.txt'), 'search me locally')

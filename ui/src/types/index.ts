@@ -193,6 +193,31 @@ export interface ManualFileOperationResult {
   message: string
 }
 
+export interface FolderCreateRequest {
+  parentPath: string
+  name: string
+}
+
+export interface FolderDeleteRequest {
+  path: string
+  confirmationName: string
+}
+
+export type FolderOperation = 'create-folder' | 'preview-delete-folder' | 'delete-folder'
+export type FolderOperationStatus = 'created' | 'previewed' | 'deleted' | 'blocked' | 'failed'
+
+export interface FolderOperationResult {
+  ok: boolean
+  operation: FolderOperation
+  path: string
+  status: FolderOperationStatus
+  message: string
+  parentPath: string
+  name?: string
+  fileCount?: number
+  folderCount?: number
+}
+
 export interface PickBrowseEntry {
   name: string
   path: string

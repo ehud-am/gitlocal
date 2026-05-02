@@ -53,6 +53,7 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
     onBrowseParent?: () => void
     onDirtyChange?: (value: boolean) => void
     onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
+    onDeleteFolder?: (path: string) => void
   }) => (
     <div>
       <div data-testid="content-props">
@@ -73,6 +74,7 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
       <button type="button" onClick={() => props.onOpenPath('', 'dir', true)}>open-empty-dir</button>
       <button type="button" onClick={() => props.onOpenPath('notes.txt', 'file', false)}>open-file</button>
       <button type="button" onClick={() => props.onOpenPath('docs', 'dir', true)}>open-dir</button>
+      <button type="button" onClick={() => props.onDeleteFolder?.('docs')}>request-delete-folder</button>
     </div>
   ),
 }))
@@ -209,6 +211,33 @@ vi.mock('./components/AppDialogs', () => ({
       </div>
     ) : null
   ),
+  FolderDeleteDialog: (props: {
+    open: boolean
+    pending: boolean
+    error: string
+    name: string
+    confirmationName: string
+    onOpenChange: (open: boolean) => void
+    onConfirmationNameChange: (value: string) => void
+    onCancel: () => void
+    onDelete: () => void
+  }) => (
+    props.open ? (
+      <div data-testid="folder-delete-dialog">
+        <span>{props.error}</span>
+        <span>{props.name}</span>
+        <input
+          aria-label="Folder delete confirmation"
+          value={props.confirmationName}
+          onChange={(event) => props.onConfirmationNameChange(event.target.value)}
+        />
+        <button type="button" onClick={() => props.onOpenChange(false)}>close-folder-delete</button>
+        <button type="button" onClick={props.onCancel}>cancel-folder-delete</button>
+        <button type="button" onClick={props.onDelete}>confirm-folder-delete</button>
+        <span>{props.pending ? 'pending' : 'idle'}</span>
+      </div>
+    ) : null
+  ),
 }))
 
 vi.mock('./services/api', () => ({
@@ -225,6 +254,9 @@ vi.mock('./services/api', () => ({
     createFile: vi.fn(),
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
+    createFolder: vi.fn(),
+    getFolderDeletePreview: vi.fn(),
+    deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
     getPickBrowse: vi.fn(),
     submitPick: vi.fn(),
@@ -384,6 +416,28 @@ describe('App branch coverage', () => {
         email: 'local@example.com',
         source: 'local',
       },
+    })
+    vi.mocked(api.getFolderDeletePreview).mockResolvedValue({
+      ok: true,
+      operation: 'preview-delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      fileCount: 1,
+      folderCount: 0,
+      status: 'previewed',
+      message: 'This will permanently delete docs and all of its contents, including 1 file.',
+    })
+    vi.mocked(api.deleteFolder).mockResolvedValue({
+      ok: true,
+      operation: 'delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      fileCount: 1,
+      folderCount: 0,
+      status: 'deleted',
+      message: 'Folder deleted successfully.',
     })
   })
 
@@ -719,6 +773,81 @@ describe('App branch coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'open-search' }))
     fireEvent.click(screen.getByRole('button', { name: 'change-search-query' }))
     expect(screen.getByTestId('search-panel')).toBeInTheDocument()
+  })
+
+  it('handles folder delete preview and delete error branches', async () => {
+    vi.mocked(api.getFolderDeletePreview)
+      .mockRejectedValueOnce({ error: 'Folder preview failed.' })
+      .mockResolvedValueOnce({
+        ok: true,
+        operation: 'preview-delete-folder',
+        path: 'docs',
+        parentPath: '',
+        name: 'docs',
+        fileCount: 1,
+        folderCount: 0,
+        status: 'previewed',
+        message: 'This will permanently delete docs and all of its contents, including 1 file.',
+      })
+    vi.mocked(api.deleteFolder).mockRejectedValueOnce(new Error('Delete failed.'))
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'request-delete-folder' }))
+    expect(await screen.findByText(/folder preview failed/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'request-delete-folder' }))
+    expect(await screen.findByTestId('folder-delete-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'confirm-folder-delete' }))
+    expect(await screen.findByText(/delete failed/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'close-folder-delete' }))
+    expect(screen.queryByTestId('folder-delete-dialog')).not.toBeInTheDocument()
+  })
+
+  it('surfaces identity, commit, and follow-up branch switch errors', async () => {
+    vi.mocked(api.updateGitIdentity).mockRejectedValueOnce({ error: 'Identity update failed.' })
+    vi.mocked(api.commitChanges).mockRejectedValueOnce(new Error('Commit failed.'))
+    vi.mocked(api.switchBranch)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 'confirmation-required',
+        message: 'Need confirmation.',
+        trackedChangeCount: 1,
+        untrackedChangeCount: 0,
+        blockingPaths: ['README.md'],
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 'confirmation-required',
+        message: 'Need more confirmation.',
+        trackedChangeCount: 1,
+        untrackedChangeCount: 0,
+        blockingPaths: ['README.md'],
+        suggestedCommitMessage: 'Suggested follow-up message',
+      })
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'open-identity' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /git user name/i }), { target: { value: 'New User' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /git user email/i }), { target: { value: 'new@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'save-identity' }))
+    expect(await screen.findByText(/identity update failed/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'close-identity' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), { target: { value: 'Ship it' } })
+    fireEvent.click(screen.getByRole('button', { name: 'submit-commit' }))
+    expect(await screen.findByText(/commit failed/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'close-commit' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'switch-branch' }))
+    expect(await screen.findByTestId('branch-switch-dialog')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: /branch switch commit message/i }), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'commit-branch-switch' }))
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /branch switch commit message/i })).toHaveValue('Suggested follow-up message')
+    })
   })
 
   it('renders safely when repository info is unavailable and allows toggling dark mode', async () => {

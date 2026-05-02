@@ -45,6 +45,12 @@ import {
   switchBranch,
   writeWorkingTreeTextFile,
   deleteWorkingTreeFile,
+  validateRepoChildFolderName,
+  resolveWorkingTreeFolderParent,
+  resolveWorkingTreeSubfolder,
+  createWorkingTreeFolder,
+  countWorkingTreeFolderImpact,
+  deleteWorkingTreeFolder,
   listWorkingTreeDirectoryEntries,
 } from '../../../src/git/repo.js'
 
@@ -1361,6 +1367,60 @@ describe('working tree helpers', () => {
       rmSync(readOnlyDir, { recursive: true, force: true })
       rmSync(workspace, { recursive: true, force: true })
       source.cleanup()
+    }
+  })
+
+  it('validates and creates direct working-tree child folders safely', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      expect(validateRepoChildFolderName(' notes ')).toBe('notes')
+      expect(() => validateRepoChildFolderName('')).toThrow(/required/i)
+      expect(() => validateRepoChildFolderName('../escape')).toThrow(/direct child/i)
+      expect(() => validateRepoChildFolderName('a/b')).toThrow(/direct child/i)
+
+      expect(resolveWorkingTreeFolderParent(dir, '')).toBe('')
+      expect(resolveWorkingTreeFolderParent(dir, 'docs')).toBe('docs')
+      expect(() => resolveWorkingTreeFolderParent(dir, 'missing')).toThrow(/no longer available/i)
+      expect(() => resolveWorkingTreeFolderParent(dir, '../escape')).toThrow(/inside the repository/i)
+
+      const created = createWorkingTreeFolder(dir, 'docs', 'api')
+      expect(created).toBe('docs/api')
+      expect(getPathType(dir, 'docs/api')).toBe('dir')
+      expect(() => createWorkingTreeFolder(dir, 'docs', 'api')).toThrow(/already exists/i)
+      expect(() => createWorkingTreeFolder(dir, 'main.ts', 'child')).toThrow(/parent folder/i)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('previews and deletes working-tree folders recursively without allowing root deletion', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      mkdirSync(join(dir, 'docs', 'nested'))
+      writeFileSync(join(dir, 'docs', 'nested', 'deep.txt'), 'deep')
+      writeFileSync(join(dir, 'docs', '.hidden'), 'hidden')
+      writeFileSync(join(dir, 'docs', 'scratch.tmp'), 'ignored maybe')
+
+      const impact = countWorkingTreeFolderImpact(dir, 'docs')
+      expect(impact).toEqual({
+        path: 'docs',
+        name: 'docs',
+        parentPath: '',
+        fileCount: 4,
+        folderCount: 1,
+      })
+
+      expect(resolveWorkingTreeSubfolder(dir, 'docs')).toBe('docs')
+      expect(() => resolveWorkingTreeSubfolder(dir, '')).toThrow(/root cannot be deleted/i)
+      expect(() => countWorkingTreeFolderImpact(dir, '../escape')).toThrow(/inside the repository/i)
+
+      const deleted = deleteWorkingTreeFolder(dir, 'docs')
+      expect(deleted.fileCount).toBe(4)
+      expect(existsSync(join(dir, 'docs'))).toBe(false)
+    } finally {
+      cleanup()
     }
   })
 })
