@@ -334,7 +334,7 @@ describe('ContentPanel', () => {
     expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
   })
 
-  it('requests folder deletion from directory rows without opening the row', async () => {
+  it('requests current folder deletion from the main folder action area without row delete controls', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: 'assets', path: 'docs/assets', type: 'dir', localOnly: false },
     ])
@@ -355,10 +355,54 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /delete folder assets/i }))
+    const deleteButton = await screen.findByRole('button', { name: /^delete folder$/i })
+    expect(deleteButton.className).toContain('text-[var(--danger)]')
+    expect(screen.queryByRole('button', { name: /delete folder assets/i })).not.toBeInTheDocument()
+    fireEvent.click(deleteButton)
 
-    expect(onDeleteFolder).toHaveBeenCalledWith('docs/assets')
+    expect(onDeleteFolder).toHaveBeenCalledWith('docs')
     expect(onOpenPath).not.toHaveBeenCalled()
+  })
+
+  it('hides the folder delete action for repository root and file views', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([])
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'README.md' }))
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onDeleteFolder={vi.fn()}
+      />,
+      client,
+    )
+
+    await screen.findByRole('button', { name: /^new file$/i })
+    expect(screen.queryByRole('button', { name: /^delete folder$/i })).not.toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles
+          refreshToken={0}
+          selectedPath="README.md"
+          selectedPathType="file"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+          onDeleteFolder={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('hello')
+    expect(screen.queryByRole('button', { name: /^delete folder$/i })).not.toBeInTheDocument()
   })
 
   it('shows ignored files and folders in directory listings and opens them normally', async () => {
@@ -408,7 +452,8 @@ describe('ContentPanel', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getAllByText(/local only/i)).toHaveLength(3)
+      expect(screen.getAllByText(/^local$/i)).toHaveLength(3)
+      expect(screen.queryByText(/local only/i)).not.toBeInTheDocument()
     })
     expect(screen.getByRole('heading', { name: 'root/docs' })).toBeInTheDocument()
   })
@@ -469,7 +514,7 @@ describe('ContentPanel', () => {
       />,
     )
 
-    expect(await screen.findByText(/local only/i)).toBeInTheDocument()
+    expect(await screen.findByText(/^local$/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'root/.env' })).toBeInTheDocument()
   })
 

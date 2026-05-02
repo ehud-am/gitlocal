@@ -434,13 +434,18 @@ pre {
   min-width: 0;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
 .file-tree-node-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-tree-node-label > .inline-flex {
+  max-width: 6rem;
+  font-size: 0.5625rem;
 }
 
 .file-tree-children {

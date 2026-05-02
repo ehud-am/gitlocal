@@ -26,4 +26,12 @@ describe('Button', () => {
     expect(link).toHaveAttribute('href', '/docs')
     expect(link.className).toContain('border')
   })
+
+  it('supports a destructive outline variant', () => {
+    render(<Button variant="dangerOutline">Delete folder</Button>)
+
+    const button = screen.getByRole('button', { name: 'Delete folder' })
+    expect(button.className).toContain('border')
+    expect(button.className).toContain('text-[var(--danger)]')
+  })
 })

@@ -10,8 +10,6 @@ interface Props {
   selectedPath: string
   selectedPathType: 'file' | 'dir' | 'none'
   onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
-  onDeleteFolder?: (path: string) => void
-  canDeleteFolders?: boolean
 }
 
 interface NodeState {
@@ -21,7 +19,7 @@ interface NodeState {
   error: boolean
 }
 
-export default function FileTree({ branch, refreshToken, selectedPath, selectedPathType, onSelect, onDeleteFolder, canDeleteFolders = false }: Props) {
+export default function FileTree({ branch, refreshToken, selectedPath, selectedPathType, onSelect }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
 
   const { data: roots, isLoading, isError } = useQuery({
@@ -170,8 +168,6 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
                   onSelect(node.path, 'file', Boolean(node.localOnly))
                 }
               }}
-              canDeleteFolder={canDeleteFolders}
-              onDeleteFolder={() => onDeleteFolder?.(node.path)}
             />
             {node.type === 'dir' && isExpanded && (
               <div className="file-tree-children">
