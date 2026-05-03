@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3
+
+- Added a non-executing package entry point so package size analyzers and import resolvers can resolve GitLocal without launching the CLI server.
+- Kept the `gitlocal` command-line entry separate from the importable package entry while continuing to publish both built files.
+
 ## 0.6.2
 
 - Unified optional commands for picker folders, repository folders, and files behind consistent three-dots action menus.
