@@ -87,6 +87,13 @@ function parentPathOf(path: string): string {
   return boundary >= 0 ? path.slice(0, boundary) : ''
 }
 
+function basenameOf(path: string): string {
+  if (!path) return ''
+  const normalized = path.replace(/\/+$/, '')
+  const boundary = normalized.lastIndexOf('/')
+  return boundary >= 0 ? normalized.slice(boundary + 1) : normalized
+}
+
 function buildSuggestedFilename(entries: TreeNode[]): string {
   const fileNames = new Set(
     entries
@@ -191,6 +198,7 @@ export default function ContentPanel({
   const [draftFolderName, setDraftFolderName] = useState('')
   const [formError, setFormError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fileDeleteConfirmationName, setFileDeleteConfirmationName] = useState('')
   const [fileFindOpen, setFileFindOpen] = useState(false)
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
@@ -232,6 +240,7 @@ export default function ContentPanel({
     setMode('view')
     setFormError('')
     setBusy(false)
+    setFileDeleteConfirmationName('')
     setFileFindOpen(false)
     setFileFindQuery('')
     setFileFindCaseSensitive(false)
@@ -370,6 +379,7 @@ export default function ContentPanel({
       await refreshFileQueries()
       const nextPath = parentPathOf(selectedPath)
       setMode('view')
+      setFileDeleteConfirmationName('')
       onStatusMessage?.(result.message)
       onMutationComplete?.({ result, nextPath, nextPathType: nextPath ? 'dir' : 'none' })
     } catch (error) {
@@ -399,9 +409,19 @@ export default function ContentPanel({
     setMode('create-folder')
   }
 
+  function beginDeleteFileMode(): void {
+    if (!confirmDiscardIfNeeded()) return
+    setFormError('')
+    setFileDeleteConfirmationName('')
+    setMode('confirm-delete')
+  }
+
   const canToggleRaw = data?.type === 'markdown' || data?.type === 'text'
   const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
   const visibleDirectoryEntries = directoryEntries ?? []
+  const selectedFileName = selectedPathType === 'file' ? basenameOf(selectedPath) : ''
+  const selectedFileLocation = selectedPathType === 'file' ? parentPathOf(selectedPath) : ''
+  const hasFileActions = canToggleRaw || canMutateFiles
 
   function renderDirectoryList(path: string, entries: TreeNode[]): JSX.Element {
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
@@ -477,24 +497,33 @@ export default function ContentPanel({
               </div>
             </div>
             {canMutateFiles ? (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-raw" onClick={() => { void beginCreateMode() }}>
-                  {path ? 'New file here' : 'New file'}
-                </button>
-                <button type="button" className="btn-raw" onClick={() => { void beginCreateFolderMode() }}>
-                  {path ? 'New folder here' : 'New folder'}
-                </button>
-                {canDeleteCurrentFolder ? (
-                  <Button
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
                     type="button"
-                    variant="dangerOutline"
-                    size="sm"
-                    onClick={() => onDeleteFolder?.(path)}
+                    className="panel-icon-button content-actions-trigger"
+                    aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly)}`}
                   >
-                    Delete folder
-                  </Button>
-                ) : null}
-              </div>
+                    <KebabIcon />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
+                    {path ? 'New file here' : 'New file'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
+                    {path ? 'New folder here' : 'New folder'}
+                  </DropdownMenuItem>
+                  {canDeleteCurrentFolder ? (
+                    <DropdownMenuItem
+                      className="dropdown-danger"
+                      onSelect={() => onDeleteFolder?.(path)}
+                    >
+                      Delete folder
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
           </div>
 
@@ -760,56 +789,57 @@ export default function ContentPanel({
                 Find in file
               </Button>
             ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="panel-icon-button content-actions-trigger"
-                  aria-label="File actions"
-                >
-                  <KebabIcon />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canToggleRaw ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      if (!confirmDiscardIfNeeded()) return
-                      const next = !showRaw
-                      setShowRaw(next)
-                      onRawChange?.(next)
-                    }}
+            {hasFileActions ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="panel-icon-button content-actions-trigger"
+                    aria-label={`File actions for ${selectedFileName || selectedPath}`}
                   >
-                    {showRaw ? 'View rendered' : 'View raw'}
-                  </DropdownMenuItem>
-                ) : null}
-                {canMutateFiles ? (
-                  <DropdownMenuItem
-                    disabled={!data.editable}
-                    onSelect={() => {
-                      setDraftContent(data.content)
-                      setFormError('')
-                      setMode('edit')
-                    }}
-                  >
-                    Edit file
-                  </DropdownMenuItem>
-                ) : null}
-                {canMutateFiles ? (
-                  <DropdownMenuItem
-                    className="dropdown-danger"
-                    disabled={!data.revisionToken}
-                    onSelect={() => {
-                      if (!confirmDiscardIfNeeded()) return
-                      setFormError('')
-                      setMode('confirm-delete')
-                    }}
-                  >
-                    Delete file
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <KebabIcon />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canToggleRaw ? (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        if (!confirmDiscardIfNeeded()) return
+                        const next = !showRaw
+                        setShowRaw(next)
+                        onRawChange?.(next)
+                      }}
+                    >
+                      {showRaw ? 'View rendered' : 'View raw'}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canMutateFiles ? (
+                    <DropdownMenuItem
+                      disabled={!data.editable}
+                      onSelect={() => {
+                        setDraftContent(data.content)
+                        setFormError('')
+                        setMode('edit')
+                      }}
+                    >
+                      Edit file
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canMutateFiles ? (
+                    <DropdownMenuItem
+                      className="dropdown-danger"
+                      disabled={!data.revisionToken}
+                      onSelect={() => {
+                        if (!confirmDiscardIfNeeded()) return
+                        beginDeleteFileMode()
+                      }}
+                    >
+                      Delete file
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -944,11 +974,16 @@ export default function ContentPanel({
       ) : mode === 'confirm-delete' ? (
         <DeleteFileDialog
           path={selectedPath}
+          name={selectedFileName}
+          location={selectedFileLocation}
+          confirmationName={fileDeleteConfirmationName}
           busy={busy}
           error={formError}
+          onConfirmationNameChange={setFileDeleteConfirmationName}
           onConfirm={() => { void handleDeleteFile() }}
           onCancel={() => {
             setFormError('')
+            setFileDeleteConfirmationName('')
             setMode('view')
           }}
         />

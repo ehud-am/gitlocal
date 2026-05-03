@@ -297,6 +297,26 @@ describe('PickerPage', () => {
     expect(window.location.reload).toHaveBeenCalled()
   })
 
+  it('hides the folder actions trigger when no setup actions are available', async () => {
+    vi.mocked(api.getPickBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/locked',
+      parentPath: '/Users/example',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [],
+      error: '',
+      canOpen: false,
+      canCreateChild: false,
+      canInitGit: false,
+      canCloneIntoChild: false,
+    })
+
+    render(<PickerPage />)
+
+    await screen.findByText('/Users/example/locked')
+    expect(screen.queryByRole('button', { name: /folder actions/i })).not.toBeInTheDocument()
+  })
+
   it('runs git init from the folder actions menu and opens the initialized repository', async () => {
     vi.mocked(api.initPickGit).mockResolvedValue({ ok: true, error: '', path: '/Users/example/projects/new-repo' })
     vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })

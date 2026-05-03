@@ -51,6 +51,14 @@ async function openFileActionsMenu() {
   })
 }
 
+async function openFolderActionsMenu() {
+  const trigger = await screen.findByRole('button', { name: /folder actions/i })
+  await userEvent.setup().click(trigger)
+  await waitFor(() => {
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+}
+
 function makeTextFile(overrides: Partial<Awaited<ReturnType<typeof api.getFile>>> = {}) {
   return {
     path: 'README.md',
@@ -116,7 +124,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('README.md')
     fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
     fireEvent.change(screen.getByLabelText(/new file content/i), { target: { value: '# Draft' } })
@@ -149,7 +158,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveAttribute('placeholder', 'README.md')
     fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
     fireEvent.click(screen.getByRole('button', { name: /create file/i }))
@@ -175,7 +185,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'README.md' } })
     fireEvent.click(screen.getByRole('button', { name: /create file/i }))
 
@@ -201,7 +212,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('myfile 2.md')
   })
 
@@ -222,7 +234,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('myfile.md')
   })
 
@@ -251,7 +264,8 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /new file here/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file here/i }))
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/README.md')
   })
 
@@ -286,7 +300,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new folder here/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new folder here/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: ' assets ' } })
     fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }))
 
@@ -322,7 +337,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /^new folder$/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /^new folder$/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: 'docs' } })
     expect(onDirtyChange).toHaveBeenLastCalledWith(true)
 
@@ -355,10 +371,13 @@ describe('ContentPanel', () => {
       />,
     )
 
-    const deleteButton = await screen.findByRole('button', { name: /^delete folder$/i })
-    expect(deleteButton.className).toContain('text-[var(--danger)]')
+    await openFolderActionsMenu()
+    expect(screen.getByRole('menuitem', { name: /new file here/i }).className).not.toContain('dropdown-danger')
+    expect(screen.getByRole('menuitem', { name: /new folder here/i }).className).not.toContain('dropdown-danger')
+    const deleteItem = await screen.findByRole('menuitem', { name: /^delete folder$/i })
+    expect(deleteItem.className).toContain('dropdown-danger')
     expect(screen.queryByRole('button', { name: /delete folder assets/i })).not.toBeInTheDocument()
-    fireEvent.click(deleteButton)
+    fireEvent.click(deleteItem)
 
     expect(onDeleteFolder).toHaveBeenCalledWith('docs')
     expect(onOpenPath).not.toHaveBeenCalled()
@@ -383,8 +402,8 @@ describe('ContentPanel', () => {
       client,
     )
 
-    await screen.findByRole('button', { name: /^new file$/i })
-    expect(screen.queryByRole('button', { name: /^delete folder$/i })).not.toBeInTheDocument()
+    await openFolderActionsMenu()
+    expect(screen.queryByRole('menuitem', { name: /^delete folder$/i })).not.toBeInTheDocument()
 
     rerender(
       <QueryClientProvider client={client}>
@@ -402,7 +421,26 @@ describe('ContentPanel', () => {
     )
 
     await screen.findByText('hello')
-    expect(screen.queryByRole('button', { name: /^delete folder$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^delete folder$/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the folder actions menu when mutation commands are unavailable', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await screen.findByRole('heading', { name: 'docs' })
+    expect(screen.queryByRole('button', { name: /folder actions/i })).not.toBeInTheDocument()
   })
 
   it('shows ignored files and folders in directory listings and opens them normally', async () => {
@@ -535,7 +573,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file here/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file here/i }))
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
 
     expect(screen.getByRole('heading', { name: 'docs' })).toBeInTheDocument()
@@ -836,7 +875,9 @@ describe('ContentPanel', () => {
     await openFileActionsMenu()
 
     expect(screen.getByRole('menuitem', { name: /edit file/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /^delete file$/i })).toBeInTheDocument()
+    const deleteItem = screen.getByRole('menuitem', { name: /^delete file$/i })
+    expect(deleteItem).toBeInTheDocument()
+    expect(deleteItem.className).toContain('dropdown-danger')
     expect(screen.queryByRole('menuitem', { name: /^new file$/i })).not.toBeInTheDocument()
   })
 
@@ -898,6 +939,35 @@ describe('ContentPanel', () => {
       expect(img.getAttribute('src')).toContain('abc123')
     })
     expect(screen.queryByRole('button', { name: /find in file/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the file actions menu when no file commands are available', async () => {
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'image.bin',
+      type: 'binary',
+      content: '',
+      language: '',
+      encoding: 'none',
+      editable: false,
+      revisionToken: '',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="image.bin"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Binary file/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: /file actions/i })).not.toBeInTheDocument()
   })
 
   it('enters edit mode, tracks dirty state, and saves updates', async () => {
@@ -1054,7 +1124,19 @@ describe('ContentPanel', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
     const dialog = screen.getByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
+    expect(within(dialog).getAllByText('README.md').length).toBeGreaterThan(0)
+    expect(within(dialog).getByText(/repository root/i)).toBeInTheDocument()
+    const deleteButton = within(dialog).getByRole('button', { name: /^delete file$/i })
+    expect(deleteButton).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'readme.md' },
+    })
+    expect(deleteButton).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'README.md' },
+    })
+    expect(deleteButton).not.toBeDisabled()
+    fireEvent.click(deleteButton)
 
     await waitFor(() => {
       expect(api.deleteFile).toHaveBeenCalledWith({
@@ -1097,7 +1179,13 @@ describe('ContentPanel', () => {
 
     await openFileActionsMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
-    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^delete file$/i }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(within(dialog).getAllByText('README.md').length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText('docs').length).toBeGreaterThan(0)
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'README.md' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
 
     await waitFor(() => {
       expect(api.deleteFile).toHaveBeenCalledWith({
@@ -1112,6 +1200,42 @@ describe('ContentPanel', () => {
         nextPathType: 'dir',
       }),
     )
+  })
+
+  it('requires exact punctuation and case before confirming file deletion', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'docs/Release Notes (Final).md' }))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="docs/Release Notes (Final).md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
+    const dialog = screen.getByRole('alertdialog')
+    const deleteButton = within(dialog).getByRole('button', { name: /^delete file$/i })
+
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'release notes (final).md' },
+    })
+    expect(deleteButton).toBeDisabled()
+
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'Release Notes Final.md' },
+    })
+    expect(deleteButton).toBeDisabled()
+
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'Release Notes (Final).md' },
+    })
+    expect(deleteButton).not.toBeDisabled()
   })
 
   it('shows delete errors and allows canceling the confirmation state', async () => {
@@ -1133,6 +1257,9 @@ describe('ContentPanel', () => {
     await openFileActionsMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
     const dialog = screen.getByRole('alertdialog')
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'README.md' },
+    })
     fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/delete completed/i)
@@ -1155,7 +1282,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /new file/i }))
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new file/i }))
     fireEvent.change(screen.getByLabelText(/new file path/i), { target: { value: 'docs/draft.md' } })
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
 

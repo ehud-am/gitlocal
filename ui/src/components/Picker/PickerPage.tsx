@@ -3,17 +3,12 @@ import { api } from '../../services/api'
 import type { PickBrowseEntry, PickBrowseRoot } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 
-function CogIcon() {
+function KebabIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path
-        d="M6.7 1.75h2.6l.3 1.46c.42.15.82.38 1.19.66l1.42-.47 1.3 2.25-1.12.98c.05.22.08.45.08.69 0 .24-.03.47-.08.69l1.12.98-1.3 2.25-1.42-.47c-.37.28-.77.51-1.19.66l-.3 1.46H6.7l-.3-1.46a4.3 4.3 0 0 1-1.19-.66l-1.42.47-1.3-2.25 1.12-.98A3.18 3.18 0 0 1 3.53 8c0-.24.03-.47.08-.69l-1.12-.98 1.3-2.25 1.42.47c.37-.28.77-.51 1.19-.66l.3-1.46Zm1.3 4.1a2.15 2.15 0 1 0 0 4.3 2.15 2.15 0 0 0 0-4.3Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <circle cx="8" cy="3.5" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="12.5" r="1.25" fill="currentColor" />
     </svg>
   )
 }
@@ -47,6 +42,7 @@ export default function PickerPage() {
   const [canCloneIntoChild, setCanCloneIntoChild] = useState(false)
 
   const currentLabel = useMemo(() => currentPath || 'Choose a folder to begin', [currentPath])
+  const hasFolderActions = canCreateChild || canInitGit || canCloneIntoChild || canOpen
 
   async function loadPath(nextPath?: string) {
     setBrowseLoading(true)
@@ -259,27 +255,29 @@ export default function PickerPage() {
               <div className="picker-current-path" aria-label="current folder">
                 {currentLabel}
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="panel-icon-button picker-actions-trigger" aria-label="Folder actions">
-                    <CogIcon />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem disabled={!canCreateChild || loading} onSelect={() => { void handleCreateFolder() }}>
-                    Create subfolder
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!canInitGit || loading} onSelect={() => { void handleInitGit() }}>
-                    Run git init
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!canCloneIntoChild || loading} onSelect={() => { void handleCloneIntoChild() }}>
-                    Clone into subfolder
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!canOpen || loading} onSelect={() => { void handleOpenRepository(currentPath) }}>
-                    Open this repository
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {hasFolderActions ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="panel-icon-button picker-actions-trigger" aria-label={`Folder actions for ${currentLabel}`}>
+                      <KebabIcon />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem disabled={!canCreateChild || loading} onSelect={() => { void handleCreateFolder() }}>
+                      Create subfolder
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={!canInitGit || loading} onSelect={() => { void handleInitGit() }}>
+                      Run git init
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={!canCloneIntoChild || loading} onSelect={() => { void handleCloneIntoChild() }}>
+                      Clone into subfolder
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={!canOpen || loading} onSelect={() => { void handleOpenRepository(currentPath) }}>
+                      Open this repository
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
             </div>
 
             <div className="picker-browser-table-wrap">

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -659,7 +660,8 @@ describe('App', () => {
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
 
-    fireEvent.click(await screen.findByRole('button', { name: /new folder here/i }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder here/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), {
       target: { value: 'new-folder' },
     })
@@ -676,7 +678,8 @@ describe('App', () => {
 
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
-    fireEvent.click(await screen.findByRole('button', { name: /^delete folder$/i }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete folder$/i }))
 
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getAllByText(/2 files/i).length).toBeGreaterThan(0)
@@ -705,6 +708,25 @@ describe('App', () => {
       })
     })
     expect(await screen.findByText(/folder deleted successfully/i)).toBeInTheDocument()
+  })
+
+  it('cancels typed file delete confirmation without deleting the file', async () => {
+    renderWithClient()
+
+    const readmeButtons = await screen.findAllByRole('button', { name: /open file README\.md/i })
+    fireEvent.click(readmeButtons[0])
+    await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'README.md' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^cancel$/i }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(api.deleteFile).not.toHaveBeenCalled()
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
   })
 
   it('opens the picker page and footer in picker mode', async () => {
