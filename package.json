@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Browse any local git repository in your browser",
   "keywords": [
     "git",
@@ -17,6 +17,12 @@
     "gitlocal"
   ],
   "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./cli": "./dist/cli.js",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "gitlocal": "./dist/cli.js"
   },
@@ -31,7 +37,7 @@
   ],
   "scripts": {
     "build:ui": "npm --prefix ui run build",
-    "build:server": "tsc --noEmit && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
+    "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
     "build": "npm run build:ui && npm run build:server && chmod +x dist/cli.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:server": "node --watch --experimental-strip-types src/cli.ts .",
