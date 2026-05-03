@@ -2,7 +2,7 @@
 
 **Feature Branch**: `013-unified-action-menus`
 **Created**: 2026-05-02
-**Status**: Draft
+**Status**: Ready for v0.6.2 release
 **Input**: User description: "let's be more consistent in the experience of the optional commands. Right now we have these three different behaviors: 1. for folder that is not under git we have a setup icon on the right side with list of options. for a file we have 3-dots drop down menu. 3. for folder that is under git we have a list of buttons. Let's implement in the three cases a 3-dots menu with list of options. in all cases delete is in red text, and has confirmation page that is not just \"approve\" button but instead ask for the file/folder name to be typed as approval (github style)."
 
 ## User Scenarios & Testing *(mandatory)*

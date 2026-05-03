@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2
+
+- Unified optional commands for picker folders, repository folders, and files behind consistent three-dots action menus.
+- Styled delete options as red menu items while keeping non-destructive actions in normal menu styling.
+- Upgraded file deletion to require exact typed-name confirmation with target location context, matching the existing strong folder delete safety model.
+- Added contributor documentation with `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`, and linked them from the README.
+
 ## 0.6.1
 
 - Moved folder deletion from the left navigation row icon into the main folder view action area.
