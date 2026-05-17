@@ -1,4 +1,6 @@
 import type { Context } from 'hono'
+import { existsSync, statSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import {
   commitWorkingTreeChanges,
   getAppVersion,
@@ -10,17 +12,14 @@ import {
   switchBranch,
   syncCurrentBranchWithRemote,
 } from '../git/repo.js'
-import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest } from '../types.js'
+import { setPickerPath, setRepoPath } from '../server.js'
+import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest, LocalActionResponse, RepositoryOpenRequest } from '../types.js'
 
-type Variables = { repoPath: string; pickerPath: string; folderPath: string }
+type Variables = { repoPath: string; pickerPath: string }
 
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   const pickerPath = c.get('pickerPath')
-  const folderPath = c.get('folderPath')
-  if (folderPath) {
-    return c.json(getInfo(folderPath))
-  }
   if (pickerPath) {
     return c.json({
       name: '',
@@ -36,6 +35,48 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
   }
   const info = getInfo(repoPath)
   return c.json(info)
+}
+
+export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let body: RepositoryOpenRequest
+  try {
+    body = await c.req.json<RepositoryOpenRequest>()
+  } catch {
+    const res: LocalActionResponse = { ok: false, error: 'Invalid JSON body' }
+    return c.json(res)
+  }
+
+  const { path } = body
+  if (!path) {
+    const res: LocalActionResponse = { ok: false, error: 'path is required' }
+    return c.json(res)
+  }
+
+  if (!existsSync(path)) {
+    const res: LocalActionResponse = { ok: false, error: `Path does not exist: ${path}` }
+    return c.json(res)
+  }
+
+  if (!statSync(path).isDirectory()) {
+    const res: LocalActionResponse = { ok: false, error: `Not a folder: ${path}` }
+    return c.json(res)
+  }
+
+  setRepoPath(resolve(path))
+  setPickerPath('')
+  const res: LocalActionResponse = { ok: true, error: '' }
+  return c.json(res)
+}
+
+export async function repositoryParentFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({ ok: false, error: 'No repository is currently open' })
+  }
+
+  setRepoPath('')
+  setPickerPath(dirname(repoPath))
+  return c.json({ ok: true, error: '' })
 }
 
 export async function branchesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

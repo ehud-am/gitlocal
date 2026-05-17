@@ -132,8 +132,10 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    if (info?.currentBranch && !currentBranch) {
+    if (info?.isGitRepo && info.currentBranch && !currentBranch) {
       setCurrentBranch(info.currentBranch)
+    } else if (info && !info.isGitRepo && currentBranch) {
+      setCurrentBranch('')
     }
   }, [currentBranch, info])
 
@@ -187,7 +189,7 @@ export default function App() {
     setSearchQuery('')
     setSearchMode('both')
     setSearchCaseSensitive(false)
-    setStatusMessage('GitLocal reset the saved file context because you opened a different repository.')
+    setStatusMessage('GitLocal reset the saved file context because you opened a different folder.')
     lastRevisionRef.current = ''
 
     if (info.isGitRepo && currentBranch !== info.currentBranch) {
@@ -297,7 +299,7 @@ export default function App() {
   async function handleBrowseParentFolder() {
     setPickerLoading(true)
     try {
-      const result = await api.showParentPicker()
+      const result = await api.showParentFolder()
       if (result.ok) {
         window.location.reload()
         return
@@ -626,7 +628,7 @@ export default function App() {
   const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
-  const isWorkingTreeBranchSelected = !info?.isGitRepo || !info.currentBranch || currentBranch === info.currentBranch
+  const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
   const darkMode = theme === 'dark'
 
   let emptyStateTitle: string | undefined
@@ -635,10 +637,12 @@ export default function App() {
 
   if (!visibleSelectedPath && !hasRepoMismatch) {
     if (isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
-      emptyStateTitle = info?.isGitRepo ? 'This repository is ready for a first file' : 'This folder is ready for a first file'
+      emptyStateTitle = info?.isGitRepo
+        ? 'This repository is ready for a first file'
+        : 'This folder is ready for a first file'
       emptyStateDetail = info?.isGitRepo
         ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
-        : 'This folder does not have any visible files yet, so GitLocal is showing a guided landing state instead of an empty document view.'
+        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.'
       emptyStateActions = canMutateFiles
         ? [{ label: 'Create first file', action: 'create-file' }]
         : undefined
@@ -732,7 +736,7 @@ export default function App() {
                   void handleBranchChange(nextBranch)
                 }}
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
-                onOpenSearch={() => setSearchPresentation('expanded')}
+                onOpenSearch={info?.isGitRepo ? () => setSearchPresentation('expanded') : undefined}
                 branchDisabled={branchSwitchPending}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 branchSwitchDialog={

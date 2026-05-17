@@ -301,12 +301,6 @@ export function getBrowseableRootEntryCount(repoPath: string): number {
     .length
 }
 
-export function getLocalRootEntryCount(rootPath: string): number {
-  return listLocalDirectoryEntries(rootPath)
-    .filter((entry) => !entry.name.startsWith('.'))
-    .length
-}
-
 export function getInfo(repoPath: string): RepoInfo {
   const version = getAppVersion()
   if (!repoPath) {
@@ -332,7 +326,7 @@ export function getInfo(repoPath: string): RepoInfo {
       pickerMode: false,
       version,
       hasCommits: false,
-      rootEntryCount: getLocalRootEntryCount(repoPath),
+      rootEntryCount: getBrowseableRootEntryCount(repoPath),
       gitContext: null,
     }
   }
@@ -488,14 +482,6 @@ export function resolveSafeRepoPath(repoPath: string, filePath: string): string 
   return resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
 }
 
-export function normalizeLocalRootRelativePath(filePath: string): string {
-  return normalizeRepoRelativePath(filePath)
-}
-
-export function resolveSafeLocalRootPath(rootPath: string, filePath: string): string | null {
-  return resolveSafeRepoPath(rootPath, normalizeLocalRootRelativePath(filePath))
-}
-
 export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
   const fullPath = resolveSafeRepoPath(repoPath, filePath)
@@ -503,10 +489,6 @@ export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' 
   if (!existsSync(fullPath)) return 'missing'
   const stats = statSync(fullPath)
   return stats.isDirectory() ? 'dir' : 'file'
-}
-
-export function getLocalPathType(rootPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
-  return getPathType(rootPath, filePath)
 }
 
 export function validateRepoChildFolderName(name: string): string {
@@ -577,8 +559,9 @@ export function createWorkingTreeFolder(repoPath: string, parentPath: string, na
   const targetPath = normalizedParent ? `${normalizedParent}/${childName}` : childName
   const fullTargetPath = resolveSafeRepoPath(repoPath, targetPath)
 
+  /* v8 ignore next -- resolveWorkingTreeFolderParent already guarantees the target stays inside the root */
   if (!fullTargetPath) {
-    throw new Error('Folder must be created inside the repository.')
+    throw new Error('Folder must be created inside the opened folder.')
   }
 
   if (existsSync(fullTargetPath)) {
@@ -601,8 +584,9 @@ export interface FolderDeleteImpact {
 export function countWorkingTreeFolderImpact(repoPath: string, folderPath: string): FolderDeleteImpact {
   const normalizedPath = resolveWorkingTreeSubfolder(repoPath, folderPath)
   const fullPath = resolveSafeRepoPath(repoPath, normalizedPath)
+  /* v8 ignore next -- resolveWorkingTreeSubfolder already guarantees the target stays inside the root */
   if (!fullPath) {
-    throw new Error('Folder must be inside the repository.')
+    throw new Error('Folder must be inside the opened folder.')
   }
 
   let fileCount = 0
@@ -631,6 +615,7 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
       if (stat.isFile()) {
         impactHash.update(readFileSync(childPath))
       } else {
+        /* v8 ignore next -- filesystems used in tests expose entries here as regular files or symlinks */
         impactHash.update(`${stat.mode}\0${stat.size}\0${stat.mtimeMs}`)
       }
       impactHash.update('\0')
@@ -1306,11 +1291,8 @@ export function readWorkingTreeFile(repoPath: string, filePath: string): Buffer 
   return readFileSync(fullPath)
 }
 
-export function readLocalRootFile(rootPath: string, filePath: string): Buffer | null {
-  return readWorkingTreeFile(rootPath, filePath)
-}
-
 export function isIgnoredPath(repoPath: string, filePath: string): boolean {
+  if (!validateRepo(repoPath)) return false
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized) return false
   const result = spawnSync('git', ['check-ignore', '-q', normalized], { cwd: repoPath })
@@ -1334,18 +1316,6 @@ export function getEditableState(repoPath: string, filePath: string, branch: str
   }
 }
 
-export function getLocalEditableState(rootPath: string, filePath: string): { editable: boolean; revisionToken: string | null } {
-  if (getLocalPathType(rootPath, filePath) !== 'file') {
-    return { editable: false, revisionToken: null }
-  }
-
-  const { type } = detectFileType(filePath)
-  return {
-    editable: type === 'markdown' || type === 'text',
-    revisionToken: getLocalFileRevisionToken(rootPath, filePath),
-  }
-}
-
 export function getFileRevisionToken(repoPath: string, filePath: string): string | null {
   const rawBytes = readWorkingTreeFile(repoPath, filePath)
   if (!rawBytes) return null
@@ -1353,10 +1323,6 @@ export function getFileRevisionToken(repoPath: string, filePath: string): string
   hash.update(normalizeRepoRelativePath(filePath))
   hash.update(rawBytes)
   return hash.digest('hex')
-}
-
-export function getLocalFileRevisionToken(rootPath: string, filePath: string): string | null {
-  return getFileRevisionToken(rootPath, filePath)
 }
 
 export function writeWorkingTreeTextFile(repoPath: string, filePath: string, content: string): void {
@@ -1369,17 +1335,6 @@ export function writeWorkingTreeTextFile(repoPath: string, filePath: string, con
   writeFileSync(fullPath, content, 'utf-8')
 }
 
-export function writeLocalRootTextFile(rootPath: string, filePath: string, content: string): void {
-  try {
-    writeWorkingTreeTextFile(rootPath, filePath, content)
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Path must stay inside the opened repository.') {
-      throw new Error('Path must stay inside the opened folder.')
-    }
-    throw error
-  }
-}
-
 export function deleteWorkingTreeFile(repoPath: string, filePath: string): void {
   const fullPath = resolveSafeRepoPath(repoPath, filePath)
   if (!fullPath) {
@@ -1387,17 +1342,6 @@ export function deleteWorkingTreeFile(repoPath: string, filePath: string): void 
   }
 
   unlinkSync(fullPath)
-}
-
-export function deleteLocalRootFile(rootPath: string, filePath: string): void {
-  try {
-    deleteWorkingTreeFile(rootPath, filePath)
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Path must stay inside the opened repository.') {
-      throw new Error('Path must stay inside the opened folder.')
-    }
-    throw error
-  }
 }
 
 function validateChildFolderName(name: string): string {
@@ -1482,16 +1426,17 @@ export function cloneRepositoryInto(parentPath: string, name: string, repository
 export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: string = ''): TreeNode[] {
   const normalized = normalizeRepoRelativePath(subpath)
   const dirPath = normalized ? resolveSafeRepoPath(repoPath, normalized) : repoPath
+  const isGitRepo = validateRepo(repoPath)
 
   if (!dirPath || !existsSync(dirPath) || !statSync(dirPath).isDirectory()) {
     return []
   }
 
   return readdirSync(dirPath, { withFileTypes: true })
-    .filter((entry) => entry.name !== '.git')
+    .filter((entry) => !isGitRepo || entry.name !== '.git')
     .map((entry) => {
       const path = normalized ? `${normalized}/${entry.name}` : entry.name
-      return { entry, path, localOnly: isIgnoredPath(repoPath, path) }
+      return { entry, path, localOnly: isGitRepo ? isIgnoredPath(repoPath, path) : true }
     })
     .map(({ entry, path, localOnly }) => ({
       name: entry.name,
@@ -1499,30 +1444,6 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
       type: entry.isDirectory() ? 'dir' as const : 'file' as const,
       localOnly,
     }))
-    .sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
-}
-
-export function listLocalDirectoryEntries(rootPath: string, subpath: string = ''): TreeNode[] {
-  const normalized = normalizeLocalRootRelativePath(subpath)
-  const dirPath = normalized ? resolveSafeLocalRootPath(rootPath, normalized) : rootPath
-
-  if (!dirPath || !existsSync(dirPath) || !statSync(dirPath).isDirectory()) {
-    return []
-  }
-
-  return readdirSync(dirPath, { withFileTypes: true })
-    .map((entry) => {
-      const path = normalized ? `${normalized}/${entry.name}` : entry.name
-      return {
-        name: entry.name,
-        path,
-        type: entry.isDirectory() ? 'dir' as const : 'file' as const,
-        localOnly: true,
-      }
-    })
     .sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
       return a.name.localeCompare(b.name)

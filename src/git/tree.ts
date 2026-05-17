@@ -4,7 +4,6 @@ import { spawnSync } from 'node:child_process'
 import type { TreeNode } from '../types.js'
 import {
   getTrackedPathType,
-  listLocalDirectoryEntries,
   listWorkingTreeDirectoryEntries,
   normalizeRepoRelativePath,
   resolveSafeRepoPath,
@@ -47,10 +46,6 @@ export function listDir(repoPath: string, branch: string, subpath: string = ''):
 
 export function listWorkingTreeDir(repoPath: string, subpath: string = ''): TreeNode[] {
   return listWorkingTreeDirectoryEntries(repoPath, subpath)
-}
-
-export function listLocalDir(rootPath: string, subpath: string = ''): TreeNode[] {
-  return listLocalDirectoryEntries(rootPath, subpath)
 }
 
 function getSearchableWorkingTreeEntries(repoPath: string, subpath: string = ''): TreeNode[] {

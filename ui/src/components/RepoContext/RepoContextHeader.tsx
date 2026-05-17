@@ -92,7 +92,8 @@ export default function RepoContextHeader({
   const remotePath = remote?.webUrl || remote?.fetchUrl || ''
   const repoSyncBadge = describeRepoSyncState(repoSync)
   const changeSummary = trackedChangeCount + untrackedChangeCount
-  const repoName = info?.name || (info?.isGitRepo ? 'Repository' : 'Folder')
+  const isGitRepo = Boolean(info?.isGitRepo)
+  const repoName = info?.name || (isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
 
   return (
@@ -101,13 +102,13 @@ export default function RepoContextHeader({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-              {info?.isGitRepo ? 'Repository' : 'Folder'}
+              {isGitRepo ? 'Repository' : 'Folder'}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <h1 className="truncate text-[20px] leading-tight font-semibold text-[var(--foreground)]">
                 {repoName}
               </h1>
-              {info?.isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}
+              {isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}
               {remote ? <MetaTag label="Remote" icon="remote" tone="neutral" compact /> : null}
               {repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
               {changeSummary > 0 ? (
@@ -122,7 +123,7 @@ export default function RepoContextHeader({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {info?.isGitRepo ? (
+            {isGitRepo ? (
               <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
                   Branch
@@ -152,61 +153,65 @@ export default function RepoContextHeader({
         {detailsExpanded ? (
           <div className="grid gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">{info?.isGitRepo ? 'Local repository' : 'Local folder'}</p>
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+                {isGitRepo ? 'Local repository' : 'Local folder'}
+              </p>
               <p className="break-all text-sm text-[var(--foreground)]">{info?.path || 'Not available'}</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Remote repository</p>
-              {remotePath ? (
-                remoteWebUrl ? (
-                  <a
-                    className="break-all text-sm text-[var(--primary)] underline-offset-2 hover:underline"
-                    href={remoteWebUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {remotePath}
-                  </a>
+            {isGitRepo ? (
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Remote repository</p>
+                {remotePath ? (
+                  remoteWebUrl ? (
+                    <a
+                      className="break-all text-sm text-[var(--primary)] underline-offset-2 hover:underline"
+                      href={remoteWebUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {remotePath}
+                    </a>
+                  ) : (
+                    <p className="break-all text-sm text-[var(--foreground)]">{remotePath}</p>
+                  )
                 ) : (
-                  <p className="break-all text-sm text-[var(--foreground)]">{remotePath}</p>
-                )
-              ) : (
-                <p className="text-sm text-[var(--foreground)]">{info?.isGitRepo ? 'No remote configured' : 'Not a git repository'}</p>
-              )}
-            </div>
+                  <p className="text-sm text-[var(--foreground)]">No remote configured</p>
+                )}
+              </div>
+            ) : null}
             {hasActivePath ? (
               <div className="space-y-1 sm:col-span-2">
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Active path</p>
                 <p className="break-all text-sm text-[var(--foreground)]">{displayPath}</p>
               </div>
             ) : null}
-            {info?.isGitRepo ? (
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Git identity</p>
-                {gitUser?.source ? <MetaTag label={gitUser.source} icon="user" tone="neutral" compact /> : null}
+            {isGitRepo ? (
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Git identity</p>
+                  {gitUser?.source ? <MetaTag label={gitUser.source} icon="user" tone="neutral" compact /> : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  <p className="break-all text-sm text-[var(--foreground)]">
+                    {gitUser?.name && gitUser?.email
+                      ? `${gitUser.name} <${gitUser.email}>`
+                      : 'Git user is not configured'}
+                  </p>
+                  {onEditGitIdentity ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={onEditGitIdentity}
+                      aria-label="Edit repository git identity"
+                      title="Edit repository git identity"
+                    >
+                      <EditIcon />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1">
-                <p className="break-all text-sm text-[var(--foreground)]">
-                  {gitUser?.name && gitUser?.email
-                    ? `${gitUser.name} <${gitUser.email}>`
-                    : 'Git user is not configured'}
-                </p>
-                {onEditGitIdentity ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={onEditGitIdentity}
-                    aria-label="Edit repository git identity"
-                    title="Edit repository git identity"
-                  >
-                    <EditIcon />
-                  </Button>
-                ) : null}
-              </div>
-            </div>
             ) : null}
           </div>
         ) : null}
@@ -216,7 +221,7 @@ export default function RepoContextHeader({
         type="button"
         className="flex w-full items-center justify-center border-t border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-2 text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
         aria-expanded={detailsExpanded}
-        aria-label={detailsExpanded ? 'Collapse repository details' : 'Expand repository details'}
+        aria-label={detailsExpanded ? `Collapse ${isGitRepo ? 'repository' : 'folder'} details` : `Expand ${isGitRepo ? 'repository' : 'folder'} details`}
         onClick={() => setDetailsExpanded((value) => !value)}
       >
         <ChevronIcon expanded={detailsExpanded} />

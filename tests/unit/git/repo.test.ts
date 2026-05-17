@@ -52,13 +52,6 @@ import {
   countWorkingTreeFolderImpact,
   deleteWorkingTreeFolder,
   listWorkingTreeDirectoryEntries,
-  listLocalDirectoryEntries,
-  getLocalRootEntryCount,
-  getLocalEditableState,
-  getLocalPathType,
-  readLocalRootFile,
-  writeLocalRootTextFile,
-  deleteLocalRootFile,
   getRepoSshKeyPath,
 } from '../../../src/git/repo.js'
 
@@ -156,12 +149,15 @@ describe('getInfo', () => {
     }
   })
 
-  it('returns isGitRepo false for non-git path', () => {
+  it('returns folder metadata for a non-git path', () => {
     const dir = mkdtempSync(join(tmpdir(), 'not-git-'))
     try {
+      writeFileSync(join(dir, 'README.md'), '# Plain folder')
       const info = getInfo(dir)
       expect(info.isGitRepo).toBe(false)
       expect(info.pickerMode).toBe(false)
+      expect(info.name).toBeTruthy()
+      expect(info.rootEntryCount).toBe(1)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -1040,43 +1036,6 @@ describe('working tree helpers', () => {
       expect(getRepoSshKeyPath(dir)).toBe('')
     } finally {
       cleanup()
-    }
-  })
-
-  it('supports root-safe regular-folder file helpers', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-local-root-'))
-    try {
-      mkdirSync(join(dir, 'docs'))
-      writeFileSync(join(dir, '.hidden'), 'hidden')
-      writeFileSync(join(dir, 'README.md'), '# local')
-      writeFileSync(join(dir, 'docs', 'guide.md'), 'guide')
-
-      expect(getLocalRootEntryCount(dir)).toBe(2)
-      expect(getLocalPathType(dir, 'docs')).toBe('dir')
-      expect(getLocalPathType(dir, 'README.md')).toBe('file')
-      expect(getLocalPathType(dir, '../escape.md')).toBe('missing')
-      expect(readLocalRootFile(dir, 'README.md')?.toString('utf-8')).toBe('# local')
-      expect(getLocalEditableState(dir, 'README.md')).toMatchObject({ editable: true })
-      expect(getLocalEditableState(dir, 'missing.md')).toEqual({ editable: false, revisionToken: null })
-
-      writeLocalRootTextFile(dir, 'docs/new.md', 'new')
-      expect(readLocalRootFile(dir, 'docs/new.md')?.toString('utf-8')).toBe('new')
-      expect(() => writeLocalRootTextFile(dir, '../escape.md', 'no')).toThrow('opened folder')
-      expect(() => writeLocalRootTextFile(dir, 'docs', 'no')).toThrow()
-
-      deleteLocalRootFile(dir, 'docs/new.md')
-      expect(getLocalPathType(dir, 'docs/new.md')).toBe('missing')
-      expect(() => deleteLocalRootFile(dir, '../escape.md')).toThrow('opened folder')
-      expect(() => deleteLocalRootFile(dir, 'docs')).toThrow()
-
-      expect(listLocalDirectoryEntries(dir).map((entry) => entry.name)).toEqual(['docs', '.hidden', 'README.md'])
-      expect(listLocalDirectoryEntries(dir, 'docs')).toEqual([
-        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: true },
-      ])
-      expect(listLocalDirectoryEntries(dir, '../escape')).toEqual([])
-      expect(listLocalDirectoryEntries(join(dir, 'missing'))).toEqual([])
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
     }
   })
 

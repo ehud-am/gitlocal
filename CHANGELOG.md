@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Added regular-folder mode so non-git folders can open as browsable editable roots with file list, view, create, update, and delete support.
+- Unified folder and repository opening so plain folders open in the main viewer, while git repositories add branch, remote, and identity context.
+- Updated the picker to list files and folders, navigate into folders on double-click, and use one explicit Open action for the selected folder.
 - Simplified expanded repository context by showing local and remote repositories together while removing repeated branch, upstream sync, commit, and remote sync controls.
 - Added repository-local SSH key path viewing and editing to git identity settings.
 

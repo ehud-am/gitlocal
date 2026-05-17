@@ -14,11 +14,11 @@ import type {
   GitIdentityUpdateResponse,
   ManualFileMutationRequest,
   ManualFileOperationResult,
-  PickCloneRequest,
-  PickCreateFolderRequest,
-  PickBrowseResponse,
-  PickInitGitRequest,
-  PickResponse,
+  FolderCloneRepositoryRequest,
+  FolderCreateChildRequest,
+  FolderBrowseResponse,
+  FolderInitRepositoryRequest,
+  LocalActionResponse,
   RepoInfo,
   RemoteSyncResponse,
   SearchMode,
@@ -169,25 +169,25 @@ export const api = {
     return request(`/api/sync?${params.toString()}`)
   },
 
-  getPickBrowse: (path?: string): Promise<PickBrowseResponse> => {
+  getFolderBrowse: (path?: string): Promise<FolderBrowseResponse> => {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
     const qs = params.toString()
-    return request(`/api/pick/browse${qs ? '?' + qs : ''}`)
+    return request(`/api/folder/browse${qs ? '?' + qs : ''}`)
   },
 
-  submitPick: (path: string): Promise<PickResponse> =>
-    mutate('/api/pick', 'POST', { path }),
+  openRepository: (path: string): Promise<LocalActionResponse> =>
+    mutate('/api/repo/open', 'POST', { path }),
 
-  createPickFolder: (payload: PickCreateFolderRequest): Promise<PickResponse> =>
-    mutate('/api/pick/create-folder', 'POST', payload),
+  createChildFolder: (payload: FolderCreateChildRequest): Promise<LocalActionResponse> =>
+    mutate('/api/folder/create-child', 'POST', payload),
 
-  initPickGit: (payload: PickInitGitRequest): Promise<PickResponse> =>
-    mutate('/api/pick/init', 'POST', payload),
+  initFolderRepository: (payload: FolderInitRepositoryRequest): Promise<LocalActionResponse> =>
+    mutate('/api/folder/init-repository', 'POST', payload),
 
-  clonePickRepo: (payload: PickCloneRequest): Promise<PickResponse> =>
-    mutate('/api/pick/clone', 'POST', payload),
+  cloneRepositoryIntoFolder: (payload: FolderCloneRepositoryRequest): Promise<LocalActionResponse> =>
+    mutate('/api/folder/clone-repository', 'POST', payload),
 
-  showParentPicker: (): Promise<PickResponse> =>
-    mutate('/api/pick/parent', 'POST', {}),
+  showParentFolder: (): Promise<LocalActionResponse> =>
+    mutate('/api/repo/parent-folder', 'POST', {}),
 }

@@ -208,16 +208,16 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
   })
 
-  it('GET /api/pick/browse returns folder metadata for picker mode', async () => {
+  it('GET /api/folder/browse returns folder metadata for picker mode', async () => {
     const app = createApp('')
-    const res = await app.fetch(new Request('http://localhost/api/pick/browse'))
+    const res = await app.fetch(new Request('http://localhost/api/folder/browse'))
     expect(res.status).toBe(200)
     const body = await res.json() as { currentPath: string; entries: unknown[] }
     expect(body.currentPath).toBe(process.cwd())
     expect(Array.isArray(body.entries)).toBe(true)
   })
 
-  it('GET /api/info opens a non-git folder as a browsable local folder', async () => {
+  it('GET /api/info opens a non-git startup folder as an active folder root', async () => {
     const nonGitDir = mkdtempSync(join(tmpdir(), 'gitlocal-non-git-'))
     try {
       const app = createApp(nonGitDir)
@@ -234,44 +234,36 @@ describe('Server integration', () => {
     }
   })
 
-  it('supports browsing and mutating files in a non-git folder', async () => {
-    const nonGitDir = mkdtempSync(join(tmpdir(), 'gitlocal-non-git-files-'))
+  it('GET /api/tree and /api/file browse a non-git folder root', async () => {
+    const nonGitDir = mkdtempSync(join(tmpdir(), 'gitlocal-folder-root-'))
     try {
-      writeFileSync(join(nonGitDir, 'README.md'), '# Local')
-      const app = createApp(nonGitDir)
+      mkdirSync(join(nonGitDir, 'docs'))
+      writeFileSync(join(nonGitDir, 'README.md'), '# Plain Folder')
+      writeFileSync(join(nonGitDir, 'docs', 'guide.md'), '# Guide')
 
+      const app = createApp(nonGitDir)
       const treeRes = await app.fetch(new Request('http://localhost/api/tree'))
       expect(treeRes.status).toBe(200)
-      const treeBody = await treeRes.json() as Array<{ name: string; localOnly: boolean }>
-      expect(treeBody).toContainEqual(expect.objectContaining({ name: 'README.md', localOnly: true }))
+      const tree = await treeRes.json() as Array<{ name: string; path: string; type: 'file' | 'dir'; localOnly?: boolean }>
+      expect(tree).toEqual([
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: true },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: true },
+      ])
 
-      const readRes = await app.fetch(new Request('http://localhost/api/file?path=README.md'))
-      expect(readRes.status).toBe(200)
-      const readBody = await readRes.json() as { content: string; revisionToken: string }
-      expect(readBody.content).toBe('# Local')
-
-      const updateRes = await app.fetch(new Request('http://localhost/api/file', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'README.md', content: '# Updated Local', revisionToken: readBody.revisionToken }),
-      }))
-      expect(updateRes.status).toBe(200)
-
-      const createRes = await app.fetch(new Request('http://localhost/api/file', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: 'new.md', content: 'new' }),
-      }))
-      expect(createRes.status).toBe(201)
-      expect(existsSync(join(nonGitDir, 'new.md'))).toBe(true)
+      const fileRes = await app.fetch(new Request('http://localhost/api/file?path=README.md'))
+      expect(fileRes.status).toBe(200)
+      const file = await fileRes.json() as { content: string; editable: boolean; revisionToken: string }
+      expect(file.content).toBe('# Plain Folder')
+      expect(file.editable).toBe(true)
+      expect(file.revisionToken).toEqual(expect.any(String))
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }
   })
 
-  it('POST /api/pick/parent switches a repo view to the parent-folder picker', async () => {
+  it('POST /api/repo/parent-folder switches a repo view to the parent-folder picker', async () => {
     const app = createApp(dir)
-    const res = await app.fetch(new Request('http://localhost/api/pick/parent', {
+    const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', {
       method: 'POST',
     }))
     expect(res.status).toBe(200)
@@ -284,9 +276,9 @@ describe('Server integration', () => {
     expect(infoBody.path).toBe(dirname(dir))
   })
 
-  it('POST /api/pick updates repo path', async () => {
+  it('POST /api/repo/open updates repo path', async () => {
     const app = createApp('')
-    const res = await app.fetch(new Request('http://localhost/api/pick', {
+    const res = await app.fetch(new Request('http://localhost/api/repo/open', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path: dir }),
@@ -370,7 +362,7 @@ describe('Server integration', () => {
     try {
       const app = createApp('')
 
-      const createRes = await app.fetch(new Request('http://localhost/api/pick/create-folder', {
+      const createRes = await app.fetch(new Request('http://localhost/api/folder/create-child', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ parentPath: parentDir, name: 'child' }),
@@ -380,7 +372,7 @@ describe('Server integration', () => {
       expect(createBody.ok).toBe(true)
       expect(existsSync(createBody.path)).toBe(true)
 
-      const initRes = await app.fetch(new Request('http://localhost/api/pick/init', {
+      const initRes = await app.fetch(new Request('http://localhost/api/folder/init-repository', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ path: createBody.path }),
@@ -389,7 +381,7 @@ describe('Server integration', () => {
       const initBody = await initRes.json() as { ok: boolean }
       expect(initBody.ok).toBe(true)
 
-      const cloneRes = await app.fetch(new Request('http://localhost/api/pick/clone', {
+      const cloneRes = await app.fetch(new Request('http://localhost/api/folder/clone-repository', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ parentPath: parentDir, name: 'clone-target', repositoryUrl: dir }),

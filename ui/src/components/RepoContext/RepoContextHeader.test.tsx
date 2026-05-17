@@ -171,6 +171,42 @@ describe('RepoContextHeader', () => {
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toBeDisabled()
   })
 
+  it('renders plain folder context without git-only controls', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'notes',
+          path: '/tmp/notes',
+          currentBranch: '',
+          isGitRepo: false,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: false,
+          rootEntryCount: 1,
+          gitContext: null,
+        }}
+        branch=""
+        branches={[]}
+        selectedPath="drafts/idea.md"
+        selectedPathType="file"
+        onBranchChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Folder')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'notes' })).toBeInTheDocument()
+    expect(screen.queryByText('Git')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /branch selector/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open repository search/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /expand folder details/i }))
+    expect(screen.getByText('Local folder')).toBeInTheDocument()
+    expect(screen.getByText('/tmp/notes/drafts/idea.md')).toBeInTheDocument()
+    expect(screen.queryByText('Remote repository')).not.toBeInTheDocument()
+    expect(screen.queryByText('Git identity')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /collapse folder details/i })).toBeInTheDocument()
+  })
+
   it('covers fallback branch labels and hides optional details when metadata is unavailable', () => {
     render(
       <RepoContextHeader

@@ -152,7 +152,7 @@ vi.mock('./services/api', () => ({
     getInfo: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
-    showParentPicker: vi.fn(),
+    showParentFolder: vi.fn(),
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
@@ -162,14 +162,14 @@ vi.mock('./services/api', () => ({
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
     getSearchResults: vi.fn(),
-    getPickBrowse: vi.fn(),
-    submitPick: vi.fn(),
+    getFolderBrowse: vi.fn(),
+    openRepository: vi.fn(),
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
-    createPickFolder: vi.fn(),
-    initPickGit: vi.fn(),
-    clonePickRepo: vi.fn(),
+    createChildFolder: vi.fn(),
+    initFolderRepository: vi.fn(),
+    cloneRepositoryIntoFolder: vi.fn(),
   },
 }))
 
@@ -284,7 +284,7 @@ describe('App logic', () => {
       { name: 'release', displayName: 'release', scope: 'local', hasLocalCheckout: true, isCurrent: false },
     ])
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
-    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
+    vi.mocked(api.showParentFolder).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
     vi.mocked(api.switchBranch).mockResolvedValue({
       ok: false,
       status: 'blocked',
@@ -325,7 +325,7 @@ describe('App logic', () => {
 
     renderApp()
 
-    expect(await screen.findByText(/opened a different repository/i)).toBeInTheDocument()
+    expect(await screen.findByText(/opened a different folder/i)).toBeInTheDocument()
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":""')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"none"')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"raw":false')
@@ -407,7 +407,7 @@ describe('App logic', () => {
     expect(await screen.findByText(/repository has no commits yet/i)).toBeInTheDocument()
   })
 
-  it('initializes the current branch from repo info, supports picker and regular-folder screens, and toggles the sidebar', async () => {
+  it('initializes the current branch from repo info, supports picker mode, and toggles the sidebar', async () => {
     readViewerState.mockReturnValue(buildViewerState({ branch: '', sidebarCollapsed: true }))
 
     const initialRender = renderApp()
@@ -424,11 +424,6 @@ describe('App logic', () => {
     const pickerRender = renderApp()
     expect(await screen.findByText('picker page')).toBeInTheDocument()
     pickerRender.unmount()
-
-    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({ isGitRepo: false }))
-    renderApp()
-    expect(await screen.findByTestId('header-props')).toBeInTheDocument()
-    expect(screen.getByTestId('content-props')).toHaveTextContent('"canMutateFiles":true')
   })
 
   it('expands search from saved state, the header trigger, selection, and dismissal', async () => {
@@ -488,7 +483,7 @@ describe('App logic', () => {
       value: { reload },
       writable: true,
     })
-    vi.mocked(api.showParentPicker).mockResolvedValueOnce({ ok: true, error: '', message: '' })
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({ ok: true, error: '', message: '' })
 
     renderApp()
 

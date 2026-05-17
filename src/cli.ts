@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     } else if (openingCurrentRepo) {
       console.log(`Serving current repository: ${launchPath}`)
     } else {
-      console.log('No repository specified — opening folder picker.')
+      console.log('No folder specified — opening folder picker.')
     }
     await openBrowser(url)
   })

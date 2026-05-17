@@ -10,52 +10,42 @@ import {
   gitIdentityUpdateHandler,
   readmeHandler,
   remoteSyncHandler,
-} from './handlers/git.js'
+  repositoryOpenHandler,
+  repositoryParentFolderHandler,
+} from './handlers/repo.js'
 import {
   treeHandler,
   fileHandler,
   createFileHandler,
   updateFileHandler,
   deleteFileHandler,
-  createFolderHandler,
-  folderDeletePreviewHandler,
-  deleteFolderHandler,
-} from './handlers/files.js'
+} from './handlers/file.js'
 import {
-  pickBrowseHandler,
-  pickCloneHandler,
-  pickCreateFolderHandler,
-  pickHandler,
-  pickInitGitHandler,
-  pickParentHandler,
-} from './handlers/pick.js'
+  folderBrowseHandler,
+  folderCloneRepositoryHandler,
+  createFolderHandler,
+  folderCreateChildHandler,
+  folderDeletePreviewHandler,
+  folderInitRepositoryHandler,
+  deleteFolderHandler,
+} from './handlers/folder.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import { validateRepo } from './git/repo.js'
 
-type AppVariables = { repoPath: string; pickerPath: string; folderPath: string }
+type AppVariables = { repoPath: string; pickerPath: string }
 type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean }
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
 let currentPickerPath = ''
-let currentFolderPath = ''
 
 export function setRepoPath(path: string): void {
   currentRepoPath = path
-  if (path) currentFolderPath = ''
 }
 
 export function setPickerPath(path: string): void {
   currentPickerPath = path
-}
-
-export function setFolderPath(path: string): void {
-  currentFolderPath = path
-  if (path) {
-    currentRepoPath = ''
-    currentPickerPath = ''
-  }
 }
 
 export function getRepoPath(): string {
@@ -66,23 +56,17 @@ export function getPickerPath(): string {
   return currentPickerPath
 }
 
-export function getFolderPath(): string {
-  return currentFolderPath
-}
-
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   if (!initialPath) {
     const cwd = process.cwd()
     if (options.detectCurrentRepoOnEmptyPath && validateRepo(cwd)) {
       currentRepoPath = cwd
       currentPickerPath = ''
-      currentFolderPath = ''
       return
     }
 
     currentRepoPath = ''
     currentPickerPath = cwd
-    currentFolderPath = ''
     return
   }
 
@@ -90,13 +74,11 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
   if (validateRepo(resolvedPath)) {
     currentRepoPath = resolvedPath
     currentPickerPath = ''
-    currentFolderPath = ''
     return
   }
 
-  currentRepoPath = ''
+  currentRepoPath = resolvedPath
   currentPickerPath = ''
-  currentFolderPath = resolvedPath
 }
 
 export function createApp(initialRepoPath: string, options: CreateAppOptions = {}): Hono<{ Variables: AppVariables }> {
@@ -108,7 +90,6 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.use('*', async (c, next) => {
     c.set('repoPath', currentRepoPath)
     c.set('pickerPath', currentPickerPath)
-    c.set('folderPath', currentFolderPath)
     await next()
   })
 
@@ -129,14 +110,14 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/folder', createFolderHandler)
   app.get('/api/folder/delete-preview', folderDeletePreviewHandler)
   app.delete('/api/folder', deleteFolderHandler)
+  app.get('/api/folder/browse', folderBrowseHandler)
+  app.post('/api/folder/create-child', folderCreateChildHandler)
+  app.post('/api/folder/init-repository', folderInitRepositoryHandler)
+  app.post('/api/folder/clone-repository', folderCloneRepositoryHandler)
+  app.post('/api/repo/open', repositoryOpenHandler)
+  app.post('/api/repo/parent-folder', repositoryParentFolderHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
-  app.get('/api/pick/browse', pickBrowseHandler)
-  app.post('/api/pick', pickHandler)
-  app.post('/api/pick/create-folder', pickCreateFolderHandler)
-  app.post('/api/pick/init', pickInitGitHandler)
-  app.post('/api/pick/clone', pickCloneHandler)
-  app.post('/api/pick/parent', pickParentHandler)
 
   // Static file serving with SPA fallback
   const uiDir = join(import.meta.dirname, '../ui/dist')

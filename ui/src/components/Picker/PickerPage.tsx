@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
-import type { PickBrowseEntry, PickBrowseRoot } from '../../types'
+import type { FolderBrowseEntry, FolderBrowseRoot } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 
 function KebabIcon() {
@@ -34,8 +34,8 @@ export default function PickerPage() {
   const [currentPath, setCurrentPath] = useState('')
   const [parentPath, setParentPath] = useState<string | null>(null)
   const [homePath, setHomePath] = useState('')
-  const [entries, setEntries] = useState<PickBrowseEntry[]>([])
-  const [roots, setRoots] = useState<PickBrowseRoot[]>([])
+  const [entries, setEntries] = useState<FolderBrowseEntry[]>([])
+  const [roots, setRoots] = useState<FolderBrowseRoot[]>([])
   const [canOpen, setCanOpen] = useState(false)
   const [canCreateChild, setCanCreateChild] = useState(false)
   const [canInitGit, setCanInitGit] = useState(false)
@@ -48,7 +48,7 @@ export default function PickerPage() {
     setBrowseLoading(true)
     setError('')
     try {
-      const result = await api.getPickBrowse(nextPath)
+      const result = await api.getFolderBrowse(nextPath)
       setCurrentPath(result.currentPath)
       setParentPath(result.parentPath)
       setHomePath(result.homePath)
@@ -61,7 +61,7 @@ export default function PickerPage() {
       setCanCloneIntoChild(Boolean(result.canCloneIntoChild))
       setError(result.error)
     } catch {
-      setError('Failed to load folders from the GitLocal server.')
+      setError('Failed to load this folder from the GitLocal server.')
     } finally {
       setBrowseLoading(false)
     }
@@ -76,13 +76,13 @@ export default function PickerPage() {
     setError('')
 
     if (!path.trim()) {
-      setError('Please choose or enter a repository path.')
+      setError('Please choose or enter a folder path.')
       return
     }
 
     setLoading(true)
     try {
-      const result = await api.submitPick(path.trim())
+      const result = await api.openRepository(path.trim())
       if (result.ok) {
         window.location.reload()
       } else {
@@ -95,12 +95,12 @@ export default function PickerPage() {
     }
   }
 
-  async function handleOpenRepository(repoPath: string) {
-    setPath(repoPath)
+  async function handleOpenPath(nextPath: string) {
+    setPath(nextPath)
     setError('')
     setLoading(true)
     try {
-      const result = await api.submitPick(repoPath)
+      const result = await api.openRepository(nextPath)
       if (result.ok) {
         window.location.reload()
       } else {
@@ -120,7 +120,7 @@ export default function PickerPage() {
     setError('')
     setLoading(true)
     try {
-      const result = await api.createPickFolder({ parentPath: currentPath, name: name.trim() })
+      const result = await api.createChildFolder({ parentPath: currentPath, name: name.trim() })
       if (result.ok) {
         await loadPath(currentPath)
       } else {
@@ -137,9 +137,9 @@ export default function PickerPage() {
     setError('')
     setLoading(true)
     try {
-      const result = await api.initPickGit({ path: currentPath })
+      const result = await api.initFolderRepository({ path: currentPath })
       if (result.ok && result.path) {
-        await handleOpenRepository(result.path)
+        await handleOpenPath(result.path)
       } else {
         setError(result.error || 'Could not initialize git in this folder.')
       }
@@ -163,13 +163,13 @@ export default function PickerPage() {
     setError('')
     setLoading(true)
     try {
-      const result = await api.clonePickRepo({
+      const result = await api.cloneRepositoryIntoFolder({
         parentPath: currentPath,
         name: name.trim(),
         repositoryUrl: repositoryUrl.trim(),
       })
       if (result.ok && result.path) {
-        await handleOpenRepository(result.path)
+        await handleOpenPath(result.path)
       } else {
         setError(result.error || 'Could not clone into this folder.')
       }
@@ -182,7 +182,7 @@ export default function PickerPage() {
 
   const rows = [
     ...(parentPath
-      ? [{ name: '..', path: parentPath, isGitRepo: false, isParent: true as const }]
+      ? [{ name: '..', path: parentPath, type: 'dir' as const, isGitRepo: false, isParent: true as const }]
       : []),
     ...entries.map((entry) => ({ ...entry, isParent: false as const })),
   ]
@@ -191,7 +191,7 @@ export default function PickerPage() {
     <div className="picker-shell">
       <header className="app-header">
         <span className="logo">GitLocal</span>
-        <span className="repo-name">Folder selector</span>
+        <span className="repo-name">Open local folder</span>
       </header>
       <div className="picker-layout">
         {sidebarCollapsed ? (
@@ -242,11 +242,10 @@ export default function PickerPage() {
 
         <main className="picker-main">
           <section className="picker-hero">
-            <p className="picker-eyebrow">Repository required</p>
-            <h1>Choose the folder GitLocal should open</h1>
+            <p className="picker-eyebrow">Local folder</p>
+            <h1>Choose what GitLocal should open</h1>
             <p>
-              GitLocal was started without a repository location, so this folder selector lets you
-              browse your machine and open the repository you want to inspect.
+              Browse your machine, select a folder, and open it in GitLocal. Git repositories include branch, remote, and identity details.
             </p>
           </section>
 
@@ -272,8 +271,8 @@ export default function PickerPage() {
                     <DropdownMenuItem disabled={!canCloneIntoChild || loading} onSelect={() => { void handleCloneIntoChild() }}>
                       Clone into subfolder
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled={!canOpen || loading} onSelect={() => { void handleOpenRepository(currentPath) }}>
-                      Open this repository
+                    <DropdownMenuItem disabled={!canOpen || loading} onSelect={() => { void handleOpenPath(currentPath) }}>
+                      Open this folder
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -282,11 +281,11 @@ export default function PickerPage() {
 
             <div className="picker-browser-table-wrap">
               {browseLoading ? (
-                <p className="picker-helper">Loading folders…</p>
+                <p className="picker-helper">Loading folder contents...</p>
               ) : rows.length === 0 ? (
-                <p className="picker-helper">No folders are available here.</p>
+                <p className="picker-helper">This folder is empty.</p>
               ) : (
-                <table className="picker-browser-table" aria-label="folders">
+                <table className="picker-browser-table" aria-label="folder contents">
                   <thead>
                     <tr>
                       <th scope="col">Name</th>
@@ -305,9 +304,7 @@ export default function PickerPage() {
                             return
                           }
 
-                          if (entry.isGitRepo) {
-                            void handleOpenRepository(entry.path)
-                          } else {
+                          if (entry.type === 'dir') {
                             void loadPath(entry.path)
                           }
                         }}
@@ -319,21 +316,21 @@ export default function PickerPage() {
                             aria-label={
                               entry.isParent
                                 ? 'Open parent folder'
-                                : `${entry.name} ${entry.isGitRepo ? 'git repository' : 'folder'}`
+                                : `${entry.name} ${entry.isGitRepo ? 'git repository' : entry.type === 'dir' ? 'folder' : 'file'}`
                             }
                             onClick={() => setPath(entry.path)}
                           >
                             <span className="picker-entry-copy">
                               <span className="picker-entry-name">{entry.name}</span>
                               <span className={`picker-entry-badge${entry.isGitRepo ? ' is-repo' : ''}`}>
-                                {entry.isParent ? 'Parent' : entry.isGitRepo ? 'Git repository' : 'Folder'}
+                                {entry.isParent ? 'Parent' : entry.isGitRepo ? 'Git repository' : entry.type === 'dir' ? 'Folder' : 'File'}
                               </span>
                             </span>
                           </button>
                         </td>
                         <td className="picker-entry-cell">
                           <span className="picker-entry-kind">
-                            {entry.isParent ? 'Parent' : entry.isGitRepo ? 'Repository' : 'Directory'}
+                            {entry.isParent ? 'Parent' : entry.isGitRepo ? 'Repository' : entry.type === 'dir' ? 'Directory' : 'File'}
                           </span>
                         </td>
                         <td className="picker-entry-cell picker-entry-cell-path">
@@ -348,27 +345,19 @@ export default function PickerPage() {
           </section>
 
           <form onSubmit={handleSubmit} className="picker-form">
-            <label htmlFor="repository-path" className="picker-input-label">Selected folder</label>
+            <label htmlFor="repository-path" className="picker-input-label">Selected path</label>
             <input
               id="repository-path"
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
-              placeholder="/Users/you/projects/my-repo"
-              aria-label="repository path"
+              placeholder="/Users/you/projects"
+              aria-label="folder path"
               className="picker-input"
             />
             <div className="picker-form-actions">
-              <button
-                type="button"
-                className="picker-nav-button"
-                disabled={browseLoading}
-                onClick={() => loadPath(path)}
-              >
-                Browse selected folder
-              </button>
               <button type="submit" disabled={loading} className="picker-submit">
-                {loading ? 'Opening…' : 'Open repository'}
+                {loading ? 'Opening...' : 'Open'}
               </button>
             </div>
           </form>

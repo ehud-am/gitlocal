@@ -11,7 +11,7 @@ vi.mock('./services/api', () => ({
     getInfo: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
-    showParentPicker: vi.fn(),
+    showParentFolder: vi.fn(),
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
@@ -24,14 +24,14 @@ vi.mock('./services/api', () => ({
     getFolderDeletePreview: vi.fn(),
     deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
-    getPickBrowse: vi.fn(),
-    submitPick: vi.fn(),
+    getFolderBrowse: vi.fn(),
+    openRepository: vi.fn(),
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
-    createPickFolder: vi.fn(),
-    initPickGit: vi.fn(),
-    clonePickRepo: vi.fn(),
+    createChildFolder: vi.fn(),
+    initFolderRepository: vi.fn(),
+    cloneRepositoryIntoFolder: vi.fn(),
   },
 }))
 
@@ -252,8 +252,8 @@ describe('App', () => {
       aheadCount: 0,
       behindCount: 0,
     })
-    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: true, error: '' })
-    vi.mocked(api.getPickBrowse).mockResolvedValue({
+    vi.mocked(api.showParentFolder).mockResolvedValue({ ok: true, error: '' })
+    vi.mocked(api.getFolderBrowse).mockResolvedValue({
       currentPath: '/tmp',
       parentPath: '/',
       homePath: '/tmp',
@@ -261,12 +261,12 @@ describe('App', () => {
       entries: [],
       error: '',
       isGitRepo: false,
-      canOpen: false,
+      canOpen: true,
       canCreateChild: true,
       canInitGit: true,
       canCloneIntoChild: true,
     })
-    vi.mocked(api.submitPick).mockResolvedValue({ ok: true, error: '' })
+    vi.mocked(api.openRepository).mockResolvedValue({ ok: true, error: '' })
     vi.mocked(api.updateGitIdentity).mockResolvedValue({
       ok: true,
       message: 'Repository git identity updated.',
@@ -297,7 +297,7 @@ describe('App', () => {
   })
 
   it('opens an info modal before leaving the repository from the root .. row', async () => {
-    vi.mocked(api.showParentPicker).mockResolvedValueOnce({
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({
       ok: false,
       error: 'Parent folder unavailable.',
     })
@@ -311,7 +311,7 @@ describe('App', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /open parent folder/i }))
 
     await waitFor(() => {
-      expect(api.showParentPicker).toHaveBeenCalledTimes(1)
+      expect(api.showParentFolder).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -728,7 +728,7 @@ describe('App', () => {
 
     renderWithClient()
 
-    expect(await screen.findByText(/choose the folder gitlocal should open/i)).toBeInTheDocument()
+    expect(await screen.findByText(/choose what gitlocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
   })
 })

@@ -245,7 +245,7 @@ vi.mock('./services/api', () => ({
     getInfo: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
-    showParentPicker: vi.fn(),
+    showParentFolder: vi.fn(),
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
@@ -258,14 +258,14 @@ vi.mock('./services/api', () => ({
     getFolderDeletePreview: vi.fn(),
     deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
-    getPickBrowse: vi.fn(),
-    submitPick: vi.fn(),
+    getFolderBrowse: vi.fn(),
+    openRepository: vi.fn(),
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
-    createPickFolder: vi.fn(),
-    initPickGit: vi.fn(),
-    clonePickRepo: vi.fn(),
+    createChildFolder: vi.fn(),
+    initFolderRepository: vi.fn(),
+    cloneRepositoryIntoFolder: vi.fn(),
   },
 }))
 
@@ -388,7 +388,7 @@ describe('App branch coverage', () => {
       { name: 'release', displayName: 'release', scope: 'local', hasLocalCheckout: true, isCurrent: false },
     ])
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
-    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
+    vi.mocked(api.showParentFolder).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
     vi.mocked(api.switchBranch).mockResolvedValue({
       ok: false,
       status: 'blocked',
@@ -559,7 +559,7 @@ describe('App branch coverage', () => {
   it('covers boundary dialog callbacks plus identity pending guards without header commit actions', async () => {
     const identityRequest = deferred<Awaited<ReturnType<typeof api.updateGitIdentity>>>()
     vi.mocked(api.updateGitIdentity).mockReturnValue(identityRequest.promise)
-    vi.mocked(api.showParentPicker).mockResolvedValueOnce({ ok: false, error: '', message: '' })
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({ ok: false, error: '', message: '' })
 
     renderApp()
 
