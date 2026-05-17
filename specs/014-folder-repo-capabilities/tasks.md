@@ -12,14 +12,15 @@
 - **[P]**: Can run in parallel because it touches different files and does not depend on incomplete tasks in the same phase
 - **[Story]**: User story label for traceability: [US1], [US2], [US3]
 - Every task includes exact file paths
+- Command-only and manual validation tasks may name the command or validation artifact instead of a source file path.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Confirm current interfaces and test surfaces before changing behavior.
 
-- [X] T001 Inspect current active repo/folder routing and file handlers in `src/server.ts`, `src/handlers/files.ts`, `src/git/repo.ts`, and `src/git/tree.ts`
+- [X] T001 Inspect current active repo/folder routing and file handlers in `src/server.ts`, `src/handlers/file.ts`, `src/handlers/folder.ts`, `src/handlers/repo.ts`, `src/git/repo.ts`, and `src/git/tree.ts`
 - [X] T002 [P] Inspect current repository context and identity UI flows in `ui/src/App.tsx`, `ui/src/components/RepoContext/RepoContextHeader.tsx`, and `ui/src/components/AppDialogs.tsx`
-- [X] T003 [P] Inspect existing server and UI test helper patterns in `tests/unit/handlers/files.test.ts`, `tests/integration/server.test.ts`, `ui/src/components/RepoContext/RepoContextHeader.test.tsx`, and `ui/src/App.test.tsx`
+- [X] T003 [P] Inspect existing server and UI test helper patterns in `tests/unit/handlers/file.test.ts`, `tests/unit/handlers/folder.test.ts`, `tests/unit/handlers/repo.test.ts`, `tests/integration/server.test.ts`, `ui/src/components/RepoContext/RepoContextHeader.test.tsx`, and `ui/src/App.test.tsx`
 
 ---
 
@@ -49,9 +50,9 @@
 
 ### Tests for User Story 1
 
-- [X] T011 [P] [US1] Add handler tests for `GET /api/info` regular-folder metadata in `tests/unit/handlers/git.test.ts`
-- [X] T012 [P] [US1] Add handler tests for regular-folder `GET /api/tree` and `GET /api/file` in `tests/unit/handlers/files.test.ts`
-- [X] T013 [P] [US1] Add handler tests for regular-folder `POST /api/file`, `PUT /api/file`, and `DELETE /api/file` in `tests/unit/handlers/files.test.ts`
+- [X] T011 [P] [US1] Add handler tests for `GET /api/info` regular-folder metadata in `tests/unit/handlers/repo.test.ts`
+- [X] T012 [P] [US1] Add handler tests for regular-folder `GET /api/tree` and `GET /api/file` in `tests/unit/handlers/file.test.ts`
+- [X] T013 [P] [US1] Add handler tests for regular-folder `POST /api/file`, `PUT /api/file`, and `DELETE /api/file` in `tests/unit/handlers/file.test.ts`
 - [X] T014 [P] [US1] Add integration coverage for opening and mutating a non-git folder in `tests/integration/server.test.ts`
 - [X] T015 [P] [US1] Add UI API client coverage for regular-folder file operations in `ui/src/services/api.ts` and existing UI API tests if present
 - [X] T016 [P] [US1] Add component coverage for browsing regular-folder entries in `ui/src/components/FileTree/FileTree.test.tsx`
@@ -61,16 +62,21 @@
 ### Implementation for User Story 1
 
 - [X] T019 [US1] Update active path initialization so valid non-git folders become the active browsable root in `src/server.ts`
-- [X] T020 [US1] Update `infoHandler` to return regular-folder metadata, root entry count, and null git context in `src/handlers/git.ts`
-- [X] T021 [US1] Update `treeHandler` to list regular-folder entries when no git repo is active in `src/handlers/files.ts`
-- [X] T022 [US1] Update `fileHandler` to read regular-folder file contents, detect type, set editability, and return revision tokens in `src/handlers/files.ts`
-- [X] T023 [US1] Update `createFileHandler`, `updateFileHandler`, and `deleteFileHandler` to mutate regular-folder files through root-safe helpers in `src/handlers/files.ts`
-- [X] T024 [US1] Update file operation error messages for missing paths, duplicate paths, path escape attempts, unsupported files, and permission failures in `src/handlers/files.ts`
+- [X] T020 [US1] Update `infoHandler` to return regular-folder metadata, root entry count, and null git context in `src/handlers/repo.ts`
+- [X] T021 [US1] Update `treeHandler` to list regular-folder entries when no git repo is active in `src/handlers/file.ts`
+- [X] T022 [US1] Update `fileHandler` to read regular-folder file contents, detect type, set editability, and return revision tokens in `src/handlers/file.ts`
+- [X] T023 [US1] Update `createFileHandler`, `updateFileHandler`, and `deleteFileHandler` to mutate regular-folder files through root-safe helpers in `src/handlers/file.ts`
+- [X] T024 [US1] Update file operation error messages for missing paths, duplicate paths, path escape attempts, unsupported files, and permission failures in `src/handlers/file.ts`
 - [X] T025 [US1] Update UI startup and state handling so non-git folders load the tree and content panels instead of staying in picker-only behavior in `ui/src/App.tsx`
 - [X] T026 [US1] Update file tree rendering for regular-folder entries without git sync labels in `ui/src/components/FileTree/FileTree.tsx` and `ui/src/components/FileTree/FileTreeNode.tsx`
 - [X] T027 [US1] Update content panel create/edit/delete controls to remain available for editable files in regular folders in `ui/src/components/ContentPanel/ContentPanel.tsx`
 - [X] T028 [US1] Update regular-folder empty state and binary/unsupported file messaging in `ui/src/components/ContentPanel/ContentPanel.tsx`
 - [X] T029 [US1] Run the User Story 1 quickstart checks from `specs/014-folder-repo-capabilities/quickstart.md`
+- [X] T029a [P] [US1] Add picker browse tests for listing files and folders, one Open action, and file-open rejection behavior in `tests/unit/handlers/folder.test.ts` and `ui/src/components/Picker/PickerPage.test.tsx`
+- [X] T029b [US1] Update folder picker responses to include file/folder entry type and folder-only open eligibility in `src/handlers/folder.ts`, `src/types.ts`, and `ui/src/types/index.ts`
+- [X] T029c [US1] Update the folder picker to remove separate browse/open actions and use one primary Open button in `ui/src/components/Picker/PickerPage.tsx`
+- [X] T029d [US1] Align the folder picker's left navigation panel with the main viewer tree organization in `ui/src/components/Picker/PickerPage.tsx` and `ui/src/styles/globals.css`
+- [X] T029e [US1] Add visible outcomes for the scoped failure matrix from SC-006 in `tests/unit/handlers/file.test.ts`, `tests/unit/handlers/repo.test.ts`, `ui/src/components/ContentPanel/ContentPanel.test.tsx`, and `ui/src/App.test.tsx`
 
 **Checkpoint**: User Story 1 is functional and testable as the MVP.
 
@@ -109,7 +115,7 @@
 ### Tests for User Story 3
 
 - [X] T038 [P] [US3] Add git identity unit tests for reading, setting, changing, and clearing repository SSH key path in `tests/unit/git/repo.test.ts`
-- [X] T039 [P] [US3] Add handler tests for `PUT /api/git/identity` with `sshKeyPath` in `tests/unit/handlers/git.test.ts`
+- [X] T039 [P] [US3] Add handler tests for `PUT /api/git/identity` with `sshKeyPath` in `tests/unit/handlers/repo.test.ts`
 - [X] T040 [P] [US3] Update repository context tests to assert commit and remote sync actions are absent in `ui/src/components/RepoContext/RepoContextHeader.test.tsx`
 - [X] T041 [P] [US3] Update identity dialog tests for SSH key path view, edit, save, and clear flows in `ui/src/components/AppDialogs.tsx` and existing dialog/app tests
 
@@ -117,7 +123,7 @@
 
 - [X] T042 [US3] Add `sshKeyPath` to git identity request and response contracts in `src/types.ts`
 - [X] T043 [US3] Add repository-local SSH key path read/write/clear behavior to git identity helpers in `src/git/repo.ts`
-- [X] T044 [US3] Update `gitIdentityUpdateHandler` to accept and persist `sshKeyPath` without corrupting name or email in `src/handlers/git.ts`
+- [X] T044 [US3] Update `gitIdentityUpdateHandler` to accept and persist `sshKeyPath` without corrupting name or email in `src/handlers/repo.ts`
 - [X] T045 [US3] Mirror `sshKeyPath` identity contracts and API payloads in `ui/src/types/index.ts` and `ui/src/services/api.ts`
 - [X] T046 [US3] Add SSH key path field, empty state, validation feedback, and save/clear behavior to the identity dialog in `ui/src/components/AppDialogs.tsx`
 - [X] T047 [US3] Pass current SSH key path into the identity dialog and update local info state after save in `ui/src/App.tsx`
@@ -139,6 +145,8 @@
 - [X] T054 Run `npm run lint` and fix TypeScript errors in changed files
 - [X] T055 Run `npm run build` and fix build failures in server or UI bundles
 - [X] T056 Perform a final manual pass through `specs/014-folder-repo-capabilities/quickstart.md`
+- [X] T057 [P] Review README and changelog after picker/navigation refinements in `README.md` and `CHANGELOG.md`
+- [X] T058 Run dependency vulnerability checks with `npm audit` at the repository root and `npm --prefix ui audit`, then apply compatible package upgrades if vulnerabilities are found
 
 ---
 
@@ -181,8 +189,8 @@
 ## Parallel Example: User Story 1
 
 ```text
-Task: "T011 [US1] Add handler tests for GET /api/info regular-folder metadata in tests/unit/handlers/git.test.ts"
-Task: "T012 [US1] Add handler tests for regular-folder GET /api/tree and GET /api/file in tests/unit/handlers/files.test.ts"
+Task: "T011 [US1] Add handler tests for GET /api/info regular-folder metadata in tests/unit/handlers/repo.test.ts"
+Task: "T012 [US1] Add handler tests for regular-folder GET /api/tree and GET /api/file in tests/unit/handlers/file.test.ts"
 Task: "T014 [US1] Add integration coverage for opening and mutating a non-git folder in tests/integration/server.test.ts"
 Task: "T016 [US1] Add component coverage for browsing regular-folder entries in ui/src/components/FileTree/FileTree.test.tsx"
 ```
@@ -198,7 +206,7 @@ Task: "T032 [US2] Add or update remote context selection tests in tests/unit/git
 
 ```text
 Task: "T038 [US3] Add git identity unit tests for reading, setting, changing, and clearing repository SSH key path in tests/unit/git/repo.test.ts"
-Task: "T039 [US3] Add handler tests for PUT /api/git/identity with sshKeyPath in tests/unit/handlers/git.test.ts"
+Task: "T039 [US3] Add handler tests for PUT /api/git/identity with sshKeyPath in tests/unit/handlers/repo.test.ts"
 Task: "T041 [US3] Update identity dialog tests for SSH key path view, edit, save, and clear flows in ui/src/components/AppDialogs.tsx and existing dialog/app tests"
 ```
 

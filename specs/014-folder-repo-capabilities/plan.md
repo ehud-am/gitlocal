@@ -56,8 +56,9 @@ src/
 │   ├── repo.ts           # repository metadata, git identity, remote context, path-safe local operations
 │   └── tree.ts           # tree listing for git and regular local folders
 ├── handlers/
-│   ├── files.ts          # tree/file/create/update/delete handlers for active local root
-│   ├── git.ts            # repo info and git identity handlers
+│   ├── file.ts           # tree/file/create/update/delete handlers for active local root
+│   ├── folder.ts         # folder picker and folder mutation handlers
+│   ├── repo.ts           # repo/folder info, open-root, and git identity handlers
 │   └── sync.ts           # retained sync-state support for file status where applicable
 ├── server.ts             # active repo/folder routing state and API route wiring
 └── types.ts              # shared server contracts

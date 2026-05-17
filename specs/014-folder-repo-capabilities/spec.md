@@ -67,6 +67,8 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 - A git repository has no remote configured.
 - A git repository has multiple remotes configured.
 - A git repository has no SSH key path configured yet, or the configured path does not exist.
+- The folder picker is opened on an empty folder, a folder containing only files, or a folder containing both plain folders and git repositories.
+- A user selects a file in the folder picker and then attempts to open it as the active root.
 
 ## Requirements *(mandatory)*
 
@@ -87,11 +89,15 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 - **FR-013**: Users MUST be able to edit and save the SSH key path shown in git identity details.
 - **FR-014**: When no remote repository or SSH key path is available, the system MUST show a clear empty state rather than misleading or stale values.
 - **FR-015**: Changes to regular-folder files and git identity SSH key path MUST be visible after refresh or after leaving and returning to the affected folder or repository.
+- **FR-016**: The folder picker MUST list both files and folders for the current folder, while only folders are eligible to be opened as the active GitLocal root.
+- **FR-017**: The folder picker MUST use a single primary "Open" action for the selected folder path; it MUST NOT present separate "browse selected folder" and "open repository" actions.
+- **FR-018**: The folder picker's left navigation panel MUST match the main viewer's folder-tree organization, including the same collapse/expand rail pattern, folder/file row treatment, and compact local or git repository badges.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Regular Folder**: A selected local folder that is not part of a git repository; includes a display name, absolute path, nested file and folder entries, and operation eligibility.
 - **File Entry**: A file or folder within a regular folder; includes name, relative path, type, size or readability status when available, and last-known operation state.
+- **Folder Picker Entry**: A filesystem entry shown while choosing what GitLocal should open; includes name, absolute path, type, whether the entry is a git repository, and whether it can be opened as a root.
 - **Git Repository Summary**: The compact and expanded presentation of a local git repository; includes local path, current branch in the compact row, remote repository in the expanded view, and available actions.
 - **Git Identity**: Repository identity information; includes user-facing identity fields and the editable SSH key path.
 
@@ -101,10 +107,11 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 
 - **SC-001**: A user can open a non-git folder and locate a known file in under 30 seconds for folders containing up to 500 visible entries.
 - **SC-002**: A user can create, edit, and delete a text file in a non-git folder in under 2 minutes without leaving the app.
-- **SC-003**: In usability review, at least 90% of users correctly identify the local repository and remote repository relationship from the first expanded git repository view.
-- **SC-004**: In usability review, at least 90% of users report that the expanded git repository view contains no redundant branch or upstream sync information.
+- **SC-003**: In manual review, the first expanded git repository view shows the local repository and remote repository relationship in one visible row without requiring scrolling or a second panel.
+- **SC-004**: In manual review, the expanded git repository view contains no repeated current branch field and no "Upstream sync" field.
 - **SC-005**: A user can view and update a repository SSH key path in under 60 seconds from the git identity area.
-- **SC-006**: 100% of unavailable or failed file and identity operations produce a visible, user-readable outcome explaining what happened.
+- **SC-006**: Each specified failure class for file and identity operations produces a visible, user-readable outcome explaining what happened: missing path, duplicate path, path escape attempt, unsupported or binary file editing attempt, stale revision token, permission failure, missing git identity fields, and failed SSH key path persistence.
+- **SC-007**: In the folder picker, a user can distinguish folders, files, and git repositories from the left navigation panel without opening a row.
 
 ## Assumptions
 
