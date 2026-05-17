@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { axe } from 'jest-axe'
@@ -66,8 +66,8 @@ describe('PickerPage', () => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalled()
     })
 
-    expect(screen.getByText('projects')).toBeInTheDocument()
-    expect(screen.getByText('gitlocal')).toBeInTheDocument()
+    expect(screen.getAllByText('projects').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('gitlocal').length).toBeGreaterThan(0)
   })
 
   it('selects a folder when clicked', async () => {
@@ -124,38 +124,40 @@ describe('PickerPage', () => {
     expect(vi.mocked(api.openRepository)).not.toHaveBeenCalled()
   })
 
-  it('uses quick-access navigation buttons', async () => {
+  it('uses the sidebar tree to select and browse folders', async () => {
     render(<PickerPage />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Home' }))
+    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    const projectsItem = within(tree).getByText('projects').closest('[role="treeitem"]')
+    expect(projectsItem).not.toBeNull()
+    fireEvent.click(projectsItem as HTMLElement)
 
+    expect(screen.getByRole('textbox', { name: /folder path/i })).toHaveValue('/Users/example/projects')
+
+    fireEvent.doubleClick(projectsItem as HTMLElement)
     await waitFor(() => {
-      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example')
+      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/projects')
     })
 
-    fireEvent.click(screen.getByRole('button', { name: '/' }))
-
-    await waitFor(() => {
-      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/')
-    })
-
-    fireEvent.doubleClick(screen.getByRole('button', { name: /open parent folder/i }))
+    const parentItem = within(tree).getByText('..').closest('[role="treeitem"]')
+    expect(parentItem).not.toBeNull()
+    fireEvent.doubleClick(parentItem as HTMLElement)
 
     await waitFor(() => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users')
     })
   })
 
-  it('collapses and restores quick access with the same rail pattern as the viewer', async () => {
+  it('collapses and restores navigation with the same rail pattern as the viewer', async () => {
     render(<PickerPage />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /collapse quick access/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
 
-    expect(await screen.findByLabelText(/collapsed quick access/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/collapsed navigation/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /expand quick access/i }))
+    fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
 
-    expect(await screen.findByRole('button', { name: /collapse quick access/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
   })
 
   it('opens the typed path from the single open action', async () => {
@@ -188,7 +190,7 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    expect(await screen.findByText(/this folder is empty/i)).toBeInTheDocument()
+    expect((await screen.findAllByText(/this folder is empty/i)).length).toBeGreaterThan(0)
   })
 
   it('shows inline error without API call when path is empty', async () => {

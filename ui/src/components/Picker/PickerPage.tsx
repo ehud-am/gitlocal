@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
-import type { FolderBrowseEntry, FolderBrowseRoot } from '../../types'
+import type { FolderBrowseEntry } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { MetaTag } from '../ui/meta-tag'
 
 function KebabIcon() {
   return (
@@ -25,6 +26,30 @@ function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   )
 }
 
+function FolderIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M1.75 2.5h4.5l1 1.5H14.25c.966 0 1.75.784 1.75 1.75v7A1.75 1.75 0 0 1 14.25 14.5H1.75A1.75 1.75 0 0 1 0 12.75v-8.5C0 3.284.784 2.5 1.75 2.5z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function FileIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 1.75A1.75 1.75 0 0 1 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25V1.75z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export default function PickerPage() {
   const [path, setPath] = useState('')
   const [error, setError] = useState('')
@@ -33,9 +58,7 @@ export default function PickerPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentPath, setCurrentPath] = useState('')
   const [parentPath, setParentPath] = useState<string | null>(null)
-  const [homePath, setHomePath] = useState('')
   const [entries, setEntries] = useState<FolderBrowseEntry[]>([])
-  const [roots, setRoots] = useState<FolderBrowseRoot[]>([])
   const [canOpen, setCanOpen] = useState(false)
   const [canCreateChild, setCanCreateChild] = useState(false)
   const [canInitGit, setCanInitGit] = useState(false)
@@ -51,9 +74,7 @@ export default function PickerPage() {
       const result = await api.getFolderBrowse(nextPath)
       setCurrentPath(result.currentPath)
       setParentPath(result.parentPath)
-      setHomePath(result.homePath)
       setEntries(result.entries)
-      setRoots(result.roots)
       setPath(result.currentPath)
       setCanOpen(Boolean(result.canOpen))
       setCanCreateChild(Boolean(result.canCreateChild))
@@ -195,13 +216,13 @@ export default function PickerPage() {
       </header>
       <div className="picker-layout">
         {sidebarCollapsed ? (
-          <aside className="sidebar-rail picker-sidebar-rail" aria-label="collapsed quick access">
+          <aside className="sidebar-rail picker-sidebar-rail" aria-label="collapsed navigation">
             <div className="sidebar-rail-toolbar">
               <button
                 type="button"
                 className="panel-icon-button sidebar-toggle-button"
-                aria-label="Expand quick access"
-                title="Expand quick access"
+                aria-label="Expand navigation"
+                title="Expand navigation"
                 onClick={() => setSidebarCollapsed(false)}
               >
                 <PanelToggleIcon collapsed />
@@ -214,28 +235,55 @@ export default function PickerPage() {
               <button
                 type="button"
                 className="panel-icon-button sidebar-toggle-button"
-                aria-label="Collapse quick access"
-                title="Collapse quick access"
+                aria-label="Collapse navigation"
+                title="Collapse navigation"
                 onClick={() => setSidebarCollapsed(true)}
               >
                 <PanelToggleIcon collapsed={false} />
               </button>
             </div>
-            <div className="picker-sidebar-section">
-              <p className="picker-sidebar-label">Quick access</p>
-              <button type="button" className="picker-nav-button" onClick={() => loadPath(homePath)}>
-                Home
-              </button>
-              {roots.map((root) => (
-                <button
-                  key={root.path}
-                  type="button"
-                  className="picker-nav-button"
-                  onClick={() => loadPath(root.path)}
-                >
-                  {root.name}
-                </button>
-              ))}
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">
+              <div className="file-tree picker-file-tree" role="tree" aria-label="folder contents navigation">
+                {browseLoading ? (
+                  <div className="file-tree-skeleton border-0 bg-transparent" aria-label="loading">
+                    {[70, 90, 65, 80, 55].map((width, index) => (
+                      <div key={index} className="skeleton-row" style={{ width: `${width}%` }} />
+                    ))}
+                  </div>
+                ) : rows.length === 0 ? (
+                  <p className="picker-helper px-3 py-2">This folder is empty.</p>
+                ) : (
+                  rows.map((entry) => (
+                    <div
+                      key={`sidebar:${entry.isParent ? 'parent:' : ''}${entry.path}`}
+                      className={`file-tree-node${path === entry.path ? ' selected' : ''}`}
+                      style={{ paddingLeft: '8px' }}
+                      role="treeitem"
+                      aria-expanded={entry.type === 'dir' ? false : undefined}
+                      aria-selected={path === entry.path}
+                      onClick={() => setPath(entry.path)}
+                      onDoubleClick={() => {
+                        if (entry.type === 'dir') {
+                          void loadPath(entry.path)
+                        }
+                      }}
+                    >
+                      {entry.type === 'dir' ? (
+                        <span className="text-[var(--muted-foreground)]">
+                          <ChevronIcon />
+                        </span>
+                      ) : null}
+                      <span className={entry.type === 'dir' ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}>
+                        {entry.type === 'dir' ? <FolderIcon /> : <FileIcon />}
+                      </span>
+                      <div className="file-tree-node-label">
+                        <span className="file-tree-node-name" title={entry.name}>{entry.name}</span>
+                        {entry.isParent ? null : <MetaTag label={entry.isGitRepo ? 'git' : 'local'} icon={entry.isGitRepo ? 'git' : 'local-only'} tone="neutral" compact />}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </aside>
         )}
