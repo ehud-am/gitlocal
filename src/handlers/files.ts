@@ -8,16 +8,21 @@ import {
   deleteWorkingTreeFolder,
   detectFileType,
   getEditableState,
+  getLocalEditableState,
+  getLocalPathType,
   getCurrentBranch,
   getFileRevisionToken,
   getRepoParentPath,
   getPathType,
   isWorkingTreeBranch,
   normalizeRepoRelativePath,
+  readLocalRootFile,
   readWorkingTreeFile,
+  writeLocalRootTextFile,
   writeWorkingTreeTextFile,
+  deleteLocalRootFile,
 } from '../git/repo.js'
-import { listDir, listWorkingTreeDir } from '../git/tree.js'
+import { listDir, listLocalDir, listWorkingTreeDir } from '../git/tree.js'
 import type {
   FileContent,
   FolderCreateRequest,
@@ -29,7 +34,16 @@ import type {
   ManualFileOperationResult,
 } from '../types.js'
 
-type Variables = { repoPath: string }
+type Variables = { repoPath: string; folderPath: string }
+
+function getActiveRoot(c: Context<{ Variables: Variables }>): { rootPath: string; isGitRepo: boolean } {
+  const repoPath = c.get('repoPath')
+  const folderPath = c.get('folderPath')
+  return {
+    rootPath: repoPath || folderPath || '',
+    isGitRepo: Boolean(repoPath),
+  }
+}
 
 function mutationBlocked(operation: 'create' | 'update' | 'delete', path: string, message: string, status: number): Response {
   const body: ManualFileOperationResult = {
@@ -85,18 +99,21 @@ function parsePath(payload: ManualFileMutationRequest): string {
 }
 
 export async function treeHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json([])
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json([])
   const path = c.req.query('path') ?? ''
   const branch = c.req.query('branch') ?? 'HEAD'
-  const nodes = isWorkingTreeBranch(repoPath, branch) ? listWorkingTreeDir(repoPath, path) : listDir(repoPath, branch, path)
-  const responseNodes = isWorkingTreeBranch(repoPath, branch) ? applyFileSyncStates(repoPath, nodes) : nodes
+  if (!isGitRepo) {
+    return c.json(listLocalDir(rootPath, path))
+  }
+  const nodes = isWorkingTreeBranch(rootPath, branch) ? listWorkingTreeDir(rootPath, path) : listDir(rootPath, branch, path)
+  const responseNodes = isWorkingTreeBranch(rootPath, branch) ? applyFileSyncStates(rootPath, nodes) : nodes
   return c.json(responseNodes)
 }
 
 export async function fileHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
   const path = c.req.query('path') ?? ''
   const branch = c.req.query('branch') ?? 'HEAD'
@@ -105,15 +122,21 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
 
   const { type, language } = detectFileType(path)
 
-  if (isWorkingTreeBranch(repoPath, branch) && getPathType(repoPath, path) !== 'file') {
+  if (isGitRepo && isWorkingTreeBranch(rootPath, branch) && getPathType(rootPath, path) !== 'file') {
     return c.json({ error: 'File not found' }, 404)
   }
 
-  const rawBytes = isWorkingTreeBranch(repoPath, branch)
-    ? readWorkingTreeFile(repoPath, path)
+  if (!isGitRepo && getLocalPathType(rootPath, path) !== 'file') {
+    return c.json({ error: 'File not found' }, 404)
+  }
+
+  const rawBytes = !isGitRepo
+    ? readLocalRootFile(rootPath, path)
+    : isWorkingTreeBranch(rootPath, branch)
+    ? readWorkingTreeFile(rootPath, path)
     : (() => {
         const result = spawnSync('git', ['cat-file', 'blob', `${branch}:${path}`], {
-          cwd: repoPath,
+          cwd: rootPath,
           encoding: 'buffer',
         })
         if (result.status !== 0) {
@@ -126,7 +149,7 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json({ error: 'File not found' }, 404)
   }
 
-  const editableState = getEditableState(repoPath, path, branch)
+  const editableState = isGitRepo ? getEditableState(rootPath, path, branch) : getLocalEditableState(rootPath, path)
 
   if (type === 'image') {
     const response: FileContent = {
@@ -167,31 +190,36 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
 }
 
 export async function createFileHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  const branch = getCurrentBranch(repoPath)
+  const branch = isGitRepo ? getCurrentBranch(rootPath) : ''
   /* v8 ignore next 3 -- create requests always target the current working tree */
-  if (!isWorkingTreeBranch(repoPath, branch)) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, branch)) {
     return mutationBlocked('create', '', 'File creation is only available on the current working tree.', 409)
   }
 
   const payload = (await c.req.json().catch(() => ({}))) as ManualFileMutationRequest
   const path = parsePath(payload)
   if (!path) {
-    return mutationBlocked('create', path, 'A repository-relative file path is required.', 400)
+    return mutationBlocked('create', path, isGitRepo ? 'A repository-relative file path is required.' : 'A folder-relative file path is required.', 400)
   }
 
   if (payload.content !== undefined && typeof payload.content !== 'string') {
     return mutationBlocked('create', path, 'File content must be text.', 400)
   }
 
-  if (getPathType(repoPath, path) !== 'missing') {
-    return mutationBlocked('create', path, 'That path already exists in the repository.', 409)
+  const pathType = isGitRepo ? getPathType(rootPath, path) : getLocalPathType(rootPath, path)
+  if (pathType !== 'missing') {
+    return mutationBlocked('create', path, isGitRepo ? 'That path already exists in the repository.' : 'That path already exists in the folder.', 409)
   }
 
   try {
-    writeWorkingTreeTextFile(repoPath, path, payload.content ?? '')
+    if (isGitRepo) {
+      writeWorkingTreeTextFile(rootPath, path, payload.content ?? '')
+    } else {
+      writeLocalRootTextFile(rootPath, path, payload.content ?? '')
+    }
     const result: ManualFileOperationResult = {
       ok: true,
       operation: 'create',
@@ -206,12 +234,12 @@ export async function createFileHandler(c: Context<{ Variables: Variables }>): P
 }
 
 export async function createFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  const branch = getCurrentBranch(repoPath)
+  const branch = isGitRepo ? getCurrentBranch(rootPath) : ''
   /* v8 ignore next 3 -- folder creation always targets the current working tree */
-  if (!isWorkingTreeBranch(repoPath, branch)) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, branch)) {
     return folderMutationBlocked('create-folder', '', 'Folder creation is only available on the current working tree.', 409)
   }
 
@@ -219,7 +247,7 @@ export async function createFolderHandler(c: Context<{ Variables: Variables }>):
   const parentPath = normalizeRepoRelativePath(payload.parentPath ?? '')
 
   try {
-    const path = createWorkingTreeFolder(repoPath, parentPath, payload.name ?? '')
+    const path = createWorkingTreeFolder(rootPath, parentPath, payload.name ?? '')
     const result: FolderOperationResult = {
       ok: true,
       operation: 'create-folder',
@@ -244,16 +272,16 @@ export async function createFolderHandler(c: Context<{ Variables: Variables }>):
 }
 
 export async function folderDeletePreviewHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  if (!isWorkingTreeBranch(repoPath, c.req.query('branch') ?? getCurrentBranch(repoPath))) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, c.req.query('branch') ?? getCurrentBranch(rootPath))) {
     return folderMutationBlocked('preview-delete-folder', '', 'Folder deletion is only available on the current working tree.', 409)
   }
 
   const path = normalizeRepoRelativePath(c.req.query('path') ?? '')
   try {
-    const impact = countWorkingTreeFolderImpact(repoPath, path)
+    const impact = countWorkingTreeFolderImpact(rootPath, path)
     const result: FolderOperationResult = {
       ok: true,
       operation: 'preview-delete-folder',
@@ -274,13 +302,13 @@ export async function folderDeletePreviewHandler(c: Context<{ Variables: Variabl
 }
 
 export async function updateFileHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
   const payload = (await c.req.json().catch(() => ({}))) as ManualFileMutationRequest
   const path = parsePath(payload)
   if (!path) {
-    return mutationBlocked('update', path, 'A repository-relative file path is required.', 400)
+    return mutationBlocked('update', path, isGitRepo ? 'A repository-relative file path is required.' : 'A folder-relative file path is required.', 400)
   }
 
   if (typeof payload.content !== 'string') {
@@ -291,11 +319,12 @@ export async function updateFileHandler(c: Context<{ Variables: Variables }>): P
     return mutationBlocked('update', path, 'A file revision token is required to save changes.', 409)
   }
 
-  if (!isWorkingTreeBranch(repoPath, c.req.query('branch') ?? getCurrentBranch(repoPath))) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, c.req.query('branch') ?? getCurrentBranch(rootPath))) {
     return mutationBlocked('update', path, 'File updates are only available on the current working tree.', 409)
   }
 
-  if (getPathType(repoPath, path) !== 'file') {
+  const pathType = isGitRepo ? getPathType(rootPath, path) : getLocalPathType(rootPath, path)
+  if (pathType !== 'file') {
     return mutationBlocked('update', path, 'The selected file is no longer available.', 404)
   }
 
@@ -304,12 +333,20 @@ export async function updateFileHandler(c: Context<{ Variables: Variables }>): P
     return mutationBlocked('update', path, 'Only text files can be edited inline.', 400)
   }
 
-  const currentToken = getFileRevisionToken(repoPath, path)
+  const currentToken = getFileRevisionToken(rootPath, path)
   if (!currentToken || currentToken !== payload.revisionToken) {
     return mutationBlocked('update', path, 'The file changed on disk before your save completed.', 409)
   }
 
-  writeWorkingTreeTextFile(repoPath, path, payload.content)
+  try {
+    if (isGitRepo) {
+      writeWorkingTreeTextFile(rootPath, path, payload.content)
+    } else {
+      writeLocalRootTextFile(rootPath, path, payload.content)
+    }
+  } catch (error) {
+    return mutationBlocked('update', path, error instanceof Error ? error.message : 'Failed to update the file.', 400)
+  }
   const result: ManualFileOperationResult = {
     ok: true,
     operation: 'update',
@@ -321,34 +358,39 @@ export async function updateFileHandler(c: Context<{ Variables: Variables }>): P
 }
 
 export async function deleteFileHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
   const payload = (await c.req.json().catch(() => ({}))) as ManualFileMutationRequest
   const path = parsePath(payload)
   if (!path) {
-    return mutationBlocked('delete', path, 'A repository-relative file path is required.', 400)
+    return mutationBlocked('delete', path, isGitRepo ? 'A repository-relative file path is required.' : 'A folder-relative file path is required.', 400)
   }
 
   if (!payload.revisionToken) {
     return mutationBlocked('delete', path, 'A file revision token is required to delete a file.', 409)
   }
 
-  if (!isWorkingTreeBranch(repoPath, c.req.query('branch') ?? getCurrentBranch(repoPath))) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, c.req.query('branch') ?? getCurrentBranch(rootPath))) {
     return mutationBlocked('delete', path, 'File deletion is only available on the current working tree.', 409)
   }
 
-  if (getPathType(repoPath, path) !== 'file') {
+  const pathType = isGitRepo ? getPathType(rootPath, path) : getLocalPathType(rootPath, path)
+  if (pathType !== 'file') {
     return mutationBlocked('delete', path, 'The selected file is no longer available.', 404)
   }
 
-  const currentToken = getFileRevisionToken(repoPath, path)
+  const currentToken = getFileRevisionToken(rootPath, path)
   if (!currentToken || currentToken !== payload.revisionToken) {
     return mutationBlocked('delete', path, 'The file changed on disk before your delete completed.', 409)
   }
 
   try {
-    deleteWorkingTreeFile(repoPath, path)
+    if (isGitRepo) {
+      deleteWorkingTreeFile(rootPath, path)
+    } else {
+      deleteLocalRootFile(rootPath, path)
+    }
     const result: ManualFileOperationResult = {
       ok: true,
       operation: 'delete',
@@ -364,10 +406,10 @@ export async function deleteFileHandler(c: Context<{ Variables: Variables }>): P
 }
 
 export async function deleteFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) return c.json({ error: 'No repository loaded' }, 400)
+  const { rootPath, isGitRepo } = getActiveRoot(c)
+  if (!rootPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  if (!isWorkingTreeBranch(repoPath, c.req.query('branch') ?? getCurrentBranch(repoPath))) {
+  if (isGitRepo && !isWorkingTreeBranch(rootPath, c.req.query('branch') ?? getCurrentBranch(rootPath))) {
     return folderMutationBlocked('delete-folder', '', 'Folder deletion is only available on the current working tree.', 409)
   }
 
@@ -386,7 +428,7 @@ export async function deleteFolderHandler(c: Context<{ Variables: Variables }>):
   }
 
   try {
-    const previewImpact = countWorkingTreeFolderImpact(repoPath, path)
+    const previewImpact = countWorkingTreeFolderImpact(rootPath, path)
     if (
       !hasDeletePreviewImpact(payload)
       || payload.previewFileCount !== previewImpact.fileCount
@@ -402,7 +444,7 @@ export async function deleteFolderHandler(c: Context<{ Variables: Variables }>):
       )
     }
 
-    const impact = deleteWorkingTreeFolder(repoPath, path)
+    const impact = deleteWorkingTreeFolder(rootPath, path)
     const result: FolderOperationResult = {
       ok: true,
       operation: 'delete-folder',

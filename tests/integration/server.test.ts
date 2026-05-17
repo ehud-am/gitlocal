@@ -217,17 +217,53 @@ describe('Server integration', () => {
     expect(Array.isArray(body.entries)).toBe(true)
   })
 
-  it('GET /api/info enters picker mode when launched with a non-git folder', async () => {
+  it('GET /api/info opens a non-git folder as a browsable local folder', async () => {
     const nonGitDir = mkdtempSync(join(tmpdir(), 'gitlocal-non-git-'))
     try {
       const app = createApp(nonGitDir)
       const res = await app.fetch(new Request('http://localhost/api/info'))
       expect(res.status).toBe(200)
-      const body = await res.json() as { pickerMode: boolean; path: string; isGitRepo: boolean; version: string }
-      expect(body.pickerMode).toBe(true)
+      const body = await res.json() as { pickerMode: boolean; path: string; isGitRepo: boolean; version: string; rootEntryCount: number }
+      expect(body.pickerMode).toBe(false)
       expect(body.isGitRepo).toBe(false)
       expect(body.path).toBe(nonGitDir)
+      expect(body.rootEntryCount).toBe(0)
       expect(body.version).toBe(APP_VERSION.version)
+    } finally {
+      rmSync(nonGitDir, { recursive: true, force: true })
+    }
+  })
+
+  it('supports browsing and mutating files in a non-git folder', async () => {
+    const nonGitDir = mkdtempSync(join(tmpdir(), 'gitlocal-non-git-files-'))
+    try {
+      writeFileSync(join(nonGitDir, 'README.md'), '# Local')
+      const app = createApp(nonGitDir)
+
+      const treeRes = await app.fetch(new Request('http://localhost/api/tree'))
+      expect(treeRes.status).toBe(200)
+      const treeBody = await treeRes.json() as Array<{ name: string; localOnly: boolean }>
+      expect(treeBody).toContainEqual(expect.objectContaining({ name: 'README.md', localOnly: true }))
+
+      const readRes = await app.fetch(new Request('http://localhost/api/file?path=README.md'))
+      expect(readRes.status).toBe(200)
+      const readBody = await readRes.json() as { content: string; revisionToken: string }
+      expect(readBody.content).toBe('# Local')
+
+      const updateRes = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'README.md', content: '# Updated Local', revisionToken: readBody.revisionToken }),
+      }))
+      expect(updateRes.status).toBe(200)
+
+      const createRes = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'new.md', content: 'new' }),
+      }))
+      expect(createRes.status).toBe(201)
+      expect(existsSync(join(nonGitDir, 'new.md'))).toBe(true)
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }

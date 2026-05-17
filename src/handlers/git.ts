@@ -12,11 +12,15 @@ import {
 } from '../git/repo.js'
 import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest } from '../types.js'
 
-type Variables = { repoPath: string; pickerPath: string }
+type Variables = { repoPath: string; pickerPath: string; folderPath: string }
 
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   const pickerPath = c.get('pickerPath')
+  const folderPath = c.get('folderPath')
+  if (folderPath) {
+    return c.json(getInfo(folderPath))
+  }
   if (pickerPath) {
     return c.json({
       name: '',
@@ -116,7 +120,7 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
   }
 
   try {
-    const result = setRepoGitIdentity(repoPath, payload.name, payload.email)
+    const result = setRepoGitIdentity(repoPath, payload.name, payload.email, payload.sshKeyPath)
     return c.json(result)
   } catch (error) {
     return c.json({

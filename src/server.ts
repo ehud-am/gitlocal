@@ -33,19 +33,29 @@ import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import { validateRepo } from './git/repo.js'
 
-type AppVariables = { repoPath: string; pickerPath: string }
+type AppVariables = { repoPath: string; pickerPath: string; folderPath: string }
 type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean }
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
 let currentPickerPath = ''
+let currentFolderPath = ''
 
 export function setRepoPath(path: string): void {
   currentRepoPath = path
+  if (path) currentFolderPath = ''
 }
 
 export function setPickerPath(path: string): void {
   currentPickerPath = path
+}
+
+export function setFolderPath(path: string): void {
+  currentFolderPath = path
+  if (path) {
+    currentRepoPath = ''
+    currentPickerPath = ''
+  }
 }
 
 export function getRepoPath(): string {
@@ -56,17 +66,23 @@ export function getPickerPath(): string {
   return currentPickerPath
 }
 
+export function getFolderPath(): string {
+  return currentFolderPath
+}
+
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   if (!initialPath) {
     const cwd = process.cwd()
     if (options.detectCurrentRepoOnEmptyPath && validateRepo(cwd)) {
       currentRepoPath = cwd
       currentPickerPath = ''
+      currentFolderPath = ''
       return
     }
 
     currentRepoPath = ''
     currentPickerPath = cwd
+    currentFolderPath = ''
     return
   }
 
@@ -74,11 +90,13 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
   if (validateRepo(resolvedPath)) {
     currentRepoPath = resolvedPath
     currentPickerPath = ''
+    currentFolderPath = ''
     return
   }
 
   currentRepoPath = ''
-  currentPickerPath = resolvedPath
+  currentPickerPath = ''
+  currentFolderPath = resolvedPath
 }
 
 export function createApp(initialRepoPath: string, options: CreateAppOptions = {}): Hono<{ Variables: AppVariables }> {
@@ -90,6 +108,7 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.use('*', async (c, next) => {
     c.set('repoPath', currentRepoPath)
     c.set('pickerPath', currentPickerPath)
+    c.set('folderPath', currentFolderPath)
     await next()
   })
 

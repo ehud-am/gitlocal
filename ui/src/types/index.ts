@@ -16,6 +16,7 @@ export interface GitUserIdentity {
   name: string
   email: string
   source: GitUserSource
+  sshKeyPath?: string
 }
 
 export interface RepoRemoteContext {
@@ -33,6 +34,7 @@ export interface GitContext {
 export interface GitIdentityUpdateRequest {
   name: string
   email: string
+  sshKeyPath?: string
 }
 
 export interface GitIdentityUpdateResponse {

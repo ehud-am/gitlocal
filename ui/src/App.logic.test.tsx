@@ -331,6 +331,38 @@ describe('App logic', () => {
     expect(screen.getByTestId('content-props')).toHaveTextContent('"raw":false')
   })
 
+  it('resets the selected branch when a different root opens with different git capabilities', async () => {
+    readViewerState.mockReturnValue(buildViewerState({
+      repoPath: '/tmp/previous',
+      branch: 'old',
+    }))
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
+      path: '/tmp/release-repo',
+      currentBranch: 'release',
+    }))
+
+    const gitRender = renderApp()
+    await waitFor(() => {
+      expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":"release"')
+    })
+    gitRender.unmount()
+
+    readViewerState.mockReturnValue(buildViewerState({
+      repoPath: '/tmp/previous',
+      branch: 'main',
+    }))
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
+      path: '/tmp/plain-folder',
+      currentBranch: '',
+      isGitRepo: false,
+    }))
+
+    renderApp()
+    await waitFor(() => {
+      expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":""')
+    })
+  })
+
   it('shows the empty repository and read-only branch landing states', async () => {
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
@@ -375,7 +407,7 @@ describe('App logic', () => {
     expect(await screen.findByText(/repository has no commits yet/i)).toBeInTheDocument()
   })
 
-  it('initializes the current branch from repo info, supports picker and non-repo screens, and toggles the sidebar', async () => {
+  it('initializes the current branch from repo info, supports picker and regular-folder screens, and toggles the sidebar', async () => {
     readViewerState.mockReturnValue(buildViewerState({ branch: '', sidebarCollapsed: true }))
 
     const initialRender = renderApp()
@@ -395,7 +427,8 @@ describe('App logic', () => {
 
     vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({ isGitRepo: false }))
     renderApp()
-    expect(await screen.findByRole('heading', { name: /not a git repository/i })).toBeInTheDocument()
+    expect(await screen.findByTestId('header-props')).toBeInTheDocument()
+    expect(screen.getByTestId('content-props')).toHaveTextContent('"canMutateFiles":true')
   })
 
   it('expands search from saved state, the header trigger, selection, and dismissal', async () => {
@@ -432,9 +465,7 @@ describe('App logic', () => {
     expect(screen.queryByRole('heading', { name: /leave this repository/i })).not.toBeInTheDocument()
   })
 
-  it('validates git identity, commit message, and remote sync failures', async () => {
-    vi.mocked(api.syncWithRemote).mockRejectedValueOnce({ message: 'Remote sync failed hard.' })
-
+  it('validates git identity without exposing commit or remote sync callbacks', async () => {
     renderApp()
 
     fireEvent.click(await screen.findByRole('button', { name: 'open-identity' }))
@@ -445,13 +476,10 @@ describe('App logic', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
     fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: /commit changes/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/enter a commit message/i)
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
-
     fireEvent.click(screen.getByRole('button', { name: 'sync-remote' }))
-    expect(await screen.findByText(/remote sync failed hard/i)).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: /commit message/i })).not.toBeInTheDocument()
+    expect(api.commitChanges).not.toHaveBeenCalled()
+    expect(api.syncWithRemote).not.toHaveBeenCalled()
   })
 
   it('handles successful parent browsing, file mutations, tree selection, and child status updates', async () => {

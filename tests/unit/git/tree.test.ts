@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:f
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { listDir, listWorkingTreeDir, searchWorkingTreeByContent, searchWorkingTreeByName } from '../../../src/git/tree.js'
+import { listDir, listLocalDir, listWorkingTreeDir, searchWorkingTreeByContent, searchWorkingTreeByName } from '../../../src/git/tree.js'
 
 function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-tree-test-'))
@@ -199,5 +199,27 @@ describe('working tree tree helpers', () => {
   it('skips oversized tracked files during content search', () => {
     writeFileSync(join(dir, 'README.md'), 'a'.repeat(600_000))
     expect(searchWorkingTreeByContent(dir, 'aaaa', false)).toEqual([])
+  })
+})
+
+describe('local folder tree helpers', () => {
+  it('lists regular folder entries as local-only tree nodes', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-local-tree-'))
+    try {
+      mkdirSync(join(dir, 'docs'))
+      writeFileSync(join(dir, 'README.md'), '# local')
+      writeFileSync(join(dir, 'docs', 'guide.md'), 'guide')
+
+      expect(listLocalDir(dir, '')).toEqual([
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: true },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: true },
+      ])
+      expect(listLocalDir(dir, 'docs')).toEqual([
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: true },
+      ])
+      expect(listLocalDir(dir, '../outside')).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

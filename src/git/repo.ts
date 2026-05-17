@@ -97,6 +97,13 @@ function writeGitConfig(repoPath: string, key: string, value: string): void {
   }
 }
 
+function unsetGitConfig(repoPath: string, key: string): void {
+  const result = runGitCapture(repoPath, 'config', '--local', '--unset', key)
+  if (result.status !== 0 && !result.stderr.includes('No such section') && !result.stderr.includes('No such key')) {
+    throw new Error(result.stderr.trim() || `Unable to clear ${key}.`)
+  }
+}
+
 function getConfiguredRemotes(repoPath: string): string[] {
   const result = runGitCapture(repoPath, 'remote')
   if (result.status !== 0 || !result.stdout) return []
@@ -150,11 +157,12 @@ export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
   const localEmail = readGitConfig(repoPath, '--local', 'user.email')
   const globalName = readGitConfig(repoPath, '--global', 'user.name')
   const globalEmail = readGitConfig(repoPath, '--global', 'user.email')
+  const sshKeyPath = getRepoSshKeyPath(repoPath)
 
   const name = localName || globalName
   const email = localEmail || globalEmail
 
-  if (!name && !email) return null
+  if (!name && !email && !sshKeyPath) return null
 
   const source: GitUserIdentity['source'] =
     localName || localEmail
@@ -165,12 +173,26 @@ export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
     name,
     email,
     source,
+    ...(sshKeyPath ? { sshKeyPath } : {}),
   }
 }
 
-export function setRepoGitIdentity(repoPath: string, name: string, email: string): GitIdentityUpdateResponse {
+export function getRepoSshKeyPath(repoPath: string): string {
+  const sshCommand = readGitConfig(repoPath, '--local', 'core.sshCommand')
+  if (!sshCommand) return ''
+  const match = sshCommand.match(/(?:^|\s)-i\s+(?:"([^"]+)"|'([^']+)'|(\S+))/)
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim()
+}
+
+function formatSshCommandForKeyPath(sshKeyPath: string): string {
+  const escaped = sshKeyPath.replaceAll('"', '\\"')
+  return `ssh -i "${escaped}" -o IdentitiesOnly=yes`
+}
+
+export function setRepoGitIdentity(repoPath: string, name: string, email: string, sshKeyPath?: string): GitIdentityUpdateResponse {
   const trimmedName = name.trim()
   const trimmedEmail = email.trim()
+  const normalizedSshKeyPath = sshKeyPath?.trim()
 
   if (!trimmedName) {
     throw new Error('Git name is required.')
@@ -186,6 +208,13 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
 
   writeGitConfig(repoPath, 'user.name', trimmedName)
   writeGitConfig(repoPath, 'user.email', trimmedEmail)
+  if (normalizedSshKeyPath !== undefined) {
+    if (normalizedSshKeyPath) {
+      writeGitConfig(repoPath, 'core.sshCommand', formatSshCommandForKeyPath(normalizedSshKeyPath))
+    } else {
+      unsetGitConfig(repoPath, 'core.sshCommand')
+    }
+  }
 
   const user = getGitUserIdentity(repoPath)
   /* v8 ignore next 3 -- if both local writes succeed, git must be able to read them back */
@@ -272,6 +301,12 @@ export function getBrowseableRootEntryCount(repoPath: string): number {
     .length
 }
 
+export function getLocalRootEntryCount(rootPath: string): number {
+  return listLocalDirectoryEntries(rootPath)
+    .filter((entry) => !entry.name.startsWith('.'))
+    .length
+}
+
 export function getInfo(repoPath: string): RepoInfo {
   const version = getAppVersion()
   if (!repoPath) {
@@ -297,7 +332,7 @@ export function getInfo(repoPath: string): RepoInfo {
       pickerMode: false,
       version,
       hasCommits: false,
-      rootEntryCount: 0,
+      rootEntryCount: getLocalRootEntryCount(repoPath),
       gitContext: null,
     }
   }
@@ -453,6 +488,14 @@ export function resolveSafeRepoPath(repoPath: string, filePath: string): string 
   return resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
 }
 
+export function normalizeLocalRootRelativePath(filePath: string): string {
+  return normalizeRepoRelativePath(filePath)
+}
+
+export function resolveSafeLocalRootPath(rootPath: string, filePath: string): string | null {
+  return resolveSafeRepoPath(rootPath, normalizeLocalRootRelativePath(filePath))
+}
+
 export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
   const fullPath = resolveSafeRepoPath(repoPath, filePath)
@@ -460,6 +503,10 @@ export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' 
   if (!existsSync(fullPath)) return 'missing'
   const stats = statSync(fullPath)
   return stats.isDirectory() ? 'dir' : 'file'
+}
+
+export function getLocalPathType(rootPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
+  return getPathType(rootPath, filePath)
 }
 
 export function validateRepoChildFolderName(name: string): string {
@@ -605,11 +652,13 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
 export function deleteWorkingTreeFolder(repoPath: string, folderPath: string): FolderDeleteImpact {
   const impact = countWorkingTreeFolderImpact(repoPath, folderPath)
   const fullPath = resolveSafeRepoPath(repoPath, impact.path)
+  /* v8 ignore next 3 -- countWorkingTreeFolderImpact already validates this path */
   if (!fullPath) {
     throw new Error('Folder must be inside the repository.')
   }
 
   rmSync(fullPath, { recursive: true, force: false })
+  /* v8 ignore next 3 -- rmSync throws before returning if removal fails on supported platforms */
   if (existsSync(fullPath)) {
     throw new Error('GitLocal could not remove the selected folder completely.')
   }
@@ -631,6 +680,7 @@ export function nearestExistingRepoPath(repoPath: string, filePath: string): str
     current = parent
   }
 
+  /* v8 ignore next -- loop exits via parent traversal on normal absolute paths */
   return ''
 }
 
@@ -929,6 +979,7 @@ function getGitWorktreeEntries(repoPath: string): GitWorktreeEntry[] {
     }
   }
 
+  /* v8 ignore next 6 -- git worktree porcelain normally terminates entries with a blank line */
   if (currentPath) {
     entries.push({
       path: currentPath,
@@ -1255,6 +1306,10 @@ export function readWorkingTreeFile(repoPath: string, filePath: string): Buffer 
   return readFileSync(fullPath)
 }
 
+export function readLocalRootFile(rootPath: string, filePath: string): Buffer | null {
+  return readWorkingTreeFile(rootPath, filePath)
+}
+
 export function isIgnoredPath(repoPath: string, filePath: string): boolean {
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized) return false
@@ -1279,6 +1334,18 @@ export function getEditableState(repoPath: string, filePath: string, branch: str
   }
 }
 
+export function getLocalEditableState(rootPath: string, filePath: string): { editable: boolean; revisionToken: string | null } {
+  if (getLocalPathType(rootPath, filePath) !== 'file') {
+    return { editable: false, revisionToken: null }
+  }
+
+  const { type } = detectFileType(filePath)
+  return {
+    editable: type === 'markdown' || type === 'text',
+    revisionToken: getLocalFileRevisionToken(rootPath, filePath),
+  }
+}
+
 export function getFileRevisionToken(repoPath: string, filePath: string): string | null {
   const rawBytes = readWorkingTreeFile(repoPath, filePath)
   if (!rawBytes) return null
@@ -1286,6 +1353,10 @@ export function getFileRevisionToken(repoPath: string, filePath: string): string
   hash.update(normalizeRepoRelativePath(filePath))
   hash.update(rawBytes)
   return hash.digest('hex')
+}
+
+export function getLocalFileRevisionToken(rootPath: string, filePath: string): string | null {
+  return getFileRevisionToken(rootPath, filePath)
 }
 
 export function writeWorkingTreeTextFile(repoPath: string, filePath: string, content: string): void {
@@ -1298,6 +1369,17 @@ export function writeWorkingTreeTextFile(repoPath: string, filePath: string, con
   writeFileSync(fullPath, content, 'utf-8')
 }
 
+export function writeLocalRootTextFile(rootPath: string, filePath: string, content: string): void {
+  try {
+    writeWorkingTreeTextFile(rootPath, filePath, content)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Path must stay inside the opened repository.') {
+      throw new Error('Path must stay inside the opened folder.')
+    }
+    throw error
+  }
+}
+
 export function deleteWorkingTreeFile(repoPath: string, filePath: string): void {
   const fullPath = resolveSafeRepoPath(repoPath, filePath)
   if (!fullPath) {
@@ -1305,6 +1387,17 @@ export function deleteWorkingTreeFile(repoPath: string, filePath: string): void 
   }
 
   unlinkSync(fullPath)
+}
+
+export function deleteLocalRootFile(rootPath: string, filePath: string): void {
+  try {
+    deleteWorkingTreeFile(rootPath, filePath)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Path must stay inside the opened repository.') {
+      throw new Error('Path must stay inside the opened folder.')
+    }
+    throw error
+  }
 }
 
 function validateChildFolderName(name: string): string {
@@ -1406,6 +1499,30 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
       type: entry.isDirectory() ? 'dir' as const : 'file' as const,
       localOnly,
     }))
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+}
+
+export function listLocalDirectoryEntries(rootPath: string, subpath: string = ''): TreeNode[] {
+  const normalized = normalizeLocalRootRelativePath(subpath)
+  const dirPath = normalized ? resolveSafeLocalRootPath(rootPath, normalized) : rootPath
+
+  if (!dirPath || !existsSync(dirPath) || !statSync(dirPath).isDirectory()) {
+    return []
+  }
+
+  return readdirSync(dirPath, { withFileTypes: true })
+    .map((entry) => {
+      const path = normalized ? `${normalized}/${entry.name}` : entry.name
+      return {
+        name: entry.name,
+        path,
+        type: entry.isDirectory() ? 'dir' as const : 'file' as const,
+        localOnly: true,
+      }
+    })
     .sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
       return a.name.localeCompare(b.name)

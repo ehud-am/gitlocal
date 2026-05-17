@@ -80,13 +80,8 @@ export default function RepoContextHeader({
   untrackedChangeCount = 0,
   onBranchChange,
   onEditGitIdentity,
-  onCommitChanges,
-  onSyncWithRemote,
   onOpenSearch,
   branchDisabled = false,
-  commitDisabled = false,
-  syncDisabled = false,
-  syncActionLabel = 'Sync with remote',
   branchSwitchDialog,
 }: Props) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
@@ -97,7 +92,7 @@ export default function RepoContextHeader({
   const remotePath = remote?.webUrl || remote?.fetchUrl || ''
   const repoSyncBadge = describeRepoSyncState(repoSync)
   const changeSummary = trackedChangeCount + untrackedChangeCount
-  const repoName = info?.name || 'Repository'
+  const repoName = info?.name || (info?.isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
 
   return (
@@ -106,7 +101,7 @@ export default function RepoContextHeader({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-              Repository
+              {info?.isGitRepo ? 'Repository' : 'Folder'}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <h1 className="truncate text-[20px] leading-tight font-semibold text-[var(--foreground)]">
@@ -127,27 +122,29 @@ export default function RepoContextHeader({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
-              <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
-                Branch
-              </span>
-              <select
-                className="min-w-[150px] border-0 bg-transparent text-sm text-[var(--foreground)] outline-none"
-                value={branch}
-                onChange={(event) => onBranchChange(event.target.value)}
-                aria-label="branch selector"
-                disabled={branchDisabled || (branches ?? []).length === 0}
-              >
-                {(branches ?? []).map((option) => (
-                  <option
-                    key={option.trackingRef ?? `${option.scope ?? 'local'}:${option.name}`}
-                    value={(option.scope ?? 'local') === 'remote' ? (option.trackingRef ?? option.name) : option.name}
-                  >
-                    {branchLabel(option)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {info?.isGitRepo ? (
+              <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
+                <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+                  Branch
+                </span>
+                <select
+                  className="min-w-[150px] border-0 bg-transparent text-sm text-[var(--foreground)] outline-none"
+                  value={branch}
+                  onChange={(event) => onBranchChange(event.target.value)}
+                  aria-label="branch selector"
+                  disabled={branchDisabled || (branches ?? []).length === 0}
+                >
+                  {(branches ?? []).map((option) => (
+                    <option
+                      key={option.trackingRef ?? `${option.scope ?? 'local'}:${option.name}`}
+                      value={(option.scope ?? 'local') === 'remote' ? (option.trackingRef ?? option.name) : option.name}
+                    >
+                      {branchLabel(option)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {onOpenSearch ? <SearchTrigger onOpen={onOpenSearch} /> : null}
           </div>
         </div>
@@ -155,12 +152,27 @@ export default function RepoContextHeader({
         {detailsExpanded ? (
           <div className="grid gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Repository details</p>
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">{info?.isGitRepo ? 'Local repository' : 'Local folder'}</p>
               <p className="break-all text-sm text-[var(--foreground)]">{info?.path || 'Not available'}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Current branch</p>
-              <p className="text-sm text-[var(--foreground)]">{branch || 'Not available'}</p>
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Remote repository</p>
+              {remotePath ? (
+                remoteWebUrl ? (
+                  <a
+                    className="break-all text-sm text-[var(--primary)] underline-offset-2 hover:underline"
+                    href={remoteWebUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {remotePath}
+                  </a>
+                ) : (
+                  <p className="break-all text-sm text-[var(--foreground)]">{remotePath}</p>
+                )
+              ) : (
+                <p className="text-sm text-[var(--foreground)]">{info?.isGitRepo ? 'No remote configured' : 'Not a git repository'}</p>
+              )}
             </div>
             {hasActivePath ? (
               <div className="space-y-1 sm:col-span-2">
@@ -168,6 +180,7 @@ export default function RepoContextHeader({
                 <p className="break-all text-sm text-[var(--foreground)]">{displayPath}</p>
               </div>
             ) : null}
+            {info?.isGitRepo ? (
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Git identity</p>
@@ -194,56 +207,6 @@ export default function RepoContextHeader({
                 ) : null}
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Upstream sync</p>
-              <p className="text-sm text-[var(--foreground)]">
-                {repoSync?.hasUpstream
-                  ? `Tracking ${repoSync.upstreamRef || 'the upstream branch'}${repoSync.remoteName ? ` via ${repoSync.remoteName}` : ''}.`
-                  : 'This branch does not currently track an upstream remote.'}
-              </p>
-            </div>
-            {remotePath ? (
-              <div className="space-y-1 sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Remote path</p>
-                {remoteWebUrl ? (
-                  <a
-                    className="break-all text-sm text-[var(--primary)] underline-offset-2 hover:underline"
-                    href={remoteWebUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {remotePath}
-                  </a>
-                ) : (
-                  <p className="break-all text-sm text-[var(--foreground)]">{remotePath}</p>
-                )}
-              </div>
-            ) : null}
-            {(onCommitChanges || onSyncWithRemote) ? (
-              <div className="space-y-3 sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Repository actions</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {onCommitChanges ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={onCommitChanges}
-                      disabled={commitDisabled}
-                    >
-                      Commit
-                    </Button>
-                  ) : null}
-                  {onSyncWithRemote ? (
-                    <Button
-                      type="button"
-                      onClick={onSyncWithRemote}
-                      disabled={syncDisabled}
-                    >
-                      {syncActionLabel}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
             ) : null}
           </div>
         ) : null}

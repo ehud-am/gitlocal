@@ -7,8 +7,6 @@ describe('RepoContextHeader', () => {
   it('renders a compact repo toolbar and expands inline details on demand', () => {
     const onBranchChange = vi.fn()
     const onEditGitIdentity = vi.fn()
-    const onCommitChanges = vi.fn()
-    const onSyncWithRemote = vi.fn()
 
     render(
       <RepoContextHeader
@@ -54,8 +52,6 @@ describe('RepoContextHeader', () => {
         untrackedChangeCount={0}
         onBranchChange={onBranchChange}
         onEditGitIdentity={onEditGitIdentity}
-        onCommitChanges={onCommitChanges}
-        onSyncWithRemote={onSyncWithRemote}
         onOpenSearch={vi.fn()}
         branchDisabled={false}
         branchSwitchDialog={<div>Branch switch dialog</div>}
@@ -79,37 +75,31 @@ describe('RepoContextHeader', () => {
     expect(onBranchChange).toHaveBeenCalledWith('origin/release')
 
     fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
-    expect(screen.getByText('Repository details')).toBeInTheDocument()
+    expect(screen.getByText('Local repository')).toBeInTheDocument()
     expect(screen.getByText('/tmp/gitlocal/src/App.tsx')).toBeInTheDocument()
     expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
     expect(screen.getByText(/test user <test@example.com>/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^commit$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sync with remote|push to remote/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /sync with remote|push to remote/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit repository git identity/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /collapse repository details/i })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /edit repository git identity/i }))
     expect(onEditGitIdentity).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole('button', { name: /^commit$/i }))
-    expect(onCommitChanges).toHaveBeenCalledTimes(1)
-
-    fireEvent.click(screen.getByRole('button', { name: /sync with remote|push to remote/i }))
-    expect(onSyncWithRemote).toHaveBeenCalledTimes(1)
-
     fireEvent.click(screen.getByRole('button', { name: /collapse repository details/i }))
     expect(screen.queryByText('/tmp/gitlocal/src/App.tsx')).not.toBeInTheDocument()
   })
 
-  it('supports remote branch labels, local-only upstream messaging, and has no obvious a11y violations', async () => {
+  it('supports remote branch labels, remote display, and has no obvious a11y violations', async () => {
     const { container } = render(
       <RepoContextHeader
         info={{
           name: '',
           path: '',
           currentBranch: '',
-          isGitRepo: false,
+          isGitRepo: true,
           pickerMode: false,
           version: '0.5.2',
           hasCommits: false,
@@ -144,11 +134,12 @@ describe('RepoContextHeader', () => {
 
     expect(screen.getByRole('heading', { name: 'Repository' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
-    expect(screen.getByText(/this branch does not currently track an upstream remote/i)).toBeInTheDocument()
+    expect(screen.queryByText(/this branch does not currently track an upstream remote/i)).not.toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('release (origin)')
     expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit repository git identity/i })).not.toBeInTheDocument()
     expect(screen.getByText('git@github.com:ehud-am/gitlocal.git')).toBeInTheDocument()
+    expect(screen.getByText('Remote repository')).toBeInTheDocument()
     expect((await axe(container)).violations).toHaveLength(0)
   })
 
@@ -227,7 +218,8 @@ describe('RepoContextHeader', () => {
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('remote-only')
     expect(screen.getByText(/3 local changes/i)).toBeInTheDocument()
     expect(screen.getByText(/git user is not configured/i)).toBeInTheDocument()
-    expect(screen.getByText(/tracking the upstream branch\./i)).toBeInTheDocument()
+    expect(screen.queryByText(/tracking the upstream branch\./i)).not.toBeInTheDocument()
+    expect(screen.getByText('No remote configured')).toBeInTheDocument()
     expect(screen.queryByText('Remote path')).not.toBeInTheDocument()
     expect(screen.queryByText('Repository actions')).not.toBeInTheDocument()
   })

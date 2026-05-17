@@ -52,6 +52,14 @@ import {
   countWorkingTreeFolderImpact,
   deleteWorkingTreeFolder,
   listWorkingTreeDirectoryEntries,
+  listLocalDirectoryEntries,
+  getLocalRootEntryCount,
+  getLocalEditableState,
+  getLocalPathType,
+  readLocalRootFile,
+  writeLocalRootTextFile,
+  deleteLocalRootFile,
+  getRepoSshKeyPath,
 } from '../../../src/git/repo.js'
 
 afterEach(() => {
@@ -1002,6 +1010,73 @@ describe('working tree helpers', () => {
       process.env.HOME = originalHome
       rmSync(homeDir, { recursive: true, force: true })
       cleanup()
+    }
+  })
+
+  it('reads, updates, and clears repository-local SSH key path', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      expect(getRepoSshKeyPath(dir)).toBe('')
+
+      const result = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '~/.ssh/id_repo')
+      expect(result.user.sshKeyPath).toBe('~/.ssh/id_repo')
+      expect(getRepoSshKeyPath(dir)).toBe('~/.ssh/id_repo')
+      expect(spawnGit(dir, 'config', '--local', 'core.sshCommand')).toContain('~/.ssh/id_repo')
+
+      const changed = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '/tmp/identity with spaces')
+      expect(changed.user.sshKeyPath).toBe('/tmp/identity with spaces')
+      expect(getRepoSshKeyPath(dir)).toBe('/tmp/identity with spaces')
+
+      const cleared = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '')
+      expect(cleared.user.sshKeyPath).toBeUndefined()
+      expect(getRepoSshKeyPath(dir)).toBe('')
+
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', "ssh -i '~/.ssh/single_quote'")
+      expect(getRepoSshKeyPath(dir)).toBe('~/.ssh/single_quote')
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', 'ssh -i /tmp/plain_key')
+      expect(getRepoSshKeyPath(dir)).toBe('/tmp/plain_key')
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', 'ssh -o IdentitiesOnly=yes')
+      expect(getRepoSshKeyPath(dir)).toBe('')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('supports root-safe regular-folder file helpers', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-local-root-'))
+    try {
+      mkdirSync(join(dir, 'docs'))
+      writeFileSync(join(dir, '.hidden'), 'hidden')
+      writeFileSync(join(dir, 'README.md'), '# local')
+      writeFileSync(join(dir, 'docs', 'guide.md'), 'guide')
+
+      expect(getLocalRootEntryCount(dir)).toBe(2)
+      expect(getLocalPathType(dir, 'docs')).toBe('dir')
+      expect(getLocalPathType(dir, 'README.md')).toBe('file')
+      expect(getLocalPathType(dir, '../escape.md')).toBe('missing')
+      expect(readLocalRootFile(dir, 'README.md')?.toString('utf-8')).toBe('# local')
+      expect(getLocalEditableState(dir, 'README.md')).toMatchObject({ editable: true })
+      expect(getLocalEditableState(dir, 'missing.md')).toEqual({ editable: false, revisionToken: null })
+
+      writeLocalRootTextFile(dir, 'docs/new.md', 'new')
+      expect(readLocalRootFile(dir, 'docs/new.md')?.toString('utf-8')).toBe('new')
+      expect(() => writeLocalRootTextFile(dir, '../escape.md', 'no')).toThrow('opened folder')
+      expect(() => writeLocalRootTextFile(dir, 'docs', 'no')).toThrow()
+
+      deleteLocalRootFile(dir, 'docs/new.md')
+      expect(getLocalPathType(dir, 'docs/new.md')).toBe('missing')
+      expect(() => deleteLocalRootFile(dir, '../escape.md')).toThrow('opened folder')
+      expect(() => deleteLocalRootFile(dir, 'docs')).toThrow()
+
+      expect(listLocalDirectoryEntries(dir).map((entry) => entry.name)).toEqual(['docs', '.hidden', 'README.md'])
+      expect(listLocalDirectoryEntries(dir, 'docs')).toEqual([
+        { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: true },
+      ])
+      expect(listLocalDirectoryEntries(dir, '../escape')).toEqual([])
+      expect(listLocalDirectoryEntries(join(dir, 'missing'))).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added regular-folder mode so non-git folders can open as browsable editable roots with file list, view, create, update, and delete support.
+- Simplified expanded repository context by showing local and remote repositories together while removing repeated branch, upstream sync, commit, and remote sync controls.
+- Added repository-local SSH key path viewing and editing to git identity settings.
+
 ## 0.6.3
 
 - Added a non-executing package entry point so package size analyzers and import resolvers can resolve GitLocal without launching the CLI server.

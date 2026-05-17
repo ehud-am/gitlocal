@@ -3,7 +3,6 @@ import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -290,7 +289,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
 
-    expect(await screen.findByText('Repository details')).toBeInTheDocument()
+    expect(await screen.findByText('Local repository')).toBeInTheDocument()
     expect(screen.getByText('/tmp/repo')).toBeInTheDocument()
     expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
     expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
@@ -383,13 +382,14 @@ describe('App', () => {
       expect(api.updateGitIdentity).toHaveBeenCalledWith({
         name: 'Updated User',
         email: 'updated@example.com',
+        sshKeyPath: '',
       })
     })
     expect(await screen.findByText(/repository git identity updated\./i)).toBeInTheDocument()
     expect(await screen.findByText(/updated user <updated@example.com>/i)).toBeInTheDocument()
   })
 
-  it('commits local changes from the repo header action', async () => {
+  it('does not expose commit actions from the repo header', async () => {
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
       trackedChangeCount: 1,
       pathSyncState: 'clean',
@@ -398,35 +398,23 @@ describe('App', () => {
     renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
-    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
-
-    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), {
-      target: { value: 'Save current work' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /^commit changes$/i }))
-
-    await waitFor(() => {
-      expect(api.commitChanges).toHaveBeenCalledWith({ message: 'Save current work' })
-    })
-    expect(await screen.findByText(/committed changes as abc1234/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
+    expect(api.commitChanges).not.toHaveBeenCalled()
   })
 
-  it('has no obvious accessibility violations for the commit dialog flow', async () => {
+  it('does not expose commit actions in the expanded repository context', async () => {
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
       trackedChangeCount: 1,
       pathSyncState: 'clean',
     }))
 
-    const { container } = renderWithClient()
+    renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /^commit$/i }))
-    expect(await screen.findByRole('heading', { name: /commit local changes/i })).toBeInTheDocument()
-    expect((await axe(container)).violations).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /^commit$/i })).not.toBeInTheDocument()
   })
 
-  it('syncs with the remote from the repo header action', async () => {
+  it('does not expose remote sync actions from the repo header', async () => {
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
       repoSync: {
         mode: 'ahead',
@@ -448,12 +436,8 @@ describe('App', () => {
     renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /push to remote/i }))
-
-    await waitFor(() => {
-      expect(api.syncWithRemote).toHaveBeenCalledTimes(1)
-    })
-    expect(await screen.findByText(/pushed main to origin\/main/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /push to remote|sync with remote/i })).not.toBeInTheDocument()
+    expect(api.syncWithRemote).not.toHaveBeenCalled()
   })
 
   it('opens search from the compact trigger only', async () => {

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
-import { createApp, getPickerPath, getRepoPath } from '../../../src/server.js'
+import { createApp, getFolderPath, getPickerPath, getRepoPath } from '../../../src/server.js'
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-pick-test-'))
@@ -80,15 +80,17 @@ describe('pickHandler', () => {
     expect(body.error).toContain('Invalid JSON')
   })
 
-  it('returns ok:false for a non-git directory', async () => {
+  it('opens a non-git directory as the active folder', async () => {
     const nonGitDir = mkdtempSync(join(tmpdir(), 'not-git-'))
     try {
       const app = createApp('')
       const client = testClient(app)
       const res = await client.api.pick.$post({ json: { path: nonGitDir } })
       const body = await res.json()
-      expect(body.ok).toBe(false)
-      expect(body.error).toBeTruthy()
+      expect(body.ok).toBe(true)
+      expect(body.error).toBe('')
+      expect(getRepoPath()).toBe('')
+      expect(getFolderPath()).toBe(nonGitDir)
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }
@@ -107,15 +109,17 @@ describe('pickHandler', () => {
     expect(body.canCloneIntoChild).toBe(true)
   })
 
-  it('uses a non-git startup folder as the initial picker location', async () => {
+  it('uses a non-git startup folder as the active folder', async () => {
     const nonGitDir = mkdtempSync(join(tmpdir(), 'picker-start-'))
     try {
       const app = createApp(nonGitDir)
       const client = testClient(app)
-      const res = await client.api.pick.browse.$get()
+      const res = await client.api.info.$get()
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.currentPath).toBe(nonGitDir)
+      expect(body.path).toBe(nonGitDir)
+      expect(body.pickerMode).toBe(false)
+      expect(body.isGitRepo).toBe(false)
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }
@@ -177,7 +181,7 @@ describe('pickHandler', () => {
       res = await client.api.pick.browse.$get({ query: { path: nonGitDir } })
       body = await res.json()
       expect(body.isGitRepo).toBe(false)
-      expect(body.canOpen).toBe(false)
+      expect(body.canOpen).toBe(true)
       expect(body.canInitGit).toBe(true)
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
@@ -195,14 +199,14 @@ describe('pickHandler', () => {
     expect(getPickerPath()).toBe(dirname(validDir))
   })
 
-  it('returns an error when asking for a parent picker without an open repo', async () => {
+  it('returns an error when asking for a parent picker without an open folder', async () => {
     const app = createApp('')
     const client = testClient(app)
     const res = await client.api.pick.parent.$post()
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(false)
-    expect(body.error).toContain('No repository is currently open')
+    expect(body.error).toContain('No folder is currently open')
   })
 
   it('creates child folders from the setup routes', async () => {

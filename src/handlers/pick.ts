@@ -3,7 +3,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { cloneRepositoryInto, createChildFolder, initializeGitRepository, validateRepo } from '../git/repo.js'
-import { getPickerPath, setPickerPath, setRepoPath } from '../server.js'
+import { getFolderPath, getPickerPath, setFolderPath, setPickerPath, setRepoPath } from '../server.js'
 import type {
   PickCloneRequest,
   PickBrowseEntry,
@@ -67,7 +67,7 @@ function getBrowseCapabilities(currentPath: string): Pick<PickBrowseResponse, 'i
 
   return {
     isGitRepo,
-    canOpen: isGitRepo,
+    canOpen: isDirectory,
     canCreateChild: isDirectory,
     canInitGit: isDirectory && !isGitRepo,
     canCloneIntoChild: isDirectory,
@@ -138,25 +138,32 @@ export async function pickHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json(res)
   }
 
-  if (!validateRepo(path)) {
-    const res: PickResponse = { ok: false, error: `Not a git repository: ${path}` }
+  if (!statSync(path).isDirectory()) {
+    const res: PickResponse = { ok: false, error: `Not a folder: ${path}` }
     return c.json(res)
   }
 
-  setRepoPath(path)
-  setPickerPath('')
+  if (validateRepo(path)) {
+    setRepoPath(path)
+    setPickerPath('')
+  } else {
+    setFolderPath(resolve(path))
+  }
   const res: PickResponse = { ok: true, error: '' }
   return c.json(res)
 }
 
 export async function pickParentHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
-  if (!repoPath) {
-    return c.json({ ok: false, error: 'No repository is currently open' })
+  const folderPath = getFolderPath()
+  const activePath = repoPath || folderPath
+  if (!activePath) {
+    return c.json({ ok: false, error: 'No folder is currently open' })
   }
 
-  const parentPath = dirname(repoPath)
+  const parentPath = dirname(activePath)
   setRepoPath('')
+  setFolderPath('')
   setPickerPath(parentPath)
   return c.json({ ok: true, error: '' })
 }
