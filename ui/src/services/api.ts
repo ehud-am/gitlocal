@@ -12,6 +12,7 @@ import type {
   FolderOperationResult,
   GitIdentityUpdateRequest,
   GitIdentityUpdateResponse,
+  GitContext,
   ManualFileMutationRequest,
   ManualFileOperationResult,
   FolderCloneRepositoryRequest,
@@ -84,6 +85,8 @@ async function branchSwitchRequest(payload: BranchSwitchRequest): Promise<Branch
 
 export const api = {
   getInfo: (): Promise<RepoInfo> => request<RepoInfo>('/api/info'),
+
+  getGitContext: (): Promise<GitContext | null> => request<GitContext | null>('/api/git/context'),
 
   getBranches: (): Promise<Branch[]> => request('/api/branches'),
 

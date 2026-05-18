@@ -243,6 +243,7 @@ vi.mock('./components/AppDialogs', () => ({
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
     showParentFolder: vi.fn(),
@@ -383,6 +384,7 @@ describe('App branch coverage', () => {
 
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
+    vi.mocked(api.getGitContext).mockResolvedValue(buildInfo().gitContext)
     vi.mocked(api.getBranches).mockResolvedValue([
       { name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true },
       { name: 'release', displayName: 'release', scope: 'local', hasLocalCheckout: true, isCurrent: false },
@@ -603,6 +605,7 @@ describe('App branch coverage', () => {
         remote: null,
       },
     }))
+    vi.mocked(api.getGitContext).mockResolvedValueOnce(null)
 
     renderApp()
 

@@ -87,7 +87,7 @@ describe('Server integration', () => {
     expect(Array.isArray(body)).toBe(true)
   })
 
-  it('GET /api/info includes git context for the repo header', async () => {
+  it('GET /api/git/context includes git context for the repo header', async () => {
     const repo = makeGitRepo()
     const remoteDir = mkdtempSync(join(tmpdir(), 'gitlocal-remote-context-'))
     spawnSync('git', ['init', '--bare'], { cwd: remoteDir })
@@ -95,16 +95,14 @@ describe('Server integration', () => {
 
     try {
       const app = createApp(repo.dir)
-      const res = await app.fetch(new Request('http://localhost/api/info'))
+      const res = await app.fetch(new Request('http://localhost/api/git/context'))
       const body = await res.json() as {
-        gitContext?: {
-          user?: { name: string; email: string }
-          remote?: { name: string }
-        }
+        user?: { name: string; email: string }
+        remote?: { name: string }
       }
 
-      expect(body.gitContext?.user?.name).toBe('Test User')
-      expect(body.gitContext?.remote?.name).toBe('origin')
+      expect(body.user?.name).toBe('Test User')
+      expect(body.remote?.name).toBe('origin')
     } finally {
       repo.cleanup()
       rmSync(remoteDir, { recursive: true, force: true })

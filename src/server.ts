@@ -7,6 +7,7 @@ import {
   branchSwitchHandler,
   commitChangesHandler,
   commitsHandler,
+  gitContextHandler,
   gitIdentityUpdateHandler,
   readmeHandler,
   remoteSyncHandler,
@@ -98,6 +99,7 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/branches', branchesHandler)
   app.post('/api/branches/switch', branchSwitchHandler)
   app.post('/api/git/commit', commitChangesHandler)
+  app.get('/api/git/context', gitContextHandler)
   app.put('/api/git/identity', gitIdentityUpdateHandler)
   app.post('/api/git/sync', remoteSyncHandler)
   app.get('/api/commits', commitsHandler)

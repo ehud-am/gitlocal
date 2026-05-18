@@ -301,6 +301,16 @@ export function getBrowseableRootEntryCount(repoPath: string): number {
     .length
 }
 
+function getFastBrowseableRootEntryCount(repoPath: string): number {
+  try {
+    return readdirSync(repoPath, { withFileTypes: true })
+      .filter((entry) => entry.name !== '.git' && !entry.name.startsWith('.'))
+      .length
+  } catch {
+    return 0
+  }
+}
+
 export function getInfo(repoPath: string): RepoInfo {
   const version = getAppVersion()
   if (!repoPath) {
@@ -340,8 +350,8 @@ export function getInfo(repoPath: string): RepoInfo {
     pickerMode: false,
     version,
     hasCommits: hasCommits(repoPath),
-    rootEntryCount: getBrowseableRootEntryCount(repoPath),
-    gitContext: getGitContext(repoPath),
+    rootEntryCount: getFastBrowseableRootEntryCount(repoPath),
+    gitContext: null,
   }
 }
 

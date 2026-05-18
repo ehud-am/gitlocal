@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import Breadcrumb from './components/Breadcrumb/Breadcrumb'
@@ -106,10 +106,25 @@ export default function App() {
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
 
-  const { data: info, isLoading } = useQuery({
+  const { data: baseInfo, isLoading } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
+
+  const { data: gitContext } = useQuery({
+    queryKey: ['git-context'],
+    queryFn: api.getGitContext,
+    enabled: !!baseInfo?.isGitRepo,
+  })
+
+  const info = useMemo<RepoInfo | undefined>(() => {
+    if (!baseInfo) return undefined
+    if (!baseInfo.isGitRepo) return baseInfo
+    return {
+      ...baseInfo,
+      gitContext: gitContext ?? baseInfo.gitContext ?? null,
+    }
+  }, [baseInfo, gitContext])
 
   const hasRepoMismatch = Boolean(info && !info.pickerMode && viewerRepoPath && info.path && viewerRepoPath !== info.path)
 
@@ -366,7 +381,10 @@ export default function App() {
             }
           : previous,
       )
-      await queryClient.invalidateQueries({ queryKey: ['info'] })
+      queryClient.setQueryData(['git-context'], {
+        user: result.user as GitUserIdentity,
+        remote: info?.gitContext?.remote ?? null,
+      })
       setGitIdentityDialogOpen(false)
       setStatusMessage(result.message)
     } catch (error) {
@@ -702,6 +720,7 @@ export default function App() {
                   refreshToken={treeRefreshToken}
                   selectedPath={visibleSelectedPath}
                   selectedPathType={visibleSelectedPathType}
+                  isGitRepo={info?.isGitRepo}
                   onSelect={(path, type, localOnly) => {
                     if (type === 'dir') {
                       handleSelectFolder(path, localOnly)

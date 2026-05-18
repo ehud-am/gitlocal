@@ -6,11 +6,14 @@ import {
   getAppVersion,
   getBranches,
   getCommits,
+  getCurrentBranch,
+  getGitContext,
   getInfo,
   findReadme,
   setRepoGitIdentity,
   switchBranch,
   syncCurrentBranchWithRemote,
+  validateRepo,
 } from '../git/repo.js'
 import { setPickerPath, setRepoPath } from '../server.js'
 import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest, LocalActionResponse, RepositoryOpenRequest } from '../types.js'
@@ -86,6 +89,12 @@ export async function branchesHandler(c: Context<{ Variables: Variables }>): Pro
   return c.json(branches)
 }
 
+export async function gitContextHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath || !validateRepo(repoPath)) return c.json(null)
+  return c.json(getGitContext(repoPath))
+}
+
 export async function commitsHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json([])
@@ -99,11 +108,11 @@ export async function commitsHandler(c: Context<{ Variables: Variables }>): Prom
 export async function readmeHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json({ path: '' })
-  const info = getInfo(repoPath)
+  if (!validateRepo(repoPath)) return c.json({ path: '' })
   const requestedPath = c.req.query('path') ?? ''
   const requestedBranch = c.req.query('branch') ?? ''
-  const readmeBranch = requestedBranch || info.currentBranch || 'HEAD'
-  const path = info.isGitRepo ? findReadme(repoPath, readmeBranch, requestedPath) : ''
+  const readmeBranch = requestedBranch || getCurrentBranch(repoPath) || 'HEAD'
+  const path = findReadme(repoPath, readmeBranch, requestedPath)
   return c.json({ path })
 }
 

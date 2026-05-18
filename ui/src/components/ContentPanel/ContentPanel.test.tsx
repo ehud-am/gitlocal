@@ -484,6 +484,7 @@ describe('ContentPanel', () => {
         selectedPathType="dir"
         selectedPathLocalOnly
         branch="main"
+        isGitRepo
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
       />,
@@ -494,6 +495,29 @@ describe('ContentPanel', () => {
       expect(screen.queryByText(/local only/i)).not.toBeInTheDocument()
     })
     expect(screen.getByRole('heading', { name: 'root/docs' })).toBeInTheDocument()
+  })
+
+  it('does not show local-only cues for plain folder directory rows', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.cache', path: 'docs/.cache', type: 'dir', localOnly: true },
+      { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        selectedPathLocalOnly
+        branch=""
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'docs' })).toBeInTheDocument()
+    expect(screen.queryByText(/^local$/i)).not.toBeInTheDocument()
   })
 
   it('shows sync badges in directory rows and the active file context', async () => {
@@ -547,6 +571,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         selectedPathLocalOnly
         branch="main"
+        isGitRepo
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
       />,
@@ -721,6 +746,7 @@ describe('ContentPanel', () => {
         selectedPathType="file"
         selectedPathLocalOnly
         branch="main"
+        isGitRepo
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
       />,
@@ -740,6 +766,7 @@ describe('ContentPanel', () => {
         selectedPathType="dir"
         selectedPathLocalOnly
         branch="main"
+        isGitRepo
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
       />,

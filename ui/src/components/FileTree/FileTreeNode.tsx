@@ -7,6 +7,7 @@ interface Props {
   isExpanded: boolean
   isSelected: boolean
   depth: number
+  showLocalOnly: boolean
   onClick: () => void
 }
 
@@ -32,7 +33,7 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
   </svg>
 )
 
-export default function FileTreeNode({ node, isExpanded, isSelected, depth, onClick }: Props) {
+export default function FileTreeNode({ node, isExpanded, isSelected, depth, showLocalOnly, onClick }: Props) {
   const syncState = describeFileSyncState(node.syncState)
 
   return (
@@ -50,7 +51,7 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, onCl
       </span>
       <div className="file-tree-node-label">
         <span className="file-tree-node-name" title={node.name}>{node.name}</span>
-        {node.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+        {showLocalOnly && node.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
         {syncState ? <MetaTag label={syncState.label} icon={syncState.icon} tone={syncState.tone} compact /> : null}
       </div>
     </div>

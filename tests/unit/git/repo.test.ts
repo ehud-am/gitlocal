@@ -1142,8 +1142,7 @@ describe('working tree helpers', () => {
       git(dir, 'branch', '-D', 'remote-only')
       git(dir, 'fetch', 'origin')
 
-      const info = getInfo(dir)
-      expect(info.gitContext?.remote?.name).toBe('origin')
+      expect(getGitRemoteContext(dir)?.name).toBe('origin')
 
       const branches = getBranches(dir)
       expect(branches.find((branch) => branch.name === currentBranch)).toEqual(

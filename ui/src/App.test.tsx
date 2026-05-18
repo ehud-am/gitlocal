@@ -9,6 +9,7 @@ import App from './App'
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
     showParentFolder: vi.fn(),
@@ -155,6 +156,7 @@ describe('App', () => {
     getItem.mockReturnValue(null)
 
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
+    vi.mocked(api.getGitContext).mockResolvedValue(buildInfo('main').gitContext)
     vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
       path: path === 'docs' ? 'docs/README.md' : 'README.md',
     }))
