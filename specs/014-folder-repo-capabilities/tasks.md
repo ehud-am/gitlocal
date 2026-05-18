@@ -72,11 +72,12 @@
 - [X] T027 [US1] Update content panel create/edit/delete controls to remain available for editable files in regular folders in `ui/src/components/ContentPanel/ContentPanel.tsx`
 - [X] T028 [US1] Update regular-folder empty state and binary/unsupported file messaging in `ui/src/components/ContentPanel/ContentPanel.tsx`
 - [X] T029 [US1] Run the User Story 1 quickstart checks from `specs/014-folder-repo-capabilities/quickstart.md`
-- [X] T029a [P] [US1] Add picker browse tests for listing files and folders, one Open action, and file-open rejection behavior in `tests/unit/handlers/folder.test.ts` and `ui/src/components/Picker/PickerPage.test.tsx`
-- [X] T029b [US1] Update folder picker responses to include file/folder entry type and folder-only open eligibility in `src/handlers/folder.ts`, `src/types.ts`, and `ui/src/types/index.ts`
+- [X] T029a [P] [US1] Add picker browse tests for listing files and folders, one Open action, and file/folder/repository handle behavior in `tests/unit/handlers/folder.test.ts` and `ui/src/components/Picker/PickerPage.test.tsx`
+- [X] T029b [US1] Update folder picker responses to include file/folder entry type and open eligibility for file viewing, regular-folder browsing, and git-repository browsing in `src/handlers/folder.ts`, `src/types.ts`, and `ui/src/types/index.ts`
 - [X] T029c [US1] Update the folder picker to remove separate browse/open actions and use one primary Open button in `ui/src/components/Picker/PickerPage.tsx`
 - [X] T029d [US1] Align the folder picker's left navigation panel with the main viewer tree organization in `ui/src/components/Picker/PickerPage.tsx` and `ui/src/styles/globals.css`
 - [X] T029e [US1] Add visible outcomes for the scoped failure matrix from SC-006 in `tests/unit/handlers/file.test.ts`, `tests/unit/handlers/repo.test.ts`, `ui/src/components/ContentPanel/ContentPanel.test.tsx`, and `ui/src/App.test.tsx`
+- [X] T029f [US1] Add UI coverage that regular-folder entries do not display local/local-only badges while git local-only entries still do in `ui/src/components/FileTree/FileTree.test.tsx` and `ui/src/components/ContentPanel/ContentPanel.test.tsx`
 
 **Checkpoint**: User Story 1 is functional and testable as the MVP.
 
@@ -96,7 +97,7 @@
 
 ### Implementation for User Story 2
 
-- [X] T033 [US2] Ensure `getInfo` returns deterministic selected remote context for upstream, origin, first remote, and no-remote cases in `src/git/repo.ts`
+- [X] T033 [US2] Ensure git remote context selection is deterministic for upstream, origin, first remote, and no-remote cases in `src/git/repo.ts`
 - [X] T034 [US2] Restructure expanded repository context layout to place local repository and remote repository in one row in `ui/src/components/RepoContext/RepoContextHeader.tsx`
 - [X] T035 [US2] Remove repeated current branch display from the expanded repository context in `ui/src/components/RepoContext/RepoContextHeader.tsx`
 - [X] T036 [US2] Remove the "Upstream sync" field and related expanded-view copy from `ui/src/components/RepoContext/RepoContextHeader.tsx`
@@ -147,6 +148,12 @@
 - [X] T056 Perform a final manual pass through `specs/014-folder-repo-capabilities/quickstart.md`
 - [X] T057 [P] Review README and changelog after picker/navigation refinements in `README.md` and `CHANGELOG.md`
 - [X] T058 Run dependency vulnerability checks with `npm audit` at the repository root and `npm --prefix ui audit`, then apply compatible package upgrades if vulnerabilities are found
+- [X] T059 Add deferred git context loading so repository initial render is not blocked by remote, identity, or root ignore decoration in `src/git/repo.ts`, `src/handlers/repo.ts`, `src/server.ts`, `ui/src/services/api.ts`, and `ui/src/App.tsx`
+- [X] T060 Add server and UI regression coverage for deferred git context loading in `tests/integration/server.test.ts`, `tests/unit/git/repo.test.ts`, `ui/src/App.test.tsx`, `ui/src/App.logic.test.tsx`, and `ui/src/App.branch-coverage.test.tsx`
+- [X] T061 Review large-file and unsupported-file handling against existing binary/non-editable file behavior in `src/git/repo.ts`, `src/handlers/file.ts`, and `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T062 Run release-readiness verification with `npm run verify`, `npm pack --dry-run`, and the release review checklist before tagging or publishing
+- [X] T063 Fix picker file handles so selecting a file opens its parent root and selected file in `src/handlers/repo.ts`, `ui/src/components/Picker/PickerPage.tsx`, `tests/unit/handlers/folder.test.ts`, and `ui/src/components/Picker/PickerPage.test.tsx`
+- [X] T064 Reduce git repository startup tree cost by sharing root tree queries and batching git ignore checks in `ui/src/components/ContentPanel/ContentPanel.tsx`, `src/git/repo.ts`, and existing tree coverage
 
 ---
 

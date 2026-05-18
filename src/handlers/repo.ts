@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { existsSync, statSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { basename, dirname, relative, resolve } from 'node:path'
 import {
   commitWorkingTreeChanges,
   getAppVersion,
@@ -11,6 +11,7 @@ import {
   getInfo,
   findReadme,
   setRepoGitIdentity,
+  spawnGit,
   switchBranch,
   syncCurrentBranchWithRemote,
   validateRepo,
@@ -60,14 +61,44 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
     return c.json(res)
   }
 
-  if (!statSync(path).isDirectory()) {
-    const res: LocalActionResponse = { ok: false, error: `Not a folder: ${path}` }
+  const resolvedInputPath = realpathSync(path)
+  const stats = statSync(resolvedInputPath)
+  if (stats.isFile()) {
+    const parentPath = dirname(resolvedInputPath)
+    let rootPath = parentPath
+    let selectedPath = basename(path)
+
+    if (validateRepo(parentPath)) {
+      try {
+        rootPath = spawnGit(parentPath, 'rev-parse', '--show-toplevel')
+        selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
+      } catch {
+        rootPath = parentPath
+      }
+    }
+
+    setRepoPath(rootPath)
+    setPickerPath('')
+    const res: LocalActionResponse = {
+      ok: true,
+      error: '',
+      path: resolvedInputPath,
+      rootPath,
+      selectedPath,
+      selectedPathType: 'file',
+    }
     return c.json(res)
   }
 
-  setRepoPath(resolve(path))
+  if (!stats.isDirectory()) {
+    const res: LocalActionResponse = { ok: false, error: `Not a folder or file: ${path}` }
+    return c.json(res)
+  }
+
+  const rootPath = resolvedInputPath
+  setRepoPath(rootPath)
   setPickerPath('')
-  const res: LocalActionResponse = { ok: true, error: '' }
+  const res: LocalActionResponse = { ok: true, error: '', path: rootPath, rootPath, selectedPath: '', selectedPathType: 'none' }
   return c.json(res)
 }
 

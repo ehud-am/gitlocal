@@ -1309,6 +1309,20 @@ export function isIgnoredPath(repoPath: string, filePath: string): boolean {
   return result.status === 0
 }
 
+function getIgnoredPathSet(repoPath: string, paths: string[]): Set<string> {
+  const normalizedPaths = uniqueNormalizedPaths(paths)
+  if (normalizedPaths.length === 0) return new Set()
+
+  const result = spawnSync('git', ['check-ignore', '--stdin'], {
+    cwd: repoPath,
+    input: normalizedPaths.join('\n'),
+    encoding: 'utf-8',
+  })
+
+  if (result.status !== 0 || !result.stdout) return new Set()
+  return new Set(result.stdout.split('\n').map((line) => line.trim()).filter(Boolean))
+}
+
 export function getEditableState(repoPath: string, filePath: string, branch: string): { editable: boolean; revisionToken: string | null } {
   if (!isWorkingTreeBranch(repoPath, branch)) {
     return { editable: false, revisionToken: null }
@@ -1442,18 +1456,23 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     return []
   }
 
-  return readdirSync(dirPath, { withFileTypes: true })
+  const directoryEntries = readdirSync(dirPath, { withFileTypes: true })
     .filter((entry) => !isGitRepo || entry.name !== '.git')
+
+  const ignoredPaths = isGitRepo
+    ? getIgnoredPathSet(repoPath, directoryEntries.map((entry) => normalized ? `${normalized}/${entry.name}` : entry.name))
+    : new Set<string>()
+
+  return directoryEntries
     .map((entry) => {
       const path = normalized ? `${normalized}/${entry.name}` : entry.name
-      return { entry, path, localOnly: isGitRepo ? isIgnoredPath(repoPath, path) : true }
+      return {
+        name: entry.name,
+        path,
+        type: entry.isDirectory() ? 'dir' as const : 'file' as const,
+        localOnly: isGitRepo ? ignoredPaths.has(path) : true,
+      }
     })
-    .map(({ entry, path, localOnly }) => ({
-      name: entry.name,
-      path,
-      type: entry.isDirectory() ? 'dir' as const : 'file' as const,
-      localOnly,
-    }))
     .sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
       return a.name.localeCompare(b.name)

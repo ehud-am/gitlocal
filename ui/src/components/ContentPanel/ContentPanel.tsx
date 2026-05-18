@@ -216,7 +216,7 @@ export default function ContentPanel({
     isLoading: isDirectoryLoading,
     isError: isDirectoryError,
   } = useQuery({
-    queryKey: ['tree', directoryPath, branch, refreshToken, 'content-panel'],
+    queryKey: ['tree', directoryPath, branch, refreshToken],
     queryFn: () => api.getTree(directoryPath, branch),
     enabled: showingDirectoryView,
   })

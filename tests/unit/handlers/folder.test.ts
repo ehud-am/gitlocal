@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -49,21 +49,25 @@ describe('folder and repository open handlers', () => {
     expect(body.error).toBeTruthy()
   })
 
-  it('returns ok:false when the selected path is a file', async () => {
+  it('opens a selected file by using its parent folder as the active root', async () => {
     const app = createApp('')
     const client = testClient(app)
     const filePath = join(validDir, 'README.md')
     const res = await client.api.repo.open.$post({ json: { path: filePath } })
     const body = await res.json()
-    expect(body.ok).toBe(false)
-    expect(body.error).toContain('Not a folder')
+    expect(body.ok).toBe(true)
+    expect(body.error).toBe('')
+    expect(body.rootPath).toBe(realpathSync(validDir))
+    expect(body.selectedPath).toBe('README.md')
+    expect(body.selectedPathType).toBe('file')
+    expect(getRepoPath()).toBe(realpathSync(validDir))
   })
 
   it('updates server repoPath on success', async () => {
     const app = createApp('')
     const client = testClient(app)
     await client.api.repo.open.$post({ json: { path: validDir } })
-    expect(getRepoPath()).toBe(validDir)
+    expect(getRepoPath()).toBe(realpathSync(validDir))
   })
 
   it('returns ok:false when path field is missing', async () => {
@@ -99,7 +103,7 @@ describe('folder and repository open handlers', () => {
       const body = await res.json()
       expect(body.ok).toBe(true)
       expect(body.error).toBe('')
-      expect(getRepoPath()).toBe(nonGitDir)
+      expect(getRepoPath()).toBe(realpathSync(nonGitDir))
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
     }

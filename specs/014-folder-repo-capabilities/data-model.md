@@ -25,13 +25,14 @@ Represents a file or folder within the active local root.
 - `name`: Entry display name.
 - `path`: Root-relative path.
 - `type`: `file` or `dir`.
-- `localOnly`: `true` for regular-folder entries and for git working-tree entries not tracked by git.
+- `localOnly`: Indicates local-only status when git metadata can identify a working-tree entry as local-only relative to git-tracked history. Regular-folder transport responses may carry compatibility metadata, but regular-folder UI does not use it for visible badges because all entries are local by definition.
 - `syncState`: Present only when git metadata can provide meaningful file sync state.
 
 **Validation rules**:
 - Paths are normalized and root-relative.
 - Entries outside the active root are never returned.
 - Hidden files and ignored-looking names are regular entries unless existing product rules exclude them.
+- Regular-folder UI must not display local/local-only badges.
 
 ## File Content
 
@@ -79,12 +80,14 @@ Represents repository identity and context shown in compact and expanded views.
 - `isGitRepo`: Always `true`.
 - `gitContext.remote`: Selected remote repository context.
 - `gitContext.user`: Git identity details.
+- `gitContext`: May be loaded after the initial repository metadata so the viewer shell can render before slower git decoration completes.
 
 **Validation rules**:
 - Expanded view must not repeat `currentBranch`.
 - Expanded view must not show an "Upstream sync" field.
 - Expanded actions must not expose commit or remote sync checks.
 - Missing remote context shows an explicit empty state.
+- Initial repository metadata should avoid expensive remote, identity, and per-entry ignore checks when those can be loaded after first render.
 
 ## Remote Repository Context
 

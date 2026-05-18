@@ -7,7 +7,7 @@
 
 ## Summary
 
-Extend GitLocal so a selected regular local folder can be browsed and edited with the same core file operations currently available for repository working trees, while cleaning up the expanded git repository context view. The implementation will generalize local filesystem tree/file/mutation behavior to the active local root, present local repository and remote repository identity in one expanded row, remove redundant upstream/commit/sync UI affordances, and add an editable SSH key path to git identity.
+Extend GitLocal so selected files, regular local folders, and git repositories share one coherent open/viewer model. Regular folders can be browsed and edited with the same core file operations currently available for repository working trees, while git repositories add branch, remote, and identity context. The implementation generalizes local filesystem tree/file/mutation behavior to the active local root, presents local repository and remote repository identity in one expanded row, removes redundant upstream/commit/sync UI affordances, adds an editable SSH key path to git identity, and keeps git repository startup responsive by loading slower git decoration after the initial shell.
 
 ## Technical Context
 
@@ -17,7 +17,7 @@ Extend GitLocal so a selected regular local folder can be browsed and edited wit
 **Testing**: Vitest, React Testing Library, jest-axe where existing UI accessibility tests apply; per-file branch coverage threshold remains 90%  
 **Target Platform**: Local Node.js-served browser application on developer machines  
 **Project Type**: Single npm package with Node.js HTTP server and React SPA  
-**Performance Goals**: Non-git folder browsing locates known files in under 30 seconds for folders up to 500 visible entries; file create/edit/delete completes within 2 minutes; SSH key path editing completes within 60 seconds  
+**Performance Goals**: Non-git folder browsing locates known files in under 30 seconds for folders up to 500 visible entries; git repositories render the initial viewer shell before slower remote/identity decoration is required to finish; file create/edit/delete completes within 2 minutes; SSH key path editing completes within 60 seconds
 **Constraints**: Local-first operation; no telemetry or account dependency; no custom remote protocol integration; no committed contributor-local absolute paths in docs; file operations must not escape the selected local root  
 **Scale/Scope**: One local active folder or git repository at a time; feature spans file tree/content/mutation APIs, repository context presentation, git identity editing, and associated tests
 
@@ -58,7 +58,7 @@ src/
 ├── handlers/
 │   ├── file.ts           # tree/file/create/update/delete handlers for active local root
 │   ├── folder.ts         # folder picker and folder mutation handlers
-│   ├── repo.ts           # repo/folder info, open-root, and git identity handlers
+│   ├── repo.ts           # repo/folder info, open-root, deferred git context, and git identity handlers
 │   └── sync.ts           # retained sync-state support for file status where applicable
 ├── server.ts             # active repo/folder routing state and API route wiring
 └── types.ts              # shared server contracts

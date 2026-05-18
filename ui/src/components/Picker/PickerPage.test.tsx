@@ -14,7 +14,12 @@ vi.mock('../../services/api', () => ({
   },
 }))
 
+vi.mock('../../services/viewerState', () => ({
+  writeViewerState: vi.fn(),
+}))
+
 import { api } from '../../services/api'
+import { writeViewerState } from '../../services/viewerState'
 
 async function openFolderActionsMenu() {
   const trigger = await screen.findByRole('button', { name: /folder actions/i })
@@ -27,9 +32,10 @@ async function openFolderActionsMenu() {
 beforeEach(() => {
   vi.clearAllMocks()
   Object.defineProperty(window, 'location', {
-    value: { reload: vi.fn() },
+    value: { pathname: '/', search: '', hash: '', reload: vi.fn() },
     writable: true,
   })
+  window.history.replaceState(null, '', '/')
 
   vi.mocked(api.getFolderBrowse).mockResolvedValue({
     currentPath: '/Users/example',
@@ -99,7 +105,7 @@ describe('PickerPage', () => {
     expect(vi.mocked(api.openRepository)).not.toHaveBeenCalled()
   })
 
-  it('selects files without browsing into them on double click', async () => {
+  it('opens files through the same Open path handling', async () => {
     vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
       currentPath: '/Users/example',
       parentPath: '/Users',
@@ -115,13 +121,28 @@ describe('PickerPage', () => {
       canInitGit: true,
       canCloneIntoChild: true,
     })
+    vi.mocked(api.openRepository).mockResolvedValue({
+      ok: true,
+      error: '',
+      path: '/Users/example/README.md',
+      rootPath: '/Users/example',
+      selectedPath: 'README.md',
+      selectedPathType: 'file',
+    })
 
     render(<PickerPage />)
 
     fireEvent.doubleClick(await screen.findByRole('button', { name: /^README\.md file$/i }))
 
-    expect(screen.getByRole('textbox', { name: /folder path/i })).toHaveValue('/Users/example')
-    expect(vi.mocked(api.openRepository)).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/README.md')
+    })
+    expect(window.location.reload).toHaveBeenCalled()
+    expect(vi.mocked(writeViewerState)).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: '/Users/example',
+      path: 'README.md',
+      pathType: 'file',
+    }))
   })
 
   it('uses the sidebar tree to select and browse folders', async () => {
@@ -146,6 +167,31 @@ describe('PickerPage', () => {
     await waitFor(() => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users')
     })
+  })
+
+  it('does not show local badges for plain folder entries in the picker tree', async () => {
+    vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example',
+      parentPath: '/Users',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [
+        { name: 'README.md', path: '/Users/example/README.md', type: 'file', isGitRepo: false },
+        { name: 'gitlocal', path: '/Users/example/gitlocal', type: 'dir', isGitRepo: true },
+      ],
+      error: '',
+      isGitRepo: false,
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: true,
+      canCloneIntoChild: true,
+    })
+
+    render(<PickerPage />)
+
+    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    expect(within(tree).queryByText(/^local$/i)).not.toBeInTheDocument()
+    expect(within(tree).getByText(/^git$/i)).toBeInTheDocument()
   })
 
   it('collapses and restores navigation with the same rail pattern as the viewer', async () => {

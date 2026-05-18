@@ -14,6 +14,7 @@
 3. Expand the folder tree and verify all immediate files and folders are visible.
 4. Open a text or markdown file and confirm its contents render.
 5. Open an image or binary file and confirm it is presented as non-editable.
+6. Confirm file and folder rows do not show `local` or `local-only` badges in the regular-folder view.
 
 ## Verify Regular Folder File Mutations
 
@@ -42,6 +43,7 @@
 5. Confirm the expanded area does not repeat current branch.
 6. Confirm the expanded area does not show "Upstream sync".
 7. Confirm commit and remote sync check actions are not offered.
+8. Confirm the repository viewer shell and file tree appear before remote repository and git identity decoration are required to finish loading.
 
 ## Verify SSH Key Path Editing
 

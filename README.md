@@ -103,7 +103,7 @@ If your current shell is already inside a git repository, GitLocal opens that re
 From the picker you can:
 
 - double-click a folder row to move deeper into it
-- select any folder and open it with the single **Open** button
+- select a file, folder, or git repository and open it with the single **Open** button
 - use the folder actions menu to create a subfolder, run `git init`, or clone into a child folder
 
 GitLocal also clears stale saved branch and path state when you switch folders, so reopening the app does not strand you on an invalid branch or file from a previous root.
@@ -115,19 +115,19 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 - **Browse the file tree** — expand and collapse folders lazily, whether the root is a plain folder or a git repository
 - **Read files beautifully** — Markdown renders with GitHub-like typography and tables; code files get syntax highlighting; images display inline
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
-- **Track file sync state** — file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
+- **Track file sync state in repositories** — repository file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
 - **Make local file edits** — create, edit, and delete files from the viewer in plain folders or on a repository's working branch
 - **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — update the repository-specific git `user.name`, `user.email`, and SSH key path without touching your global git config
-- **See repo context clearly** — GitHub-like header with branch, local path, remote repository, remote linkage, and repo-local identity
+- **See repo context clearly** — GitHub-like header with branch, local path, remote repository, remote linkage, and repo-local identity loaded after the initial viewer shell
 - **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker with files, folders, and git repository detection
 - **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; passing a plain folder opens that folder as the active root
 - **Clear folder actions** — picker folders can be browsed deeper, initialized as git repos, or used as clone targets
 - **Light and dark themes** — GitHub-inspired light mode with matching dark mode support
-- **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone and sync actions use the local `git` executable when a repo has a remote configured
+- **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone/setup actions use the local `git` executable only when you choose them
 
 The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
 Repository-wide search no longer takes over `Cmd/Ctrl+F`, so the browser's native page find stays available while GitLocal offers its own explicit repository search and current-file find tools.
@@ -198,7 +198,7 @@ gitlocal/
 │   ├── cli.ts           — entry point: arg parsing, server start, browser open
 │   ├── server.ts        — Hono app, route registration, static serving + SPA fallback
 │   ├── git/
-│   │   ├── repo.ts      — repo metadata, branch/sync actions, commit helpers, README lookup, and file sync state
+│   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, and file sync state
 │   │   └── tree.ts      — listDir (git ls-tree wrapper, sorted dirs-first)
 │   ├── services/
 │   │   └── repo-watch.ts — working-tree revision and sync status snapshots for the UI
@@ -209,12 +209,12 @@ gitlocal/
 │       ├── sync.ts      — /api/sync
 │       └── search.ts    — /api/search
 └── ui/src/
-    ├── App.tsx                      — layout, repo sync polling, dialogs, README auto-load, picker mode
+    ├── App.tsx                      — layout, repo sync polling, deferred git context, dialogs, README auto-load, picker mode
     ├── components/
     │   ├── FileTree/                — lazy expand/collapse tree
     │   ├── Breadcrumb/              — path navigation
     │   ├── ContentPanel/            — Markdown, code, image, binary rendering, and local file editing
-    │   ├── RepoContext/             — branch switcher, sync summary, repo metadata, identity editing, commit/sync actions
+    │   ├── RepoContext/             — branch switcher, sync summary, repo metadata, and identity editing
     │   └── Picker/                  — PickerPage table browser with setup actions
     └── services/api.ts              — typed fetch wrappers for all endpoints
 ```
@@ -224,7 +224,7 @@ gitlocal/
 - **No external runtime dependencies beyond Node.js** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
 - **Single npm toolchain** — build, test, and install all via `npm`; no Go, no Makefile, no shell scripts
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
-- **Local-first editing and sync awareness** — GitLocal can create, update, and delete files in repository working trees while using git commands for branch and repository metadata actions
+- **Local-first editing and repo awareness** — GitLocal can create, update, and delete files in folder roots and repository working trees while using git commands for branch and repository metadata
 
 ---
 
@@ -235,11 +235,12 @@ All endpoints are served under `/api/`:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/info` | Active root metadata (name, branch, isGitRepo, pickerMode) |
+| `GET /api/git/context` | Deferred git identity and selected remote context for the active repository |
 | `GET /api/readme` | Detects and returns the README filename for the current repo |
 | `GET /api/branches` | List of branches with `isCurrent` flag |
 | `POST /api/branches/switch` | Switch branches with dirty-tree confirmation flows |
-| `POST /api/git/commit` | Stage all current changes and create a local commit |
-| `POST /api/git/sync` | Push ahead branches or fast-forward pull behind branches |
+| `POST /api/git/commit` | Compatibility route for creating a local commit; not exposed in the current repository UI |
+| `POST /api/git/sync` | Compatibility route for remote sync; not exposed in the current repository UI |
 | `PUT /api/git/identity` | Update `user.name`, `user.email`, and optional SSH key path in the current repo's local git config |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |

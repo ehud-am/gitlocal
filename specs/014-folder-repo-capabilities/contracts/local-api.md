@@ -15,30 +15,48 @@ Returns active root metadata for either a git repository or a regular folder.
   "currentBranch": "",
   "isGitRepo": false,
   "pickerMode": true,
-  "version": "0.6.3",
+  "version": "0.7.0",
   "hasCommits": false,
   "rootEntryCount": 12,
   "gitContext": null
 }
 ```
 
-### Git Repository Response Additions
+### Git Repository Initial Response
+
+`GET /api/info` returns fast repository metadata needed to render the initial viewer. Slower git decoration can be returned as `null` and loaded through `GET /api/git/context`.
 
 ```json
 {
-  "gitContext": {
-    "user": {
-      "name": "Repo User",
-      "email": "repo@example.com",
-      "source": "local",
-      "sshKeyPath": "~/.ssh/id_repo"
-    },
-    "remote": {
-      "name": "origin",
-      "fetchUrl": "git@github.com:example/project.git",
-      "webUrl": "https://github.com/example/project",
-      "selectionReason": "origin"
-    }
+  "name": "project",
+  "path": "/runtime/absolute/path/project",
+  "currentBranch": "main",
+  "isGitRepo": true,
+  "pickerMode": false,
+  "version": "0.7.0",
+  "hasCommits": true,
+  "rootEntryCount": 12,
+  "gitContext": null
+}
+```
+
+## GET /api/git/context
+
+Returns git-specific decoration for the active repository after the initial viewer can render.
+
+```json
+{
+  "user": {
+    "name": "Repo User",
+    "email": "repo@example.com",
+    "source": "local",
+    "sshKeyPath": "~/.ssh/id_repo"
+  },
+  "remote": {
+    "name": "origin",
+    "fetchUrl": "git@github.com:example/project.git",
+    "webUrl": "https://github.com/example/project",
+    "selectionReason": "origin"
   }
 }
 ```
@@ -53,6 +71,7 @@ Returns immediate child entries for the requested path.
 - Response includes every readable immediate child file and folder at `path`.
 - Returned paths are root-relative.
 - Git sync metadata is omitted when it is not meaningful.
+- Regular-folder entries must not render visible local/local-only badges even when the transport field is present for compatibility.
 
 ```json
 [

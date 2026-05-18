@@ -32,6 +32,14 @@
 - Load every descendant into one flat list. Rejected because it is less usable for nested projects and can degrade performance on large folders.
 - Limit regular folders to top-level files. Rejected because the spec requires the full file list.
 
+## Decision: Use One Open Action with File, Folder, and Repository Handles
+
+**Rationale**: The picker should not feel like a repository-only setup step. It lists files, folders, and git repositories, and one Open action should route the selected entry to the correct viewer behavior: file viewing, regular-folder browsing, or git-repository browsing with git-specific context.
+
+**Alternatives considered**:
+- Keep separate browse-folder and open-repository actions. Rejected because it preserves the obsolete folder-vs-repository split.
+- Reject file selections from the picker. Rejected because GitLocal is growing into a local file/folder/repository viewer, and files should participate in the same open model.
+
 ## Decision: Move Remote Repository Identity into the First Expanded Repository Row
 
 **Rationale**: The compact repository view already shows the current branch. The expanded view should instead put local path and remote repository together so users can compare local and remote identity in one scan.
@@ -39,6 +47,14 @@
 **Alternatives considered**:
 - Keep branch, remote, and upstream sync together. Rejected because this repeats compact-row information and preserves the confusing expanded layout.
 - Hide remote repository identity entirely. Rejected because the user explicitly wants local-vs-remote in a single line.
+
+## Decision: Defer Slow Git Decoration After Initial Repository Render
+
+**Rationale**: Repository startup can be delayed by synchronous git config, remote lookup, identity lookup, and per-entry ignore checks. The initial page should render from cheap metadata first, then load git identity and remote context as decoration after the shell and file tree can appear.
+
+**Alternatives considered**:
+- Keep all git context in `GET /api/info`. Rejected because it blocks initial display on decoration that is not required for first render.
+- Remove git context entirely. Rejected because remote and identity information remain important repository features.
 
 ## Decision: Remove Commit and Remote Sync Actions from Repository Context UI
 

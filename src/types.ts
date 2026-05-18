@@ -223,6 +223,9 @@ export interface LocalActionResponse {
   ok: boolean
   error: string
   path?: string
+  rootPath?: string
+  selectedPath?: string
+  selectedPathType?: ViewerPathType
   message?: string
 }
 

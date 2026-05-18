@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
+import { writeViewerState } from '../../services/viewerState'
 import type { FolderBrowseEntry } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { MetaTag } from '../ui/meta-tag'
@@ -92,6 +93,21 @@ export default function PickerPage() {
     void loadPath()
   }, [])
 
+  function reloadAfterOpen(result: { rootPath?: string; path?: string; selectedPath?: string; selectedPathType?: 'file' | 'dir' | 'none' }, fallbackPath: string): void {
+    writeViewerState({
+      repoPath: result.rootPath ?? result.path ?? fallbackPath,
+      branch: '',
+      path: result.selectedPath ?? '',
+      pathType: result.selectedPathType ?? 'none',
+      raw: false,
+      searchPresentation: 'collapsed',
+      searchQuery: '',
+      searchMode: 'both',
+      searchCaseSensitive: false,
+    })
+    window.location.reload()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -105,7 +121,7 @@ export default function PickerPage() {
     try {
       const result = await api.openRepository(path.trim())
       if (result.ok) {
-        window.location.reload()
+        reloadAfterOpen(result, path.trim())
       } else {
         setError(result.error || 'An error occurred. Please try again.')
       }
@@ -123,7 +139,7 @@ export default function PickerPage() {
     try {
       const result = await api.openRepository(nextPath)
       if (result.ok) {
-        window.location.reload()
+        reloadAfterOpen(result, nextPath)
       } else {
         setError(result.error || 'An error occurred. Please try again.')
       }
@@ -265,6 +281,11 @@ export default function PickerPage() {
                       onDoubleClick={() => {
                         if (entry.type === 'dir') {
                           void loadPath(entry.path)
+                          return
+                        }
+
+                        if (!entry.isParent) {
+                          void handleOpenPath(entry.path)
                         }
                       }}
                     >
@@ -278,7 +299,7 @@ export default function PickerPage() {
                       </span>
                       <div className="file-tree-node-label">
                         <span className="file-tree-node-name" title={entry.name}>{entry.name}</span>
-                        {entry.isParent ? null : <MetaTag label={entry.isGitRepo ? 'git' : 'local'} icon={entry.isGitRepo ? 'git' : 'local-only'} tone="neutral" compact />}
+                        {entry.isParent || !entry.isGitRepo ? null : <MetaTag label="git" icon="git" tone="neutral" compact />}
                       </div>
                     </div>
                   ))
@@ -354,7 +375,10 @@ export default function PickerPage() {
 
                           if (entry.type === 'dir') {
                             void loadPath(entry.path)
+                            return
                           }
+
+                          void handleOpenPath(entry.path)
                         }}
                       >
                         <td className="picker-entry-cell picker-entry-cell-name">

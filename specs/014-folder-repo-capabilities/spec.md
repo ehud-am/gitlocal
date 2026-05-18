@@ -2,7 +2,7 @@
 
 **Feature Branch**: `014-folder-repo-capabilities`  
 **Created**: 2026-05-17  
-**Status**: Draft  
+**Status**: Ready for v0.7.0 release
 **Input**: User description: "let's make few changes: 1. let's add more capabilities for regular folders that are not under a git. Including see the full list of files, ability to view update delete create new file, etc. 2. for git repos the expanded view is a bit confusing, let's clean it up. presenting the current branch is not relevant as it is part of the short view already. instead in the right column of the first expanded view, let's move there the remote repo, so we can see the local repo against the remote repo in a single line. 3. the field \"Upstream sync\" is not needed. 4. the option for commit and check remote sync are not needed (for these i use a different tool). under the git identity let's add the path to the ssh key. i should be able to view that and edit it."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -68,7 +68,8 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 - A git repository has multiple remotes configured.
 - A git repository has no SSH key path configured yet, or the configured path does not exist.
 - The folder picker is opened on an empty folder, a folder containing only files, or a folder containing both plain folders and git repositories.
-- A user selects a file in the folder picker and then attempts to open it as the active root.
+- A user selects a file in the folder picker; the file opens through the same viewer surface while folders and repositories open as active roots with the appropriate capabilities.
+- A git repository has enough entries or git configuration metadata that synchronous startup decoration could delay the initial page render.
 
 ## Requirements *(mandatory)*
 
@@ -89,9 +90,12 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 - **FR-013**: Users MUST be able to edit and save the SSH key path shown in git identity details.
 - **FR-014**: When no remote repository or SSH key path is available, the system MUST show a clear empty state rather than misleading or stale values.
 - **FR-015**: Changes to regular-folder files and git identity SSH key path MUST be visible after refresh or after leaving and returning to the affected folder or repository.
-- **FR-016**: The folder picker MUST list both files and folders for the current folder, while only folders are eligible to be opened as the active GitLocal root.
-- **FR-017**: The folder picker MUST use a single primary "Open" action for the selected folder path; it MUST NOT present separate "browse selected folder" and "open repository" actions.
-- **FR-018**: The folder picker's left navigation panel MUST match the main viewer's folder-tree organization, including the same collapse/expand rail pattern, folder/file row treatment, and compact local or git repository badges.
+- **FR-016**: The folder picker MUST list files, folders, and git repositories for the current folder, and the single Open action MUST dispatch to the correct handle: file viewing, regular-folder browsing, or git-repository browsing.
+- **FR-017**: The folder picker MUST use a single primary "Open" action for the selected entry; it MUST NOT present separate "browse selected folder" and "open repository" actions.
+- **FR-018**: The folder picker's left navigation panel MUST match the main viewer's folder-tree organization, including the same collapse/expand rail pattern, folder/file row treatment, and compact git repository badges.
+- **FR-019**: Regular-folder views MUST NOT show "local" or "local-only" badges, because every entry in a non-git folder is local by definition; those badges are reserved for git repositories where they distinguish untracked or ignored working-tree entries from git-tracked entries.
+- **FR-020**: Git repository initial loading MUST render the primary viewer shell and file tree before slower git decoration such as remote context, git identity, or per-entry ignore checks is required to complete.
+- **FR-021**: Very large or unsupported files MUST remain safely viewable as non-editable or clearly unsupported states, with the app avoiding full inline editing for files it cannot safely treat as text.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -112,6 +116,8 @@ A user reviews a git repository's identity settings and can see and edit the SSH
 - **SC-005**: A user can view and update a repository SSH key path in under 60 seconds from the git identity area.
 - **SC-006**: Each specified failure class for file and identity operations produces a visible, user-readable outcome explaining what happened: missing path, duplicate path, path escape attempt, unsupported or binary file editing attempt, stale revision token, permission failure, missing git identity fields, and failed SSH key path persistence.
 - **SC-007**: In the folder picker, a user can distinguish folders, files, and git repositories from the left navigation panel without opening a row.
+- **SC-008**: For a git repository with a configured remote and at least 500 root entries, the initial viewer shell is visible before git identity and remote context decoration is required to finish.
+- **SC-009**: In manual review of a non-git folder containing files and subfolders, no entry shows a "local" or "local-only" badge.
 
 ## Assumptions
 
