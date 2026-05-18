@@ -97,6 +97,13 @@ function writeGitConfig(repoPath: string, key: string, value: string): void {
   }
 }
 
+function unsetGitConfig(repoPath: string, key: string): void {
+  const result = runGitCapture(repoPath, 'config', '--local', '--unset', key)
+  if (result.status !== 0 && !result.stderr.includes('No such section') && !result.stderr.includes('No such key')) {
+    throw new Error(result.stderr.trim() || `Unable to clear ${key}.`)
+  }
+}
+
 function getConfiguredRemotes(repoPath: string): string[] {
   const result = runGitCapture(repoPath, 'remote')
   if (result.status !== 0 || !result.stdout) return []
@@ -150,11 +157,12 @@ export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
   const localEmail = readGitConfig(repoPath, '--local', 'user.email')
   const globalName = readGitConfig(repoPath, '--global', 'user.name')
   const globalEmail = readGitConfig(repoPath, '--global', 'user.email')
+  const sshKeyPath = getRepoSshKeyPath(repoPath)
 
   const name = localName || globalName
   const email = localEmail || globalEmail
 
-  if (!name && !email) return null
+  if (!name && !email && !sshKeyPath) return null
 
   const source: GitUserIdentity['source'] =
     localName || localEmail
@@ -165,12 +173,26 @@ export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
     name,
     email,
     source,
+    ...(sshKeyPath ? { sshKeyPath } : {}),
   }
 }
 
-export function setRepoGitIdentity(repoPath: string, name: string, email: string): GitIdentityUpdateResponse {
+export function getRepoSshKeyPath(repoPath: string): string {
+  const sshCommand = readGitConfig(repoPath, '--local', 'core.sshCommand')
+  if (!sshCommand) return ''
+  const match = sshCommand.match(/(?:^|\s)-i\s+(?:"([^"]+)"|'([^']+)'|(\S+))/)
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim()
+}
+
+function formatSshCommandForKeyPath(sshKeyPath: string): string {
+  const escaped = sshKeyPath.replaceAll('"', '\\"')
+  return `ssh -i "${escaped}" -o IdentitiesOnly=yes`
+}
+
+export function setRepoGitIdentity(repoPath: string, name: string, email: string, sshKeyPath?: string): GitIdentityUpdateResponse {
   const trimmedName = name.trim()
   const trimmedEmail = email.trim()
+  const normalizedSshKeyPath = sshKeyPath?.trim()
 
   if (!trimmedName) {
     throw new Error('Git name is required.')
@@ -186,6 +208,13 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
 
   writeGitConfig(repoPath, 'user.name', trimmedName)
   writeGitConfig(repoPath, 'user.email', trimmedEmail)
+  if (normalizedSshKeyPath !== undefined) {
+    if (normalizedSshKeyPath) {
+      writeGitConfig(repoPath, 'core.sshCommand', formatSshCommandForKeyPath(normalizedSshKeyPath))
+    } else {
+      unsetGitConfig(repoPath, 'core.sshCommand')
+    }
+  }
 
   const user = getGitUserIdentity(repoPath)
   /* v8 ignore next 3 -- if both local writes succeed, git must be able to read them back */
@@ -272,6 +301,16 @@ export function getBrowseableRootEntryCount(repoPath: string): number {
     .length
 }
 
+function getFastBrowseableRootEntryCount(repoPath: string): number {
+  try {
+    return readdirSync(repoPath, { withFileTypes: true })
+      .filter((entry) => entry.name !== '.git' && !entry.name.startsWith('.'))
+      .length
+  } catch {
+    return 0
+  }
+}
+
 export function getInfo(repoPath: string): RepoInfo {
   const version = getAppVersion()
   if (!repoPath) {
@@ -297,7 +336,7 @@ export function getInfo(repoPath: string): RepoInfo {
       pickerMode: false,
       version,
       hasCommits: false,
-      rootEntryCount: 0,
+      rootEntryCount: getBrowseableRootEntryCount(repoPath),
       gitContext: null,
     }
   }
@@ -311,8 +350,8 @@ export function getInfo(repoPath: string): RepoInfo {
     pickerMode: false,
     version,
     hasCommits: hasCommits(repoPath),
-    rootEntryCount: getBrowseableRootEntryCount(repoPath),
-    gitContext: getGitContext(repoPath),
+    rootEntryCount: getFastBrowseableRootEntryCount(repoPath),
+    gitContext: null,
   }
 }
 
@@ -530,8 +569,9 @@ export function createWorkingTreeFolder(repoPath: string, parentPath: string, na
   const targetPath = normalizedParent ? `${normalizedParent}/${childName}` : childName
   const fullTargetPath = resolveSafeRepoPath(repoPath, targetPath)
 
+  /* v8 ignore next -- resolveWorkingTreeFolderParent already guarantees the target stays inside the root */
   if (!fullTargetPath) {
-    throw new Error('Folder must be created inside the repository.')
+    throw new Error('Folder must be created inside the opened folder.')
   }
 
   if (existsSync(fullTargetPath)) {
@@ -554,8 +594,9 @@ export interface FolderDeleteImpact {
 export function countWorkingTreeFolderImpact(repoPath: string, folderPath: string): FolderDeleteImpact {
   const normalizedPath = resolveWorkingTreeSubfolder(repoPath, folderPath)
   const fullPath = resolveSafeRepoPath(repoPath, normalizedPath)
+  /* v8 ignore next -- resolveWorkingTreeSubfolder already guarantees the target stays inside the root */
   if (!fullPath) {
-    throw new Error('Folder must be inside the repository.')
+    throw new Error('Folder must be inside the opened folder.')
   }
 
   let fileCount = 0
@@ -584,6 +625,7 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
       if (stat.isFile()) {
         impactHash.update(readFileSync(childPath))
       } else {
+        /* v8 ignore next -- filesystems used in tests expose entries here as regular files or symlinks */
         impactHash.update(`${stat.mode}\0${stat.size}\0${stat.mtimeMs}`)
       }
       impactHash.update('\0')
@@ -605,11 +647,13 @@ export function countWorkingTreeFolderImpact(repoPath: string, folderPath: strin
 export function deleteWorkingTreeFolder(repoPath: string, folderPath: string): FolderDeleteImpact {
   const impact = countWorkingTreeFolderImpact(repoPath, folderPath)
   const fullPath = resolveSafeRepoPath(repoPath, impact.path)
+  /* v8 ignore next 3 -- countWorkingTreeFolderImpact already validates this path */
   if (!fullPath) {
     throw new Error('Folder must be inside the repository.')
   }
 
   rmSync(fullPath, { recursive: true, force: false })
+  /* v8 ignore next 3 -- rmSync throws before returning if removal fails on supported platforms */
   if (existsSync(fullPath)) {
     throw new Error('GitLocal could not remove the selected folder completely.')
   }
@@ -631,6 +675,7 @@ export function nearestExistingRepoPath(repoPath: string, filePath: string): str
     current = parent
   }
 
+  /* v8 ignore next -- loop exits via parent traversal on normal absolute paths */
   return ''
 }
 
@@ -929,6 +974,7 @@ function getGitWorktreeEntries(repoPath: string): GitWorktreeEntry[] {
     }
   }
 
+  /* v8 ignore next 6 -- git worktree porcelain normally terminates entries with a blank line */
   if (currentPath) {
     entries.push({
       path: currentPath,
@@ -1256,10 +1302,25 @@ export function readWorkingTreeFile(repoPath: string, filePath: string): Buffer 
 }
 
 export function isIgnoredPath(repoPath: string, filePath: string): boolean {
+  if (!validateRepo(repoPath)) return false
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized) return false
   const result = spawnSync('git', ['check-ignore', '-q', normalized], { cwd: repoPath })
   return result.status === 0
+}
+
+function getIgnoredPathSet(repoPath: string, paths: string[]): Set<string> {
+  const normalizedPaths = uniqueNormalizedPaths(paths)
+  if (normalizedPaths.length === 0) return new Set()
+
+  const result = spawnSync('git', ['check-ignore', '--stdin'], {
+    cwd: repoPath,
+    input: normalizedPaths.join('\n'),
+    encoding: 'utf-8',
+  })
+
+  if (result.status !== 0 || !result.stdout) return new Set()
+  return new Set(result.stdout.split('\n').map((line) => line.trim()).filter(Boolean))
 }
 
 export function getEditableState(repoPath: string, filePath: string, branch: string): { editable: boolean; revisionToken: string | null } {
@@ -1389,23 +1450,29 @@ export function cloneRepositoryInto(parentPath: string, name: string, repository
 export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: string = ''): TreeNode[] {
   const normalized = normalizeRepoRelativePath(subpath)
   const dirPath = normalized ? resolveSafeRepoPath(repoPath, normalized) : repoPath
+  const isGitRepo = validateRepo(repoPath)
 
   if (!dirPath || !existsSync(dirPath) || !statSync(dirPath).isDirectory()) {
     return []
   }
 
-  return readdirSync(dirPath, { withFileTypes: true })
-    .filter((entry) => entry.name !== '.git')
+  const directoryEntries = readdirSync(dirPath, { withFileTypes: true })
+    .filter((entry) => !isGitRepo || entry.name !== '.git')
+
+  const ignoredPaths = isGitRepo
+    ? getIgnoredPathSet(repoPath, directoryEntries.map((entry) => normalized ? `${normalized}/${entry.name}` : entry.name))
+    : new Set<string>()
+
+  return directoryEntries
     .map((entry) => {
       const path = normalized ? `${normalized}/${entry.name}` : entry.name
-      return { entry, path, localOnly: isIgnoredPath(repoPath, path) }
+      return {
+        name: entry.name,
+        path,
+        type: entry.isDirectory() ? 'dir' as const : 'file' as const,
+        localOnly: isGitRepo ? ignoredPaths.has(path) : true,
+      }
     })
-    .map(({ entry, path, localOnly }) => ({
-      name: entry.name,
-      path,
-      type: entry.isDirectory() ? 'dir' as const : 'file' as const,
-      localOnly,
-    }))
     .sort((a, b) => {
       if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
       return a.name.localeCompare(b.name)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import Breadcrumb from './components/Breadcrumb/Breadcrumb'
@@ -10,7 +10,6 @@ import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
 import AppFooter from './components/AppFooter'
 import {
-  CommitChangesDialog,
   FolderDeleteDialog,
   GitIdentityDialog,
   RepoBoundaryDialog,
@@ -96,13 +95,9 @@ export default function App() {
   const [gitIdentityDialogOpen, setGitIdentityDialogOpen] = useState(false)
   const [gitIdentityName, setGitIdentityName] = useState('')
   const [gitIdentityEmail, setGitIdentityEmail] = useState('')
+  const [gitIdentitySshKeyPath, setGitIdentitySshKeyPath] = useState('')
   const [gitIdentityPending, setGitIdentityPending] = useState(false)
   const [gitIdentityError, setGitIdentityError] = useState('')
-  const [commitDialogOpen, setCommitDialogOpen] = useState(false)
-  const [commitMessage, setCommitMessage] = useState('')
-  const [commitPending, setCommitPending] = useState(false)
-  const [commitError, setCommitError] = useState('')
-  const [syncPending, setSyncPending] = useState(false)
   const [folderDeletePreview, setFolderDeletePreview] = useState<FolderOperationResult | null>(null)
   const [folderDeleteConfirmationName, setFolderDeleteConfirmationName] = useState('')
   const [folderDeletePending, setFolderDeletePending] = useState(false)
@@ -111,12 +106,27 @@ export default function App() {
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
 
-  const { data: info, isLoading } = useQuery({
+  const { data: baseInfo, isLoading } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
 
-  const hasRepoMismatch = Boolean(info?.isGitRepo && viewerRepoPath && info.path && viewerRepoPath !== info.path)
+  const { data: gitContext } = useQuery({
+    queryKey: ['git-context'],
+    queryFn: api.getGitContext,
+    enabled: !!baseInfo?.isGitRepo,
+  })
+
+  const info = useMemo<RepoInfo | undefined>(() => {
+    if (!baseInfo) return undefined
+    if (!baseInfo.isGitRepo) return baseInfo
+    return {
+      ...baseInfo,
+      gitContext: gitContext ?? baseInfo.gitContext ?? null,
+    }
+  }, [baseInfo, gitContext])
+
+  const hasRepoMismatch = Boolean(info && !info.pickerMode && viewerRepoPath && info.path && viewerRepoPath !== info.path)
 
   const { data: branches } = useQuery({
     queryKey: ['branches'],
@@ -137,8 +147,10 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    if (info?.currentBranch && !currentBranch) {
+    if (info?.isGitRepo && info.currentBranch && !currentBranch) {
       setCurrentBranch(info.currentBranch)
+    } else if (info && !info.isGitRepo && currentBranch) {
+      setCurrentBranch('')
     }
   }, [currentBranch, info])
 
@@ -174,7 +186,7 @@ export default function App() {
   }, [branches, currentBranch, info])
 
   useEffect(() => {
-    if (!info?.isGitRepo || !info.path) return
+    if (!info || info.pickerMode || !info.path) return
 
     if (!viewerRepoPath) {
       setViewerRepoPath(info.path)
@@ -192,11 +204,13 @@ export default function App() {
     setSearchQuery('')
     setSearchMode('both')
     setSearchCaseSensitive(false)
-    setStatusMessage('GitLocal reset the saved file context because you opened a different repository.')
+    setStatusMessage('GitLocal reset the saved file context because you opened a different folder.')
     lastRevisionRef.current = ''
 
-    if (currentBranch !== info.currentBranch) {
+    if (info.isGitRepo && currentBranch !== info.currentBranch) {
       setCurrentBranch(info.currentBranch || '')
+    } else if (!info.isGitRepo && currentBranch) {
+      setCurrentBranch('')
     }
   }, [currentBranch, info, viewerRepoPath])
 
@@ -300,7 +314,7 @@ export default function App() {
   async function handleBrowseParentFolder() {
     setPickerLoading(true)
     try {
-      const result = await api.showParentPicker()
+      const result = await api.showParentFolder()
       if (result.ok) {
         window.location.reload()
         return
@@ -325,6 +339,7 @@ export default function App() {
     const gitUser = info?.gitContext?.user
     setGitIdentityName(gitUser?.name ?? '')
     setGitIdentityEmail(gitUser?.email ?? '')
+    setGitIdentitySshKeyPath(gitUser?.sshKeyPath ?? '')
     setGitIdentityError('')
     setGitIdentityDialogOpen(true)
   }
@@ -335,21 +350,10 @@ export default function App() {
     setGitIdentityError('')
   }
 
-  function openCommitDialog(): void {
-    setCommitMessage(`WIP: ${info?.name ?? 'local changes'}`)
-    setCommitError('')
-    setCommitDialogOpen(true)
-  }
-
-  function closeCommitDialog(): void {
-    if (commitPending) return
-    setCommitDialogOpen(false)
-    setCommitError('')
-  }
-
   async function saveGitIdentity(): Promise<void> {
     const name = gitIdentityName.trim()
     const email = gitIdentityEmail.trim()
+    const sshKeyPath = gitIdentitySshKeyPath.trim()
 
     if (!name) {
       setGitIdentityError('Git name is required.')
@@ -365,7 +369,7 @@ export default function App() {
     setGitIdentityError('')
 
     try {
-      const result = await api.updateGitIdentity({ name, email })
+      const result = await api.updateGitIdentity({ name, email, sshKeyPath })
       queryClient.setQueryData<RepoInfo>(['info'], (previous) =>
         previous
           ? {
@@ -377,7 +381,10 @@ export default function App() {
             }
           : previous,
       )
-      await queryClient.invalidateQueries({ queryKey: ['info'] })
+      queryClient.setQueryData(['git-context'], {
+        user: result.user as GitUserIdentity,
+        remote: info?.gitContext?.remote ?? null,
+      })
       setGitIdentityDialogOpen(false)
       setStatusMessage(result.message)
     } catch (error) {
@@ -388,23 +395,14 @@ export default function App() {
   }
 
   const canMutateFiles = Boolean(
-    info?.isGitRepo
+    info
     && !hasRepoMismatch
-    && (!info.currentBranch || currentBranch === info.currentBranch),
+    && (!info.isGitRepo || !info.currentBranch || currentBranch === info.currentBranch),
   )
   const repoSync: RepoSyncState | undefined = syncStatus?.repoSync
   const selectedPathSyncState: FileSyncState | 'none' = syncStatus?.pathSyncState ?? 'none'
   const trackedChangeCount = syncStatus?.trackedChangeCount ?? 0
   const untrackedChangeCount = syncStatus?.untrackedChangeCount ?? 0
-  const hasLocalChanges = trackedChangeCount + untrackedChangeCount > 0
-  const canCommitChanges = canMutateFiles && hasLocalChanges && !hasUnsavedChanges && !branchSwitchPending && !syncPending
-  const canSyncWithRemote = canMutateFiles
-    && !hasUnsavedChanges
-    && !branchSwitchPending
-    && !commitPending
-    && !syncPending
-    && repoSync?.mode !== 'unavailable'
-    && repoSync?.mode !== 'local-only'
 
   async function handleMutationComplete(event: {
     nextPath: string
@@ -476,55 +474,6 @@ export default function App() {
       setFolderDeleteError(getErrorMessage(error, 'Could not delete the folder.'))
     } finally {
       setFolderDeletePending(false)
-    }
-  }
-
-  async function refreshRepoAfterGitAction(message: string): Promise<void> {
-    setStatusMessage(message)
-    setTreeRefreshToken((value) => value + 1)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['info'] }),
-      queryClient.invalidateQueries({ queryKey: ['branches'] }),
-      queryClient.invalidateQueries({ queryKey: ['tree'] }),
-      queryClient.invalidateQueries({ queryKey: ['file'] }),
-      queryClient.invalidateQueries({ queryKey: ['commits'] }),
-      queryClient.invalidateQueries({ queryKey: ['readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['sync'] }),
-    ])
-  }
-
-  async function submitCommitChanges(): Promise<void> {
-    const nextMessage = commitMessage.trim()
-    if (!nextMessage) {
-      setCommitError('Enter a commit message before committing changes.')
-      return
-    }
-
-    setCommitPending(true)
-    setCommitError('')
-    try {
-      const result = await api.commitChanges({ message: nextMessage })
-      setCommitDialogOpen(false)
-      setHasUnsavedChanges(false)
-      await refreshRepoAfterGitAction(result.message)
-    } catch (error) {
-      setCommitError(getErrorMessage(error, 'Could not create the local commit.'))
-    } finally {
-      setCommitPending(false)
-    }
-  }
-
-  async function handleSyncWithRemote(): Promise<void> {
-    setSyncPending(true)
-    try {
-      const result = await api.syncWithRemote()
-      setHasUnsavedChanges(false)
-      await refreshRepoAfterGitAction(result.message)
-    } catch (error) {
-      setStatusMessage(getErrorMessage(error, 'Remote sync failed.'))
-    } finally {
-      setSyncPending(false)
     }
   }
 
@@ -693,18 +642,6 @@ export default function App() {
     )
   }
 
-  if (info && !info.isGitRepo) {
-    return (
-      <>
-        <ErrorScreen
-          title="Not a Git repository"
-          description="This folder is not a git repository. Please point GitLocal at a folder containing a .git directory."
-        />
-        <AppFooter version={info.version} />
-      </>
-    )
-  }
-
   const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
   const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
   const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
@@ -718,8 +655,12 @@ export default function App() {
 
   if (!visibleSelectedPath && !hasRepoMismatch) {
     if (isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
-      emptyStateTitle = 'This repository is ready for a first file'
-      emptyStateDetail = 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
+      emptyStateTitle = info?.isGitRepo
+        ? 'This repository is ready for a first file'
+        : 'This folder is ready for a first file'
+      emptyStateDetail = info?.isGitRepo
+        ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
+        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.'
       emptyStateActions = canMutateFiles
         ? [{ label: 'Create first file', action: 'create-file' }]
         : undefined
@@ -779,6 +720,7 @@ export default function App() {
                   refreshToken={treeRefreshToken}
                   selectedPath={visibleSelectedPath}
                   selectedPathType={visibleSelectedPathType}
+                  isGitRepo={info?.isGitRepo}
                   onSelect={(path, type, localOnly) => {
                     if (type === 'dir') {
                       handleSelectFolder(path, localOnly)
@@ -813,12 +755,8 @@ export default function App() {
                   void handleBranchChange(nextBranch)
                 }}
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
-                onCommitChanges={isWorkingTreeBranchSelected ? openCommitDialog : undefined}
-                onSyncWithRemote={isWorkingTreeBranchSelected ? () => { void handleSyncWithRemote() } : undefined}
-                onOpenSearch={() => setSearchPresentation('expanded')}
+                onOpenSearch={info?.isGitRepo ? () => setSearchPresentation('expanded') : undefined}
                 branchDisabled={branchSwitchPending}
-                commitDisabled={!canCommitChanges}
-                syncDisabled={!canSyncWithRemote}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 branchSwitchDialog={
                   <BranchSwitchDialog
@@ -918,26 +856,15 @@ export default function App() {
         error={gitIdentityError}
         name={gitIdentityName}
         email={gitIdentityEmail}
+        sshKeyPath={gitIdentitySshKeyPath}
         onOpenChange={(open) => {
           if (!gitIdentityPending) setGitIdentityDialogOpen(open)
         }}
         onNameChange={setGitIdentityName}
         onEmailChange={setGitIdentityEmail}
+        onSshKeyPathChange={setGitIdentitySshKeyPath}
         onCancel={closeGitIdentityDialog}
         onSave={() => { void saveGitIdentity() }}
-      />
-
-      <CommitChangesDialog
-        open={commitDialogOpen}
-        pending={commitPending}
-        error={commitError}
-        message={commitMessage}
-        onOpenChange={(open) => {
-          if (!commitPending) setCommitDialogOpen(open)
-        }}
-        onMessageChange={setCommitMessage}
-        onCancel={closeCommitDialog}
-        onCommit={() => { void submitCommitChanges() }}
       />
 
       <FolderDeleteDialog

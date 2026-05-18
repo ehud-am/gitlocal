@@ -126,9 +126,9 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-function formatActivePathLabel(path: string, localOnly: boolean): string {
+function formatActivePathLabel(path: string, localOnly: boolean, isGitRepo: boolean): string {
   if (!path) return 'root'
-  return localOnly ? `root/${path}` : path
+  return isGitRepo && localOnly ? `root/${path}` : path
 }
 
 function findInFileMatches(content: string, query: string, caseSensitive: boolean): InFileMatch[] {
@@ -216,7 +216,7 @@ export default function ContentPanel({
     isLoading: isDirectoryLoading,
     isError: isDirectoryError,
   } = useQuery({
-    queryKey: ['tree', directoryPath, branch, refreshToken, 'content-panel'],
+    queryKey: ['tree', directoryPath, branch, refreshToken],
     queryFn: () => api.getTree(directoryPath, branch),
     enabled: showingDirectoryView,
   })
@@ -422,6 +422,7 @@ export default function ContentPanel({
   const selectedFileName = selectedPathType === 'file' ? basenameOf(selectedPath) : ''
   const selectedFileLocation = selectedPathType === 'file' ? parentPathOf(selectedPath) : ''
   const hasFileActions = canToggleRaw || canMutateFiles
+  const showSelectedLocalOnly = isGitRepo && selectedPathLocalOnly
 
   function renderDirectoryList(path: string, entries: TreeNode[]): JSX.Element {
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
@@ -492,8 +493,8 @@ export default function ContentPanel({
             <div>
               <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
               <div className="content-active-heading-row">
-                <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly)}</h2>
-                {selectedPathLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+                <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}</h2>
+                {showSelectedLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
               </div>
             </div>
             {canMutateFiles ? (
@@ -502,7 +503,7 @@ export default function ContentPanel({
                   <button
                     type="button"
                     className="panel-icon-button content-actions-trigger"
-                    aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly)}`}
+                    aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}`}
                   >
                     <KebabIcon />
                   </button>
@@ -569,7 +570,7 @@ export default function ContentPanel({
                                 </span>
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
-                              {!entry.isParent && entry.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+                              {isGitRepo && !entry.isParent && entry.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
                               {syncBadge ? <MetaTag label={syncBadge.label} icon={syncBadge.icon} tone={syncBadge.tone} compact /> : null}
                             </div>
                           </td>
@@ -721,7 +722,7 @@ export default function ContentPanel({
   }
 
   if (selectedPathType === 'dir') {
-    if (isDirectoryError && selectedPathLocalOnly) {
+    if (isDirectoryError && showSelectedLocalOnly) {
       return (
         <div className="content-panel">
           <p style={{ color: '#cf222e' }}>This local-only folder is no longer available.</p>
@@ -743,7 +744,7 @@ export default function ContentPanel({
     return (
       <div className="content-panel">
         <p style={{ color: '#cf222e' }}>
-          {selectedPathLocalOnly ? 'This local-only file is no longer available.' : 'Failed to load file.'}
+          {showSelectedLocalOnly ? 'This local-only file is no longer available.' : 'Failed to load file.'}
         </p>
       </div>
     )
@@ -766,8 +767,8 @@ export default function ContentPanel({
         <div>
           <p className="content-directory-kicker">File</p>
           <div className="content-active-heading-row">
-            <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly)}</h2>
-            {selectedPathLocalOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+            <h2 className="content-directory-heading">{formatActivePathLabel(selectedPath, selectedPathLocalOnly, isGitRepo)}</h2>
+            {showSelectedLocalOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
             {selectedPathSyncBadge ? <MetaTag label={selectedPathSyncBadge.label} icon={selectedPathSyncBadge.icon} tone={selectedPathSyncBadge.tone} compact /> : null}
           </div>
         </div>

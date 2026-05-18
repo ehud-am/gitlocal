@@ -1,16 +1,23 @@
 import type { Context } from 'hono'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { basename, dirname, relative, resolve } from 'node:path'
 import {
   commitWorkingTreeChanges,
   getAppVersion,
   getBranches,
   getCommits,
+  getCurrentBranch,
+  getGitContext,
   getInfo,
   findReadme,
   setRepoGitIdentity,
+  spawnGit,
   switchBranch,
   syncCurrentBranchWithRemote,
+  validateRepo,
 } from '../git/repo.js'
-import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest } from '../types.js'
+import { setPickerPath, setRepoPath } from '../server.js'
+import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest, LocalActionResponse, RepositoryOpenRequest } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
 
@@ -34,11 +41,89 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
   return c.json(info)
 }
 
+export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let body: RepositoryOpenRequest
+  try {
+    body = await c.req.json<RepositoryOpenRequest>()
+  } catch {
+    const res: LocalActionResponse = { ok: false, error: 'Invalid JSON body' }
+    return c.json(res)
+  }
+
+  const { path } = body
+  if (!path) {
+    const res: LocalActionResponse = { ok: false, error: 'path is required' }
+    return c.json(res)
+  }
+
+  if (!existsSync(path)) {
+    const res: LocalActionResponse = { ok: false, error: `Path does not exist: ${path}` }
+    return c.json(res)
+  }
+
+  const resolvedInputPath = realpathSync(path)
+  const stats = statSync(resolvedInputPath)
+  if (stats.isFile()) {
+    const parentPath = dirname(resolvedInputPath)
+    let rootPath = parentPath
+    let selectedPath = basename(path)
+
+    if (validateRepo(parentPath)) {
+      try {
+        rootPath = spawnGit(parentPath, 'rev-parse', '--show-toplevel')
+        selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
+      } catch {
+        rootPath = parentPath
+      }
+    }
+
+    setRepoPath(rootPath)
+    setPickerPath('')
+    const res: LocalActionResponse = {
+      ok: true,
+      error: '',
+      path: resolvedInputPath,
+      rootPath,
+      selectedPath,
+      selectedPathType: 'file',
+    }
+    return c.json(res)
+  }
+
+  if (!stats.isDirectory()) {
+    const res: LocalActionResponse = { ok: false, error: `Not a folder or file: ${path}` }
+    return c.json(res)
+  }
+
+  const rootPath = resolvedInputPath
+  setRepoPath(rootPath)
+  setPickerPath('')
+  const res: LocalActionResponse = { ok: true, error: '', path: rootPath, rootPath, selectedPath: '', selectedPathType: 'none' }
+  return c.json(res)
+}
+
+export async function repositoryParentFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({ ok: false, error: 'No repository is currently open' })
+  }
+
+  setRepoPath('')
+  setPickerPath(dirname(repoPath))
+  return c.json({ ok: true, error: '' })
+}
+
 export async function branchesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json([])
   const branches = getBranches(repoPath)
   return c.json(branches)
+}
+
+export async function gitContextHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath || !validateRepo(repoPath)) return c.json(null)
+  return c.json(getGitContext(repoPath))
 }
 
 export async function commitsHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -54,11 +139,11 @@ export async function commitsHandler(c: Context<{ Variables: Variables }>): Prom
 export async function readmeHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json({ path: '' })
-  const info = getInfo(repoPath)
+  if (!validateRepo(repoPath)) return c.json({ path: '' })
   const requestedPath = c.req.query('path') ?? ''
   const requestedBranch = c.req.query('branch') ?? ''
-  const readmeBranch = requestedBranch || info.currentBranch || 'HEAD'
-  const path = info.isGitRepo ? findReadme(repoPath, readmeBranch, requestedPath) : ''
+  const readmeBranch = requestedBranch || getCurrentBranch(repoPath) || 'HEAD'
+  const path = findReadme(repoPath, readmeBranch, requestedPath)
   return c.json({ path })
 }
 
@@ -116,7 +201,7 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
   }
 
   try {
-    const result = setRepoGitIdentity(repoPath, payload.name, payload.email)
+    const result = setRepoGitIdentity(repoPath, payload.name, payload.email, payload.sshKeyPath)
     return c.json(result)
   } catch (error) {
     return c.json({

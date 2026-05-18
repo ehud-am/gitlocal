@@ -52,24 +52,46 @@ import {
   countWorkingTreeFolderImpact,
   deleteWorkingTreeFolder,
   listWorkingTreeDirectoryEntries,
+  getRepoSshKeyPath,
 } from '../../../src/git/repo.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function isolatedGitEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env = { ...process.env, ...overrides }
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_CONFIG_KEY_') || key.startsWith('GIT_CONFIG_VALUE_')) {
+      delete env[key]
+    }
+  }
+  delete env.GIT_AUTHOR_NAME
+  delete env.GIT_AUTHOR_EMAIL
+  delete env.GIT_COMMITTER_NAME
+  delete env.GIT_COMMITTER_EMAIL
+  delete env.EMAIL
+  delete env.GIT_CONFIG_COUNT
+  delete env.GIT_CONFIG_GLOBAL
+  delete env.GIT_CONFIG_SYSTEM
+  delete env.XDG_CONFIG_HOME
+  env.GIT_CONFIG_NOSYSTEM = '1'
+  return env
+}
+
 function makeGitRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-test-'))
-  spawnSync('git', ['init'], { cwd: dir })
-  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir })
-  spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: dir })
+  const env = isolatedGitEnv()
+  spawnSync('git', ['init'], { cwd: dir, env })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir, env })
+  spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: dir, env })
   writeFileSync(join(dir, 'README.md'), '# Test')
   writeFileSync(join(dir, 'main.ts'), 'console.log("hello")')
   writeFileSync(join(dir, 'notes.txt'), 'notes')
   mkdirSync(join(dir, 'docs'))
   writeFileSync(join(dir, 'docs', 'guide.md'), 'guide')
-  spawnSync('git', ['add', '.'], { cwd: dir })
-  spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir })
+  spawnSync('git', ['add', '.'], { cwd: dir, env })
+  spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir, env })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
@@ -80,7 +102,7 @@ function makeBareRepo(prefix: string = 'gitlocal-remote-'): { dir: string; clean
 }
 
 function git(dir: string, ...args: string[]): string {
-  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf-8' })
+  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf-8', env: isolatedGitEnv() })
   expect(result.status).toBe(0)
   return result.stdout.trim()
 }
@@ -148,12 +170,15 @@ describe('getInfo', () => {
     }
   })
 
-  it('returns isGitRepo false for non-git path', () => {
+  it('returns folder metadata for a non-git path', () => {
     const dir = mkdtempSync(join(tmpdir(), 'not-git-'))
     try {
+      writeFileSync(join(dir, 'README.md'), '# Plain folder')
       const info = getInfo(dir)
       expect(info.isGitRepo).toBe(false)
       expect(info.pickerMode).toBe(false)
+      expect(info.name).toBeTruthy()
+      expect(info.rootEntryCount).toBe(1)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -685,13 +710,35 @@ describe('working tree helpers', () => {
 
   it('surfaces commit failures from git', () => {
     const originalHome = process.env.HOME
+    const isolatedKeys = [
+      'GIT_AUTHOR_NAME',
+      'GIT_AUTHOR_EMAIL',
+      'GIT_COMMITTER_NAME',
+      'GIT_COMMITTER_EMAIL',
+      'EMAIL',
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_SYSTEM',
+      'GIT_CONFIG_NOSYSTEM',
+      'XDG_CONFIG_HOME',
+      ...Object.keys(process.env).filter((key) => key.startsWith('GIT_CONFIG_KEY_') || key.startsWith('GIT_CONFIG_VALUE_')),
+    ]
+    const originalValues = new Map<string, string | undefined>(
+      isolatedKeys.map((key) => [key, process.env[key]]),
+    )
     const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-commit-failure-home-'))
     const dir = mkdtempSync(join(tmpdir(), 'gitlocal-commit-failure-'))
-    spawnSync('git', ['init'], { cwd: dir })
+    spawnSync('git', ['init'], { cwd: dir, env: isolatedGitEnv() })
     writeFileSync(join(dir, 'README.md'), '# missing identity')
 
     try {
       process.env.HOME = homeDir
+      for (const key of isolatedKeys) {
+        delete process.env[key]
+      }
+      process.env.GIT_CONFIG_NOSYSTEM = '1'
+      process.env.GIT_CONFIG_GLOBAL = '/dev/null'
+      process.env.XDG_CONFIG_HOME = homeDir
       const result = commitWorkingTreeChanges(dir, 'Will fail')
       expect(result).toEqual(expect.objectContaining({
         ok: false,
@@ -699,6 +746,14 @@ describe('working tree helpers', () => {
       }))
     } finally {
       process.env.HOME = originalHome
+      for (const key of isolatedKeys) {
+        const value = originalValues.get(key)
+        if (value === undefined) {
+          delete process.env[key]
+        } else {
+          process.env[key] = value
+        }
+      }
       rmSync(homeDir, { recursive: true, force: true })
       rmSync(dir, { recursive: true, force: true })
     }
@@ -1005,6 +1060,36 @@ describe('working tree helpers', () => {
     }
   })
 
+  it('reads, updates, and clears repository-local SSH key path', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      expect(getRepoSshKeyPath(dir)).toBe('')
+
+      const result = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '~/.ssh/id_repo')
+      expect(result.user.sshKeyPath).toBe('~/.ssh/id_repo')
+      expect(getRepoSshKeyPath(dir)).toBe('~/.ssh/id_repo')
+      expect(spawnGit(dir, 'config', '--local', 'core.sshCommand')).toContain('~/.ssh/id_repo')
+
+      const changed = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '/tmp/identity with spaces')
+      expect(changed.user.sshKeyPath).toBe('/tmp/identity with spaces')
+      expect(getRepoSshKeyPath(dir)).toBe('/tmp/identity with spaces')
+
+      const cleared = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '')
+      expect(cleared.user.sshKeyPath).toBeUndefined()
+      expect(getRepoSshKeyPath(dir)).toBe('')
+
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', "ssh -i '~/.ssh/single_quote'")
+      expect(getRepoSshKeyPath(dir)).toBe('~/.ssh/single_quote')
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', 'ssh -i /tmp/plain_key')
+      expect(getRepoSshKeyPath(dir)).toBe('/tmp/plain_key')
+      spawnGit(dir, 'config', '--local', 'core.sshCommand', 'ssh -o IdentitiesOnly=yes')
+      expect(getRepoSshKeyPath(dir)).toBe('')
+    } finally {
+      cleanup()
+    }
+  })
+
   it('rejects incomplete repository git identity updates', () => {
     const { dir, cleanup } = makeGitRepo()
 
@@ -1108,8 +1193,7 @@ describe('working tree helpers', () => {
       git(dir, 'branch', '-D', 'remote-only')
       git(dir, 'fetch', 'origin')
 
-      const info = getInfo(dir)
-      expect(info.gitContext?.remote?.name).toBe('origin')
+      expect(getGitRemoteContext(dir)?.name).toBe('origin')
 
       const branches = getBranches(dir)
       expect(branches.find((branch) => branch.name === currentBranch)).toEqual(

@@ -16,6 +16,7 @@ export interface GitUserIdentity {
   name: string
   email: string
   source: GitUserSource
+  sshKeyPath?: string
 }
 
 export interface RepoRemoteContext {
@@ -33,6 +34,7 @@ export interface GitContext {
 export interface GitIdentityUpdateRequest {
   name: string
   email: string
+  sshKeyPath?: string
 }
 
 export interface GitIdentityUpdateResponse {
@@ -213,34 +215,38 @@ export interface FolderOperationResult {
   impactToken?: string
 }
 
-export interface PickRequest {
+export interface RepositoryOpenRequest {
   path: string
 }
 
-export interface PickResponse {
+export interface LocalActionResponse {
   ok: boolean
   error: string
   path?: string
+  rootPath?: string
+  selectedPath?: string
+  selectedPathType?: ViewerPathType
   message?: string
 }
 
-export interface PickBrowseEntry {
+export interface FolderBrowseEntry {
   name: string
   path: string
+  type: 'file' | 'dir'
   isGitRepo: boolean
 }
 
-export interface PickBrowseRoot {
+export interface FolderBrowseRoot {
   name: string
   path: string
 }
 
-export interface PickBrowseResponse {
+export interface FolderBrowseResponse {
   currentPath: string
   parentPath: string | null
   homePath: string
-  roots: PickBrowseRoot[]
-  entries: PickBrowseEntry[]
+  roots: FolderBrowseRoot[]
+  entries: FolderBrowseEntry[]
   error: string
   isGitRepo?: boolean
   canOpen?: boolean
@@ -249,16 +255,16 @@ export interface PickBrowseResponse {
   canCloneIntoChild?: boolean
 }
 
-export interface PickCreateFolderRequest {
+export interface FolderCreateChildRequest {
   parentPath: string
   name: string
 }
 
-export interface PickInitGitRequest {
+export interface FolderInitRepositoryRequest {
   path: string
 }
 
-export interface PickCloneRequest {
+export interface FolderCloneRepositoryRequest {
   parentPath: string
   name: string
   repositoryUrl: string

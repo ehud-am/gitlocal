@@ -22,9 +22,11 @@ interface GitIdentityDialogProps {
   error: string
   name: string
   email: string
+  sshKeyPath: string
   onOpenChange: (open: boolean) => void
   onNameChange: (value: string) => void
   onEmailChange: (value: string) => void
+  onSshKeyPathChange: (value: string) => void
   onCancel: () => void
   onSave: () => void
 }
@@ -90,9 +92,11 @@ export function GitIdentityDialog({
   error,
   name,
   email,
+  sshKeyPath,
   onOpenChange,
   onNameChange,
   onEmailChange,
+  onSshKeyPathChange,
   onCancel,
   onSave,
 }: GitIdentityDialogProps) {
@@ -102,7 +106,7 @@ export function GitIdentityDialog({
         <DialogHeader>
           <DialogTitle>Edit Repository Git Identity</DialogTitle>
           <DialogDescription>
-            This updates <code>user.name</code> and <code>user.email</code> in this repository’s local git config only.
+            This updates <code>user.name</code>, <code>user.email</code>, and the SSH key path in this repository's local git config only.
           </DialogDescription>
         </DialogHeader>
 
@@ -126,6 +130,17 @@ export function GitIdentityDialog({
               onChange={(event) => onEmailChange(event.target.value)}
               placeholder="jane@example.com"
               aria-label="Git user email"
+              disabled={pending}
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-sm font-medium text-[var(--foreground)]">SSH key path</span>
+            <Input
+              value={sshKeyPath}
+              onChange={(event) => onSshKeyPathChange(event.target.value)}
+              placeholder="~/.ssh/id_ed25519"
+              aria-label="Git SSH key path"
               disabled={pending}
             />
           </label>

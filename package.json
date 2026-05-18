@@ -1,7 +1,7 @@
 {
   "name": "gitlocal",
-  "version": "0.6.3",
-  "description": "Browse any local git repository in your browser",
+  "version": "0.7.0",
+  "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
     "repository",
@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",
-    "hono": "^4.12.12",
+    "hono": "^4.12.19",
     "open": "^10.1.0"
   },
   "devDependencies": {

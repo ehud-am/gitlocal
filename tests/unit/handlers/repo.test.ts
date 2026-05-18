@@ -160,6 +160,44 @@ describe('gitIdentityUpdateHandler', () => {
     }
   })
 
+  it('updates and clears the repository-local SSH key path with git identity', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const update = await app.fetch(new Request('http://localhost/api/git/identity', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Updated User',
+          email: 'updated@example.com',
+          sshKeyPath: '~/.ssh/id_repo',
+        }),
+      }))
+
+      expect(update.status).toBe(200)
+      let body = await update.json() as { user: { sshKeyPath?: string } }
+      expect(body.user.sshKeyPath).toBe('~/.ssh/id_repo')
+      expect(spawnSync('git', ['config', '--local', 'core.sshCommand'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toContain('~/.ssh/id_repo')
+
+      const clear = await app.fetch(new Request('http://localhost/api/git/identity', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Updated User',
+          email: 'updated@example.com',
+          sshKeyPath: '',
+        }),
+      }))
+
+      expect(clear.status).toBe(200)
+      body = await clear.json() as { user: { sshKeyPath?: string } }
+      expect(body.user.sshKeyPath).toBeUndefined()
+    } finally {
+      repo.cleanup()
+    }
+  })
+
   it('rejects invalid git identity payloads', async () => {
     const repo = makeGitRepo()
 

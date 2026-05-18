@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+## 0.7.0 - 2026-05-18
+
+- Unified folder and repository opening so plain folders open in the main viewer, while git repositories add branch, remote, and identity context.
+- Updated the picker to list files, folders, and git repositories, navigate into folders on double-click, and use one explicit Open action for the selected entry.
+- Simplified expanded repository context by showing local and remote repositories together while removing repeated branch, upstream sync, commit, and remote sync controls.
+- Added repository-local SSH key path viewing and editing to git identity settings.
+- Improved git repository startup by rendering the initial viewer before slower remote and identity decoration finishes loading.
+- Hid local-only badges for plain folders while preserving them for git repository entries where they distinguish untracked or ignored working-tree content.
+
 ## 0.6.3
 
 - Added a non-executing package entry point so package size analyzers and import resolvers can resolve GitLocal without launching the CLI server.

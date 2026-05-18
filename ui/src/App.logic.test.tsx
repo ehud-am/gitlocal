@@ -150,9 +150,10 @@ vi.mock('./components/AppFooter', () => ({
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
-    showParentPicker: vi.fn(),
+    showParentFolder: vi.fn(),
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
@@ -162,14 +163,14 @@ vi.mock('./services/api', () => ({
     updateFile: vi.fn(),
     deleteFile: vi.fn(),
     getSearchResults: vi.fn(),
-    getPickBrowse: vi.fn(),
-    submitPick: vi.fn(),
+    getFolderBrowse: vi.fn(),
+    openRepository: vi.fn(),
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
-    createPickFolder: vi.fn(),
-    initPickGit: vi.fn(),
-    clonePickRepo: vi.fn(),
+    createChildFolder: vi.fn(),
+    initFolderRepository: vi.fn(),
+    cloneRepositoryIntoFolder: vi.fn(),
   },
 }))
 
@@ -279,12 +280,13 @@ describe('App logic', () => {
 
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
+    vi.mocked(api.getGitContext).mockResolvedValue(buildInfo().gitContext)
     vi.mocked(api.getBranches).mockResolvedValue([
       { name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true },
       { name: 'release', displayName: 'release', scope: 'local', hasLocalCheckout: true, isCurrent: false },
     ])
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
-    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
+    vi.mocked(api.showParentFolder).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
     vi.mocked(api.switchBranch).mockResolvedValue({
       ok: false,
       status: 'blocked',
@@ -325,10 +327,42 @@ describe('App logic', () => {
 
     renderApp()
 
-    expect(await screen.findByText(/opened a different repository/i)).toBeInTheDocument()
+    expect(await screen.findByText(/opened a different folder/i)).toBeInTheDocument()
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":""')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"none"')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"raw":false')
+  })
+
+  it('resets the selected branch when a different root opens with different git capabilities', async () => {
+    readViewerState.mockReturnValue(buildViewerState({
+      repoPath: '/tmp/previous',
+      branch: 'old',
+    }))
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
+      path: '/tmp/release-repo',
+      currentBranch: 'release',
+    }))
+
+    const gitRender = renderApp()
+    await waitFor(() => {
+      expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":"release"')
+    })
+    gitRender.unmount()
+
+    readViewerState.mockReturnValue(buildViewerState({
+      repoPath: '/tmp/previous',
+      branch: 'main',
+    }))
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
+      path: '/tmp/plain-folder',
+      currentBranch: '',
+      isGitRepo: false,
+    }))
+
+    renderApp()
+    await waitFor(() => {
+      expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":""')
+    })
   })
 
   it('shows the empty repository and read-only branch landing states', async () => {
@@ -375,7 +409,7 @@ describe('App logic', () => {
     expect(await screen.findByText(/repository has no commits yet/i)).toBeInTheDocument()
   })
 
-  it('initializes the current branch from repo info, supports picker and non-repo screens, and toggles the sidebar', async () => {
+  it('initializes the current branch from repo info, supports picker mode, and toggles the sidebar', async () => {
     readViewerState.mockReturnValue(buildViewerState({ branch: '', sidebarCollapsed: true }))
 
     const initialRender = renderApp()
@@ -392,10 +426,6 @@ describe('App logic', () => {
     const pickerRender = renderApp()
     expect(await screen.findByText('picker page')).toBeInTheDocument()
     pickerRender.unmount()
-
-    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({ isGitRepo: false }))
-    renderApp()
-    expect(await screen.findByRole('heading', { name: /not a git repository/i })).toBeInTheDocument()
   })
 
   it('expands search from saved state, the header trigger, selection, and dismissal', async () => {
@@ -432,9 +462,7 @@ describe('App logic', () => {
     expect(screen.queryByRole('heading', { name: /leave this repository/i })).not.toBeInTheDocument()
   })
 
-  it('validates git identity, commit message, and remote sync failures', async () => {
-    vi.mocked(api.syncWithRemote).mockRejectedValueOnce({ message: 'Remote sync failed hard.' })
-
+  it('validates git identity without exposing commit or remote sync callbacks', async () => {
     renderApp()
 
     fireEvent.click(await screen.findByRole('button', { name: 'open-identity' }))
@@ -445,13 +473,10 @@ describe('App logic', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
     fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: /commit changes/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/enter a commit message/i)
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
-
     fireEvent.click(screen.getByRole('button', { name: 'sync-remote' }))
-    expect(await screen.findByText(/remote sync failed hard/i)).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: /commit message/i })).not.toBeInTheDocument()
+    expect(api.commitChanges).not.toHaveBeenCalled()
+    expect(api.syncWithRemote).not.toHaveBeenCalled()
   })
 
   it('handles successful parent browsing, file mutations, tree selection, and child status updates', async () => {
@@ -460,7 +485,7 @@ describe('App logic', () => {
       value: { reload },
       writable: true,
     })
-    vi.mocked(api.showParentPicker).mockResolvedValueOnce({ ok: true, error: '', message: '' })
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({ ok: true, error: '', message: '' })
 
     renderApp()
 

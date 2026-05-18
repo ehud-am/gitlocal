@@ -1015,7 +1015,7 @@ pre {
 
 .picker-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   min-height: calc(100vh - 48px);
 }
 
@@ -1026,13 +1026,13 @@ pre {
 }
 
 .picker-sidebar {
-  padding: 1rem;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
 }
 
-.picker-sidebar-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.picker-file-tree {
+  max-height: 100%;
 }
 
 .picker-main {

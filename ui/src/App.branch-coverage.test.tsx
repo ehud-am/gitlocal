@@ -243,9 +243,10 @@ vi.mock('./components/AppDialogs', () => ({
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
-    showParentPicker: vi.fn(),
+    showParentFolder: vi.fn(),
     getTree: vi.fn(),
     getBranches: vi.fn(),
     getCommits: vi.fn(),
@@ -258,14 +259,14 @@ vi.mock('./services/api', () => ({
     getFolderDeletePreview: vi.fn(),
     deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
-    getPickBrowse: vi.fn(),
-    submitPick: vi.fn(),
+    getFolderBrowse: vi.fn(),
+    openRepository: vi.fn(),
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
-    createPickFolder: vi.fn(),
-    initPickGit: vi.fn(),
-    clonePickRepo: vi.fn(),
+    createChildFolder: vi.fn(),
+    initFolderRepository: vi.fn(),
+    cloneRepositoryIntoFolder: vi.fn(),
   },
 }))
 
@@ -383,12 +384,13 @@ describe('App branch coverage', () => {
 
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
+    vi.mocked(api.getGitContext).mockResolvedValue(buildInfo().gitContext)
     vi.mocked(api.getBranches).mockResolvedValue([
       { name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true },
       { name: 'release', displayName: 'release', scope: 'local', hasLocalCheckout: true, isCurrent: false },
     ])
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
-    vi.mocked(api.showParentPicker).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
+    vi.mocked(api.showParentFolder).mockResolvedValue({ ok: false, error: '', message: 'Parent unavailable.' })
     vi.mocked(api.switchBranch).mockResolvedValue({
       ok: false,
       status: 'blocked',
@@ -556,12 +558,10 @@ describe('App branch coverage', () => {
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"none"')
   })
 
-  it('covers boundary dialog callbacks plus pending guards for identity and commit dialogs', async () => {
+  it('covers boundary dialog callbacks plus identity pending guards without header commit actions', async () => {
     const identityRequest = deferred<Awaited<ReturnType<typeof api.updateGitIdentity>>>()
-    const commitRequest = deferred<Awaited<ReturnType<typeof api.commitChanges>>>()
     vi.mocked(api.updateGitIdentity).mockReturnValue(identityRequest.promise)
-    vi.mocked(api.commitChanges).mockReturnValue(commitRequest.promise)
-    vi.mocked(api.showParentPicker).mockResolvedValueOnce({ ok: false, error: '', message: '' })
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({ ok: false, error: '', message: '' })
 
     renderApp()
 
@@ -593,21 +593,8 @@ describe('App branch coverage', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    expect(screen.getByRole('textbox', { name: /commit message/i })).toHaveValue('WIP: repo')
-    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), { target: { value: 'Ship it' } })
-    fireEvent.click(screen.getByRole('button', { name: 'submit-commit' }))
-    fireEvent.click(screen.getByRole('button', { name: 'close-commit' }))
-    expect(screen.getByTestId('commit-dialog')).toBeInTheDocument()
-    commitRequest.resolve({
-      ok: true,
-      status: 'committed',
-      message: 'Committed.',
-      commitHash: 'def1234567',
-      shortHash: 'def1234',
-    })
-    await waitFor(() => {
-      expect(screen.queryByTestId('commit-dialog')).not.toBeInTheDocument()
-    })
+    expect(screen.queryByTestId('commit-dialog')).not.toBeInTheDocument()
+    expect(api.commitChanges).not.toHaveBeenCalled()
   })
 
   it('uses fallback dialog values when repository metadata is incomplete', async () => {
@@ -618,6 +605,7 @@ describe('App branch coverage', () => {
         remote: null,
       },
     }))
+    vi.mocked(api.getGitContext).mockResolvedValueOnce(null)
 
     renderApp()
 
@@ -627,7 +615,7 @@ describe('App branch coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'close-identity' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    expect(screen.getByRole('textbox', { name: /commit message/i })).toHaveValue('WIP: local changes')
+    expect(screen.queryByRole('textbox', { name: /commit message/i })).not.toBeInTheDocument()
   })
 
   it('covers branch switch early returns, follow-up confirmations, and retained-path updates', async () => {
@@ -837,9 +825,8 @@ describe('App branch coverage', () => {
     })
   })
 
-  it('surfaces identity, commit, and follow-up branch switch errors', async () => {
+  it('surfaces identity and follow-up branch switch errors', async () => {
     vi.mocked(api.updateGitIdentity).mockRejectedValueOnce({ error: 'Identity update failed.' })
-    vi.mocked(api.commitChanges).mockRejectedValueOnce(new Error('Commit failed.'))
     vi.mocked(api.switchBranch)
       .mockResolvedValueOnce({
         ok: false,
@@ -867,12 +854,6 @@ describe('App branch coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'save-identity' }))
     expect(await screen.findByText(/identity update failed/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'close-identity' }))
-
-    fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /commit message/i }), { target: { value: 'Ship it' } })
-    fireEvent.click(screen.getByRole('button', { name: 'submit-commit' }))
-    expect(await screen.findByText(/commit failed/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'close-commit' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'switch-branch' }))
     expect(await screen.findByTestId('branch-switch-dialog')).toBeInTheDocument()

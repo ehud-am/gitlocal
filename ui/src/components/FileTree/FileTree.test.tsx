@@ -84,18 +84,29 @@ describe('FileTree', () => {
     })
   })
 
-  it('shows a local-only cue for ignored tree entries', async () => {
+  it('shows a local-only cue for ignored tree entries in git repos', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: '.env', path: '.env', type: 'file', localOnly: true },
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
-    renderWithClient(<FileTree {...defaultProps} />)
+    renderWithClient(<FileTree {...defaultProps} isGitRepo />)
 
     const ignoredEntry = await screen.findByRole('treeitem', { name: /\.env/i })
     expect(within(ignoredEntry).getByText(/^local$/i)).toBeInTheDocument()
     expect(screen.queryByText(/local only/i)).not.toBeInTheDocument()
     expect(screen.queryAllByText(/^local$/i)).toHaveLength(1)
+  })
+
+  it('does not show local-only cues for plain folders', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    expect(await screen.findByRole('treeitem', { name: /\.env/i })).toBeInTheDocument()
+    expect(screen.queryByText(/^local$/i)).not.toBeInTheDocument()
   })
 
   it('does not render folder delete controls in the left tree', async () => {
