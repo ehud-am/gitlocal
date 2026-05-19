@@ -279,7 +279,12 @@ export default function PickerPage() {
                       aria-selected={path === entry.path}
                       onClick={() => setPath(entry.path)}
                       onDoubleClick={() => {
-                        if (entry.type === 'dir') {
+                        if (entry.isParent) {
+                          void loadPath(entry.path)
+                          return
+                        }
+
+                        if (!entry.isParent && entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
                           void loadPath(entry.path)
                           return
                         }
@@ -373,7 +378,7 @@ export default function PickerPage() {
                             return
                           }
 
-                          if (entry.type === 'dir') {
+                          if (entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
                             void loadPath(entry.path)
                             return
                           }

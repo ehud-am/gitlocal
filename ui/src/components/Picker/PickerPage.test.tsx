@@ -94,15 +94,26 @@ describe('PickerPage', () => {
     })
   })
 
-  it('double-clicking a repository folder browses into it', async () => {
+  it('double-clicking a repository folder opens it as a repository', async () => {
+    vi.mocked(api.openRepository).mockResolvedValue({
+      ok: true,
+      error: '',
+      path: '/Users/example/gitlocal',
+      rootPath: '/Users/example/gitlocal',
+      selectedPath: '',
+      selectedPathType: 'none',
+      openMode: 'repository',
+      gitState: 'repository-root',
+    })
     render(<PickerPage />)
 
     fireEvent.doubleClick(await screen.findByRole('button', { name: /^gitlocal git repository$/i }))
 
     await waitFor(() => {
-      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/gitlocal')
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/gitlocal')
     })
-    expect(vi.mocked(api.openRepository)).not.toHaveBeenCalled()
+    expect(vi.mocked(api.getFolderBrowse)).not.toHaveBeenCalledWith('/Users/example/gitlocal')
+    expect(window.location.reload).toHaveBeenCalled()
   })
 
   it('opens files through the same Open path handling', async () => {
@@ -192,6 +203,40 @@ describe('PickerPage', () => {
     const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
     expect(within(tree).queryByText(/^local$/i)).not.toBeInTheDocument()
     expect(within(tree).getByText(/^git$/i)).toBeInTheDocument()
+  })
+
+  it('does not show repository badges for nested folders inside a repository', async () => {
+    vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/gitlocal',
+      parentPath: '/Users/example',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [
+        {
+          name: 'docs',
+          path: '/Users/example/gitlocal/docs',
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'inside-repository',
+          openMode: 'folder',
+          repositoryRootPath: '/Users/example/gitlocal',
+        },
+      ],
+      error: '',
+      isGitRepo: true,
+      gitState: 'repository-root',
+      openMode: 'repository',
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: false,
+      canCloneIntoChild: true,
+    })
+
+    render(<PickerPage />)
+
+    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    expect(within(tree).queryByText(/^git$/i)).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^docs folder$/i })).toBeInTheDocument()
   })
 
   it('collapses and restores navigation with the same rail pattern as the viewer', async () => {

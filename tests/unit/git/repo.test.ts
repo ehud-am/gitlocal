@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -9,6 +9,7 @@ import {
   commitWorkingTreeChanges,
   convertGitRemoteToWebUrl,
   createChildFolder,
+  classifyLocalPath,
   spawnGit,
   validateRepo,
   getInfo,
@@ -144,6 +145,142 @@ describe('validateRepo', () => {
       expect(validateRepo(dir)).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns false for a regular folder inside a git repo', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(validateRepo(join(dir, 'docs'))).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+})
+
+describe('classifyLocalPath', () => {
+  it('classifies a repository root', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(classifyLocalPath(dir)).toMatchObject({
+        exists: true,
+        pathType: 'directory',
+        gitState: 'repository-root',
+        openMode: 'repository',
+        repositoryRootPath: realpathSync(dir),
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('classifies a folder inside a repository separately from the root', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(classifyLocalPath(join(dir, 'docs'))).toMatchObject({
+        exists: true,
+        pathType: 'directory',
+        gitState: 'inside-repository',
+        openMode: 'folder',
+        repositoryRootPath: realpathSync(dir),
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('classifies a folder outside git as a folder outside repository', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'outside-git-'))
+    try {
+      expect(classifyLocalPath(dir)).toMatchObject({
+        exists: true,
+        pathType: 'directory',
+        gitState: 'outside-repository',
+        openMode: 'folder',
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('classifies missing paths as blocked', () => {
+    const missing = join(tmpdir(), `missing-${Date.now()}`)
+    expect(classifyLocalPath(missing)).toMatchObject({
+      exists: false,
+      pathType: 'missing',
+      gitState: 'outside-repository',
+      openMode: 'blocked',
+    })
+  })
+
+  it('classifies unsupported filesystem entries as blocked', () => {
+    if (process.platform === 'win32') return
+    const dir = mkdtempSync(join(tmpdir(), 'unsupported-entry-'))
+    const fifoPath = join(dir, 'pipe')
+    try {
+      const result = spawnSync('mkfifo', [fifoPath])
+      expect(result.status).toBe(0)
+      expect(classifyLocalPath(fifoPath)).toMatchObject({
+        exists: true,
+        pathType: 'unsupported',
+        gitState: 'outside-repository',
+        openMode: 'blocked',
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('classifies files inside repositories with the containing repository root', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(classifyLocalPath(join(dir, 'README.md'))).toMatchObject({
+        exists: true,
+        pathType: 'file',
+        gitState: 'inside-repository',
+        openMode: 'file',
+        repositoryRootPath: realpathSync(dir),
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('uses canonical paths for symlinked repository roots', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const linkPath = `${dir}-link`
+    try {
+      symlinkSync(dir, linkPath)
+      expect(classifyLocalPath(linkPath)).toMatchObject({
+        canonicalPath: realpathSync(dir),
+        gitState: 'repository-root',
+        openMode: 'repository',
+        repositoryRootPath: realpathSync(dir),
+      })
+    } finally {
+      rmSync(linkPath, { recursive: true, force: true })
+      cleanup()
+    }
+  })
+
+  it('classifies worktree roots that use a .git file as repository roots', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const worktreeDir = mkdtempSync(join(tmpdir(), 'gitlocal-worktree-'))
+    rmSync(worktreeDir, { recursive: true, force: true })
+    try {
+      const result = spawnSync('git', ['worktree', 'add', '-b', 'worktree-test', worktreeDir], { cwd: dir, encoding: 'utf-8' })
+      expect(result.status).toBe(0)
+      expect(classifyLocalPath(worktreeDir)).toMatchObject({
+        exists: true,
+        pathType: 'directory',
+        gitState: 'repository-root',
+        openMode: 'repository',
+        repositoryRootPath: realpathSync(worktreeDir),
+      })
+    } finally {
+      spawnSync('git', ['worktree', 'remove', '--force', worktreeDir], { cwd: dir })
+      rmSync(worktreeDir, { recursive: true, force: true })
+      cleanup()
     }
   })
 })
@@ -639,10 +776,13 @@ describe('working tree helpers', () => {
         const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process')
         return {
           ...actual,
-          spawnSync: vi.fn((command: string, args: string[]) => {
+          spawnSync: vi.fn((command: string, args: string[], options?: Parameters<typeof actual.spawnSync>[2]) => {
             if (command !== 'git') return actual.spawnSync(command, args)
             if (args[0] === 'rev-parse' && args.includes('--is-inside-work-tree')) {
               return { status: 0, stdout: 'true\n', stderr: '' }
+            }
+            if (args[0] === 'rev-parse' && args.includes('--show-toplevel')) {
+              return { status: 0, stdout: `${repo.dir}\n`, stderr: '' }
             }
             if (args[0] === 'rev-parse' && args.includes('--symbolic-full-name')) {
               return { status: 0, stdout: 'origin/main\n', stderr: '' }
@@ -650,7 +790,7 @@ describe('working tree helpers', () => {
             if (args[0] === 'rev-list') {
               return { status: 1, stdout: '', stderr: 'bad revision' }
             }
-            return actual.spawnSync(command, args)
+            return actual.spawnSync(command, args, options)
           }),
         }
       })

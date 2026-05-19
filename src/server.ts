@@ -32,7 +32,7 @@ import {
 } from './handlers/folder.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
-import { validateRepo } from './git/repo.js'
+import { classifyLocalPath } from './git/repo.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
 type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean }
@@ -60,8 +60,9 @@ export function getPickerPath(): string {
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   if (!initialPath) {
     const cwd = process.cwd()
-    if (options.detectCurrentRepoOnEmptyPath && validateRepo(cwd)) {
-      currentRepoPath = cwd
+    const cwdClassification = classifyLocalPath(cwd)
+    if (options.detectCurrentRepoOnEmptyPath && cwdClassification.gitState === 'repository-root') {
+      currentRepoPath = cwdClassification.canonicalPath
       currentPickerPath = ''
       return
     }
@@ -72,13 +73,14 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
   }
 
   const resolvedPath = resolve(initialPath)
-  if (validateRepo(resolvedPath)) {
-    currentRepoPath = resolvedPath
+  const classification = classifyLocalPath(resolvedPath)
+  if (classification.gitState === 'repository-root') {
+    currentRepoPath = classification.canonicalPath
     currentPickerPath = ''
     return
   }
 
-  currentRepoPath = resolvedPath
+  currentRepoPath = classification.canonicalPath || resolvedPath
   currentPickerPath = ''
 }
 

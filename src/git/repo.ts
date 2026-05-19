@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -12,6 +12,7 @@ import type {
   GitContext,
   GitIdentityUpdateResponse,
   GitUserIdentity,
+  LocalPathClassification,
   RemoteSyncResponse,
   RepoSyncState,
   RepoInfo,
@@ -270,13 +271,97 @@ export function getGitContext(repoPath: string): GitContext {
   }
 }
 
-export function validateRepo(repoPath: string): boolean {
+function normalizePlatformPath(path: string): string {
+  return resolve(path)
+}
+
+function canonicalizeExistingPath(path: string): string {
+  return normalizePlatformPath(realpathSync(path))
+}
+
+function getContainingGitRoot(existingPath: string, isFile: boolean): string {
+  const cwd = isFile ? dirname(existingPath) : existingPath
   try {
-    spawnGit(repoPath, 'rev-parse', '--is-inside-work-tree')
-    return true
+    const rootPath = spawnGit(cwd, 'rev-parse', '--show-toplevel')
+    return rootPath ? canonicalizeExistingPath(rootPath) : ''
   } catch {
-    return false
+    return ''
   }
+}
+
+function isSamePath(left: string, right: string): boolean {
+  return normalizePlatformPath(left) === normalizePlatformPath(right)
+}
+
+function isPathDescendant(parentPath: string, childPath: string): boolean {
+  const rel = relative(parentPath, childPath)
+  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+export function classifyLocalPath(inputPath: string): LocalPathClassification {
+  const requestedPath = inputPath ? resolve(inputPath) : ''
+  if (!requestedPath || !existsSync(requestedPath)) {
+    return {
+      inputPath,
+      canonicalPath: requestedPath,
+      exists: false,
+      pathType: 'missing',
+      gitState: 'outside-repository',
+      openMode: 'blocked',
+      message: requestedPath ? `Path does not exist: ${requestedPath}` : 'path is required',
+    }
+  }
+
+  const stats = statSync(requestedPath)
+  const pathType: LocalPathClassification['pathType'] =
+    stats.isFile() ? 'file' : stats.isDirectory() ? 'directory' : 'unsupported'
+  const canonicalPath = canonicalizeExistingPath(requestedPath)
+
+  if (pathType === 'unsupported') {
+    return {
+      inputPath,
+      canonicalPath,
+      exists: true,
+      pathType,
+      gitState: 'outside-repository',
+      openMode: 'blocked',
+      message: `Not a folder or file: ${inputPath}`,
+    }
+  }
+
+  const repositoryRootPath = getContainingGitRoot(canonicalPath, pathType === 'file')
+  const gitState: LocalPathClassification['gitState'] = repositoryRootPath
+    ? isSamePath(repositoryRootPath, canonicalPath)
+      ? 'repository-root'
+      : isPathDescendant(repositoryRootPath, canonicalPath)
+        ? 'inside-repository'
+        : 'outside-repository'
+    : 'outside-repository'
+
+  const openMode: LocalPathClassification['openMode'] =
+    pathType === 'file'
+      ? 'file'
+      : gitState === 'repository-root'
+        ? 'repository'
+        : 'folder'
+
+  return {
+    inputPath,
+    canonicalPath,
+    exists: true,
+    pathType,
+    gitState,
+    openMode,
+    ...(repositoryRootPath ? { repositoryRootPath } : {}),
+  }
+}
+
+export function isRepositoryRoot(repoPath: string): boolean {
+  return classifyLocalPath(repoPath).gitState === 'repository-root'
+}
+
+export function validateRepo(repoPath: string): boolean {
+  return isRepositoryRoot(repoPath)
 }
 
 export function getCurrentBranch(repoPath: string): string {
@@ -307,6 +392,7 @@ function getFastBrowseableRootEntryCount(repoPath: string): number {
       .filter((entry) => entry.name !== '.git' && !entry.name.startsWith('.'))
       .length
   } catch {
+    /* v8 ignore next -- directory readability can change between classification and counting */
     return 0
   }
 }
@@ -326,31 +412,32 @@ export function getInfo(repoPath: string): RepoInfo {
       gitContext: null,
     }
   }
-  const isGitRepo = validateRepo(repoPath)
+  const classification = classifyLocalPath(repoPath)
+  const isGitRepo = classification.gitState === 'repository-root'
   if (!isGitRepo) {
     return {
-      name: basename(repoPath),
-      path: repoPath,
+      name: basename(classification.canonicalPath || repoPath),
+      path: classification.canonicalPath || repoPath,
       currentBranch: '',
       isGitRepo: false,
       pickerMode: false,
       version,
       hasCommits: false,
-      rootEntryCount: getBrowseableRootEntryCount(repoPath),
+      rootEntryCount: getBrowseableRootEntryCount(classification.canonicalPath || repoPath),
       gitContext: null,
     }
   }
   let currentBranch = ''
-  currentBranch = getCurrentBranch(repoPath)
+  currentBranch = getCurrentBranch(classification.canonicalPath)
   return {
-    name: basename(repoPath),
-    path: repoPath,
+    name: basename(classification.canonicalPath),
+    path: classification.canonicalPath,
     currentBranch,
     isGitRepo: true,
     pickerMode: false,
     version,
-    hasCommits: hasCommits(repoPath),
-    rootEntryCount: getFastBrowseableRootEntryCount(repoPath),
+    hasCommits: hasCommits(classification.canonicalPath),
+    rootEntryCount: getFastBrowseableRootEntryCount(classification.canonicalPath),
     gitContext: null,
   }
 }

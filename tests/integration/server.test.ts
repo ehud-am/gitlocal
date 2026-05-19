@@ -224,7 +224,7 @@ describe('Server integration', () => {
       const body = await res.json() as { pickerMode: boolean; path: string; isGitRepo: boolean; version: string; rootEntryCount: number }
       expect(body.pickerMode).toBe(false)
       expect(body.isGitRepo).toBe(false)
-      expect(body.path).toBe(nonGitDir)
+      expect(body.path).toBe(realpathSync(nonGitDir))
       expect(body.rootEntryCount).toBe(0)
       expect(body.version).toBe(APP_VERSION.version)
     } finally {
@@ -271,7 +271,7 @@ describe('Server integration', () => {
     const infoRes = await app.fetch(new Request('http://localhost/api/info'))
     const infoBody = await infoRes.json() as { pickerMode: boolean; path: string }
     expect(infoBody.pickerMode).toBe(true)
-    expect(infoBody.path).toBe(dirname(dir))
+    expect(infoBody.path).toBe(realpathSync(dirname(dir)))
   })
 
   it('POST /api/repo/open updates repo path', async () => {
