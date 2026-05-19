@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
-import { existsSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, relative, resolve } from 'node:path'
+import { statSync } from 'node:fs'
+import { basename, dirname, relative } from 'node:path'
 import {
+  classifyLocalPath,
   commitWorkingTreeChanges,
   getAppVersion,
   getBranches,
@@ -11,7 +12,6 @@ import {
   getInfo,
   findReadme,
   setRepoGitIdentity,
-  spawnGit,
   switchBranch,
   syncCurrentBranchWithRemote,
   validateRepo,
@@ -51,30 +51,28 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   }
 
   const { path } = body
+  const classification = classifyLocalPath(path ?? '')
+
   if (!path) {
     const res: LocalActionResponse = { ok: false, error: 'path is required' }
     return c.json(res)
   }
 
-  if (!existsSync(path)) {
-    const res: LocalActionResponse = { ok: false, error: `Path does not exist: ${path}` }
+  if (!classification.exists || classification.openMode === 'blocked') {
+    const res: LocalActionResponse = { ok: false, error: classification.message ?? `Path does not exist: ${path}` }
     return c.json(res)
   }
 
-  const resolvedInputPath = realpathSync(path)
+  const resolvedInputPath = classification.canonicalPath
   const stats = statSync(resolvedInputPath)
   if (stats.isFile()) {
     const parentPath = dirname(resolvedInputPath)
     let rootPath = parentPath
     let selectedPath = basename(path)
 
-    if (validateRepo(parentPath)) {
-      try {
-        rootPath = spawnGit(parentPath, 'rev-parse', '--show-toplevel')
-        selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
-      } catch {
-        rootPath = parentPath
-      }
+    if (classification.repositoryRootPath) {
+      rootPath = classification.repositoryRootPath
+      selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
     }
 
     setRepoPath(rootPath)
@@ -86,10 +84,14 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
       rootPath,
       selectedPath,
       selectedPathType: 'file',
+      openMode: 'file',
+      gitState: classification.gitState,
+      ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
     }
     return c.json(res)
   }
 
+  /* v8 ignore next 4 -- classifyLocalPath blocks unsupported existing paths before this point */
   if (!stats.isDirectory()) {
     const res: LocalActionResponse = { ok: false, error: `Not a folder or file: ${path}` }
     return c.json(res)
@@ -98,7 +100,17 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   const rootPath = resolvedInputPath
   setRepoPath(rootPath)
   setPickerPath('')
-  const res: LocalActionResponse = { ok: true, error: '', path: rootPath, rootPath, selectedPath: '', selectedPathType: 'none' }
+  const res: LocalActionResponse = {
+    ok: true,
+    error: '',
+    path: rootPath,
+    rootPath,
+    selectedPath: '',
+    selectedPathType: 'none',
+    openMode: classification.openMode,
+    gitState: classification.gitState,
+    ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
+  }
   return c.json(res)
 }
 

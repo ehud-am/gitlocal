@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.7.1 - 2026-05-19
+
+- Fixed folder-picker and startup detection so actual git repository roots open with repository capabilities, while ordinary folders inside a repository remain folder roots instead of being mislabeled as repositories.
+- Pinned the UI test dependency tree to patched `ws` versions so release verification audits pass cleanly.
+
 ## 0.7.0 - 2026-05-18
 
 - Unified folder and repository opening so plain folders open in the main viewer, while git repositories add branch, remote, and identity context.

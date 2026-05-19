@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -57,6 +57,47 @@ describe('infoHandler', () => {
     expect(body.version).toBe(APP_VERSION.version)
     expect(body.hasCommits).toBe(true)
     expect(body.rootEntryCount).toBeGreaterThan(0)
+  })
+
+  it('returns folder metadata for a plain folder root', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'gitlocal-info-folder-'))
+    try {
+      writeFileSync(join(folder, 'README.md'), '# Folder')
+      const app = createApp(folder)
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+      const body = await res.json()
+
+      expect(body.isGitRepo).toBe(false)
+      expect(body.currentBranch).toBe('')
+      expect(body.hasCommits).toBe(false)
+      expect(body.gitContext).toBeNull()
+      expect(body.rootEntryCount).toBe(1)
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
+  })
+
+  it('returns folder metadata for a nested folder inside a repository', async () => {
+    const repo = makeGitRepo()
+    const nested = join(repo.dir, 'docs')
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(nested, 'guide.md'), 'guide')
+
+    try {
+      const app = createApp(nested)
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+      const body = await res.json()
+
+      expect(body.path).toBe(realpathSync(nested))
+      expect(body.isGitRepo).toBe(false)
+      expect(body.currentBranch).toBe('')
+      expect(body.hasCommits).toBe(false)
+      expect(body.gitContext).toBeNull()
+    } finally {
+      repo.cleanup()
+    }
   })
 
   it('counts ignored local root entries in repo metadata', async () => {
@@ -216,6 +257,24 @@ describe('gitIdentityUpdateHandler', () => {
       const body = await res.json() as { ok: boolean; message: string }
       expect(body.ok).toBe(false)
       expect(body.message).toBe('Git name is required.')
+    } finally {
+      repo.cleanup()
+    }
+  })
+})
+
+describe('gitContextHandler', () => {
+  it('returns null for an active folder inside a repository', async () => {
+    const repo = makeGitRepo()
+    const nested = join(repo.dir, 'docs')
+    mkdirSync(nested)
+
+    try {
+      const app = createApp(nested)
+      const client = testClient(app)
+      const res = await client.api.git.context.$get()
+      expect(res.status).toBe(200)
+      expect(await res.json()).toBeNull()
     } finally {
       repo.cleanup()
     }

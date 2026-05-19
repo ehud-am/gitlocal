@@ -102,7 +102,7 @@ If your current shell is already inside a git repository, GitLocal opens that re
 
 From the picker you can:
 
-- double-click a folder row to move deeper into it
+- double-click a regular folder row to move deeper into it, or double-click a git repository row to open it as a repository
 - select a file, folder, or git repository and open it with the single **Open** button
 - use the folder actions menu to create a subfolder, run `git init`, or clone into a child folder
 

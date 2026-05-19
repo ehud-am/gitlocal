@@ -44,6 +44,20 @@ export interface GitIdentityUpdateResponse {
 }
 
 export type ViewerPathType = 'file' | 'dir' | 'none'
+export type LocalGitState = 'repository-root' | 'inside-repository' | 'outside-repository'
+export type LocalOpenMode = 'repository' | 'folder' | 'file' | 'blocked'
+export type LocalPathType = 'file' | 'directory' | 'missing' | 'unsupported'
+
+export interface LocalPathClassification {
+  inputPath: string
+  canonicalPath: string
+  exists: boolean
+  pathType: LocalPathType
+  gitState: LocalGitState
+  openMode: LocalOpenMode
+  repositoryRootPath?: string
+  message?: string
+}
 
 export interface ViewerState {
   branch: string
@@ -226,6 +240,9 @@ export interface LocalActionResponse {
   rootPath?: string
   selectedPath?: string
   selectedPathType?: ViewerPathType
+  gitState?: LocalGitState
+  openMode?: LocalOpenMode
+  repositoryRootPath?: string
   message?: string
 }
 
@@ -234,6 +251,9 @@ export interface FolderBrowseEntry {
   path: string
   type: 'file' | 'dir'
   isGitRepo: boolean
+  gitState?: LocalGitState
+  openMode?: LocalOpenMode
+  repositoryRootPath?: string
 }
 
 export interface FolderBrowseRoot {
@@ -249,6 +269,9 @@ export interface FolderBrowseResponse {
   entries: FolderBrowseEntry[]
   error: string
   isGitRepo?: boolean
+  gitState?: LocalGitState
+  openMode?: LocalOpenMode
+  repositoryRootPath?: string
   canOpen?: boolean
   canCreateChild?: boolean
   canInitGit?: boolean

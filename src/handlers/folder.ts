@@ -8,6 +8,7 @@ import {
   createChildFolder,
   createWorkingTreeFolder,
   deleteWorkingTreeFolder,
+  classifyLocalPath,
   getCurrentBranch,
   getRepoParentPath,
   initializeGitRepository,
@@ -54,11 +55,15 @@ function listFolderEntries(currentPath: string): FolderBrowseEntry[] {
       .map((entry) => {
         const path = resolve(currentPath, entry.name)
         const type = entry.isDirectory() ? 'dir' as const : 'file' as const
+        const classification = classifyLocalPath(path)
         return {
           name: entry.name,
           path,
           type,
-          isGitRepo: type === 'dir' && validateRepo(path),
+          isGitRepo: type === 'dir' && classification.gitState === 'repository-root',
+          gitState: type === 'dir' ? classification.gitState : undefined,
+          openMode: classification.openMode,
+          ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
         }
       })
       .sort((a, b) => {
@@ -78,13 +83,16 @@ function getParentPath(currentPath: string): string | null {
   return parent === currentPath ? null : parent
 }
 
-function getBrowseCapabilities(currentPath: string): Pick<FolderBrowseResponse, 'isGitRepo' | 'canOpen' | 'canCreateChild' | 'canInitGit' | 'canCloneIntoChild'> {
+function getBrowseCapabilities(currentPath: string): Pick<FolderBrowseResponse, 'isGitRepo' | 'gitState' | 'openMode' | 'repositoryRootPath' | 'canOpen' | 'canCreateChild' | 'canInitGit' | 'canCloneIntoChild'> {
   const exists = existsSync(currentPath)
   const isDirectory = exists && statSync(currentPath).isDirectory()
-  const isGitRepo = isDirectory && validateRepo(currentPath)
+  const classification = exists ? classifyLocalPath(currentPath) : null
+  const isGitRepo = isDirectory && classification?.gitState === 'repository-root'
 
   return {
     isGitRepo,
+    ...(classification ? { gitState: classification.gitState, openMode: classification.openMode } : {}),
+    ...(classification?.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
     canOpen: isDirectory,
     canCreateChild: isDirectory,
     canInitGit: isDirectory && !isGitRepo,
@@ -152,6 +160,8 @@ export async function folderBrowseHandler(c: Context<{ Variables: Variables }>):
       entries: [],
       error: `Path does not exist: ${currentPath}`,
       isGitRepo: false,
+      gitState: 'outside-repository',
+      openMode: 'blocked',
       canOpen: false,
       canCreateChild: false,
       canInitGit: false,
