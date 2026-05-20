@@ -28,6 +28,7 @@ Auto-generated from all feature plans. Last updated: 2026-05-19
 - No database; state is derived from local filesystem contents, git metadata/config, browser URL state, and in-memory server/UI state (014-folder-repo-capabilities)
 - TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned (015-fix-git-folder-detection)
 - No database; classification is derived from local filesystem metadata and local git metadata at request time (015-fix-git-folder-detection)
+- No database; classification derives from local filesystem metadata, local git metadata, browser URL state, and in-memory server/UI state (016-fix-subrepo-detection)
 
 ## Project Structure
 
@@ -53,9 +54,9 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). No Go, no Makefile, no shell scripts.
 
 ## Recent Changes
+- 016-fix-subrepo-detection: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 - 015-fix-git-folder-detection: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 - 014-folder-repo-capabilities: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present in the UI
-- 013-unified-action-menus: Added TypeScript 5.x on Node.js 22+ + Hono, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, Radix UI primitives
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -63,5 +64,5 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/015-fix-git-folder-detection/plan.md`
+`specs/016-fix-subrepo-detection/plan.md`
 <!-- SPECKIT END -->

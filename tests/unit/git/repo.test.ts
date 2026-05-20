@@ -96,6 +96,20 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
+function makePlainParentWithRepositoryChild(): { parentDir: string; repoChild: string; cleanup: () => void } {
+  const parentDir = mkdtempSync(join(tmpdir(), 'gitlocal-plain-parent-'))
+  const repoChild = join(parentDir, 'app-repo')
+  mkdirSync(repoChild)
+  const env = isolatedGitEnv()
+  spawnSync('git', ['init'], { cwd: repoChild, env })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: repoChild, env })
+  spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: repoChild, env })
+  writeFileSync(join(repoChild, 'README.md'), '# Repository child')
+  spawnSync('git', ['add', '.'], { cwd: repoChild, env })
+  spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: repoChild, env })
+  return { parentDir, repoChild, cleanup: () => rmSync(parentDir, { recursive: true, force: true }) }
+}
+
 function makeBareRepo(prefix: string = 'gitlocal-remote-'): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   spawnSync('git', ['init', '--bare'], { cwd: dir })
@@ -168,6 +182,21 @@ describe('classifyLocalPath', () => {
         gitState: 'repository-root',
         openMode: 'repository',
         repositoryRootPath: realpathSync(dir),
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('classifies a repository child under a plain parent as a repository root', () => {
+    const { repoChild, cleanup } = makePlainParentWithRepositoryChild()
+    try {
+      expect(classifyLocalPath(repoChild)).toMatchObject({
+        exists: true,
+        pathType: 'directory',
+        gitState: 'repository-root',
+        openMode: 'repository',
+        repositoryRootPath: realpathSync(repoChild),
       })
     } finally {
       cleanup()

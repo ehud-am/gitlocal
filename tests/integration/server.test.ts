@@ -21,6 +21,28 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
+function makeMixedPlainParent(): { parentDir: string; repoChild: string; regularChild: string; emptyRepoChild: string; cleanup: () => void } {
+  const parentDir = mkdtempSync(join(tmpdir(), 'gitlocal-int-mixed-parent-'))
+  const repoChild = join(parentDir, 'app-repo')
+  const regularChild = join(parentDir, 'notes')
+  const emptyRepoChild = join(parentDir, 'empty-repo')
+  mkdirSync(repoChild)
+  mkdirSync(regularChild)
+  mkdirSync(emptyRepoChild)
+  spawnSync('git', ['init'], { cwd: repoChild })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: repoChild })
+  spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: repoChild })
+  writeFileSync(join(repoChild, 'README.md'), '# Repository child')
+  spawnSync('git', ['add', '.'], { cwd: repoChild })
+  spawnSync('git', ['commit', '-m', 'init'], { cwd: repoChild })
+
+  spawnSync('git', ['init'], { cwd: emptyRepoChild })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyRepoChild })
+  spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: emptyRepoChild })
+
+  return { parentDir, repoChild, regularChild, emptyRepoChild, cleanup: () => rmSync(parentDir, { recursive: true, force: true }) }
+}
+
 function makeBareRepo(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-int-remote-'))
   spawnSync('git', ['init', '--bare'], { cwd: dir })
@@ -51,6 +73,90 @@ describe('Server integration', () => {
     expect(body.version).toBe(APP_VERSION.version)
     expect(body.hasCommits).toBe(true)
     expect(body.rootEntryCount).toBeGreaterThan(0)
+  })
+
+  it('opens a repository child directly at startup as a repository', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp(mixed.repoChild)
+      const res = await app.fetch(new Request('http://localhost/api/info'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { isGitRepo: boolean; pickerMode: boolean; path: string }
+      expect(body.isGitRepo).toBe(true)
+      expect(body.pickerMode).toBe(false)
+      expect(realpathSync(body.path)).toBe(realpathSync(mixed.repoChild))
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('keeps repository child classification consistent between parent browse and open', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp(mixed.parentDir)
+      const browseRes = await app.fetch(new Request(`http://localhost/api/folder/browse?path=${encodeURIComponent(mixed.parentDir)}`))
+      expect(browseRes.status).toBe(200)
+      const browseBody = await browseRes.json() as {
+        entries: Array<{ name: string; isGitRepo: boolean; gitState: string; openMode: string; path: string }>
+      }
+      const repoEntry = browseBody.entries.find((entry) => entry.name === 'app-repo')
+
+      expect(repoEntry).toMatchObject({
+        path: mixed.repoChild,
+        isGitRepo: true,
+        gitState: 'repository-root',
+        openMode: 'repository',
+      })
+
+      const openRes = await app.fetch(new Request('http://localhost/api/repo/open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: mixed.repoChild }),
+      }))
+      expect(openRes.status).toBe(200)
+      const openBody = await openRes.json() as { ok: boolean; gitState: string; openMode: string; rootPath: string }
+
+      expect(openBody.ok).toBe(true)
+      expect(openBody.gitState).toBe(repoEntry?.gitState)
+      expect(openBody.openMode).toBe(repoEntry?.openMode)
+      expect(realpathSync(openBody.rootPath)).toBe(realpathSync(mixed.repoChild))
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('opens an empty repository child from a plain parent with repository empty-state metadata', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp(mixed.parentDir)
+      const browseRes = await app.fetch(new Request(`http://localhost/api/folder/browse?path=${encodeURIComponent(mixed.parentDir)}`))
+      const browseBody = await browseRes.json() as {
+        entries: Array<{ name: string; isGitRepo: boolean; gitState: string; openMode: string; path: string }>
+      }
+      expect(browseBody.entries).toContainEqual(expect.objectContaining({
+        name: 'empty-repo',
+        path: mixed.emptyRepoChild,
+        isGitRepo: true,
+        gitState: 'repository-root',
+        openMode: 'repository',
+      }))
+
+      const openRes = await app.fetch(new Request('http://localhost/api/repo/open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: mixed.emptyRepoChild }),
+      }))
+      expect(openRes.status).toBe(200)
+      const infoRes = await app.fetch(new Request('http://localhost/api/info'))
+      const info = await infoRes.json() as { isGitRepo: boolean; hasCommits: boolean; currentBranch: string; rootEntryCount: number; path: string }
+      expect(info.isGitRepo).toBe(true)
+      expect(info.hasCommits).toBe(false)
+      expect(info.currentBranch).toBe('')
+      expect(info.rootEntryCount).toBe(0)
+      expect(realpathSync(info.path)).toBe(realpathSync(mixed.emptyRepoChild))
+    } finally {
+      mixed.cleanup()
+    }
   })
 
   it('GET /api/info reports newly initialized repositories as empty landing states', async () => {

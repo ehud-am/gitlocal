@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -17,6 +17,107 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+function makeMixedPlainParent(): {
+  parentDir: string
+  repoChild: string
+  regularChild: string
+  emptyRepoChild: string
+  linkedRepoChild: string
+  linkedRegularChild: string
+  worktreeChild: string
+  brokenLink: string
+  cleanup: () => void
+} {
+  const parentDir = mkdtempSync(join(tmpdir(), 'gitlocal-mixed-parent-'))
+  const repoChild = join(parentDir, 'app-repo')
+  const regularChild = join(parentDir, 'notes')
+  const emptyRepoChild = join(parentDir, 'empty-repo')
+  mkdirSync(repoChild)
+  mkdirSync(regularChild)
+  mkdirSync(emptyRepoChild)
+  spawnSync('git', ['init'], { cwd: repoChild })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: repoChild })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: repoChild })
+  writeFileSync(join(repoChild, 'README.md'), '# repo child')
+  spawnSync('git', ['add', '.'], { cwd: repoChild })
+  spawnSync('git', ['commit', '-m', 'init'], { cwd: repoChild })
+
+  const linkedRepoTarget = mkdtempSync(join(tmpdir(), 'gitlocal-linked-repo-target-'))
+  spawnSync('git', ['init'], { cwd: linkedRepoTarget })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: linkedRepoTarget })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: linkedRepoTarget })
+  writeFileSync(join(linkedRepoTarget, 'README.md'), '# linked repo child')
+  spawnSync('git', ['add', '.'], { cwd: linkedRepoTarget })
+  spawnSync('git', ['commit', '-m', 'init'], { cwd: linkedRepoTarget })
+
+  const linkedRepoChild = join(parentDir, 'linked-repo')
+  symlinkSync(linkedRepoTarget, linkedRepoChild)
+
+  spawnSync('git', ['init'], { cwd: emptyRepoChild })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyRepoChild })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: emptyRepoChild })
+
+  const linkedRegularTarget = mkdtempSync(join(tmpdir(), 'gitlocal-linked-folder-target-'))
+  writeFileSync(join(linkedRegularTarget, 'notes.txt'), 'plain linked folder')
+  const linkedRegularChild = join(parentDir, 'linked-notes')
+  symlinkSync(linkedRegularTarget, linkedRegularChild)
+
+  const worktreeBase = mkdtempSync(join(tmpdir(), 'gitlocal-worktree-base-'))
+  spawnSync('git', ['init'], { cwd: worktreeBase })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: worktreeBase })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: worktreeBase })
+  writeFileSync(join(worktreeBase, 'README.md'), '# worktree base')
+  spawnSync('git', ['add', '.'], { cwd: worktreeBase })
+  spawnSync('git', ['commit', '-m', 'init'], { cwd: worktreeBase })
+  const worktreeChild = join(parentDir, 'worktree-repo')
+  spawnSync('git', ['worktree', 'add', '-b', 'worktree-child', worktreeChild], { cwd: worktreeBase })
+
+  const brokenLink = join(parentDir, 'broken-link')
+  symlinkSync(join(parentDir, 'missing-target'), brokenLink)
+
+  return {
+    parentDir,
+    repoChild,
+    regularChild,
+    emptyRepoChild,
+    linkedRepoChild,
+    linkedRegularChild,
+    worktreeChild,
+    brokenLink,
+    cleanup: () => {
+      spawnSync('git', ['worktree', 'remove', '--force', worktreeChild], { cwd: worktreeBase })
+      rmSync(parentDir, { recursive: true, force: true })
+      rmSync(linkedRepoTarget, { recursive: true, force: true })
+      rmSync(linkedRegularTarget, { recursive: true, force: true })
+      rmSync(worktreeBase, { recursive: true, force: true })
+    },
+  }
+}
+
+function makeRepoWithNestedIndependentRepo(): { outerRepo: string; vendorDir: string; innerRepo: string; cleanup: () => void } {
+  const outerRepo = mkdtempSync(join(tmpdir(), 'gitlocal-outer-repo-'))
+  const vendorDir = join(outerRepo, 'vendor')
+  const innerRepo = join(vendorDir, 'inner-repo')
+  mkdirSync(vendorDir)
+  mkdirSync(innerRepo)
+  spawnSync('git', ['init'], { cwd: outerRepo })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: outerRepo })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: outerRepo })
+  writeFileSync(join(outerRepo, 'README.md'), '# outer')
+  writeFileSync(join(vendorDir, 'plain.txt'), 'plain vendor file')
+  spawnSync('git', ['add', 'README.md', 'vendor/plain.txt'], { cwd: outerRepo })
+  spawnSync('git', ['commit', '-m', 'outer init'], { cwd: outerRepo })
+
+  spawnSync('git', ['init'], { cwd: innerRepo })
+  spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: innerRepo })
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: innerRepo })
+  writeFileSync(join(innerRepo, 'README.md'), '# inner')
+  spawnSync('git', ['add', '.'], { cwd: innerRepo })
+  spawnSync('git', ['commit', '-m', 'inner init'], { cwd: innerRepo })
+
+  return { outerRepo, vendorDir, innerRepo, cleanup: () => rmSync(outerRepo, { recursive: true, force: true }) }
 }
 
 describe('folder and repository open handlers', () => {
@@ -271,6 +372,196 @@ describe('folder and repository open handlers', () => {
       ])
     } finally {
       rmSync(nonGitDir, { recursive: true, force: true })
+    }
+  })
+
+  it('marks repository children inside plain folders as repositories', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+      const res = await client.api.folder.browse.$get({ query: { path: mixed.parentDir } })
+      const body = await res.json()
+
+      expect(body.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'app-repo',
+          path: mixed.repoChild,
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: realpathSync(mixed.repoChild),
+        }),
+        expect.objectContaining({
+          name: 'linked-repo',
+          path: mixed.linkedRepoChild,
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: realpathSync(mixed.linkedRepoChild),
+        }),
+        expect.objectContaining({
+          name: 'worktree-repo',
+          path: mixed.worktreeChild,
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: realpathSync(mixed.worktreeChild),
+        }),
+      ]))
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('opens repository children from a plain parent as repository roots', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+
+      for (const repositoryPath of [mixed.linkedRepoChild, mixed.worktreeChild, mixed.emptyRepoChild]) {
+        const res = await client.api.repo.open.$post({ json: { path: repositoryPath } })
+        const body = await res.json()
+
+        expect(body.ok).toBe(true)
+        expect(body.rootPath).toBe(realpathSync(repositoryPath))
+        expect(body.gitState).toBe('repository-root')
+        expect(body.openMode).toBe('repository')
+        expect(body.repositoryRootPath).toBe(realpathSync(repositoryPath))
+        expect(getRepoPath()).toBe(realpathSync(repositoryPath))
+      }
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('marks empty repository children inside plain folders as repositories', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+      const res = await client.api.folder.browse.$get({ query: { path: mixed.parentDir } })
+      const body = await res.json()
+
+      expect(body.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'empty-repo',
+          path: mixed.emptyRepoChild,
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: realpathSync(mixed.emptyRepoChild),
+        }),
+      ]))
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('keeps regular siblings beside repository children in folder mode', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+      const browseRes = await client.api.folder.browse.$get({ query: { path: mixed.parentDir } })
+      const browseBody = await browseRes.json()
+
+      expect(browseBody.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'notes',
+          path: mixed.regularChild,
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'outside-repository',
+          openMode: 'folder',
+        }),
+        expect.objectContaining({
+          name: 'linked-notes',
+          path: mixed.linkedRegularChild,
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'outside-repository',
+          openMode: 'folder',
+        }),
+      ]))
+
+      const openRes = await client.api.repo.open.$post({ json: { path: mixed.regularChild } })
+      const openBody = await openRes.json()
+
+      expect(openBody.ok).toBe(true)
+      expect(openBody.rootPath).toBe(realpathSync(mixed.regularChild))
+      expect(openBody.gitState).toBe('outside-repository')
+      expect(openBody.openMode).toBe('folder')
+      expect(openBody.repositoryRootPath).toBeUndefined()
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('keeps browsing a parent folder when one child is a broken symlink', async () => {
+    const mixed = makeMixedPlainParent()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+      const res = await client.api.folder.browse.$get({ query: { path: mixed.parentDir } })
+      const body = await res.json()
+
+      expect(body.error).toBe('')
+      expect(body.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'app-repo', isGitRepo: true }),
+        expect.objectContaining({
+          name: 'broken-link',
+          path: mixed.brokenLink,
+          type: 'file',
+          isGitRepo: false,
+          openMode: 'blocked',
+        }),
+      ]))
+    } finally {
+      mixed.cleanup()
+    }
+  })
+
+  it('marks nested independent repositories as repositories without promoting their parent folder', async () => {
+    const nested = makeRepoWithNestedIndependentRepo()
+    try {
+      const app = createApp('')
+      const client = testClient(app)
+
+      const outerRes = await client.api.folder.browse.$get({ query: { path: nested.outerRepo } })
+      const outerBody = await outerRes.json()
+      expect(outerBody.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'vendor',
+          path: nested.vendorDir,
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'inside-repository',
+          openMode: 'folder',
+          repositoryRootPath: realpathSync(nested.outerRepo),
+        }),
+      ]))
+
+      const vendorRes = await client.api.folder.browse.$get({ query: { path: nested.vendorDir } })
+      const vendorBody = await vendorRes.json()
+      expect(vendorBody.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'inner-repo',
+          path: nested.innerRepo,
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: realpathSync(nested.innerRepo),
+        }),
+      ]))
+    } finally {
+      nested.cleanup()
     }
   })
 
