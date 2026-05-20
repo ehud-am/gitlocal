@@ -54,8 +54,8 @@ function listFolderEntries(currentPath: string): FolderBrowseEntry[] {
     return readdirSync(currentPath, { withFileTypes: true })
       .map((entry) => {
         const path = resolve(currentPath, entry.name)
-        const type = entry.isDirectory() ? 'dir' as const : 'file' as const
         const classification = classifyLocalPath(path)
+        const type = classification.pathType === 'directory' ? 'dir' as const : 'file' as const
         return {
           name: entry.name,
           path,

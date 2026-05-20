@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.2 - 2026-05-20
+
+- Fixed folder-picker classification for symlinked repository folders inside plain parent folders so they appear and open as git repositories instead of regular files or folders.
+
 ## 0.7.1 - 2026-05-19
 
 - Fixed folder-picker and startup detection so actual git repository roots open with repository capabilities, while ordinary folders inside a repository remain folder roots instead of being mislabeled as repositories.

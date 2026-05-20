@@ -116,6 +116,117 @@ describe('PickerPage', () => {
     expect(window.location.reload).toHaveBeenCalled()
   })
 
+  it('labels and opens a repository child from a plain parent', async () => {
+    vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/projects',
+      parentPath: '/Users/example',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [
+        {
+          name: 'app-repo',
+          path: '/Users/example/projects/app-repo',
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+          repositoryRootPath: '/Users/example/projects/app-repo',
+        },
+        {
+          name: 'notes',
+          path: '/Users/example/projects/notes',
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'outside-repository',
+          openMode: 'folder',
+        },
+      ],
+      error: '',
+      isGitRepo: false,
+      gitState: 'outside-repository',
+      openMode: 'folder',
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: true,
+      canCloneIntoChild: true,
+    })
+    vi.mocked(api.openRepository).mockResolvedValue({
+      ok: true,
+      error: '',
+      path: '/Users/example/projects/app-repo',
+      rootPath: '/Users/example/projects/app-repo',
+      selectedPath: '',
+      selectedPathType: 'none',
+      openMode: 'repository',
+      gitState: 'repository-root',
+      repositoryRootPath: '/Users/example/projects/app-repo',
+    })
+
+    render(<PickerPage />)
+
+    expect(await screen.findByRole('button', { name: /^app-repo git repository$/i })).toBeInTheDocument()
+    expect(screen.getByText('Git repository')).toBeInTheDocument()
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: /^app-repo git repository$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/projects/app-repo')
+    })
+    expect(vi.mocked(api.getFolderBrowse)).not.toHaveBeenCalledWith('/Users/example/projects/app-repo')
+    expect(vi.mocked(writeViewerState)).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: '/Users/example/projects/app-repo',
+      path: '',
+      pathType: 'none',
+    }))
+    expect(window.location.reload).toHaveBeenCalled()
+  })
+
+  it('keeps a regular sibling beside a repository child as a browsable folder', async () => {
+    vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/projects',
+      parentPath: '/Users/example',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [
+        {
+          name: 'app-repo',
+          path: '/Users/example/projects/app-repo',
+          type: 'dir',
+          isGitRepo: true,
+          gitState: 'repository-root',
+          openMode: 'repository',
+        },
+        {
+          name: 'notes',
+          path: '/Users/example/projects/notes',
+          type: 'dir',
+          isGitRepo: false,
+          gitState: 'outside-repository',
+          openMode: 'folder',
+        },
+      ],
+      error: '',
+      isGitRepo: false,
+      gitState: 'outside-repository',
+      openMode: 'folder',
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: true,
+      canCloneIntoChild: true,
+    })
+
+    render(<PickerPage />)
+
+    expect(await screen.findByRole('button', { name: /^notes folder$/i })).toBeInTheDocument()
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: /^notes folder$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/projects/notes')
+    })
+    expect(vi.mocked(api.openRepository)).not.toHaveBeenCalledWith('/Users/example/projects/notes')
+  })
+
   it('opens files through the same Open path handling', async () => {
     vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
       currentPath: '/Users/example',
@@ -264,6 +375,35 @@ describe('PickerPage', () => {
     })
   })
 
+  it('opens a typed repository child path using the returned repository root', async () => {
+    vi.mocked(api.openRepository).mockResolvedValue({
+      ok: true,
+      error: '',
+      path: '/Users/example/projects/app-repo',
+      rootPath: '/Users/example/projects/app-repo',
+      selectedPath: '',
+      selectedPathType: 'none',
+      openMode: 'repository',
+      gitState: 'repository-root',
+      repositoryRootPath: '/Users/example/projects/app-repo',
+    })
+    render(<PickerPage />)
+
+    const input = await screen.findByRole('textbox', { name: /folder path/i })
+    fireEvent.change(input, { target: { value: '/Users/example/projects/app-repo' } })
+    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/projects/app-repo')
+    })
+    expect(vi.mocked(writeViewerState)).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: '/Users/example/projects/app-repo',
+      path: '',
+      pathType: 'none',
+    }))
+    expect(window.location.reload).toHaveBeenCalled()
+  })
+
   it('shows an empty-state message when no files or folders are available', async () => {
     vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
       currentPath: '/empty',
@@ -403,6 +543,53 @@ describe('PickerPage', () => {
     await waitFor(() => {
       expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/gitlocal')
     })
+    expect(window.location.reload).toHaveBeenCalled()
+  })
+
+  it('opens the current repository browse root from the folder actions menu as a repository', async () => {
+    vi.mocked(api.getFolderBrowse).mockResolvedValueOnce({
+      currentPath: '/Users/example/projects/app-repo',
+      parentPath: '/Users/example/projects',
+      homePath: '/Users/example',
+      roots: [{ name: '/', path: '/' }],
+      entries: [
+        { name: 'README.md', path: '/Users/example/projects/app-repo/README.md', type: 'file', isGitRepo: false, openMode: 'file' },
+      ],
+      error: '',
+      isGitRepo: true,
+      gitState: 'repository-root',
+      openMode: 'repository',
+      repositoryRootPath: '/Users/example/projects/app-repo',
+      canOpen: true,
+      canCreateChild: true,
+      canInitGit: false,
+      canCloneIntoChild: true,
+    })
+    vi.mocked(api.openRepository).mockResolvedValue({
+      ok: true,
+      error: '',
+      path: '/Users/example/projects/app-repo',
+      rootPath: '/Users/example/projects/app-repo',
+      selectedPath: '',
+      selectedPathType: 'none',
+      openMode: 'repository',
+      gitState: 'repository-root',
+      repositoryRootPath: '/Users/example/projects/app-repo',
+    })
+
+    render(<PickerPage />)
+
+    await openFolderActionsMenu()
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /open this folder/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Users/example/projects/app-repo')
+    })
+    expect(vi.mocked(writeViewerState)).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: '/Users/example/projects/app-repo',
+      path: '',
+      pathType: 'none',
+    }))
     expect(window.location.reload).toHaveBeenCalled()
   })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -305,6 +305,65 @@ describe('manual file operation handlers', () => {
       body: JSON.stringify({ path: '../escape.txt', content: 'x' }),
     }))
     expect(escaped.status).toBe(400)
+  })
+
+  it('keeps file mutations inside a symlinked plain-folder root', async () => {
+    const targetDir = mkdtempSync(join(tmpdir(), 'gitlocal-symlink-root-target-'))
+    const linkPath = `${targetDir}-link`
+    const escapedPath = join(targetDir, '..', 'outside-symlink-root.txt')
+    symlinkSync(targetDir, linkPath)
+    try {
+      const app = createApp(linkPath)
+
+      const createRes = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: 'safe.txt', content: 'inside root' }),
+      }))
+      expect(createRes.status).toBe(201)
+      expect(existsSync(join(targetDir, 'safe.txt'))).toBe(true)
+
+      const escaped = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '../outside-symlink-root.txt', content: 'escape' }),
+      }))
+      expect(escaped.status).toBe(400)
+      expect(existsSync(escapedPath)).toBe(false)
+
+      const readRes = await app.fetch(new Request('http://localhost/api/file?path=safe.txt'))
+      const readBody = await readRes.json()
+
+      const updateRes = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path: 'safe.txt',
+          content: 'updated inside root',
+          revisionToken: readBody.revisionToken,
+        }),
+      }))
+      expect(updateRes.status).toBe(200)
+
+      const updatedRes = await app.fetch(new Request('http://localhost/api/file?path=safe.txt'))
+      const updatedBody = await updatedRes.json()
+      expect(updatedBody.content).toBe('updated inside root')
+
+      const deleteRes = await app.fetch(new Request('http://localhost/api/file', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          path: 'safe.txt',
+          revisionToken: updatedBody.revisionToken,
+        }),
+      }))
+      expect(deleteRes.status).toBe(200)
+      expect(existsSync(join(targetDir, 'safe.txt'))).toBe(false)
+    } finally {
+      if (existsSync(linkPath)) unlinkSync(linkPath)
+      rmSync(targetDir, { recursive: true, force: true })
+      rmSync(escapedPath, { force: true })
+    }
   })
 
   it('deletes a file through DELETE /api/file with a matching revision token', async () => {
