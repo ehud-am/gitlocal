@@ -516,8 +516,10 @@ describe('Server integration', () => {
     expect(body.user).toEqual({
       name: 'Integration User',
       email: 'integration@example.com',
-      source: 'local',
+      source: 'private-settings',
     })
+    expect(readFileSync(join(dir, '.env'), 'utf-8')).toContain('GITLOCAL_GIT_EMAIL="integration@example.com"')
+    rmSync(join(dir, '.env'), { force: true })
   })
 
   it('GET /api/sync returns sync metadata for the current file path', async () => {

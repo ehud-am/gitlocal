@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Input } from './ui/input'
+import type { PrivateSettingsProtectionState, SshKeyCandidate } from '../types'
 
 interface RepoBoundaryDialogProps {
   open: boolean
@@ -23,10 +24,16 @@ interface GitIdentityDialogProps {
   name: string
   email: string
   sshKeyPath: string
+  sshKeys: SshKeyCandidate[]
+  sshKeysMessage: string
+  sshKeysPending: boolean
+  protection?: PrivateSettingsProtectionState | null
+  protectionPending: boolean
   onOpenChange: (open: boolean) => void
   onNameChange: (value: string) => void
   onEmailChange: (value: string) => void
   onSshKeyPathChange: (value: string) => void
+  onApplyProtection: () => void
   onCancel: () => void
   onSave: () => void
 }
@@ -93,20 +100,29 @@ export function GitIdentityDialog({
   name,
   email,
   sshKeyPath,
+  sshKeys,
+  sshKeysMessage,
+  sshKeysPending,
+  protection,
+  protectionPending,
   onOpenChange,
   onNameChange,
   onEmailChange,
   onSshKeyPathChange,
+  onApplyProtection,
   onCancel,
   onSave,
 }: GitIdentityDialogProps) {
+  const showProtectionWarning = protection && !protection.protected
+  const controlsDisabled = pending || protectionPending
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Repository Git Identity</DialogTitle>
           <DialogDescription>
-            This updates <code>user.name</code>, <code>user.email</code>, and the SSH key path in this repository's local git config only.
+            This saves project identity locally and keeps this repository's git config in sync.
           </DialogDescription>
         </DialogHeader>
 
@@ -118,7 +134,7 @@ export function GitIdentityDialog({
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Jane Developer"
               aria-label="Git user name"
-              disabled={pending}
+              disabled={controlsDisabled}
             />
           </label>
 
@@ -130,20 +146,51 @@ export function GitIdentityDialog({
               onChange={(event) => onEmailChange(event.target.value)}
               placeholder="jane@example.com"
               aria-label="Git user email"
-              disabled={pending}
+              disabled={controlsDisabled}
             />
           </label>
 
-          <label className="grid gap-1.5">
+          <div className="grid gap-2">
             <span className="text-sm font-medium text-[var(--foreground)]">SSH key path</span>
+            <label className="grid gap-1.5">
+              <span className="sr-only">Choose SSH key</span>
+              <select
+                className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Choose SSH key"
+                value={sshKeys.some((key) => key.path === sshKeyPath) ? sshKeyPath : ''}
+                onChange={(event) => {
+                  if (event.target.value) onSshKeyPathChange(event.target.value)
+                }}
+                disabled={controlsDisabled || sshKeysPending || sshKeys.length === 0}
+              >
+                <option value="">{sshKeysPending ? 'Loading SSH keys...' : 'Select a private key'}</option>
+                {sshKeys.map((key) => (
+                  <option key={key.path} value={key.path}>{key.name}</option>
+                ))}
+              </select>
+            </label>
             <Input
               value={sshKeyPath}
               onChange={(event) => onSshKeyPathChange(event.target.value)}
               placeholder="~/.ssh/id_ed25519"
               aria-label="Git SSH key path"
-              disabled={pending}
+              disabled={controlsDisabled}
             />
-          </label>
+            {sshKeysMessage ? (
+              <p className="text-xs text-[var(--muted-foreground)]">{sshKeysMessage}</p>
+            ) : null}
+          </div>
+
+          {showProtectionWarning ? (
+            <div className="grid gap-2 rounded-md border border-[var(--warning-border,var(--border))] bg-[var(--warning-bg,var(--muted))] p-3">
+              <p role="alert" className="text-sm text-[var(--foreground)]">{protection.message}</p>
+              {protection.canApplyFix ? (
+                <Button type="button" variant="secondary" onClick={onApplyProtection} disabled={controlsDisabled}>
+                  {protectionPending ? 'Updating .gitignore...' : 'Add .env to .gitignore'}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           {error ? (
             <p role="alert" className="text-sm text-[var(--danger)]">
@@ -153,10 +200,10 @@ export function GitIdentityDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={controlsDisabled}>
             Cancel
           </Button>
-          <Button type="button" onClick={onSave} disabled={pending}>
+          <Button type="button" onClick={onSave} disabled={controlsDisabled}>
             {pending ? 'Saving...' : 'Save identity'}
           </Button>
         </DialogFooter>

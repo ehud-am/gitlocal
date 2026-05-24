@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.8.0 - 2026-05-24
+
+- Added project-persistent git identity settings backed by local `.env` values while keeping repository-local git config synchronized for author name, email, and SSH command behavior.
+- Added SSH private key discovery from the user's conventional SSH folder, filtering to valid private key files while preserving manual path entry for nonstandard key locations.
+- Added validation for selected SSH private key paths, including passphrase-protected key acceptance without reading or exposing key contents.
+- Added `.env` protection checks that warn when private identity settings are not ignored and can create or update `.gitignore` after explicit user approval.
+- Expanded server, integration, and UI coverage for identity persistence, SSH key validation, and private-settings protection flows.
+
 ## 0.7.2 - 2026-05-20
 
 - Fixed folder-picker classification for symlinked repository folders inside plain parent folders so they appear and open as git repositories instead of regular files or folders.

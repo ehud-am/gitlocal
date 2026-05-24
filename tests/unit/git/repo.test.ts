@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
+import {
+  applyPrivateSettingsProtection,
+  getPrivateSettingsProtection,
+  listSshPrivateKeys,
+  readPrivateIdentitySettings,
+  validateSshPrivateKeyPath,
+  writePrivateIdentitySettings,
+} from '../../../src/git/identity-settings.js'
 import {
   applyFileSyncStates,
   cloneRepositoryInto,
@@ -94,6 +102,27 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   spawnSync('git', ['add', '.'], { cwd: dir, env })
   spawnSync('git', ['commit', '-m', 'initial commit'], { cwd: dir, env })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const OPENSSH_PRIVATE_KEY = [
+  '-----BEGIN OPENSSH PRIVATE KEY-----',
+  'b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAA=',
+  '-----END OPENSSH PRIVATE KEY-----',
+  '',
+].join('\n')
+
+const RSA_PRIVATE_KEY = [
+  '-----BEGIN RSA PRIVATE KEY-----',
+  'Proc-Type: 4,ENCRYPTED',
+  'DEK-Info: AES-128-CBC,00000000000000000000000000000000',
+  'ZmFrZS1lbmNyeXB0ZWQta2V5',
+  '-----END RSA PRIVATE KEY-----',
+  '',
+].join('\n')
+
+function writeFakePrivateKey(path: string, content = OPENSSH_PRIVATE_KEY): string {
+  writeFileSync(path, content)
+  return path
 }
 
 function makePlainParentWithRepositoryChild(): { parentDir: string; repoChild: string; cleanup: () => void } {
@@ -1212,11 +1241,19 @@ describe('working tree helpers', () => {
 
       expect(result).toEqual({
         ok: true,
-        message: 'Repository git identity updated.',
+        message: 'Project git identity updated.',
         user: {
           name: 'Repo User',
           email: 'repo@example.com',
-          source: 'local',
+          source: 'private-settings',
+        },
+        protection: {
+          settingsPath: '.env',
+          ignoreFileExists: false,
+          protected: false,
+          status: 'missing-ignore-file',
+          canApplyFix: true,
+          message: '.env is not ignored. Create .gitignore before committing private settings.',
         },
       })
       expect(getGitUserIdentity(dir)).toEqual(result.user)
@@ -1231,18 +1268,20 @@ describe('working tree helpers', () => {
 
   it('reads, updates, and clears repository-local SSH key path', () => {
     const { dir, cleanup } = makeGitRepo()
+    const keyPath = writeFakePrivateKey(join(dir, 'id_repo'))
+    const changedKeyPath = writeFakePrivateKey(join(dir, 'identity with spaces'))
 
     try {
       expect(getRepoSshKeyPath(dir)).toBe('')
 
-      const result = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '~/.ssh/id_repo')
-      expect(result.user.sshKeyPath).toBe('~/.ssh/id_repo')
-      expect(getRepoSshKeyPath(dir)).toBe('~/.ssh/id_repo')
-      expect(spawnGit(dir, 'config', '--local', 'core.sshCommand')).toContain('~/.ssh/id_repo')
+      const result = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', keyPath)
+      expect(result.user.sshKeyPath).toBe(keyPath)
+      expect(getRepoSshKeyPath(dir)).toBe(keyPath)
+      expect(spawnGit(dir, 'config', '--local', 'core.sshCommand')).toContain(keyPath)
 
-      const changed = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '/tmp/identity with spaces')
-      expect(changed.user.sshKeyPath).toBe('/tmp/identity with spaces')
-      expect(getRepoSshKeyPath(dir)).toBe('/tmp/identity with spaces')
+      const changed = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', changedKeyPath)
+      expect(changed.user.sshKeyPath).toBe(changedKeyPath)
+      expect(getRepoSshKeyPath(dir)).toBe(changedKeyPath)
 
       const cleared = setRepoGitIdentity(dir, 'Repo User', 'repo@example.com', '')
       expect(cleared.user.sshKeyPath).toBeUndefined()
@@ -1267,6 +1306,240 @@ describe('working tree helpers', () => {
       expect(() => setRepoGitIdentity(join(tmpdir(), 'definitely-missing-repo'), 'Repo User', 'repo@example.com')).toThrow(
         'No repository is currently open.',
       )
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('validates SSH private keys and rejects non-private-key paths', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-ssh-keys-'))
+    const valid = writeFakePrivateKey(join(dir, 'id_ed25519'))
+    const encrypted = writeFakePrivateKey(join(dir, 'id_rsa'), RSA_PRIVATE_KEY)
+    const publicKey = join(dir, 'id_ed25519.pub')
+    const knownHosts = join(dir, 'known_hosts')
+    writeFileSync(publicKey, 'ssh-ed25519 AAAAC3Nza public@example\n')
+    writeFileSync(knownHosts, 'github.com ssh-ed25519 AAAAC3Nza\n')
+    mkdirSync(join(dir, 'nested'))
+
+    try {
+      expect(validateSshPrivateKeyPath(valid)).toEqual({
+        valid: true,
+        path: valid,
+        message: 'SSH private key is valid.',
+      })
+      expect(validateSshPrivateKeyPath('   ').message).toBe('SSH key path is required.')
+      expect(validateSshPrivateKeyPath(encrypted).valid).toBe(true)
+      expect(validateSshPrivateKeyPath(publicKey).valid).toBe(false)
+      expect(validateSshPrivateKeyPath(knownHosts).valid).toBe(false)
+      expect(validateSshPrivateKeyPath(join(dir, 'nested')).message).toBe('Selected path is not a file.')
+      expect(validateSshPrivateKeyPath(join(dir, 'missing')).message).toBe('SSH private key file could not be read.')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('lists valid SSH keys from the conventional SSH folder', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-ssh-home-'))
+    const sshDir = join(homeDir, '.ssh')
+    mkdirSync(sshDir)
+    const valid = writeFakePrivateKey(join(sshDir, 'id_ed25519'))
+    const second = writeFakePrivateKey(join(sshDir, 'id_rsa'))
+    writeFileSync(join(sshDir, 'id_ed25519.pub'), 'ssh-ed25519 AAAAC3Nza public@example\n')
+    writeFileSync(join(sshDir, 'config'), 'Host example\n')
+
+    try {
+      process.env.HOME = homeDir
+      const result = listSshPrivateKeys()
+      expect(result.directory).toEqual({ path: sshDir, exists: true, readable: true })
+      expect(result.keys).toEqual([
+        { name: 'id_ed25519', path: valid },
+        { name: 'id_rsa', path: second },
+      ])
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns SSH key listing fallbacks for missing or non-folder conventional paths', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-ssh-missing-home-'))
+
+    try {
+      process.env.HOME = homeDir
+      expect(listSshPrivateKeys()).toMatchObject({
+        directory: { path: join(homeDir, '.ssh'), exists: false, readable: false },
+        keys: [],
+      })
+
+      writeFileSync(join(homeDir, '.ssh'), 'not a directory')
+      expect(listSshPrivateKeys()).toMatchObject({
+        directory: { path: join(homeDir, '.ssh'), exists: true, readable: false },
+        keys: [],
+      })
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns SSH key listing fallback when the conventional folder is unreadable', () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-ssh-blocked-home-'))
+    const sshDir = join(homeDir, '.ssh')
+    mkdirSync(sshDir)
+
+    try {
+      process.env.HOME = homeDir
+      chmodSync(sshDir, 0o000)
+      expect(listSshPrivateKeys()).toMatchObject({
+        directory: { path: sshDir, exists: true, readable: false },
+        keys: [],
+      })
+    } finally {
+      chmodSync(sshDir, 0o700)
+      process.env.HOME = originalHome
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads and writes private identity settings without removing unrelated .env values', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const keyPath = writeFakePrivateKey(join(dir, 'id_ed25519'))
+
+    try {
+      writeFileSync(join(dir, '.env'), 'OTHER_VALUE=keep\n')
+      writePrivateIdentitySettings(dir, {
+        name: 'Env User',
+        email: 'env@example.com',
+        sshKeyPath: keyPath,
+      })
+
+      expect(readPrivateIdentitySettings(dir)).toEqual({
+        name: 'Env User',
+        email: 'env@example.com',
+        sshKeyPath: keyPath,
+      })
+      expect(readFileSync(join(dir, '.env'), 'utf-8')).toContain('OTHER_VALUE=keep')
+      expect(getGitUserIdentity(dir)).toMatchObject({
+        name: 'Env User',
+        email: 'env@example.com',
+        source: 'private-settings',
+        sshKeyPath: keyPath,
+      })
+      writeFileSync(join(dir, '.env'), "GITLOCAL_GIT_NAME='Single Quote'\nGITLOCAL_GIT_EMAIL=plain@example.com\nBROKEN=\"unterminated\n")
+      expect(readPrivateIdentitySettings(dir)).toMatchObject({
+        name: 'Single Quote',
+        email: 'plain@example.com',
+      })
+      writeFileSync(join(dir, '.env'), 'GITLOCAL_GIT_NAME="bad\\q"\n')
+      expect(readPrivateIdentitySettings(dir)).toMatchObject({
+        name: 'bad\\q',
+      })
+      writePrivateIdentitySettings(dir, {})
+      expect(readPrivateIdentitySettings(dir)).toEqual({
+        name: '',
+        email: '',
+        sshKeyPath: '',
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('detects and applies .env protection in .gitignore', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: false,
+        status: 'missing-ignore-file',
+        canApplyFix: true,
+      })
+
+      expect(applyPrivateSettingsProtection(dir, false)).toMatchObject({
+        protected: false,
+        status: 'blocked',
+      })
+
+      expect(applyPrivateSettingsProtection(dir, true)).toMatchObject({
+        protected: true,
+        status: 'protected',
+      })
+      expect(readFileSync(join(dir, '.gitignore'), 'utf-8')).toBe('.env\n')
+
+      expect(applyPrivateSettingsProtection(dir, true)).toMatchObject({
+        protected: true,
+        status: 'protected',
+      })
+      expect(readFileSync(join(dir, '.gitignore'), 'utf-8')).toBe('.env\n')
+
+      writeFileSync(join(dir, '.gitignore'), 'dist/')
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: false,
+        status: 'missing-entry',
+        canApplyFix: true,
+      })
+      expect(applyPrivateSettingsProtection(dir, true)).toMatchObject({
+        protected: true,
+        status: 'protected',
+      })
+      expect(readFileSync(join(dir, '.gitignore'), 'utf-8')).toBe('dist/\n.env\n')
+
+      writeFileSync(join(dir, '.gitignore'), '# comment\n.env*\n')
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: true,
+        status: 'protected',
+      })
+      writeFileSync(join(dir, '.gitignore'), '.env\n!.env\n')
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: false,
+        status: 'missing-entry',
+        canApplyFix: true,
+      })
+      writeFileSync(join(dir, '.env'), 'SECRET=tracked\n')
+      spawnGit(dir, 'add', '.env')
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: false,
+        status: 'blocked',
+        canApplyFix: false,
+      })
+      spawnGit(dir, 'reset', '--', '.env')
+      writeFileSync(join(dir, '.gitignore'), 'dist/\n')
+      chmodSync(join(dir, '.gitignore'), 0o400)
+      expect(applyPrivateSettingsProtection(dir, true)).toMatchObject({
+        protected: false,
+        status: 'blocked',
+      })
+      chmodSync(join(dir, '.gitignore'), 0o600)
+      rmSync(join(dir, '.gitignore'), { force: true })
+      mkdirSync(join(dir, '.gitignore'))
+      expect(getPrivateSettingsProtection(dir)).toMatchObject({
+        protected: false,
+        status: 'blocked',
+        canApplyFix: false,
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('blocks GitLocal commits while .env could be included', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      writeFileSync(join(dir, '.env'), 'SECRET=local\n')
+      expect(commitWorkingTreeChanges(dir, 'commit env')).toMatchObject({
+        ok: false,
+        status: 'blocked',
+      })
+
+      writeFileSync(join(dir, '.gitignore'), '.env\n')
+      expect(commitWorkingTreeChanges(dir, 'ignore env')).toMatchObject({
+        ok: true,
+        status: 'committed',
+      })
     } finally {
       cleanup()
     }

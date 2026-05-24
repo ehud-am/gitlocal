@@ -21,6 +21,18 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
+const OPENSSH_PRIVATE_KEY = [
+  '-----BEGIN OPENSSH PRIVATE KEY-----',
+  'b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAA=',
+  '-----END OPENSSH PRIVATE KEY-----',
+  '',
+].join('\n')
+
+function writeFakePrivateKey(path: string): string {
+  writeFileSync(path, OPENSSH_PRIVATE_KEY)
+  return path
+}
+
 describe('infoHandler', () => {
   let dir: string
   let cleanup: () => void
@@ -187,13 +199,14 @@ describe('gitIdentityUpdateHandler', () => {
       }))
 
       expect(res.status).toBe(200)
-      const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string } }
+      const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string }; protection: { status: string } }
       expect(body.ok).toBe(true)
       expect(body.user).toEqual({
         name: 'Updated User',
         email: 'updated@example.com',
-        source: 'local',
+        source: 'private-settings',
       })
+      expect(body.protection.status).toBe('missing-ignore-file')
       expect(spawnSync('git', ['config', '--local', 'user.name'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('Updated User')
       expect(spawnSync('git', ['config', '--local', 'user.email'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('updated@example.com')
     } finally {
@@ -203,6 +216,7 @@ describe('gitIdentityUpdateHandler', () => {
 
   it('updates and clears the repository-local SSH key path with git identity', async () => {
     const repo = makeGitRepo()
+    const keyPath = writeFakePrivateKey(join(repo.dir, 'id_ed25519'))
 
     try {
       const app = createApp(repo.dir)
@@ -212,14 +226,14 @@ describe('gitIdentityUpdateHandler', () => {
         body: JSON.stringify({
           name: 'Updated User',
           email: 'updated@example.com',
-          sshKeyPath: '~/.ssh/id_repo',
+          sshKeyPath: keyPath,
         }),
       }))
 
       expect(update.status).toBe(200)
       let body = await update.json() as { user: { sshKeyPath?: string } }
-      expect(body.user.sshKeyPath).toBe('~/.ssh/id_repo')
-      expect(spawnSync('git', ['config', '--local', 'core.sshCommand'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toContain('~/.ssh/id_repo')
+      expect(body.user.sshKeyPath).toBe(keyPath)
+      expect(spawnSync('git', ['config', '--local', 'core.sshCommand'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toContain(keyPath)
 
       const clear = await app.fetch(new Request('http://localhost/api/git/identity', {
         method: 'PUT',
@@ -257,6 +271,112 @@ describe('gitIdentityUpdateHandler', () => {
       const body = await res.json() as { ok: boolean; message: string }
       expect(body.ok).toBe(false)
       expect(body.message).toBe('Git name is required.')
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('lists and validates SSH private keys', async () => {
+    const originalHome = process.env.HOME
+    const homeDir = mkdtempSync(join(tmpdir(), 'gitlocal-handler-home-'))
+    const sshDir = join(homeDir, '.ssh')
+    mkdirSync(sshDir)
+    const keyPath = writeFakePrivateKey(join(sshDir, 'id_ed25519'))
+    writeFileSync(join(sshDir, 'id_ed25519.pub'), 'ssh-ed25519 AAAAC3Nza public@example\n')
+    const repo = makeGitRepo()
+
+    try {
+      process.env.HOME = homeDir
+      const app = createApp(repo.dir)
+      const list = await app.fetch(new Request('http://localhost/api/git/identity/ssh-keys'))
+      expect(list.status).toBe(200)
+      const listBody = await list.json() as { keys: Array<{ name: string; path: string }> }
+      expect(listBody.keys).toEqual([{ name: 'id_ed25519', path: keyPath }])
+
+      const valid = await app.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sshKeyPath: keyPath }),
+      }))
+      expect(valid.status).toBe(200)
+
+      const invalid = await app.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sshKeyPath: join(sshDir, 'id_ed25519.pub') }),
+      }))
+      expect(invalid.status).toBe(400)
+    } finally {
+      process.env.HOME = originalHome
+      repo.cleanup()
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns identity helper errors when no repository is open or JSON is invalid', async () => {
+    const app = createApp('')
+
+    expect((await app.fetch(new Request('http://localhost/api/git/identity/ssh-keys'))).status).toBe(400)
+    expect((await app.fetch(new Request('http://localhost/api/git/identity/protection'))).status).toBe(400)
+    expect((await app.fetch(new Request('http://localhost/api/git/identity/protection', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ approved: true }),
+    }))).status).toBe(400)
+    expect((await app.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sshKeyPath: '/missing' }),
+    }))).status).toBe(400)
+
+    const repo = makeGitRepo()
+    try {
+      const repoApp = createApp(repo.dir)
+      expect((await repoApp.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))).status).toBe(400)
+      expect((await repoApp.fetch(new Request('http://localhost/api/git/identity/protection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))).status).toBe(400)
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('returns and applies private settings protection status', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      const app = createApp(repo.dir)
+      const status = await app.fetch(new Request('http://localhost/api/git/identity/protection'))
+      expect(status.status).toBe(200)
+      expect(await status.json()).toMatchObject({
+        protected: false,
+        status: 'missing-ignore-file',
+        canApplyFix: true,
+      })
+
+      const rejected = await app.fetch(new Request('http://localhost/api/git/identity/protection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ approved: false }),
+      }))
+      expect(rejected.status).toBe(400)
+
+      const applied = await app.fetch(new Request('http://localhost/api/git/identity/protection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ approved: true }),
+      }))
+      expect(applied.status).toBe(200)
+      expect(await applied.json()).toMatchObject({
+        protected: true,
+        status: 'protected',
+      })
     } finally {
       repo.cleanup()
     }

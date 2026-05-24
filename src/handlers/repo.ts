@@ -2,6 +2,12 @@ import type { Context } from 'hono'
 import { statSync } from 'node:fs'
 import { basename, dirname, relative } from 'node:path'
 import {
+  applyPrivateSettingsProtection,
+  getPrivateSettingsProtection,
+  listSshPrivateKeys,
+  validateSshPrivateKeyPath,
+} from '../git/identity-settings.js'
+import {
   classifyLocalPath,
   commitWorkingTreeChanges,
   getAppVersion,
@@ -17,7 +23,15 @@ import {
   validateRepo,
 } from '../git/repo.js'
 import { setPickerPath, setRepoPath } from '../server.js'
-import type { BranchSwitchRequest, CommitChangesRequest, GitIdentityUpdateRequest, LocalActionResponse, RepositoryOpenRequest } from '../types.js'
+import type {
+  BranchSwitchRequest,
+  CommitChangesRequest,
+  GitIdentityUpdateRequest,
+  LocalActionResponse,
+  PrivateSettingsProtectionUpdateRequest,
+  RepositoryOpenRequest,
+  SshKeyValidationRequest,
+} from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
 
@@ -221,6 +235,91 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
       message: error instanceof Error ? error.message : 'Could not update the repository identity.',
     }, 400)
   }
+}
+
+export async function gitIdentitySshKeysHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      directory: { path: '', exists: false, readable: false },
+      keys: [],
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  return c.json(listSshPrivateKeys())
+}
+
+export async function gitIdentitySshKeyValidateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      valid: false,
+      path: '',
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  let payload: SshKeyValidationRequest
+  try {
+    payload = await c.req.json<SshKeyValidationRequest>()
+  } catch {
+    return c.json({
+      valid: false,
+      path: '',
+      message: 'Invalid JSON body.',
+    }, 400)
+  }
+
+  const result = validateSshPrivateKeyPath(payload.sshKeyPath ?? '')
+  return c.json(result, result.valid ? 200 : 400)
+}
+
+export async function gitIdentityProtectionHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      settingsPath: '.env',
+      ignoreFileExists: false,
+      protected: false,
+      status: 'blocked',
+      canApplyFix: false,
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  return c.json(getPrivateSettingsProtection(repoPath))
+}
+
+export async function gitIdentityProtectionUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({
+      settingsPath: '.env',
+      ignoreFileExists: false,
+      protected: false,
+      status: 'blocked',
+      canApplyFix: false,
+      message: 'No repository is currently open.',
+    }, 400)
+  }
+
+  let payload: PrivateSettingsProtectionUpdateRequest
+  try {
+    payload = await c.req.json<PrivateSettingsProtectionUpdateRequest>()
+  } catch {
+    return c.json({
+      settingsPath: '.env',
+      ignoreFileExists: false,
+      protected: false,
+      status: 'blocked',
+      canApplyFix: false,
+      message: 'Invalid JSON body.',
+    }, 400)
+  }
+
+  const result = applyPrivateSettingsProtection(repoPath, payload.approved === true)
+  return c.json(result, result.status === 'blocked' ? 400 : 200)
 }
 
 export async function commitChangesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
