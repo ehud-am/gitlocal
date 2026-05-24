@@ -119,7 +119,7 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 - **Make local file edits** — create, edit, and delete files from the viewer in plain folders or on a repository's working branch
 - **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
-- **Manage repo identity locally** — update the repository-specific git `user.name`, `user.email`, and SSH key path without touching your global git config
+- **Manage repo identity locally** — save project-specific git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and keep private `.env` settings protected from commits
 - **See repo context clearly** — GitHub-like header with branch, local path, remote repository, remote linkage, and repo-local identity loaded after the initial viewer shell
 - **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
@@ -198,7 +198,8 @@ gitlocal/
 │   ├── cli.ts           — entry point: arg parsing, server start, browser open
 │   ├── server.ts        — Hono app, route registration, static serving + SPA fallback
 │   ├── git/
-│   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, and file sync state
+│   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, identity sync, and file sync state
+│   │   ├── identity-settings.ts — project-local identity persistence, SSH private key validation, and .gitignore protection
 │   │   └── tree.ts      — listDir (git ls-tree wrapper, sorted dirs-first)
 │   ├── services/
 │   │   └── repo-watch.ts — working-tree revision and sync status snapshots for the UI
@@ -241,7 +242,11 @@ All endpoints are served under `/api/`:
 | `POST /api/branches/switch` | Switch branches with dirty-tree confirmation flows |
 | `POST /api/git/commit` | Compatibility route for creating a local commit; not exposed in the current repository UI |
 | `POST /api/git/sync` | Compatibility route for remote sync; not exposed in the current repository UI |
-| `PUT /api/git/identity` | Update `user.name`, `user.email`, and optional SSH key path in the current repo's local git config |
+| `PUT /api/git/identity` | Save project-local identity settings and sync `user.name`, `user.email`, and optional SSH command behavior in local git config |
+| `GET /api/git/identity/ssh-keys` | List valid SSH private keys from the user's conventional SSH folder |
+| `POST /api/git/identity/ssh-key/validate` | Validate an arbitrary SSH private key path before saving it |
+| `GET /api/git/identity/protection` | Check whether `.env` private settings are protected by `.gitignore` |
+| `POST /api/git/identity/protection` | Create or update `.gitignore` with `.env` protection after explicit approval |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
 | `GET /api/search?query=&branch=&mode=&caseSensitive=` | Repository search across file names, file contents, or both |

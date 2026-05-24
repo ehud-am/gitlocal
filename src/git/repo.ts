@@ -19,6 +19,12 @@ import type {
   RepoRemoteContext,
   TreeNode,
 } from '../types.js'
+import {
+  getPrivateSettingsProtection,
+  readPrivateIdentitySettings,
+  validateSshPrivateKeyPath,
+  writePrivateIdentitySettings,
+} from './identity-settings.js'
 
 interface WorkingTreeChangeSummary {
   trackedPaths: string[]
@@ -154,19 +160,23 @@ export function convertGitRemoteToWebUrl(fetchUrl: string): string {
 }
 
 export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
+  const privateSettings = readPrivateIdentitySettings(repoPath)
   const localName = readGitConfig(repoPath, '--local', 'user.name')
   const localEmail = readGitConfig(repoPath, '--local', 'user.email')
   const globalName = readGitConfig(repoPath, '--global', 'user.name')
   const globalEmail = readGitConfig(repoPath, '--global', 'user.email')
-  const sshKeyPath = getRepoSshKeyPath(repoPath)
+  const repoSshKeyPath = getRepoSshKeyPath(repoPath)
 
-  const name = localName || globalName
-  const email = localEmail || globalEmail
+  const name = privateSettings.name || localName || globalName
+  const email = privateSettings.email || localEmail || globalEmail
+  const sshKeyPath = privateSettings.sshKeyPath || repoSshKeyPath
 
   if (!name && !email && !sshKeyPath) return null
 
   const source: GitUserIdentity['source'] =
-    localName || localEmail
+    privateSettings.name || privateSettings.email || privateSettings.sshKeyPath
+      ? 'private-settings'
+      : localName || localEmail
       ? ((localName && localEmail) || (!globalName && !globalEmail) ? 'local' : 'mixed')
       : 'global'
 
@@ -207,6 +217,19 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
     throw new Error('No repository is currently open.')
   }
 
+  if (normalizedSshKeyPath) {
+    const validation = validateSshPrivateKeyPath(normalizedSshKeyPath)
+    if (!validation.valid) {
+      throw new Error(validation.message)
+    }
+  }
+
+  writePrivateIdentitySettings(repoPath, {
+    name: trimmedName,
+    email: trimmedEmail,
+    sshKeyPath: normalizedSshKeyPath ?? getRepoSshKeyPath(repoPath),
+  })
+
   writeGitConfig(repoPath, 'user.name', trimmedName)
   writeGitConfig(repoPath, 'user.email', trimmedEmail)
   if (normalizedSshKeyPath !== undefined) {
@@ -225,8 +248,9 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
 
   return {
     ok: true,
-    message: 'Repository git identity updated.',
+    message: 'Project git identity updated.',
     user,
+    protection: getPrivateSettingsProtection(repoPath),
   }
 }
 
@@ -1247,6 +1271,17 @@ export function commitWorkingTreeChanges(repoPath: string, message: string): Com
       ok: false,
       status: 'blocked',
       message: 'There are no local changes to commit.',
+    }
+  }
+
+  if (existsSync(resolve(repoPath, '.env'))) {
+    const protection = getPrivateSettingsProtection(repoPath)
+    if (!protection.protected) {
+      return {
+        ok: false,
+        status: 'blocked',
+        message: `${protection.message} GitLocal will not commit while .env could be included.`,
+      }
     }
   }
 

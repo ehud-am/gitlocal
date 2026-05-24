@@ -10,7 +10,7 @@ export interface RepoInfo {
   gitContext?: GitContext | null
 }
 
-export type GitUserSource = 'local' | 'global' | 'mixed'
+export type GitUserSource = 'private-settings' | 'local' | 'global' | 'mixed'
 
 export interface GitUserIdentity {
   name: string
@@ -37,10 +37,53 @@ export interface GitIdentityUpdateRequest {
   sshKeyPath?: string
 }
 
+export interface SshKeyDirectory {
+  path: string
+  exists: boolean
+  readable: boolean
+}
+
+export interface SshKeyCandidate {
+  name: string
+  path: string
+}
+
+export interface SshKeyListResponse {
+  directory: SshKeyDirectory
+  keys: SshKeyCandidate[]
+  message: string
+}
+
+export interface SshKeyValidationRequest {
+  sshKeyPath: string
+}
+
+export interface SshKeyValidationResponse {
+  valid: boolean
+  path: string
+  message: string
+}
+
+export type PrivateSettingsProtectionStatus = 'protected' | 'missing-ignore-file' | 'missing-entry' | 'blocked'
+
+export interface PrivateSettingsProtectionState {
+  settingsPath: string
+  ignoreFileExists: boolean
+  protected: boolean
+  status: PrivateSettingsProtectionStatus
+  canApplyFix: boolean
+  message: string
+}
+
+export interface PrivateSettingsProtectionUpdateRequest {
+  approved: boolean
+}
+
 export interface GitIdentityUpdateResponse {
   ok: boolean
   message: string
   user: GitUserIdentity
+  protection?: PrivateSettingsProtectionState
 }
 
 export type ViewerPathType = 'file' | 'dir' | 'none'

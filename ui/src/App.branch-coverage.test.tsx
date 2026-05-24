@@ -264,6 +264,10 @@ vi.mock('./services/api', () => ({
     switchBranch: vi.fn(),
     syncWithRemote: vi.fn(),
     updateGitIdentity: vi.fn(),
+    getGitIdentitySshKeys: vi.fn(),
+    validateGitIdentitySshKey: vi.fn(),
+    getGitIdentityProtection: vi.fn(),
+    applyGitIdentityProtection: vi.fn(),
     createChildFolder: vi.fn(),
     initFolderRepository: vi.fn(),
     cloneRepositoryIntoFolder: vi.fn(),
@@ -416,8 +420,34 @@ describe('App branch coverage', () => {
       user: {
         name: 'Local User',
         email: 'local@example.com',
-        source: 'local',
+        source: 'private-settings',
       },
+    })
+    vi.mocked(api.getGitIdentitySshKeys).mockResolvedValue({
+      directory: { path: '/home/user/.ssh', exists: true, readable: true },
+      keys: [],
+      message: 'Found 0 SSH private keys.',
+    })
+    vi.mocked(api.validateGitIdentitySshKey).mockResolvedValue({
+      valid: true,
+      path: '/home/user/.ssh/id_ed25519',
+      message: 'SSH private key is valid.',
+    })
+    vi.mocked(api.getGitIdentityProtection).mockResolvedValue({
+      settingsPath: '.env',
+      ignoreFileExists: true,
+      protected: true,
+      status: 'protected',
+      canApplyFix: false,
+      message: '.env is protected by .gitignore.',
+    })
+    vi.mocked(api.applyGitIdentityProtection).mockResolvedValue({
+      settingsPath: '.env',
+      ignoreFileExists: true,
+      protected: true,
+      status: 'protected',
+      canApplyFix: false,
+      message: '.env was added to .gitignore.',
     })
     vi.mocked(api.getFolderDeletePreview).mockResolvedValue({
       ok: true,

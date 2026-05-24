@@ -8,6 +8,10 @@ import {
   commitChangesHandler,
   commitsHandler,
   gitContextHandler,
+  gitIdentityProtectionHandler,
+  gitIdentityProtectionUpdateHandler,
+  gitIdentitySshKeysHandler,
+  gitIdentitySshKeyValidateHandler,
   gitIdentityUpdateHandler,
   readmeHandler,
   remoteSyncHandler,
@@ -102,6 +106,10 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/branches/switch', branchSwitchHandler)
   app.post('/api/git/commit', commitChangesHandler)
   app.get('/api/git/context', gitContextHandler)
+  app.get('/api/git/identity/ssh-keys', gitIdentitySshKeysHandler)
+  app.post('/api/git/identity/ssh-key/validate', gitIdentitySshKeyValidateHandler)
+  app.get('/api/git/identity/protection', gitIdentityProtectionHandler)
+  app.post('/api/git/identity/protection', gitIdentityProtectionUpdateHandler)
   app.put('/api/git/identity', gitIdentityUpdateHandler)
   app.post('/api/git/sync', remoteSyncHandler)
   app.get('/api/commits', commitsHandler)
