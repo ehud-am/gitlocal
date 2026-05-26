@@ -42,6 +42,10 @@ swift -module-cache-path "${SWIFT_MODULE_CACHE}" "${ROOT_DIR}/packaging/macos/re
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile GitLocal" "${APP_PATH}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconName GitLocal" "${APP_PATH}/Contents/Info.plist"
 
+xattr -cr "${APP_PATH}"
+codesign --force --deep --sign - "${APP_PATH}" >/dev/null
+codesign --verify --deep --strict --verbose=2 "${APP_PATH}" >/dev/null
+
 touch "${APP_PATH}"
 if [[ -x /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister ]]; then
   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \

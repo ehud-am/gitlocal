@@ -33,6 +33,8 @@ if [[ "${APP_ICON_NAME}" != "GitLocal" ]]; then
   exit 1
 fi
 
+codesign --verify --deep --strict --verbose=2 "${APP_PATH}" >/dev/null
+
 LOG_FILE="$(mktemp)"
 SERVICE_PID=""
 cleanup() {

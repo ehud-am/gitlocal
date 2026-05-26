@@ -11,7 +11,7 @@ export HOMEBREW_CACHE="${HOMEBREW_CACHE_DIR}"
 export HOMEBREW_NO_AUTO_UPDATE=1
 
 cleanup() {
-  brew uninstall --cask gitlocal >/dev/null 2>&1 || true
+  brew uninstall --cask --force "${TAP_NAME}/gitlocal" >/dev/null 2>&1 || true
   brew untap --force "${TAP_NAME}" >/dev/null 2>&1 || true
   rm -rf "${APPDIR}"
   rm -rf "${HOMEBREW_CACHE_DIR}"
@@ -37,8 +37,9 @@ TAP_REPO="$(brew --repository)/Library/Taps/gitlocal/homebrew-local-test"
 mkdir -p "${TAP_REPO}/Casks"
 cp "${CASK_PATH}" "${TAP_REPO}/Casks/gitlocal.rb"
 
-brew install --cask --appdir="${APPDIR}" "${TAP_NAME}/gitlocal"
+brew uninstall --cask --force "${TAP_NAME}/gitlocal" >/dev/null 2>&1 || true
+brew install --cask --force --appdir="${APPDIR}" "${TAP_NAME}/gitlocal"
 test -d "${APPDIR}/GitLocal.app"
-brew uninstall --cask gitlocal
+brew uninstall --cask --force "${TAP_NAME}/gitlocal"
 
 echo "Cask install/uninstall validation passed for ${CASK_PATH}"
