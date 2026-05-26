@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.9.1 - 2026-05-26
+
+- Fixed the macOS app package by signing the finalized bundle after packaged Node, server, UI, and icon resources are copied into `GitLocal.app`.
+- Added release validation that fails if the macOS app bundle signature is invalid before packaging.
+
 ## 0.9.0 - 2026-05-26
 
 - Added the macOS Homebrew native app distribution scaffold, including a Swift/WebKit wrapper, cask template, packaging and validation scripts, and a macOS app artifact workflow.
