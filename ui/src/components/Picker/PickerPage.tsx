@@ -227,7 +227,10 @@ export default function PickerPage() {
   return (
     <div className="picker-shell">
       <header className="app-header">
-        <span className="logo">GitLocal</span>
+        <span className="brand-lockup">
+          <img className="brand-mark" src="/gitlocal-logo.svg" alt="" aria-hidden="true" />
+          <span className="logo">GitLocal</span>
+        </span>
         <span className="repo-name">Open local folder</span>
       </header>
       <div className="picker-layout">

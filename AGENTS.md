@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-05-24
+Auto-generated from all feature plans. Last updated: 2026-05-25
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -30,6 +30,8 @@ Auto-generated from all feature plans. Last updated: 2026-05-24
 - No database; classification is derived from local filesystem metadata and local git metadata at request time (015-fix-git-folder-detection)
 - No database; classification derives from local filesystem metadata, local git metadata, browser URL state, and in-memory server/UI state (016-fix-subrepo-detection)
 - Project-local `.env` file for GitLocal identity values, repository-local git config for active git command behavior, `.gitignore` for private-file protection (017-git-identity-settings)
+- TypeScript 5.x on Node.js 22+ for the existing server/CLI and React UI; Swift 5.x for the macOS native wrapper; Ruby cask metadata for the Homebrew tap + Existing Hono server, @hono/node-server, React 18, Vite 7, current npm build/test stack; macOS AppKit/WebKit for the wrapper; Homebrew cask packaging conventions; GitHub Releases for versioned app artifacts (018-macos-homebrew-app)
+- No new application database; bundled release assets for the native app, user-local app preferences only if needed for native window/session state, Homebrew cask metadata in a project-owned tap repository (018-macos-homebrew-app)
 
 ## Project Structure
 
@@ -40,6 +42,16 @@ ui/           # React frontend (Vite)
 dist/         # Compiled server bundle (gitignored)
 ui/dist/      # Compiled UI bundle (gitignored)
 ```
+
+## Product Direction
+
+GitLocal is for less-technical builders working in an AI-driven development lifecycle. The product should optimize for codebase browsing, Markdown reading, review, and lightweight human intervention rather than full-IDE workflows.
+
+GitLocal has two distributions using the same app code:
+- npm package: cross-platform, one-command install, browser-based, requires the terminal process to stay open.
+- macOS Homebrew cask: native `GitLocal.app`, embedded WebKit browser, managed local service lifecycle.
+
+Measured on the current branch, 93.3% of implementation lines are shared between both distributions, excluding tests, docs, and generated build output.
 
 ## Commands
 
@@ -52,12 +64,12 @@ npm run verify # Run tests, builds, and dependency audits
 
 ## Code Style
 
-TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). No Go, no Makefile, no shell scripts.
+TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 018-macos-homebrew-app: Added TypeScript 5.x on Node.js 22+ for the existing server/CLI and React UI; Swift 5.x for the macOS native wrapper; Ruby cask metadata for the Homebrew tap + Existing Hono server, @hono/node-server, React 18, Vite 7, current npm build/test stack; macOS AppKit/WebKit for the wrapper; Homebrew cask packaging conventions; GitHub Releases for versioned app artifacts
 - 017-git-identity-settings: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 - 016-fix-subrepo-detection: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
-- 015-fix-git-folder-detection: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -65,5 +77,5 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/017-git-identity-settings/plan.md`
+`specs/018-macos-homebrew-app/plan.md`
 <!-- SPECKIT END -->

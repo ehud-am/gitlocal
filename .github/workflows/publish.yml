@@ -5,13 +5,15 @@ on:
     types: [published]
 
 jobs:
-  publish:
+  publish-npm:
     if: github.event.release.prerelease == false
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: read
       id-token: write # Required for npm trusted publishing via OIDC
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Check out repository
@@ -33,8 +35,114 @@ jobs:
       - name: Install UI dependencies
         run: npm --prefix ui ci
 
+      - name: Read package version
+        id: version
+        run: |
+          VERSION="$(node -p 'require("./package.json").version')"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "Release tag ${GITHUB_REF_NAME} does not match package version ${VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
       - name: Verify release
         run: npm run verify
 
       - name: Publish package to npm
         run: npm publish --access public
+
+  publish-homebrew:
+    if: github.event.release.prerelease == false
+    needs: publish-npm
+    runs-on: macos-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      HOMEBREW_TAP_REPOSITORY: ehud-am/homebrew-gitlocal
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Require Homebrew tap token
+        run: |
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN is required to publish the Homebrew cask." >&2
+            exit 1
+          fi
+
+      - name: Build macOS app artifact
+        run: packaging/macos/release/package-app.sh
+
+      - name: Validate app package
+        run: packaging/macos/release/test-package.sh
+
+      - name: Prepare cask metadata
+        id: cask
+        run: |
+          VERSION="${{ needs.publish-npm.outputs.version }}"
+          ARTIFACT="packaging/macos/release/artifacts/GitLocal-${VERSION}-macos.zip"
+          SHA256="$(shasum -a 256 "${ARTIFACT}" | awk '{print $1}')"
+          URL="https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/GitLocal-${VERSION}-macos.zip"
+
+          packaging/macos/cask/update-cask.sh \
+            --version "${VERSION}" \
+            --url "${URL}" \
+            --sha256 "${SHA256}"
+          packaging/macos/cask/validate-cask.sh packaging/macos/cask/gitlocal.rb
+
+          echo "artifact=${ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
+          echo "url=${URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attach macOS artifact to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "${{ steps.cask.outputs.artifact }}" \
+            "${{ steps.cask.outputs.artifact }}.sha256" \
+            --clobber
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.HOMEBREW_TAP_REPOSITORY }}
+          token: ${{ env.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Publish Homebrew cask
+        run: |
+          VERSION="${{ needs.publish-npm.outputs.version }}"
+          mkdir -p homebrew-tap/Casks
+          cp packaging/macos/cask/gitlocal.rb homebrew-tap/Casks/gitlocal.rb
+
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/gitlocal.rb
+
+          if git diff --cached --quiet; then
+            echo "Homebrew cask already up to date."
+          else
+            git commit -m "Update gitlocal cask to ${VERSION}"
+            git push
+          fi

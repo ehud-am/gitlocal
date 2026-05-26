@@ -48,6 +48,28 @@ Icon?
 # macOS Finder tags and extended attributes
 *.icloud
 
+# macOS native app build output
+native/macos/build/
+native/macos/DerivedData/
+native/macos/**/DerivedData/
+native/macos/**/*.xcuserstate
+native/macos/**/*.xcuserdata/
+native/macos/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+native/macos/**/*.xcodeproj/xcuserdata/
+native/macos/**/*.app/
+.build/
+DerivedData/
+*.swiftpm/
+Packages/
+
+# macOS release packaging output
+packaging/macos/release/artifacts/
+packaging/macos/release/staging/
+packaging/macos/release/tmp/
+packaging/macos/release/*.dmg
+packaging/macos/release/*.zip
+packaging/macos/release/*.sha256
+
 # ── Windows ───────────────────────────────────────────────────────────────────
 
 Thumbs.db
