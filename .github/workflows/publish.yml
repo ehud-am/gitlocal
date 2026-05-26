@@ -1,12 +1,12 @@
 name: Publish Package
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 jobs:
   publish-npm:
-    if: github.event.release.prerelease == false
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -53,7 +53,6 @@ jobs:
         run: npm publish --access public
 
   publish-homebrew:
-    if: github.event.release.prerelease == false
     needs: publish-npm
     runs-on: macos-latest
     environment: release
@@ -101,7 +100,7 @@ jobs:
           VERSION="${{ needs.publish-npm.outputs.version }}"
           ARTIFACT="packaging/macos/release/artifacts/GitLocal-${VERSION}-macos.zip"
           SHA256="$(shasum -a 256 "${ARTIFACT}" | awk '{print $1}')"
-          URL="https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/GitLocal-${VERSION}-macos.zip"
+          URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/GitLocal-${VERSION}-macos.zip"
 
           packaging/macos/cask/update-cask.sh \
             --version "${VERSION}" \
@@ -113,14 +112,20 @@ jobs:
           echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
           echo "url=${URL}" >> "${GITHUB_OUTPUT}"
 
-      - name: Attach macOS artifact to release
+      - name: Create GitHub release with macOS artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists. Immutable releases must be created with assets in one step." >&2
+            exit 1
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
             "${{ steps.cask.outputs.artifact }}" \
             "${{ steps.cask.outputs.artifact }}.sha256" \
-            --clobber
+            --title "GitLocal ${GITHUB_REF_NAME}" \
+            --generate-notes
 
       - name: Check out Homebrew tap
         uses: actions/checkout@v5

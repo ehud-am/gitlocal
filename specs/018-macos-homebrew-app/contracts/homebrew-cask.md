@@ -76,7 +76,7 @@ The cask must define:
 ## Artifact Requirements
 
 - Artifact URL points to a GitHub Release asset for the same GitLocal version.
-- SHA-256 matches the exact uploaded artifact.
+- SHA-256 matches the exact release artifact.
 - Artifact contains the app bundle and required packaged assets.
 - Artifact signing/notarization status is documented in the release notes.
 

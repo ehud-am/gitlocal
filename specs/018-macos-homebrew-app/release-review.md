@@ -24,7 +24,7 @@ This review covers the macOS Homebrew native app distribution scaffold and produ
 | Homebrew cask metadata validation | Passed | `validate-cask.sh`, `validate-artifact.sh`, and `validate-version-alignment.sh` passed for the local artifact. |
 | Homebrew cask install/uninstall validation | Passed | Local artifact installed through a temporary Homebrew tap into a temporary app directory and uninstalled cleanly. |
 | Release version metadata | Passed | `package.json` is set to 0.9.0, `package-app.sh` writes the same app bundle version, `validate-version-alignment.sh` checks package/app/artifact/cask alignment, and `publish.yml` rejects release tags that do not match the package version. |
-| Unified npm/Homebrew release pipeline | Passed | `.github/workflows/publish.yml` publishes npm first, then builds and validates the macOS artifact, uploads the artifact/checksum to the GitHub Release, updates the cask checksum, and pushes `Casks/gitlocal.rb` to the project-owned tap using `HOMEBREW_TAP_TOKEN`. |
+| Unified npm/Homebrew release pipeline | Passed | `.github/workflows/publish.yml` publishes npm first, then builds and validates the macOS artifact, creates the immutable GitHub Release with the artifact/checksum attached, updates the cask checksum, and pushes `Casks/gitlocal.rb` to the project-owned tap using `HOMEBREW_TAP_TOKEN`. |
 | Accessibility validation | Passed | Existing UI test coverage includes automated accessibility checks for key browsing surfaces. Contrarian QA reviewed the native wrapper as a distribution shell around the already-tested React UI and found no new interactive product surface beyond the WebKit container and native error dialogs. |
 | Native error handling validation | Passed | Startup and missing-asset failures route through `AppErrorPresenter`; non-loopback service URLs are rejected before WebKit load; repository permission failures are surfaced by the shared GitLocal viewer; README/Homebrew docs cover blocked/unsigned macOS app launch. |
 | Homebrew upgrade validation | Deferred | Requires two published versioned artifacts or a later release-candidate tap update. |
@@ -39,7 +39,7 @@ This review covers the macOS Homebrew native app distribution scaffold and produ
 - Closing the app should not leave a managed service process running. Result: launch/quit smoke plus process-list check found no remaining app-mode process.
 - Native error states must be understandable. Result: startup and asset failures use native error presentation; repository permission errors stay in the shared viewer; blocked app launch is documented as a macOS security troubleshooting case.
 - Accessibility must not regress. Result: shared React accessibility checks remain part of UI CI; the native wrapper adds no replacement UI for repository browsing, and native error dialogs use standard macOS controls.
-- Cask checksum must match the uploaded artifact exactly. Result: local checksum validation passes; release must recompute after final uploaded artifact.
+- Cask checksum must match the attached release artifact exactly. Result: local checksum validation passes; release must compute the checksum from the final artifact before creating the immutable release.
 - Public release docs must state whether the artifact is signed and notarized. Result: signing/notarization docs added; current local artifact remains unsigned test output.
 - Homebrew metadata must not use contributor-local absolute paths. Result: committed cask uses a GitHub Release URL; local file URLs are generated only in temporary validation casks.
 
@@ -48,7 +48,7 @@ This review covers the macOS Homebrew native app distribution scaffold and produ
 - No npm package bloat observed.
 - No non-loopback URL loading path observed in the native wrapper.
 - No managed service process remained after the app quit smoke.
-- Release is not ready for public Homebrew promotion until a final signed/notarized artifact is uploaded and its exact checksum is placed in the tap.
+- Release is not ready for public Homebrew promotion until a final signed/notarized artifact is attached to the immutable release at creation time and its exact checksum is placed in the tap.
 
 ## Known Limitations
 
