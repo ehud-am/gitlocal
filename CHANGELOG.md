@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.0 - 2026-05-26
+
+- Added the macOS Homebrew native app distribution scaffold, including a Swift/WebKit wrapper, cask template, packaging and validation scripts, and a macOS app artifact workflow.
+- Preserved the npm package as the primary cross-platform distribution and added regression coverage to keep native packaging artifacts out of the npm package.
+- Amended project governance to allow a scoped macOS native wrapper while keeping the TypeScript/Node product core intact.
+- Updated product documentation to position GitLocal for less-technical builders in AI-driven development workflows, where browsing, Markdown review, and lightweight intervention matter more than a full IDE.
+
 ## 0.8.0 - 2026-05-24
 
 - Added project-persistent git identity settings backed by local `.env` values while keeping repository-local git config synchronized for author name, email, and SSH command behavior.

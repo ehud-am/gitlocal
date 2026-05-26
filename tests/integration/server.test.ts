@@ -185,6 +185,24 @@ describe('Server integration', () => {
     expect(res.status).toBe(200)
   })
 
+  it('keeps npm no-argument launch behavior pointed at the current repository', async () => {
+    const repo = makeGitRepo()
+    const previousCwd = process.cwd()
+    try {
+      chdir(repo.dir)
+      const app = createApp('', { detectCurrentRepoOnEmptyPath: true })
+      const res = await app.fetch(new Request('http://localhost/api/info'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { isGitRepo: boolean; pickerMode: boolean; path: string }
+      expect(body.isGitRepo).toBe(true)
+      expect(body.pickerMode).toBe(false)
+      expect(realpathSync(body.path)).toBe(realpathSync(repo.dir))
+    } finally {
+      chdir(previousCwd)
+      repo.cleanup()
+    }
+  })
+
   it('GET /api/branches returns array', async () => {
     const app = createApp(dir)
     const res = await app.fetch(new Request('http://localhost/api/branches'))

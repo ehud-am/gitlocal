@@ -1,14 +1,12 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 3.0.0 → 3.1.0 (MINOR — added explicit pre-GA release governance,
-  branch/version discipline, and a mandatory contrarian QA review gate before releases)
+  Version change: 3.1.0 → 3.2.0 (MINOR — added explicit macOS native
+  distribution allowance while preserving the TypeScript/Node product core)
   Modified principles:
-    - Principle II: expanded release coverage language to restate the 90% per-file gate
-    - Principle VII: renamed to "Repository-Relative Paths and Release Documentation" and
-      updated to require changelog updates and README review for every release
-  Added principles:
-    - Principle VIII: "Release Branches, Pre-GA Versioning, and Contrarian QA"
+    - Principle I: clarified that TypeScript remains the product core while a
+      scoped macOS native wrapper is permitted for Homebrew app distribution
+  Added principles: none
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -18,7 +16,7 @@
     - .specify/templates/checklist-template.md — ✅ no change needed
     - .specify/templates/constitution-template.md — ✅ no change needed
     - README.md — ✅ no change needed
-    - AGENTS.md — ✅ no change needed
+    - AGENTS.md — ✅ updated for scoped Swift wrapper/package scripts
     - CLAUDE.md — ✅ no change needed
   Follow-up TODOs: none
 -->
@@ -27,13 +25,22 @@
 
 ## Core Principles
 
-### I. TypeScript-First
+### I. TypeScript-First Product Core
 
 All server-side and CLI code MUST be written in TypeScript, running on Node.js 22+ (active LTS).
-The single deliverable is an npm package, distributed via the npm registry and runnable via
-`npx gitlocal` or `npm install -g gitlocal`. No other backend language or runtime is permitted;
+The primary cross-platform deliverable is an npm package, distributed via the npm registry and
+runnable via `npx gitlocal` or `npm install -g gitlocal`. No other backend language or runtime
+may replace the TypeScript/Node product core.
+
+A scoped macOS native wrapper MAY be used solely to distribute GitLocal as a Homebrew-installed
+Mac app. That wrapper MUST remain a thin shell around the existing Node.js-served React UI and
+local service, MUST NOT fork product behavior, MUST NOT add telemetry or proprietary services,
+and MUST keep npm package contents and behavior unchanged. Platform-native code for this wrapper
+MUST be isolated under native macOS packaging paths and covered by lifecycle/package validation
+appropriate to macOS app distribution.
+
 Go is no longer used in this project. Third-party npm dependencies are allowed but MUST be
-justified by clear need — avoid dependency bloat.
+justified by clear need; avoid dependency bloat.
 
 ### II. Test Coverage (NON-NEGOTIABLE)
 
@@ -117,15 +124,19 @@ for human approval before the release can be finalized.
 - **Frontend**: React (TypeScript), built with Vite, served as static assets by the backend
 - **Build**: `npm run build` at repository root; Vite produces frontend assets; TypeScript
   compiler produces the backend; single npm package contains both
-- **Distribution**: npm registry (`npm install -g gitlocal` / `npx gitlocal`)
+- **Distribution**: npm registry (`npm install -g gitlocal` / `npx gitlocal`) for the primary
+  cross-platform package; optional macOS Homebrew cask for a native app wrapper
 - **Testing**: Vitest for both backend and frontend; single test run via `npm test`
-- **Packaging**: npm package with a `bin` entry point; Node.js 22+ required at runtime
+- **Packaging**: npm package with a `bin` entry point; optional macOS app artifact for Homebrew
+  distribution that wraps the same Node.js-served React UI
 - **License**: MIT
 
 ## Target Audience & UX Philosophy
 
-GitLocal is built for **non-developers** who collaborate on code repositories using AI tools
-like Claude Code but do not need or want a full IDE. The primary use cases are:
+GitLocal is built for **less-technical builders** who collaborate with AI agents on code
+repositories but do not need or want a full IDE. In this workflow, direct human editing is
+often the exception; understanding and reviewing the codebase is the recurring human task.
+The primary use cases are:
 
 - Browsing a local Git repository's file tree
 - Reading rendered Markdown documentation
@@ -135,7 +146,9 @@ like Claude Code but do not need or want a full IDE. The primary use cases are:
 
 The UX MUST assume users are comfortable with a browser but not necessarily with terminal
 commands or IDE workflows. Every interaction should feel as natural as browsing a repo
-on GitHub.
+on GitHub. Editing must remain available, but the product should optimize first for
+navigation, reading, Markdown review, and lightweight human intervention around
+AI-generated changes.
 
 ## Governance
 
@@ -155,4 +168,4 @@ implementation decisions, code reviews, and release gates MUST comply with these
 - **Runtime guidance**: See `AGENTS.md` and `CLAUDE.md` for development-time conventions and
   workflow details that supplement but do not override this constitution.
 
-**Version**: 3.1.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-04-23
+**Version**: 3.2.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-05-25

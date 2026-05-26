@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">GitLocal logo</title>
+  <desc id="desc">A rounded app icon with a simplified git branch mark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="18" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16343a"/>
+      <stop offset="1" stop-color="#0b1720"/>
+    </linearGradient>
+    <linearGradient id="branch" x1="38" y1="90" x2="90" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#31d488"/>
+      <stop offset="1" stop-color="#61b7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="27" fill="url(#bg)"/>
+  <path d="M42 86V50c0-8 6-14 14-14h21" fill="none" stroke="url(#branch)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M42 58c18 0 31 13 31 31" fill="none" stroke="url(#branch)" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="42" cy="88" r="13" fill="#0d1f2a" stroke="#31d488" stroke-width="7"/>
+  <circle cx="80" cy="36" r="13" fill="#0d1f2a" stroke="#61b7ff" stroke-width="7"/>
+  <circle cx="74" cy="90" r="13" fill="#0d1f2a" stroke="#50e6a1" stroke-width="7"/>
+</svg>

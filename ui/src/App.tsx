@@ -718,7 +718,10 @@ export default function App() {
     <>
       <div className="flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
         <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
-          <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
+          <span className="brand-lockup">
+            <img className="brand-mark" src="/gitlocal-logo.svg" alt="" aria-hidden="true" />
+            <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
+          </span>
           {info ? <span className="repo-name truncate text-sm text-[var(--muted-foreground)]">{info.name}</span> : null}
           <label className="ml-auto inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
             <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>

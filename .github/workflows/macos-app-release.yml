@@ -1,0 +1,37 @@
+name: macOS App Artifact
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos-app:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Build macOS app artifact
+        run: packaging/macos/release/package-app.sh
+
+      - name: Validate app package
+        run: packaging/macos/release/test-package.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitlocal-macos-app
+          path: |
+            packaging/macos/release/artifacts/GitLocal-*-macos.zip
+            packaging/macos/release/artifacts/GitLocal-*-macos.zip.sha256

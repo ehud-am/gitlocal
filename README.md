@@ -5,7 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
-A local folder and git repository viewer that gives you a GitHub-like browsing experience — without leaving your machine. Built for non-developers who use tools like [Claude Code](https://claude.ai/code) to work in project folders and git repositories and want a clean way to read, navigate, and review their code without a full IDE. Everything runs locally, there are no accounts or telemetry, and any clone, fetch, pull, or push action goes through your installed `git` only when you choose it.
+GitLocal is a local folder and git repository viewer for less-technical builders working in today's AI-driven development lifecycle.
+
+When AI agents do most of the code generation, direct hand-editing source files becomes the exception rather than the default. A full IDE can be overkill. GitLocal focuses on the work humans still need to do constantly: browse the codebase, understand structure, read Markdown documents clearly, inspect changes, and make small edits when needed. Editing remains possible, but the product is optimized first for navigation, reading, review, and lightweight intervention.
+
+Everything runs locally, there are no accounts or telemetry, and any clone, fetch, pull, or push action goes through your installed `git` only when you choose it.
 
 ---
 
@@ -20,12 +24,44 @@ A local folder and git repository viewer that gives you a GitHub-like browsing e
 
 ## Install
 
+GitLocal has two distributions that run the same app code.
+
+Measured on this branch, **90.4% of the implementation is shared** between the npm and macOS native distributions: 10,510 lines of shared app code in `src/` and `ui/src/`, compared with 1,117 macOS-distribution-specific lines in the Swift wrapper, Xcode/plist config, cask/package scripts, and release workflows. This excludes tests, docs, and generated build outputs.
+
 Choose the workflow that fits how you want to use GitLocal:
 
-### Install globally
+### NPM package
 
 ```bash
 npm install -g gitlocal
+```
+
+This is the simple cross-platform distribution for any system that supports Node.js and JavaScript. It installs with one command and opens GitLocal in your browser.
+
+Tradeoff: it is not a native app. The terminal process that starts GitLocal must stay open while you use it.
+
+### macOS native app
+
+Mac users can install the native app distribution from the project tap when a macOS app artifact is published:
+
+```bash
+brew tap ehud-am/gitlocal
+brew install --cask gitlocal
+```
+
+The Homebrew cask installs `GitLocal.app`, which runs as a native Mac app with an embedded WebKit browser. It uses the same GitLocal server and React viewer as the npm package, starts the local service for the app session, and does not require `npm install -g gitlocal` for normal app launch.
+
+Upgrade the native app through Homebrew:
+
+```bash
+brew update
+brew upgrade --cask gitlocal
+```
+
+Uninstall:
+
+```bash
+brew uninstall --cask gitlocal
 ```
 
 ### Run without installing
@@ -68,6 +104,8 @@ gitlocal listening on http://localhost:54321
 ```
 
 Press **Ctrl+C** to stop the server.
+
+The macOS native app starts the same local server for the app session, loads it in an embedded WebKit window, and stops the managed service when the app quits.
 
 ### Open a folder or repository
 
@@ -113,10 +151,10 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 ## What it does
 
 - **Browse the file tree** — expand and collapse folders lazily, whether the root is a plain folder or a git repository
-- **Read files beautifully** — Markdown renders with GitHub-like typography and tables; code files get syntax highlighting; images display inline
+- **Read project knowledge comfortably** — Markdown renders with GitHub-like typography, tables, task lists, and code blocks so specs, plans, READMEs, and agent-generated docs are easy to review
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **Track file sync state in repositories** — repository file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
-- **Make local file edits** — create, edit, and delete files from the viewer in plain folders or on a repository's working branch
+- **Make small local file edits** — create, edit, and delete files from the viewer when human intervention is needed, without making editing the main product center of gravity
 - **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — save project-specific git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and keep private `.env` settings protected from commits
@@ -131,6 +169,25 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 
 The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
 Repository-wide search no longer takes over `Cmd/Ctrl+F`, so the browser's native page find stays available while GitLocal offers its own explicit repository search and current-file find tools.
+
+---
+
+## Distribution Options
+
+| Channel | Platforms | Runtime experience | Best for | Tradeoff |
+|---------|-----------|--------------------|----------|----------|
+| npm | macOS, Windows, Linux | Local server opened in your browser | Cross-platform installs and automation | Requires a terminal process to stay open |
+| Homebrew cask | macOS | `GitLocal.app` with embedded WebKit viewer | Mac users who want native app launch | macOS only |
+
+Both channels use the same GitLocal server and React viewer for a given release. The native macOS app is a thin wrapper around the local service; it is not a separate product fork.
+
+### Homebrew troubleshooting
+
+- If `brew` is not found, install Homebrew first from the official Homebrew site.
+- If installation reports a checksum mismatch, run `brew update` and retry. Do not bypass checksum verification.
+- If macOS blocks the app, verify that the release notes identify the artifact as signed/notarized. Internal test artifacts may require manual security approval.
+- If your macOS version or processor architecture is unsupported, use the npm package until a compatible native artifact is available.
+- If a launch fails, the app should show a native error. The npm browser workflow remains available as a fallback.
 
 ---
 
@@ -178,6 +235,50 @@ npm run build
 
 Builds the React frontend and compiles the Node.js CLI into `dist/cli.js`.
 
+### Build and run the macOS native app from source
+
+On macOS with Xcode installed, build the shared GitLocal app and the native wrapper:
+
+```bash
+packaging/macos/release/package-app.sh
+```
+
+This runs the normal npm build, builds `GitLocal.app`, bundles the server/UI assets, copies the local Node runtime into the app bundle, and creates a local unsigned artifact in `packaging/macos/release/artifacts/`.
+
+List the generated artifacts:
+
+```bash
+ls packaging/macos/release/artifacts/
+```
+
+Or open the artifact folder in Finder:
+
+```bash
+open packaging/macos/release/artifacts/
+```
+
+Launch the locally built app:
+
+```bash
+open native/macos/build/Build/Products/Release/GitLocal.app
+```
+
+Validate the local app bundle:
+
+```bash
+packaging/macos/release/test-package.sh
+```
+
+Validate the local Homebrew cask against the generated artifact:
+
+```bash
+packaging/macos/cask/test-install-cask.sh \
+  packaging/macos/cask/gitlocal.rb \
+  packaging/macos/release/artifacts/GitLocal-$(node -p "require('./package.json').version")-macos.zip
+```
+
+The local app is unsigned unless you run the signing/notarization release flow. It is intended for development validation, not public distribution.
+
 ### Full verification
 
 ```bash
@@ -195,7 +296,7 @@ GitLocal is a Node.js CLI that serves a React SPA:
 ```
 gitlocal/
 ├── src/
-│   ├── cli.ts           — entry point: arg parsing, server start, browser open
+│   ├── cli.ts           — entry point: arg parsing, server start, browser/app-mode launch
 │   ├── server.ts        — Hono app, route registration, static serving + SPA fallback
 │   ├── git/
 │   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, identity sync, and file sync state
@@ -220,10 +321,18 @@ gitlocal/
     └── services/api.ts              — typed fetch wrappers for all endpoints
 ```
 
+Optional macOS native app distribution:
+
+```
+native/macos/           — Swift/AppKit/WebKit wrapper for GitLocal.app
+packaging/macos/        — Homebrew cask, package, checksum, and release helpers
+```
+
 **Key design decisions:**
 
-- **No external runtime dependencies beyond Node.js** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
-- **Single npm toolchain** — build, test, and install all via `npm`; no Go, no Makefile, no shell scripts
+- **No external runtime dependencies beyond Node.js for the product core** — all git operations shell out to the local `git` binary via `child_process.spawnSync`
+- **Primary npm toolchain** — build, test, and install the cross-platform package via `npm`; macOS app packaging adds scoped Swift and shell/Ruby release helpers outside the npm package
+- **Shared app code across distributions** — npm and Homebrew use the same TypeScript server and React UI; the Mac wrapper only owns native windowing, service lifecycle, and packaging
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
 - **Local-first editing and repo awareness** — GitLocal can create, update, and delete files in folder roots and repository working trees while using git commands for branch and repository metadata
 

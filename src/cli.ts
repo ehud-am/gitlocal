@@ -22,16 +22,34 @@ async function openBrowser(url: string): Promise<void> {
   }
 }
 
+function parseArgs(argv: string[]): { repoPath: string; openSystemBrowser: boolean } {
+  let openSystemBrowser = true
+  const positional: string[] = []
+
+  for (const arg of argv) {
+    if (arg === '--app-mode' || arg === '--no-open') {
+      openSystemBrowser = false
+    } else {
+      positional.push(arg)
+    }
+  }
+
+  return {
+    repoPath: positional[0] ?? '',
+    openSystemBrowser,
+  }
+}
+
 async function main(): Promise<void> {
   checkNodeVersion()
 
-  const repoPath = process.argv[2] ?? ''
+  const { repoPath, openSystemBrowser } = parseArgs(process.argv.slice(2))
   const launchPath = repoPath || process.cwd()
   const openingCurrentRepo = !repoPath && validateRepo(launchPath)
   const app = createApp(repoPath, { detectCurrentRepoOnEmptyPath: true })
 
-  const server = serve({ fetch: app.fetch, port: 0 }, async (info) => {
-    const url = `http://localhost:${info.port}`
+  const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }, async (info) => {
+    const url = `http://127.0.0.1:${info.port}`
     console.log(`gitlocal listening on ${url}`)
     if (repoPath) {
       console.log(`Serving: ${repoPath}`)
@@ -40,7 +58,9 @@ async function main(): Promise<void> {
     } else {
       console.log('No folder specified — opening folder picker.')
     }
-    await openBrowser(url)
+    if (openSystemBrowser) {
+      await openBrowser(url)
+    }
   })
 
   const shutdown = (): void => {
