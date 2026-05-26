@@ -1048,6 +1048,10 @@ pre {
   min-height: calc(100vh - 48px);
 }
 
+.picker-layout-collapsed {
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+}
+
 .picker-sidebar,
 .picker-sidebar-rail {
   border-right: 1px solid var(--border);
@@ -1058,6 +1062,44 @@ pre {
   display: flex;
   min-height: 0;
   flex-direction: column;
+}
+
+.picker-sidebar .sidebar-toolbar,
+.picker-sidebar-rail .sidebar-rail-toolbar {
+  display: flex;
+  padding: 0.75rem;
+}
+
+.picker-sidebar .sidebar-toolbar {
+  justify-content: flex-end;
+  padding-bottom: 0.5rem;
+}
+
+.picker-sidebar-rail .sidebar-rail-toolbar {
+  justify-content: center;
+}
+
+.picker-sidebar .sidebar-toggle-button,
+.picker-sidebar-rail .sidebar-toggle-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.picker-sidebar .sidebar-toggle-button:hover,
+.picker-sidebar .sidebar-toggle-button:focus-visible,
+.picker-sidebar-rail .sidebar-toggle-button:hover,
+.picker-sidebar-rail .sidebar-toggle-button:focus-visible {
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .picker-file-tree {
@@ -1218,6 +1260,10 @@ pre {
 @media (max-width: 960px) {
   .picker-layout {
     grid-template-columns: 1fr;
+  }
+
+  .picker-layout-collapsed {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
   }
 
   .picker-sidebar,

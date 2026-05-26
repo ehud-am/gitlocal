@@ -353,13 +353,18 @@ describe('PickerPage', () => {
   it('collapses and restores navigation with the same rail pattern as the viewer', async () => {
     render(<PickerPage />)
 
+    const layout = document.querySelector('.picker-layout')
+    expect(layout).not.toHaveClass('picker-layout-collapsed')
+
     fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
 
     expect(await screen.findByLabelText(/collapsed navigation/i)).toBeInTheDocument()
+    expect(layout).toHaveClass('picker-layout-collapsed')
 
     fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
 
     expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
+    expect(layout).not.toHaveClass('picker-layout-collapsed')
   })
 
   it('opens the typed path from the single open action', async () => {

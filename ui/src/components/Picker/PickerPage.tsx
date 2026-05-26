@@ -233,7 +233,7 @@ export default function PickerPage() {
         </span>
         <span className="repo-name">Open local folder</span>
       </header>
-      <div className="picker-layout">
+      <div className={`picker-layout${sidebarCollapsed ? ' picker-layout-collapsed' : ''}`}>
         {sidebarCollapsed ? (
           <aside className="sidebar-rail picker-sidebar-rail" aria-label="collapsed navigation">
             <div className="sidebar-rail-toolbar">

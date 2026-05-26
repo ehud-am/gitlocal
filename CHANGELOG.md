@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.2 - 2026-05-26
+
+- Fixed the folder picker sidebar collapse/expand regression introduced in 0.9.0 so the native app and browser picker collapse to a narrow navigation rail instead of leaving a blank sidebar column.
+
 ## 0.9.1 - 2026-05-26
 
 - Fixed the macOS app package by signing the finalized bundle after packaged Node, server, UI, and icon resources are copied into `GitLocal.app`.
