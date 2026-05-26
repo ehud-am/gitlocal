@@ -71,7 +71,7 @@ Represents the downloadable app package consumed by Homebrew.
 **Validation Rules**:
 
 - `artifactUrl` must include the release version.
-- `sha256` must be computed from the exact uploaded artifact.
+- `sha256` must be computed from the exact release artifact.
 - `version` must match the npm package release version for the same GitLocal release.
 - Public cask artifacts must be reproducible through the documented release workflow.
 

@@ -27,9 +27,9 @@ Casks/gitlocal.rb
 
 ## Updating The Cask
 
-Published GitLocal releases update this cask automatically through `.github/workflows/publish.yml`.
+Tagged GitLocal releases update this cask automatically through `.github/workflows/publish.yml`.
 The repository must define a release environment secret named `HOMEBREW_TAP_TOKEN` with write access to `ehud-am/homebrew-gitlocal`.
-The workflow builds the macOS artifact, uploads it to the GitHub Release, computes the artifact SHA-256, updates the cask, and commits `Casks/gitlocal.rb` to the tap.
+The workflow builds the macOS artifact, creates the GitHub Release with the artifact attached, computes the artifact SHA-256, updates the cask, and commits `Casks/gitlocal.rb` to the tap.
 
 For a manual cask update, use `update-cask.sh` from this directory:
 

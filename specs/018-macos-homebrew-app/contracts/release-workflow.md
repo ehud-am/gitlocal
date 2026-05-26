@@ -19,7 +19,7 @@ Both release outputs must use the same GitLocal app implementation. The macOS re
 
 - npm package release remains publishable through the existing release workflow.
 - macOS app artifact attached to the GitHub Release.
-- SHA-256 checksum for the uploaded app artifact.
+- SHA-256 checksum for the final app artifact.
 - Updated cask metadata in the project-owned Homebrew tap.
 - Release documentation covering install, upgrade, uninstall, and troubleshooting.
 - Release review artifact covering npm and macOS distribution checks.
@@ -32,8 +32,8 @@ Both release outputs must use the same GitLocal app implementation. The macOS re
 4. Package the native app with the required shared assets/runtime.
 5. Sign, notarize, and staple the app when credentials are available.
 6. Create a `.dmg` or `.zip` release artifact.
-7. Compute SHA-256 from the final uploaded artifact.
-8. Attach the artifact to the GitHub Release.
+7. Compute SHA-256 from the final app artifact.
+8. Create the GitHub Release with the artifact attached.
 9. Update cask metadata in the project-owned tap.
 10. Verify cask install, launch, upgrade path, and uninstall on a supported macOS machine.
 11. Complete release review and contrarian QA before public release approval.

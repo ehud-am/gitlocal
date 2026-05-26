@@ -75,7 +75,7 @@ packaging/
 
 .github/
 └── workflows/
-    ├── publish.yml           # Published release pipeline for npm plus macOS/Homebrew
+    ├── publish.yml           # Tag-driven release pipeline for npm plus macOS/Homebrew
     └── macos-app-release.yml # Manual native app artifact build/package validation
 
 tests/
