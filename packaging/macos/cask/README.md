@@ -11,6 +11,16 @@ The cask points to a versioned GitHub Release artifact and verifies it with SHA-
 
 This is the native Mac distribution for builders who want GitLocal to launch like an app instead of keeping a terminal open. It runs the same GitLocal app code as the npm package inside `GitLocal.app`.
 
+## Alpha Signing Status
+
+`GitLocal.app` is currently an alpha native distribution and is not signed or notarized. macOS may show Apple security warnings on first launch. After installing, approve the unsigned bundle with:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/GitLocal.app
+```
+
+Then open `GitLocal.app` normally. Future public signed/notarized releases should update this section and remove the quarantine approval requirement.
+
 ## Tap Setup
 
 The tap repository should be named `homebrew-gitlocal` so Homebrew's short tap syntax works:

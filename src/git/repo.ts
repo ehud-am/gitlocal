@@ -20,10 +20,7 @@ import type {
   TreeNode,
 } from '../types.js'
 import {
-  getPrivateSettingsProtection,
-  readPrivateIdentitySettings,
   validateSshPrivateKeyPath,
-  writePrivateIdentitySettings,
 } from './identity-settings.js'
 
 interface WorkingTreeChangeSummary {
@@ -106,7 +103,7 @@ function writeGitConfig(repoPath: string, key: string, value: string): void {
 
 function unsetGitConfig(repoPath: string, key: string): void {
   const result = runGitCapture(repoPath, 'config', '--local', '--unset', key)
-  if (result.status !== 0 && !result.stderr.includes('No such section') && !result.stderr.includes('No such key')) {
+  if (result.status !== 0 && result.status !== 5 && !result.stderr.includes('No such section') && !result.stderr.includes('No such key')) {
     throw new Error(result.stderr.trim() || `Unable to clear ${key}.`)
   }
 }
@@ -160,30 +157,16 @@ export function convertGitRemoteToWebUrl(fetchUrl: string): string {
 }
 
 export function getGitUserIdentity(repoPath: string): GitUserIdentity | null {
-  const privateSettings = readPrivateIdentitySettings(repoPath)
   const localName = readGitConfig(repoPath, '--local', 'user.name')
   const localEmail = readGitConfig(repoPath, '--local', 'user.email')
-  const globalName = readGitConfig(repoPath, '--global', 'user.name')
-  const globalEmail = readGitConfig(repoPath, '--global', 'user.email')
-  const repoSshKeyPath = getRepoSshKeyPath(repoPath)
+  const sshKeyPath = getRepoSshKeyPath(repoPath)
 
-  const name = privateSettings.name || localName || globalName
-  const email = privateSettings.email || localEmail || globalEmail
-  const sshKeyPath = privateSettings.sshKeyPath || repoSshKeyPath
-
-  if (!name && !email && !sshKeyPath) return null
-
-  const source: GitUserIdentity['source'] =
-    privateSettings.name || privateSettings.email || privateSettings.sshKeyPath
-      ? 'private-settings'
-      : localName || localEmail
-      ? ((localName && localEmail) || (!globalName && !globalEmail) ? 'local' : 'mixed')
-      : 'global'
+  if (!localName && !localEmail && !sshKeyPath) return null
 
   return {
-    name,
-    email,
-    source,
+    name: localName,
+    email: localEmail,
+    source: 'local',
     ...(sshKeyPath ? { sshKeyPath } : {}),
   }
 }
@@ -204,13 +187,10 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
   const trimmedName = name.trim()
   const trimmedEmail = email.trim()
   const normalizedSshKeyPath = sshKeyPath?.trim()
+  const clearingUser = !trimmedName && !trimmedEmail
 
-  if (!trimmedName) {
-    throw new Error('Git name is required.')
-  }
-
-  if (!trimmedEmail) {
-    throw new Error('Git email is required.')
+  if (!clearingUser && (!trimmedName || !trimmedEmail)) {
+    throw new Error('Git name and email must both be set or both be cleared.')
   }
 
   if (!validateRepo(repoPath)) {
@@ -224,14 +204,14 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
     }
   }
 
-  writePrivateIdentitySettings(repoPath, {
-    name: trimmedName,
-    email: trimmedEmail,
-    sshKeyPath: normalizedSshKeyPath ?? getRepoSshKeyPath(repoPath),
-  })
+  if (clearingUser) {
+    unsetGitConfig(repoPath, 'user.name')
+    unsetGitConfig(repoPath, 'user.email')
+  } else {
+    writeGitConfig(repoPath, 'user.name', trimmedName)
+    writeGitConfig(repoPath, 'user.email', trimmedEmail)
+  }
 
-  writeGitConfig(repoPath, 'user.name', trimmedName)
-  writeGitConfig(repoPath, 'user.email', trimmedEmail)
   if (normalizedSshKeyPath !== undefined) {
     if (normalizedSshKeyPath) {
       writeGitConfig(repoPath, 'core.sshCommand', formatSshCommandForKeyPath(normalizedSshKeyPath))
@@ -241,16 +221,15 @@ export function setRepoGitIdentity(repoPath: string, name: string, email: string
   }
 
   const user = getGitUserIdentity(repoPath)
-  /* v8 ignore next 3 -- if both local writes succeed, git must be able to read them back */
-  if (!user) {
+  /* v8 ignore next 3 -- if local writes succeed, git must be able to read them back unless clearing */
+  if (!user && !clearingUser && normalizedSshKeyPath !== '') {
     throw new Error('GitLocal could not read the updated repository identity.')
   }
 
   return {
     ok: true,
-    message: 'Project git identity updated.',
+    message: user ? 'Repository git identity updated.' : 'Repository git identity cleared.',
     user,
-    protection: getPrivateSettingsProtection(repoPath),
   }
 }
 
@@ -1275,12 +1254,13 @@ export function commitWorkingTreeChanges(repoPath: string, message: string): Com
   }
 
   if (existsSync(resolve(repoPath, '.env'))) {
-    const protection = getPrivateSettingsProtection(repoPath)
-    if (!protection.protected) {
+    const ignored = runGitCapture(repoPath, 'check-ignore', '-q', '.env').status === 0
+    const tracked = runGitCapture(repoPath, 'ls-files', '--error-unmatch', '.env').status === 0
+    if (!ignored || tracked) {
       return {
         ok: false,
         status: 'blocked',
-        message: `${protection.message} GitLocal will not commit while .env could be included.`,
+        message: '.env is not safely ignored. GitLocal will not commit while .env could be included.',
       }
     }
   }

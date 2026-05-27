@@ -25,7 +25,6 @@ import type {
   SearchMode,
   SearchResponse,
   SyncStatus,
-  PrivateSettingsProtectionState,
   SshKeyListResponse,
   SshKeyValidationResponse,
   TreeNode,
@@ -158,12 +157,6 @@ export const api = {
 
   validateGitIdentitySshKey: (sshKeyPath: string): Promise<SshKeyValidationResponse> =>
     mutate('/api/git/identity/ssh-key/validate', 'POST', { sshKeyPath }),
-
-  getGitIdentityProtection: (): Promise<PrivateSettingsProtectionState> =>
-    request('/api/git/identity/protection'),
-
-  applyGitIdentityProtection: (): Promise<PrivateSettingsProtectionState> =>
-    mutate('/api/git/identity/protection', 'POST', { approved: true }),
 
   syncWithRemote: (): Promise<RemoteSyncResponse> =>
     mutate('/api/git/sync', 'POST', {}),

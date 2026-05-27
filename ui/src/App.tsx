@@ -23,7 +23,6 @@ import type {
   FileSyncState,
   FolderOperationResult,
   GitUserIdentity,
-  PrivateSettingsProtectionState,
   RepoInfo,
   RepoSyncState,
   SearchMode,
@@ -101,8 +100,6 @@ export default function App() {
   const [gitIdentitySshKeys, setGitIdentitySshKeys] = useState<SshKeyCandidate[]>([])
   const [gitIdentitySshKeysMessage, setGitIdentitySshKeysMessage] = useState('')
   const [gitIdentitySshKeysPending, setGitIdentitySshKeysPending] = useState(false)
-  const [gitIdentityProtection, setGitIdentityProtection] = useState<PrivateSettingsProtectionState | null>(null)
-  const [gitIdentityProtectionPending, setGitIdentityProtectionPending] = useState(false)
   const [gitIdentityPending, setGitIdentityPending] = useState(false)
   const [gitIdentityError, setGitIdentityError] = useState('')
   const [folderDeletePreview, setFolderDeletePreview] = useState<FolderOperationResult | null>(null)
@@ -346,13 +343,9 @@ export default function App() {
     setGitIdentitySshKeysPending(true)
     setGitIdentitySshKeysMessage('')
     try {
-      const [keys, protection] = await Promise.all([
-        api.getGitIdentitySshKeys(),
-        api.getGitIdentityProtection(),
-      ])
+      const keys = await api.getGitIdentitySshKeys()
       setGitIdentitySshKeys(keys.keys)
       setGitIdentitySshKeysMessage(keys.message)
-      setGitIdentityProtection(protection)
     } catch (error) {
       setGitIdentitySshKeys([])
       setGitIdentitySshKeysMessage(getErrorMessage(error, 'Could not load SSH key options.'))
@@ -372,22 +365,9 @@ export default function App() {
   }
 
   function closeGitIdentityDialog(): void {
-    if (gitIdentityPending || gitIdentityProtectionPending) return
+    if (gitIdentityPending) return
     setGitIdentityDialogOpen(false)
     setGitIdentityError('')
-  }
-
-  async function applyGitIdentityProtection(): Promise<void> {
-    setGitIdentityProtectionPending(true)
-    setGitIdentityError('')
-    try {
-      const protection = await api.applyGitIdentityProtection()
-      setGitIdentityProtection(protection)
-    } catch (error) {
-      setGitIdentityError(getErrorMessage(error, 'Could not update .gitignore.'))
-    } finally {
-      setGitIdentityProtectionPending(false)
-    }
   }
 
   async function saveGitIdentity(): Promise<void> {
@@ -395,13 +375,8 @@ export default function App() {
     const email = gitIdentityEmail.trim()
     const sshKeyPath = gitIdentitySshKeyPath.trim()
 
-    if (!name) {
-      setGitIdentityError('Git name is required.')
-      return
-    }
-
-    if (!email) {
-      setGitIdentityError('Git email is required.')
+    if ((name && !email) || (!name && email)) {
+      setGitIdentityError('Git name and email must both be set or both be cleared.')
       return
     }
 
@@ -413,26 +388,25 @@ export default function App() {
         await api.validateGitIdentitySshKey(sshKeyPath)
       }
       const result = await api.updateGitIdentity({ name, email, sshKeyPath })
-      if (result.protection) setGitIdentityProtection(result.protection)
       queryClient.setQueryData<RepoInfo>(['info'], (previous) =>
         previous
           ? {
               ...previous,
               gitContext: {
-                user: result.user as GitUserIdentity,
+                user: result.user as GitUserIdentity | null,
                 remote: previous.gitContext?.remote ?? null,
               },
             }
           : previous,
       )
       queryClient.setQueryData(['git-context'], {
-        user: result.user as GitUserIdentity,
+        user: result.user as GitUserIdentity | null,
         remote: info?.gitContext?.remote ?? null,
       })
       setGitIdentityDialogOpen(false)
       setStatusMessage(result.message)
     } catch (error) {
-      setGitIdentityError(getErrorMessage(error, 'Could not update the repository identity.'))
+      setGitIdentityError(getErrorMessage(error, 'Could not update the repository-local Git identity.'))
     } finally {
       setGitIdentityPending(false)
     }
@@ -907,15 +881,12 @@ export default function App() {
         sshKeys={gitIdentitySshKeys}
         sshKeysMessage={gitIdentitySshKeysMessage}
         sshKeysPending={gitIdentitySshKeysPending}
-        protection={gitIdentityProtection}
-        protectionPending={gitIdentityProtectionPending}
         onOpenChange={(open) => {
-          if (!gitIdentityPending && !gitIdentityProtectionPending) setGitIdentityDialogOpen(open)
+          if (!gitIdentityPending) setGitIdentityDialogOpen(open)
         }}
         onNameChange={setGitIdentityName}
         onEmailChange={setGitIdentityEmail}
         onSshKeyPathChange={setGitIdentitySshKeyPath}
-        onApplyProtection={() => { void applyGitIdentityProtection() }}
         onCancel={closeGitIdentityDialog}
         onSave={() => { void saveGitIdentity() }}
       />

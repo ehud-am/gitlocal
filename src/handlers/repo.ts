@@ -2,8 +2,6 @@ import type { Context } from 'hono'
 import { statSync } from 'node:fs'
 import { basename, dirname, relative } from 'node:path'
 import {
-  applyPrivateSettingsProtection,
-  getPrivateSettingsProtection,
   listSshPrivateKeys,
   validateSshPrivateKeyPath,
 } from '../git/identity-settings.js'
@@ -28,7 +26,6 @@ import type {
   CommitChangesRequest,
   GitIdentityUpdateRequest,
   LocalActionResponse,
-  PrivateSettingsProtectionUpdateRequest,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
 } from '../types.js'
@@ -232,7 +229,7 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
   } catch (error) {
     return c.json({
       ok: false,
-      message: error instanceof Error ? error.message : 'Could not update the repository identity.',
+      message: error instanceof Error ? error.message : 'Could not update the repository-local Git identity.',
     }, 400)
   }
 }
@@ -273,53 +270,6 @@ export async function gitIdentitySshKeyValidateHandler(c: Context<{ Variables: V
 
   const result = validateSshPrivateKeyPath(payload.sshKeyPath ?? '')
   return c.json(result, result.valid ? 200 : 400)
-}
-
-export async function gitIdentityProtectionHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) {
-    return c.json({
-      settingsPath: '.env',
-      ignoreFileExists: false,
-      protected: false,
-      status: 'blocked',
-      canApplyFix: false,
-      message: 'No repository is currently open.',
-    }, 400)
-  }
-
-  return c.json(getPrivateSettingsProtection(repoPath))
-}
-
-export async function gitIdentityProtectionUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  const repoPath = c.get('repoPath')
-  if (!repoPath) {
-    return c.json({
-      settingsPath: '.env',
-      ignoreFileExists: false,
-      protected: false,
-      status: 'blocked',
-      canApplyFix: false,
-      message: 'No repository is currently open.',
-    }, 400)
-  }
-
-  let payload: PrivateSettingsProtectionUpdateRequest
-  try {
-    payload = await c.req.json<PrivateSettingsProtectionUpdateRequest>()
-  } catch {
-    return c.json({
-      settingsPath: '.env',
-      ignoreFileExists: false,
-      protected: false,
-      status: 'blocked',
-      canApplyFix: false,
-      message: 'Invalid JSON body.',
-    }, 400)
-  }
-
-  const result = applyPrivateSettingsProtection(repoPath, payload.approved === true)
-  return c.json(result, result.status === 'blocked' ? 400 : 200)
 }
 
 export async function commitChangesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

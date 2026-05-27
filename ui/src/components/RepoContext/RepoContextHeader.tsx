@@ -189,7 +189,7 @@ export default function RepoContextHeader({
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Git identity</p>
-                  {gitUser?.source ? <MetaTag label={gitUser.source} icon="user" tone="neutral" compact /> : null}
+                  {gitUser?.source ? <MetaTag label="local" icon="user" tone="neutral" compact /> : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
                   <p className="break-all text-sm text-[var(--foreground)]">

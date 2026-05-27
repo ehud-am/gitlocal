@@ -170,8 +170,6 @@ vi.mock('./services/api', () => ({
     updateGitIdentity: vi.fn(),
     getGitIdentitySshKeys: vi.fn(),
     validateGitIdentitySshKey: vi.fn(),
-    getGitIdentityProtection: vi.fn(),
-    applyGitIdentityProtection: vi.fn(),
     createChildFolder: vi.fn(),
     initFolderRepository: vi.fn(),
     cloneRepositoryIntoFolder: vi.fn(),
@@ -316,7 +314,7 @@ describe('App logic', () => {
       user: {
         name: 'Local User',
         email: 'local@example.com',
-        source: 'private-settings',
+        source: 'local',
       },
     })
     vi.mocked(api.getGitIdentitySshKeys).mockResolvedValue({
@@ -328,22 +326,6 @@ describe('App logic', () => {
       valid: true,
       path: '/home/user/.ssh/id_ed25519',
       message: 'SSH private key is valid.',
-    })
-    vi.mocked(api.getGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env is protected by .gitignore.',
-    })
-    vi.mocked(api.applyGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env was added to .gitignore.',
     })
   })
 
@@ -497,9 +479,9 @@ describe('App logic', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'open-identity' }))
     fireEvent.change(screen.getByRole('textbox', { name: /git user name/i }), { target: { value: '' } })
-    fireEvent.change(screen.getByRole('textbox', { name: /git user email/i }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /git user email/i }), { target: { value: 'missing-name@example.com' } })
     fireEvent.click(screen.getByRole('button', { name: /save identity/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/git name is required/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/git name and email must both be set or both be cleared/i)
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
     fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))

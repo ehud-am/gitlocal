@@ -10,7 +10,7 @@ export interface RepoInfo {
   gitContext?: GitContext | null
 }
 
-export type GitUserSource = 'private-settings' | 'local' | 'global' | 'mixed'
+export type GitUserSource = 'local'
 
 export interface GitUserIdentity {
   name: string
@@ -64,26 +64,10 @@ export interface SshKeyValidationResponse {
   message: string
 }
 
-export type PrivateSettingsProtectionStatus = 'protected' | 'missing-ignore-file' | 'missing-entry' | 'blocked'
-
-export interface PrivateSettingsProtectionState {
-  settingsPath: string
-  ignoreFileExists: boolean
-  protected: boolean
-  status: PrivateSettingsProtectionStatus
-  canApplyFix: boolean
-  message: string
-}
-
-export interface PrivateSettingsProtectionUpdateRequest {
-  approved: boolean
-}
-
 export interface GitIdentityUpdateResponse {
   ok: boolean
   message: string
-  user: GitUserIdentity
-  protection?: PrivateSettingsProtectionState
+  user: GitUserIdentity | null
 }
 
 export type SearchPresentation = 'collapsed' | 'expanded'
