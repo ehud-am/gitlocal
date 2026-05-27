@@ -1,6 +1,6 @@
 cask "gitlocal" do
   version "0.9.3"
-  sha256 "ec38f5b40f369f967d9ba4ebe4f46c1c863c2f69a316c67cd43859d30e8fb4e8"
+  sha256 "7c15ce09792d3e859718e51bce5a7b7c9689dd9d67d4b2ddd77beb8abc5e364e"
 
   url "https://github.com/ehud-am/gitlocal/releases/download/v0.9.3/GitLocal-0.9.3-macos.zip"
   name "GitLocal"
