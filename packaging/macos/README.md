@@ -7,11 +7,21 @@ The distribution strategy intentionally serves two audiences with the same app c
 - npm users get a one-command install on any platform with Node.js, with the tradeoff that a terminal process stays open.
 - macOS Homebrew users get `GitLocal.app`, a native wrapper with an embedded WebKit browser and managed local service lifecycle.
 
-Measured on the current implementation, 90.4% of the code is shared between these distributions. The Mac-specific layer owns only native windowing, lifecycle, cask metadata, packaging, and release automation.
+Measured on the current implementation, 90.7% of the code is shared between these distributions. The Mac-specific layer owns only native windowing, lifecycle, cask metadata, packaging, and release automation.
 
 ## Scope
 
 The first native distribution targets macOS only. Windows and Linux native app packaging remain future work; those users should continue to use the npm package and browser workflow.
+
+## Alpha Signing Status
+
+The native macOS app is currently alpha and unsigned. Public users should expect Apple security warning messages on first launch until signing and notarization are available.
+
+After installing the app, approve the unsigned bundle with:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/GitLocal.app
+```
 
 ## Layout
 

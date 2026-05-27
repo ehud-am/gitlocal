@@ -37,7 +37,7 @@ GitLocal has two distributions using the same app code:
 - npm package: cross-platform, one-command install, browser-based, requires the terminal process to stay open.
 - macOS Homebrew cask: native `GitLocal.app`, embedded WebKit browser, managed local service lifecycle.
 
-Measured on the current branch, 93.3% of implementation lines are shared between both distributions, excluding tests, docs, and generated build output.
+Measured on the current branch, 90.7% of implementation lines are shared between both distributions, excluding tests, docs, and generated build output.
 
 ## Code Style
 
@@ -46,7 +46,7 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 ## Recent Changes
 
 - 018-macos-homebrew-app: Added scoped macOS native app packaging around the shared GitLocal server/UI while preserving the npm package distribution.
-- 017-git-identity-settings: Added project-persistent git identity settings with SSH key validation and `.env` protection.
+- 020-local-git-identity: Changed git identity settings to use repository-local git config directly, while preserving SSH key discovery and validation.
 - 003-simplify-tech-stack: Replaced Go backend with Node.js/TypeScript/Hono; removed Makefile and all shell script dependencies from the product core; single `npm` toolchain for the cross-platform package.
 
 <!-- MANUAL ADDITIONS START -->

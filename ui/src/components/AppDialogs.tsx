@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Input } from './ui/input'
-import type { PrivateSettingsProtectionState, SshKeyCandidate } from '../types'
+import type { SshKeyCandidate } from '../types'
 
 interface RepoBoundaryDialogProps {
   open: boolean
@@ -27,13 +27,10 @@ interface GitIdentityDialogProps {
   sshKeys: SshKeyCandidate[]
   sshKeysMessage: string
   sshKeysPending: boolean
-  protection?: PrivateSettingsProtectionState | null
-  protectionPending: boolean
   onOpenChange: (open: boolean) => void
   onNameChange: (value: string) => void
   onEmailChange: (value: string) => void
   onSshKeyPathChange: (value: string) => void
-  onApplyProtection: () => void
   onCancel: () => void
   onSave: () => void
 }
@@ -103,18 +100,14 @@ export function GitIdentityDialog({
   sshKeys,
   sshKeysMessage,
   sshKeysPending,
-  protection,
-  protectionPending,
   onOpenChange,
   onNameChange,
   onEmailChange,
   onSshKeyPathChange,
-  onApplyProtection,
   onCancel,
   onSave,
 }: GitIdentityDialogProps) {
-  const showProtectionWarning = protection && !protection.protected
-  const controlsDisabled = pending || protectionPending
+  const controlsDisabled = pending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,7 +115,7 @@ export function GitIdentityDialog({
         <DialogHeader>
           <DialogTitle>Edit Repository Git Identity</DialogTitle>
           <DialogDescription>
-            This saves project identity locally and keeps this repository's git config in sync.
+            This saves repository-local Git identity values that regular Git commands can use.
           </DialogDescription>
         </DialogHeader>
 
@@ -180,17 +173,6 @@ export function GitIdentityDialog({
               <p className="text-xs text-[var(--muted-foreground)]">{sshKeysMessage}</p>
             ) : null}
           </div>
-
-          {showProtectionWarning ? (
-            <div className="grid gap-2 rounded-md border border-[var(--warning-border,var(--border))] bg-[var(--warning-bg,var(--muted))] p-3">
-              <p role="alert" className="text-sm text-[var(--foreground)]">{protection.message}</p>
-              {protection.canApplyFix ? (
-                <Button type="button" variant="secondary" onClick={onApplyProtection} disabled={controlsDisabled}>
-                  {protectionPending ? 'Updating .gitignore...' : 'Add .env to .gitignore'}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
 
           {error ? (
             <p role="alert" className="text-sm text-[var(--danger)]">

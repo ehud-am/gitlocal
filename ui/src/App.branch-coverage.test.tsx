@@ -266,8 +266,6 @@ vi.mock('./services/api', () => ({
     updateGitIdentity: vi.fn(),
     getGitIdentitySshKeys: vi.fn(),
     validateGitIdentitySshKey: vi.fn(),
-    getGitIdentityProtection: vi.fn(),
-    applyGitIdentityProtection: vi.fn(),
     createChildFolder: vi.fn(),
     initFolderRepository: vi.fn(),
     cloneRepositoryIntoFolder: vi.fn(),
@@ -420,7 +418,7 @@ describe('App branch coverage', () => {
       user: {
         name: 'Local User',
         email: 'local@example.com',
-        source: 'private-settings',
+        source: 'local',
       },
     })
     vi.mocked(api.getGitIdentitySshKeys).mockResolvedValue({
@@ -432,22 +430,6 @@ describe('App branch coverage', () => {
       valid: true,
       path: '/home/user/.ssh/id_ed25519',
       message: 'SSH private key is valid.',
-    })
-    vi.mocked(api.getGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env is protected by .gitignore.',
-    })
-    vi.mocked(api.applyGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env was added to .gitignore.',
     })
     vi.mocked(api.getFolderDeletePreview).mockResolvedValue({
       ok: true,
@@ -718,7 +700,7 @@ describe('App branch coverage', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /git user name/i }), { target: { value: 'New User' } })
     fireEvent.change(screen.getByRole('textbox', { name: /git user email/i }), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'save-identity' }))
-    expect(await screen.findByText(/git email is required/i)).toBeInTheDocument()
+    expect(await screen.findByText(/git name and email must both be set or both be cleared/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'close-identity' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'switch-branch' }))

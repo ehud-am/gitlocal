@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -48,6 +48,8 @@
     "audit": "npm audit --audit-level=moderate",
     "audit:ui": "npm --prefix ui audit --audit-level=moderate",
     "verify": "npm test && npm run build && npm run audit && npm run audit:ui",
+    "prepack": "node packaging/npm/use-npm-readme.mjs prepack",
+    "postpack": "node packaging/npm/use-npm-readme.mjs postpack",
     "prepublishOnly": "npm run verify"
   },
   "dependencies": {

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.3 - 2026-05-27
+
+- Changed git identity settings to read and write repository-local git config for `user.name`, `user.email`, and SSH command behavior, removing the separate project `.env` identity store.
+- Kept SSH private key discovery and validation while making saved identity values visible to normal Git commands through the repository's own local config.
+- Added a channel-specific npm README so the npm package stays focused on browser usage while the GitHub README carries native macOS and source-build details.
+- Documented the alpha unsigned macOS app status, first-run quarantine approval command, and GitLocal icon in the GitHub README.
+
 ## 0.9.2 - 2026-05-26
 
 - Fixed the folder picker sidebar collapse/expand regression introduced in 0.9.0 so the native app and browser picker collapse to a narrow navigation rail instead of leaving a blank sidebar column.

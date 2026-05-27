@@ -534,10 +534,10 @@ describe('Server integration', () => {
     expect(body.user).toEqual({
       name: 'Integration User',
       email: 'integration@example.com',
-      source: 'private-settings',
+      source: 'local',
     })
-    expect(readFileSync(join(dir, '.env'), 'utf-8')).toContain('GITLOCAL_GIT_EMAIL="integration@example.com"')
-    rmSync(join(dir, '.env'), { force: true })
+    expect(spawnSync('git', ['config', '--local', 'user.email'], { cwd: dir, encoding: 'utf-8' }).stdout.trim()).toBe('integration@example.com')
+    expect(existsSync(join(dir, '.env'))).toBe(false)
   })
 
   it('GET /api/sync returns sync metadata for the current file path', async () => {

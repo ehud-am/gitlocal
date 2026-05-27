@@ -1,16 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { GitIdentityDialog } from './AppDialogs'
-import type { PrivateSettingsProtectionState, SshKeyCandidate } from '../types'
-
-const protectedState: PrivateSettingsProtectionState = {
-  settingsPath: '.env',
-  ignoreFileExists: true,
-  protected: true,
-  status: 'protected',
-  canApplyFix: false,
-  message: '.env is protected by .gitignore.',
-}
+import type { SshKeyCandidate } from '../types'
 
 function renderDialog(overrides: Partial<Parameters<typeof GitIdentityDialog>[0]> = {}) {
   const props: Parameters<typeof GitIdentityDialog>[0] = {
@@ -23,13 +14,10 @@ function renderDialog(overrides: Partial<Parameters<typeof GitIdentityDialog>[0]
     sshKeys: [],
     sshKeysMessage: 'Found 0 SSH private keys.',
     sshKeysPending: false,
-    protection: protectedState,
-    protectionPending: false,
     onOpenChange: vi.fn(),
     onNameChange: vi.fn(),
     onEmailChange: vi.fn(),
     onSshKeyPathChange: vi.fn(),
-    onApplyProtection: vi.fn(),
     onCancel: vi.fn(),
     onSave: vi.fn(),
     ...overrides,
@@ -59,20 +47,4 @@ describe('GitIdentityDialog', () => {
     expect(screen.getByLabelText(/git user name/i)).toBeDisabled()
   })
 
-  it('shows .env protection warning and applies the approved fix', () => {
-    const props = renderDialog({
-      protection: {
-        settingsPath: '.env',
-        ignoreFileExists: false,
-        protected: false,
-        status: 'missing-ignore-file',
-        canApplyFix: true,
-        message: '.env is not ignored.',
-      },
-    })
-
-    expect(screen.getByRole('alert')).toHaveTextContent('.env is not ignored.')
-    fireEvent.click(screen.getByRole('button', { name: /add \.env to \.gitignore/i }))
-    expect(props.onApplyProtection).toHaveBeenCalledTimes(1)
-  })
 })

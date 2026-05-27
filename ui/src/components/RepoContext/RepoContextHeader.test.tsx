@@ -223,7 +223,7 @@ describe('RepoContextHeader', () => {
             user: {
               name: '',
               email: '',
-              source: 'global',
+              source: 'local',
             },
             remote: null,
           },

@@ -32,8 +32,6 @@ vi.mock('./services/api', () => ({
     updateGitIdentity: vi.fn(),
     getGitIdentitySshKeys: vi.fn(),
     validateGitIdentitySshKey: vi.fn(),
-    getGitIdentityProtection: vi.fn(),
-    applyGitIdentityProtection: vi.fn(),
     createChildFolder: vi.fn(),
     initFolderRepository: vi.fn(),
     cloneRepositoryIntoFolder: vi.fn(),
@@ -275,19 +273,11 @@ describe('App', () => {
     vi.mocked(api.openRepository).mockResolvedValue({ ok: true, error: '' })
     vi.mocked(api.updateGitIdentity).mockResolvedValue({
       ok: true,
-      message: 'Project git identity updated.',
+      message: 'Repository git identity updated.',
       user: {
         name: 'Updated User',
         email: 'updated@example.com',
-        source: 'private-settings',
-      },
-      protection: {
-        settingsPath: '.env',
-        ignoreFileExists: true,
-        protected: true,
-        status: 'protected',
-        canApplyFix: false,
-        message: '.env is protected by .gitignore.',
+        source: 'local',
       },
     })
     vi.mocked(api.getGitIdentitySshKeys).mockResolvedValue({
@@ -299,22 +289,6 @@ describe('App', () => {
       valid: true,
       path: '/home/user/.ssh/id_ed25519',
       message: 'SSH private key is valid.',
-    })
-    vi.mocked(api.getGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env is protected by .gitignore.',
-    })
-    vi.mocked(api.applyGitIdentityProtection).mockResolvedValue({
-      settingsPath: '.env',
-      ignoreFileExists: true,
-      protected: true,
-      status: 'protected',
-      canApplyFix: false,
-      message: '.env was added to .gitignore.',
     })
   })
 
@@ -381,7 +355,7 @@ describe('App', () => {
     let gitUser = {
       name: 'Local User',
       email: 'local@example.com',
-      source: 'private-settings' as const,
+      source: 'local' as const,
     }
 
     vi.mocked(api.getInfo).mockImplementation(async () => ({
@@ -400,11 +374,11 @@ describe('App', () => {
       gitUser = {
         name: payload.name,
         email: payload.email,
-        source: 'private-settings',
+        source: 'local',
       }
       return {
         ok: true,
-        message: 'Project git identity updated.',
+        message: 'Repository git identity updated.',
         user: gitUser,
       }
     })
@@ -434,30 +408,8 @@ describe('App', () => {
       })
     })
     expect(api.validateGitIdentitySshKey).toHaveBeenCalledWith('/home/user/.ssh/id_ed25519')
-    expect(await screen.findByText(/project git identity updated\./i)).toBeInTheDocument()
+    expect(await screen.findByText(/repository git identity updated\./i)).toBeInTheDocument()
     expect(await screen.findByText(/updated user <updated@example.com>/i)).toBeInTheDocument()
-  })
-
-  it('applies .env protection from the identity warning', async () => {
-    vi.mocked(api.getGitIdentityProtection).mockResolvedValueOnce({
-      settingsPath: '.env',
-      ignoreFileExists: false,
-      protected: false,
-      status: 'missing-ignore-file',
-      canApplyFix: true,
-      message: '.env is not ignored.',
-    })
-
-    renderWithClient()
-
-    fireEvent.click(await screen.findByRole('button', { name: /expand repository details/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /edit repository git identity/i }))
-    expect(await screen.findByText('.env is not ignored.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /add \.env to \.gitignore/i }))
-
-    await waitFor(() => {
-      expect(api.applyGitIdentityProtection).toHaveBeenCalledTimes(1)
-    })
   })
 
   it('does not expose commit actions from the repo header', async () => {

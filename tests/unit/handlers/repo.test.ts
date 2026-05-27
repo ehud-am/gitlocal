@@ -199,14 +199,13 @@ describe('gitIdentityUpdateHandler', () => {
       }))
 
       expect(res.status).toBe(200)
-      const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string }; protection: { status: string } }
+      const body = await res.json() as { ok: boolean; user: { name: string; email: string; source: string } }
       expect(body.ok).toBe(true)
       expect(body.user).toEqual({
         name: 'Updated User',
         email: 'updated@example.com',
-        source: 'private-settings',
+        source: 'local',
       })
-      expect(body.protection.status).toBe('missing-ignore-file')
       expect(spawnSync('git', ['config', '--local', 'user.name'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('Updated User')
       expect(spawnSync('git', ['config', '--local', 'user.email'], { cwd: repo.dir, encoding: 'utf-8' }).stdout.trim()).toBe('updated@example.com')
     } finally {
@@ -270,7 +269,7 @@ describe('gitIdentityUpdateHandler', () => {
       expect(res.status).toBe(400)
       const body = await res.json() as { ok: boolean; message: string }
       expect(body.ok).toBe(false)
-      expect(body.message).toBe('Git name is required.')
+      expect(body.message).toBe('Git name and email must both be set or both be cleared.')
     } finally {
       repo.cleanup()
     }
@@ -317,12 +316,6 @@ describe('gitIdentityUpdateHandler', () => {
     const app = createApp('')
 
     expect((await app.fetch(new Request('http://localhost/api/git/identity/ssh-keys'))).status).toBe(400)
-    expect((await app.fetch(new Request('http://localhost/api/git/identity/protection'))).status).toBe(400)
-    expect((await app.fetch(new Request('http://localhost/api/git/identity/protection', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ approved: true }),
-    }))).status).toBe(400)
     expect((await app.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -337,46 +330,6 @@ describe('gitIdentityUpdateHandler', () => {
         headers: { 'content-type': 'application/json' },
         body: '{bad-json',
       }))).status).toBe(400)
-      expect((await repoApp.fetch(new Request('http://localhost/api/git/identity/protection', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{bad-json',
-      }))).status).toBe(400)
-    } finally {
-      repo.cleanup()
-    }
-  })
-
-  it('returns and applies private settings protection status', async () => {
-    const repo = makeGitRepo()
-
-    try {
-      const app = createApp(repo.dir)
-      const status = await app.fetch(new Request('http://localhost/api/git/identity/protection'))
-      expect(status.status).toBe(200)
-      expect(await status.json()).toMatchObject({
-        protected: false,
-        status: 'missing-ignore-file',
-        canApplyFix: true,
-      })
-
-      const rejected = await app.fetch(new Request('http://localhost/api/git/identity/protection', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ approved: false }),
-      }))
-      expect(rejected.status).toBe(400)
-
-      const applied = await app.fetch(new Request('http://localhost/api/git/identity/protection', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ approved: true }),
-      }))
-      expect(applied.status).toBe(200)
-      expect(await applied.json()).toMatchObject({
-        protected: true,
-        status: 'protected',
-      })
     } finally {
       repo.cleanup()
     }

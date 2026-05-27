@@ -1,5 +1,9 @@
 # GitLocal
 
+<p align="center">
+  <img src="ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
+</p>
+
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -26,7 +30,7 @@ Everything runs locally, there are no accounts or telemetry, and any clone, fetc
 
 GitLocal has two distributions that run the same app code.
 
-Measured on this branch, **90.4% of the implementation is shared** between the npm and macOS native distributions: 10,510 lines of shared app code in `src/` and `ui/src/`, compared with 1,117 macOS-distribution-specific lines in the Swift wrapper, Xcode/plist config, cask/package scripts, and release workflows. This excludes tests, docs, and generated build outputs.
+Measured on this branch, **90.7% of the implementation is shared** between the npm and macOS native distributions: 10,187 lines of shared app code in `src/` and `ui/src/`, compared with 1,040 macOS-distribution-specific lines in the Swift wrapper, Xcode/plist config, cask/package scripts, and release workflows. This excludes tests, docs, and generated build outputs.
 
 Choose the workflow that fits how you want to use GitLocal:
 
@@ -48,6 +52,14 @@ Mac users can install the native app distribution from the project tap when a ma
 brew tap ehud-am/gitlocal
 brew install --cask gitlocal
 ```
+
+**Alpha and unsigned app notice:** `GitLocal.app` is currently an alpha native distribution and is not signed or notarized. macOS will show Apple security warning messages on first launch. To approve the unsigned app after installing it, run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/GitLocal.app
+```
+
+Then open `GitLocal.app` normally.
 
 The Homebrew cask installs `GitLocal.app`, which runs as a native Mac app with an embedded WebKit browser. It uses the same GitLocal server and React viewer as the npm package, starts the local service for the app session, and does not require `npm install -g gitlocal` for normal app launch.
 
@@ -157,7 +169,7 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 - **Make small local file edits** — create, edit, and delete files from the viewer when human intervention is needed, without making editing the main product center of gravity
 - **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
-- **Manage repo identity locally** — save project-specific git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and keep private `.env` settings protected from commits
+- **Manage repo identity locally** — save repository-local git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and make those settings visible to regular Git commands
 - **See repo context clearly** — GitHub-like header with branch, local path, remote repository, remote linkage, and repo-local identity loaded after the initial viewer shell
 - **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
@@ -185,7 +197,7 @@ Both channels use the same GitLocal server and React viewer for a given release.
 
 - If `brew` is not found, install Homebrew first from the official Homebrew site.
 - If installation reports a checksum mismatch, run `brew update` and retry. Do not bypass checksum verification.
-- If macOS blocks the app, verify that the release notes identify the artifact as signed/notarized. Internal test artifacts may require manual security approval.
+- If macOS blocks the current alpha app, approve the unsigned bundle with `xattr -dr com.apple.quarantine /Applications/GitLocal.app`, then launch it again. Future signed/notarized releases should not require this approval path.
 - If your macOS version or processor architecture is unsupported, use the npm package until a compatible native artifact is available.
 - If a launch fails, the app should show a native error. The npm browser workflow remains available as a fallback.
 
@@ -299,8 +311,8 @@ gitlocal/
 │   ├── cli.ts           — entry point: arg parsing, server start, browser/app-mode launch
 │   ├── server.ts        — Hono app, route registration, static serving + SPA fallback
 │   ├── git/
-│   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, identity sync, and file sync state
-│   │   ├── identity-settings.ts — project-local identity persistence, SSH private key validation, and .gitignore protection
+│   │   ├── repo.ts      — repo metadata, branch helpers, deferred git context, README lookup, repository-local identity, and file sync state
+│   │   ├── identity-settings.ts — SSH private key path expansion, discovery, and validation
 │   │   └── tree.ts      — listDir (git ls-tree wrapper, sorted dirs-first)
 │   ├── services/
 │   │   └── repo-watch.ts — working-tree revision and sync status snapshots for the UI
@@ -351,11 +363,9 @@ All endpoints are served under `/api/`:
 | `POST /api/branches/switch` | Switch branches with dirty-tree confirmation flows |
 | `POST /api/git/commit` | Compatibility route for creating a local commit; not exposed in the current repository UI |
 | `POST /api/git/sync` | Compatibility route for remote sync; not exposed in the current repository UI |
-| `PUT /api/git/identity` | Save project-local identity settings and sync `user.name`, `user.email`, and optional SSH command behavior in local git config |
+| `PUT /api/git/identity` | Save repository-local `user.name`, `user.email`, and optional SSH command behavior in local git config |
 | `GET /api/git/identity/ssh-keys` | List valid SSH private keys from the user's conventional SSH folder |
 | `POST /api/git/identity/ssh-key/validate` | Validate an arbitrary SSH private key path before saving it |
-| `GET /api/git/identity/protection` | Check whether `.env` private settings are protected by `.gitignore` |
-| `POST /api/git/identity/protection` | Create or update `.gitignore` with `.env` protection after explicit approval |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
 | `GET /api/search?query=&branch=&mode=&caseSensitive=` | Repository search across file names, file contents, or both |
