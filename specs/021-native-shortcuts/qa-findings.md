@@ -13,7 +13,7 @@
 ### 1. Resolved: Release branch implements the requested native shortcut fixes
 
 **Severity**: Critical  
-**Status**: Resolved  
+**Status**: Resolved
 **Evidence**:
 
 - `native/macos/GitLocal/GitLocal/AppDelegate.swift` installs native Edit and View menu items.
@@ -25,8 +25,8 @@
 
 ### 2. Resolved: Acceptance coverage exists for the new native shortcut behavior
 
-**Severity**: Critical  
-**Status**: Resolved  
+**Severity**: Critical
+**Status**: Resolved
 **Evidence**:
 
 - `ui/src/App.native-shortcuts.test.tsx` covers native Find and Refresh command events.
@@ -35,24 +35,16 @@
 
 **Risk**: Native WebKit/AppKit command regressions still require manual app validation because the UI tests cannot exercise real macOS menu dispatch.
 
-### 3. Partially resolved: Patch release metadata updated; final artifact cask work remains
+### 3. Resolved: Patch release metadata and final artifact cask work are complete
 
-**Severity**: Critical  
-**Status**: Release blocker for public release  
+**Severity**: Critical
+**Status**: Resolved
 **Evidence**:
 
 - `package.json` and `package-lock.json` are updated to `0.9.4`.
 - `CHANGELOG.md` includes a `0.9.4` patch entry.
-- `packaging/macos/release/artifacts/GitLocal-0.9.4-macos.zip` was built locally and validated.
-- `packaging/macos/cask/gitlocal.rb` remains pending final release artifact metadata.
-- The cask checksum cannot be finalized until the exact release archive exists.
-
-**Risk**: Public Homebrew installation cannot be finalized until the cask points to the exact published `0.9.4` archive checksum.
-
-**Required resolution**:
-
-- Build the final macOS artifact, compute SHA-256 from that archive, and update the cask from the final artifact.
-- Re-run version alignment, package, cask, and release workflow checks.
+- GitHub Release `v0.9.4` contains `GitLocal-0.9.4-macos.zip`.
+- `packaging/macos/cask/gitlocal.rb` points to the final `v0.9.4` release archive with SHA-256 `161efd3fe3ea64f8f5b8c2cb0fb7ebdecba92535770558faf3958099b19dcd60`.
 
 ### 4. Resolved: Quickstart release verification now covers the required release checks
 
@@ -80,10 +72,10 @@ Run during implementation validation:
 - `packaging/macos/release/package-app.sh` passed and built `GitLocal-0.9.4-macos.zip`.
 - `packaging/macos/release/test-package.sh` passed.
 - `packaging/macos/cask/validate-cask.sh` passed.
-- `packaging/macos/cask/test-install-cask.sh` passed against current `0.9.3` cask metadata.
-- `packaging/macos/release/validate-version-alignment.sh` failed as expected because cask metadata still references `0.9.3`.
+- `packaging/macos/cask/test-install-cask.sh` passed against released `0.9.4` cask metadata.
+- `packaging/macos/release/validate-version-alignment.sh` passed after the source cask update.
 - `npm pack --dry-run` passed for `gitlocal@0.9.4`.
 
 ## Release Recommendation
 
-Do not approve public release until the final GitHub Release archive exists, the cask is updated to its exact SHA-256 checksum, and version alignment passes. Product code, focused tests, local app packaging, versioning, changelog, documentation, cask syntax validation, cask install validation, and npm package dry run are complete.
+Approve public patch release `0.9.4`. Product code, focused tests, local app packaging, versioning, changelog, documentation, GitHub Release artifact publication, source cask update, cask syntax validation, cask install validation, version alignment, and npm package publication are complete.
