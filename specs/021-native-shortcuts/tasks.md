@@ -130,7 +130,7 @@
 - [x] T047 Run `npm pack --dry-run` and record package contents in `specs/021-native-shortcuts/release-review.md`
 - [x] T048 Update `specs/021-native-shortcuts/qa-findings.md` with resolved blocker status and any remaining findings
 - [x] T049 Complete final contrarian QA release decision in `specs/021-native-shortcuts/release-review.md`
-- [ ] T050 Update `packaging/macos/cask/gitlocal.rb` from the final GitHub Release archive and SHA-256 checksum after the immutable release artifact exists
+- [x] T050 Update `packaging/macos/cask/gitlocal.rb` from the final GitHub Release archive and SHA-256 checksum after the immutable release artifact exists
 
 ---
 
