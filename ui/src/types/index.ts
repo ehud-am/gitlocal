@@ -73,6 +73,10 @@ export interface GitIdentityUpdateResponse {
 export type SearchPresentation = 'collapsed' | 'expanded'
 export type SearchMode = 'name' | 'content' | 'both'
 export type ViewerPathType = 'file' | 'dir' | 'none'
+export type NativeAppCommand = 'find' | 'refresh'
+export interface NativeAppCommandEvent extends CustomEvent<{ command: NativeAppCommand }> {
+  type: 'gitlocal:native-command'
+}
 export type LocalGitState = 'repository-root' | 'inside-repository' | 'outside-repository'
 export type LocalOpenMode = 'repository' | 'folder' | 'file' | 'blocked'
 

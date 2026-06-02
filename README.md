@@ -118,6 +118,7 @@ gitlocal listening on http://localhost:54321
 Press **Ctrl+C** to stop the server.
 
 The macOS native app starts the same local server for the app session, loads it in an embedded WebKit window, and stops the managed service when the app quits.
+Native app menu and keyboard shortcuts support standard editing commands, preview-scoped Find, and Refresh for the current repository view.
 
 ### Open a folder or repository
 

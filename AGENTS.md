@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-05-27
+Auto-generated from all feature plans. Last updated: 2026-06-01
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -32,6 +32,8 @@ Auto-generated from all feature plans. Last updated: 2026-05-27
 - TypeScript 5.x on Node.js 22+ for the existing server/CLI and React UI; Swift 5.x for the macOS native wrapper; Ruby cask metadata for the Homebrew tap + Existing Hono server, @hono/node-server, React 18, Vite 7, current npm build/test stack; macOS AppKit/WebKit for the wrapper; Homebrew cask packaging conventions; GitHub Releases for versioned app artifacts (018-macos-homebrew-app)
 - No new application database; bundled release assets for the native app, user-local app preferences only if needed for native window/session state, Homebrew cask metadata in a project-owned tap repository (018-macos-homebrew-app)
 - Repository-local Git configuration for identity values; no application-owned `.env` identity storage (020-local-git-identity)
+- TypeScript 5.x on Node.js 22+ for the shared app; React 18 TypeScript UI; Swift 5.x for the scoped macOS wrapper + Existing Hono local server, React/Vite UI, AppKit/WebKit native wrapper, Vitest/React Testing Library, xcodebuild for wrapper validation (021-native-shortcuts)
+- No database; runtime state remains derived from local filesystem/git metadata, browser URL state, in-memory UI/server state, and native app session state (021-native-shortcuts)
 
 ## Project Structure
 
@@ -67,9 +69,9 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 021-native-shortcuts: Added TypeScript 5.x on Node.js 22+ for the shared app; React 18 TypeScript UI; Swift 5.x for the scoped macOS wrapper + Existing Hono local server, React/Vite UI, AppKit/WebKit native wrapper, Vitest/React Testing Library, xcodebuild for wrapper validation
 - 020-local-git-identity: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 - 018-macos-homebrew-app: Added TypeScript 5.x on Node.js 22+ for the existing server/CLI and React UI; Swift 5.x for the macOS native wrapper; Ruby cask metadata for the Homebrew tap + Existing Hono server, @hono/node-server, React 18, Vite 7, current npm build/test stack; macOS AppKit/WebKit for the wrapper; Homebrew cask packaging conventions; GitHub Releases for versioned app artifacts
-- 017-git-identity-settings: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, Radix UI primitives; no new runtime dependency planned
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -77,5 +79,5 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/020-local-git-identity/plan.md`
+`specs/021-native-shortcuts/plan.md`
 <!-- SPECKIT END -->

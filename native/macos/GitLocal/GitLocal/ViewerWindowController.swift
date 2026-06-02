@@ -31,4 +31,23 @@ final class ViewerWindowController: NSWindowController {
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
     }
+
+    @objc func findInPreview(_ sender: Any?) {
+        dispatchNativeCommand("find")
+    }
+
+    @objc func refreshViewer(_ sender: Any?) {
+        dispatchNativeCommand("refresh")
+    }
+
+    private func dispatchNativeCommand(_ command: String) {
+        let escapedCommand = command.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+        let script = """
+        window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+          detail: { command: '\(escapedCommand)' }
+        }));
+        """
+        webView.evaluateJavaScript(script)
+    }
 }
