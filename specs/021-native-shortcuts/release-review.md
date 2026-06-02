@@ -4,35 +4,34 @@
 
 - Feature: `021-native-shortcuts`
 - Intended release type: PATCH
-- Current package version during pre-release validation: `0.9.3`
+- Current package version during implementation validation: `0.9.4`
 - Review date: 2026-06-01
 
-This review covers the specification and implementation-plan branch for restoring expected macOS native app command behavior for Copy, Cut, Paste, Find, and Refresh. The branch currently contains planning artifacts only. It does not yet contain the Swift/WebKit or shared UI implementation for the shortcut fixes.
+This review covers restoring expected macOS native app command behavior for Copy, Cut, Paste, Find, and Refresh.
 
 ## Validation Log
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| `npm run verify` | Passed | Server tests: 10 files / 277 tests. UI tests: 19 files / 203 tests. Build and root/UI audits passed with 0 vulnerabilities. |
+| `npm run verify` | Passed | Server tests: 10 files / 277 tests. UI tests: 20 files / 207 tests. Build and root/UI audits passed with 0 vulnerabilities. |
 | `xcodebuild -project native/macos/GitLocal/GitLocal.xcodeproj -scheme GitLocal -configuration Release build` | Passed | Native wrapper Release build succeeded. Xcode selected the first matching local macOS destination. |
-| `packaging/macos/release/test-package.sh` | Passed | Existing packaged app bundle validated on disk, code signature verified, bundled service started, and `/api/info` responded. |
+| `packaging/macos/release/package-app.sh` | Passed | Built local artifact `packaging/macos/release/artifacts/GitLocal-0.9.4-macos.zip`; SHA-256 `c02f2454b8d7618c22a954940d0c184824d3a8781e424c4c38cfd6d9380cceba`. |
+| `packaging/macos/release/test-package.sh` | Passed | Built app bundle validated on disk, code signature verified, bundled service started, and `/api/info` responded. |
 | `packaging/macos/cask/validate-cask.sh` | Passed | Cask metadata validation passed for `packaging/macos/cask/gitlocal.rb`. |
-| `packaging/macos/cask/test-install-cask.sh` | Passed | Local-test cask installed and uninstalled successfully. Homebrew emitted tap-trust transition warnings for existing taps, but the validation completed successfully. |
-| `packaging/macos/release/validate-version-alignment.sh` | Passed | Existing release metadata is aligned for `0.9.3`. |
-| `npm pack --dry-run` | Passed | Package dry run produced `gitlocal-0.9.3.tgz` with 15 files and expected built server/UI contents. |
-| README review | Passed with no change | README does not need shortcut-specific documentation before implementation because this patch restores expected native app platform behavior rather than adding a new user workflow. |
-| CHANGELOG review | Pending implementation | No `0.9.4` changelog entry was added because the branch has not implemented the user-visible fix yet. |
-| Version metadata review | Pending implementation | `package.json`, `package-lock.json`, and cask metadata remain at `0.9.3`; they should advance only when the patch implementation and final artifact are ready. |
+| `packaging/macos/cask/test-install-cask.sh` | Passed | Local-test cask installed and uninstalled successfully against current `0.9.3` cask metadata. Homebrew emitted tap-trust transition warnings for existing taps, but validation completed successfully. |
+| `packaging/macos/release/validate-version-alignment.sh` | Failed as expected | Root package/app bundle are `0.9.4`, but `packaging/macos/cask/gitlocal.rb` still points to `0.9.3`. This must pass after the final GitHub Release archive and cask checksum update. |
+| `npm pack --dry-run` | Passed | `gitlocal@0.9.4`, 15 files, 317.2 kB package, unpacked size 1.1 MB, shasum `6d109cfc06faaa62919fda2af0afca2e2de094a5`. |
+| README review | Updated | README now notes native app menu and keyboard shortcut support for editing, preview Find, and Refresh. |
+| CHANGELOG review | Updated | `CHANGELOG.md` includes a `0.9.4` patch entry dated 2026-06-01. |
+| Version metadata review | Updated | `package.json` and `package-lock.json` are set to `0.9.4`; cask metadata remains pending final artifact checksum. |
 
 ## Contrarian QA Findings
 
-- **Release blocker: shortcut implementation is absent.** The branch defines the feature and plan, but no native app command routing, preview-scoped Find behavior, or Refresh behavior changes have been implemented yet.
-- **Release blocker: no implemented acceptance tests for the new behavior exist yet.** The current passing test suite proves the existing app remains healthy, not that Command-C, Command-X, Command-V, Command-F, and Refresh have been fixed in the native app.
-- **Release blocker: version metadata is intentionally unchanged.** Advancing to the next patch version before implementation would make local package/cask validation misleading and could desynchronize final cask checksum work.
+- **Resolved: shortcut implementation is present.** Native menu/shortcut routing, preview-scoped Find behavior, and Refresh command handling have been implemented.
+- **Resolved: automated and manual acceptance coverage exists.** Focused UI tests and native manual acceptance notes now cover the native command bridge, preview Find trigger, standard Edit commands, and Refresh refetch behavior.
+- **Resolved: package version metadata updated.** Root package metadata now targets `0.9.4`.
 - **Release blocker: final macOS release artifact checksum is not available.** The project cask must be updated from the exact final GitHub Release archive, not from a planning-only branch.
-- **Residual risk: native Find behavior can accidentally search app chrome.** Implementation must explicitly verify preview-only matching, including cases where the sidebar or toolbar contains the same text as the query.
-- **Residual risk: native command routing can break focused text controls.** Implementation must preserve standard text-field behavior inside dialogs and editable fields before adding generic preview handling.
-- **Residual risk: Refresh can hide stale state bugs.** Implementation must cover changed, deleted, and concurrently refreshed files.
+- **Residual risk: native WebKit menu dispatch requires manual app validation.** Automated tests cover the React event bridge and preview behavior, but real AppKit/WebKit responder-chain behavior still needs the manual checklist before public release approval.
 
 ## Accessibility Review
 
@@ -42,10 +41,18 @@ The current branch adds no new runtime UI. For implementation, any Find control 
 
 - `specs/021-native-shortcuts/spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/native-app-commands.md` define the intended patch scope.
 - `AGENTS.md` points to `specs/021-native-shortcuts/plan.md`.
-- `CHANGELOG.md` should receive a dated patch entry after the implementation is complete.
-- `package.json` and `package-lock.json` should advance to the next patch version after implementation validation.
+- `CHANGELOG.md` includes a dated patch entry for `0.9.4`.
+- `package.json` and `package-lock.json` are updated to `0.9.4`.
 - `packaging/macos/cask/gitlocal.rb` should be updated only after the final GitHub Release archive and SHA-256 checksum exist.
 
 ## Release Readiness
 
-Not release-ready. The pre-release validation environment is healthy, but the branch is a planning branch. Public release approval should wait for implementation, tests, patch version bump, changelog update, README re-review, final artifact validation, and cask checksum update.
+Not release-ready until the cask checksum is updated from the exact final GitHub Release archive and version alignment passes. Implementation, tests, patch version metadata, changelog, README updates, local app packaging, cask syntax validation, cask install/uninstall validation, and npm packaging dry run are complete.
+
+## QA Blocker Traceability
+
+- `specs/021-native-shortcuts/qa-findings.md` finding 1 maps to implementation tasks T005-T034.
+- `specs/021-native-shortcuts/qa-findings.md` finding 2 maps to acceptance coverage tasks T010-T012, T018-T020, and T027-T029.
+- `specs/021-native-shortcuts/qa-findings.md` finding 3 maps to release metadata and artifact tasks T037-T050.
+- `specs/021-native-shortcuts/qa-findings.md` finding 4 maps to quickstart and release verification tasks T002 and T040-T047.
+- `specs/021-native-shortcuts/qa-findings.md` finding 5 maps to wording cleanup task T001.

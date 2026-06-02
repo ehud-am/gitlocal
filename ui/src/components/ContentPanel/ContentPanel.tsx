@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { FileSyncState, FolderOperationResult, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
@@ -34,6 +34,7 @@ interface Props {
   selectedPathType: ViewerPathType
   selectedPathLocalOnly?: boolean
   selectedPathSyncState?: FileSyncState | 'none'
+  nativeFindToken?: number
   branch: string
   isGitRepo?: boolean
   onNavigate: (path: string) => void
@@ -173,6 +174,7 @@ export default function ContentPanel({
   selectedPathType,
   selectedPathLocalOnly = false,
   selectedPathSyncState = 'none',
+  nativeFindToken = 0,
   branch,
   isGitRepo = false,
   onNavigate,
@@ -203,6 +205,8 @@ export default function ContentPanel({
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
+  const fileFindInputRef = useRef<HTMLInputElement | null>(null)
+  const previousNativeFindTokenRef = useRef(nativeFindToken)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -281,6 +285,17 @@ export default function ContentPanel({
     if (activeFileFindIndex < fileFindMatches.length) return
     setActiveFileFindIndex(0)
   }, [activeFileFindIndex, fileFindMatches.length])
+
+  useEffect(() => {
+    if (nativeFindToken === previousNativeFindTokenRef.current) return
+    previousNativeFindTokenRef.current = nativeFindToken
+    if (!canSearchCurrentFile || mode !== 'view') return
+
+    setFileFindOpen(true)
+    window.setTimeout(() => {
+      fileFindInputRef.current?.focus()
+    }, 0)
+  }, [canSearchCurrentFile, mode, nativeFindToken])
 
   function confirmDiscardIfNeeded(): boolean {
     if (!dirty) return true
@@ -861,6 +876,7 @@ export default function ContentPanel({
                 className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] outline-none ring-offset-2 ring-offset-[var(--background)] placeholder:text-[var(--muted-foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 placeholder="Search the current file"
                 value={fileFindQuery}
+                ref={fileFindInputRef}
                 onChange={(event) => setFileFindQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {

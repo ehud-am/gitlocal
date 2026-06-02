@@ -34,8 +34,13 @@ xcodebuild -project native/macos/GitLocal/GitLocal.xcodeproj -scheme GitLocal -c
 
 ```sh
 npm run verify
+xcodebuild -project native/macos/GitLocal/GitLocal.xcodeproj -scheme GitLocal -configuration Release build
+packaging/macos/release/package-app.sh
 packaging/macos/release/test-package.sh
+packaging/macos/cask/validate-cask.sh
 packaging/macos/cask/test-install-cask.sh
+packaging/macos/release/validate-version-alignment.sh
+npm pack --dry-run
 ```
 
-Before release approval, update version metadata for the patch release, add a `CHANGELOG.md` entry, review README instructions for the native app, and complete the required contrarian QA release review.
+Before release approval, update version metadata for the patch release, add a `CHANGELOG.md` entry, review README instructions for the native app, complete the required contrarian QA release review, and update `packaging/macos/cask/gitlocal.rb` only from the exact final GitHub Release archive and SHA-256 checksum.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.4 - 2026-06-01
+
+- Fixed native macOS app menu and keyboard handling for standard Copy, Cut, Paste, Find, and Refresh commands.
+- Scoped native Command-F to GitLocal's current file preview instead of searching app chrome.
+- Added native Refresh handling that reloads repository, tree, file, README, branch, and sync state without restarting the app.
+- Added focused UI coverage and native manual acceptance notes for shortcut command behavior.
+
 ## 0.9.3 - 2026-05-27
 
 - Changed git identity settings to read and write repository-local git config for `user.name`, `user.email`, and SSH command behavior, removing the separate project `.env` identity store.

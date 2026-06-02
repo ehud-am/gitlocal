@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import Breadcrumb from './components/Breadcrumb/Breadcrumb'
@@ -23,6 +23,7 @@ import type {
   FileSyncState,
   FolderOperationResult,
   GitUserIdentity,
+  NativeAppCommandEvent,
   RepoInfo,
   RepoSyncState,
   SearchMode,
@@ -107,8 +108,10 @@ export default function App() {
   const [folderDeletePending, setFolderDeletePending] = useState(false)
   const [folderDeleteError, setFolderDeleteError] = useState('')
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
+  const [nativeFindToken, setNativeFindToken] = useState(0)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
+  const nativeRefreshPendingRef = useRef(false)
 
   const { data: baseInfo, isLoading } = useQuery({
     queryKey: ['info'],
@@ -281,6 +284,48 @@ export default function App() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasUnsavedChanges])
+
+  const refreshCurrentView = useCallback(async (): Promise<void> => {
+    if (nativeRefreshPendingRef.current) return
+    nativeRefreshPendingRef.current = true
+    setStatusMessage('Refreshing current view...')
+    setTreeRefreshToken((value) => value + 1)
+
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['info'] }),
+        queryClient.invalidateQueries({ queryKey: ['git-context'] }),
+        queryClient.invalidateQueries({ queryKey: ['branches'] }),
+        queryClient.invalidateQueries({ queryKey: ['tree'] }),
+        queryClient.invalidateQueries({ queryKey: ['file'] }),
+        queryClient.invalidateQueries({ queryKey: ['readme'] }),
+        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
+        queryClient.invalidateQueries({ queryKey: ['sync'] }),
+      ])
+      setStatusMessage('Current view refreshed.')
+    } finally {
+      nativeRefreshPendingRef.current = false
+    }
+  }, [queryClient])
+
+  useEffect(() => {
+    const handleNativeCommand = (event: Event) => {
+      const command = (event as NativeAppCommandEvent).detail?.command
+      if (command === 'find') {
+        event.preventDefault()
+        setNativeFindToken((value) => value + 1)
+        return
+      }
+
+      if (command === 'refresh') {
+        event.preventDefault()
+        void refreshCurrentView()
+      }
+    }
+
+    window.addEventListener('gitlocal:native-command', handleNativeCommand)
+    return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
+  }, [refreshCurrentView])
 
   function confirmDiscardChanges(): boolean {
     if (!hasUnsavedChanges) return true
@@ -829,6 +874,7 @@ export default function App() {
                   selectedPathType={visibleSelectedPathType}
                   selectedPathLocalOnly={visibleSelectedPathLocalOnly}
                   selectedPathSyncState={selectedPathSyncState}
+                  nativeFindToken={nativeFindToken}
                   branch={currentBranch}
                   isGitRepo={info?.isGitRepo}
                   onNavigate={handleSelectFile}

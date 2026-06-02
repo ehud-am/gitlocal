@@ -884,6 +884,91 @@ describe('ContentPanel', () => {
     expect(screen.queryByRole('searchbox', { name: /find in file query/i })).not.toBeInTheDocument()
   })
 
+  it('opens preview-scoped find from a native Find command token', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'notes.txt', language: 'text', content: 'native-command-preview-only' }),
+    )
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        nativeFindToken={0}
+        selectedPath="notes.txt"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    await screen.findByTestId('code-viewer')
+    expect(screen.queryByRole('searchbox', { name: /find in file query/i })).not.toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          nativeFindToken={1}
+          selectedPath="notes.txt"
+          selectedPathType="file"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    const input = await screen.findByRole('searchbox', { name: /find in file query/i })
+    expect(input).toHaveFocus()
+    fireEvent.change(input, { target: { value: 'native-command-preview-only' } })
+    expect(screen.getByText(/1 match in this file/i)).toBeInTheDocument()
+
+    fireEvent.change(input, { target: { value: 'toolbar-only-text' } })
+    expect(screen.getByText(/no matches for "toolbar-only-text" in this file/i)).toBeInTheDocument()
+  })
+
+  it('refetches visible file content when the refresh token changes', async () => {
+    vi.mocked(api.getFile)
+      .mockResolvedValueOnce(makeTextFile({ content: 'old content' }))
+      .mockResolvedValueOnce(makeTextFile({ content: 'changed content' }))
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    expect(await screen.findByText('old content')).toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={1}
+          selectedPath="README.md"
+          selectedPathType="file"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('changed content')).toBeInTheDocument()
+  })
+
   it('keeps file actions scoped to the current file', async () => {
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
 

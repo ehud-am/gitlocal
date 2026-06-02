@@ -78,7 +78,7 @@ As a GitLocal user in the macOS native app, I want an obvious refresh action to 
 - **FR-008**: Refresh MUST reload the current app view from the latest local repository and filesystem state.
 - **FR-009**: Refresh MUST preserve the user's current repository, navigation location, and selected file when those items still exist after reload.
 - **FR-010**: The app MUST handle unavailable commands gracefully without corrupting content, changing unrelated state, or requiring a restart.
-- **FR-011**: The release MUST be suitable for a minor patch update with no required user migration or new configuration.
+- **FR-011**: The release MUST be suitable for a patch update with no required user migration or new configuration.
 
 ## Success Criteria *(mandatory)*
 
@@ -96,4 +96,4 @@ As a GitLocal user in the macOS native app, I want an obvious refresh action to 
 - "Find" means in-page finding within the currently visible preview panel, not global repository search.
 - Copy may apply to read-only selected preview text, while cut and paste apply only to editable fields.
 - Refresh should preserve context when possible, but may fall back to an available repository or empty state when the prior target no longer exists.
-- This is scoped as a minor patch release and should not introduce new user-facing configuration, account flows, or migration steps.
+- This is scoped as a patch release and should not introduce new user-facing configuration, account flows, or migration steps.

@@ -27,8 +27,19 @@ The packaged service is expected to bind only to loopback. The native wrapper lo
 
 - Start one managed local service process per app session.
 - Load the existing GitLocal viewer in a native WebKit window.
+- Provide standard macOS menu and keyboard commands for Copy, Cut, Paste, preview-scoped Find, and Refresh.
 - Show clear native errors for missing assets, startup failures, port readiness failures, and blocked app launch.
 - Stop the managed local service on close or quit.
+
+## Native Commands
+
+The wrapper installs app menus for common Mac workflows while keeping product behavior in the shared React viewer:
+
+- Edit > Copy and Command-C copy selected preview or editable text through WebKit.
+- Edit > Cut and Command-X cut only when editable WebKit content is focused.
+- Edit > Paste and Command-V paste only when editable WebKit content is focused.
+- Edit > Find and Command-F dispatch a GitLocal native command event so the React viewer opens the current preview's in-file Find panel.
+- View > Refresh and Command-R dispatch a GitLocal native command event so the React viewer reloads local repository, tree, file, README, branch, and sync state without restarting the managed service.
 
 ## Out Of Scope
 
