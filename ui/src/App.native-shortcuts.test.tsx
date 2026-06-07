@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -28,9 +28,10 @@ vi.mock('./components/FileTree/FileTree', () => ({
 }))
 
 vi.mock('./components/ContentPanel/ContentPanel', () => ({
-  default: (props: { nativeFindToken?: number; refreshToken: number }) => (
+  default: (props: { nativeFindToken?: number; nativeSelectAllToken?: number; refreshToken: number }) => (
     <div>
       <div data-testid="native-find-token">{props.nativeFindToken ?? 0}</div>
+      <div data-testid="native-select-all-token">{props.nativeSelectAllToken ?? 0}</div>
       <div data-testid="content-refresh-token">{props.refreshToken}</div>
     </div>
   ),
@@ -178,5 +179,31 @@ describe('native app shortcut bridge', () => {
       expect(screen.getByTestId('content-refresh-token')).toHaveTextContent('1')
     })
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
+  })
+
+  it('refreshes the current view from the visible header button', async () => {
+    renderWithClient()
+
+    expect(await screen.findByTestId('content-refresh-token')).toHaveTextContent('0')
+
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tree-refresh-token')).toHaveTextContent('1')
+      expect(screen.getByTestId('content-refresh-token')).toHaveTextContent('1')
+    })
+    expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
+  })
+
+  it('forwards native Select All commands to the content panel', async () => {
+    renderWithClient()
+
+    expect(await screen.findByTestId('native-select-all-token')).toHaveTextContent('0')
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', { detail: { command: 'select-all-panel' } }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('native-select-all-token')).toHaveTextContent('1')
+    })
   })
 })

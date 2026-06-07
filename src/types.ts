@@ -86,6 +86,36 @@ export interface LocalPathClassification {
   message?: string
 }
 
+export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
+export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
+
+export interface StartupFolderResolution {
+  path: string
+  source: StartupFolderSource
+  exists: boolean
+  readable: boolean
+  platformDefaultPath: string
+  lastUsedPath: string
+  fallbackReason: string
+}
+
+export interface StartupFolderPreference {
+  path: string
+  openedAt: string
+  source: StartupFolderUpdateSource
+}
+
+export interface StartupFolderUpdateRequest {
+  path: string
+  source: StartupFolderUpdateSource
+}
+
+export interface StartupFolderUpdateResponse {
+  ok: boolean
+  path: string
+  message: string
+}
+
 export interface ViewerState {
   branch: string
   path: string

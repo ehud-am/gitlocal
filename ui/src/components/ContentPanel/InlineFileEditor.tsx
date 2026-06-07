@@ -1,3 +1,13 @@
+import { useEffect, useRef, useState } from 'react'
+import type { NativeAppCommandEvent } from '../../types'
+import {
+  createEditorHistory,
+  pushEditorChange,
+  redoEditorChange,
+  undoEditorChange,
+  type EditorHistoryState,
+} from './editor-history'
+
 interface Props {
   path: string
   content: string
@@ -9,6 +19,54 @@ interface Props {
 }
 
 export default function InlineFileEditor({ path, content, busy = false, error, onChange, onSave, onCancel }: Props) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [history, setHistory] = useState<EditorHistoryState>(() => createEditorHistory(content))
+
+  useEffect(() => {
+    setHistory(createEditorHistory(content))
+  }, [path])
+
+  function applyHistory(nextHistory: EditorHistoryState): void {
+    setHistory(nextHistory)
+    onChange(nextHistory.present)
+  }
+
+  function handleContentChange(nextContent: string): void {
+    const nextHistory = pushEditorChange(history, nextContent)
+    setHistory(nextHistory)
+    onChange(nextContent)
+  }
+
+  function handleUndo(): void {
+    applyHistory(undoEditorChange(history))
+  }
+
+  function handleRedo(): void {
+    applyHistory(redoEditorChange(history))
+  }
+
+  function editorHasFocus(): boolean {
+    return document.activeElement === textareaRef.current
+  }
+
+  useEffect(() => {
+    const handleNativeCommand = (event: Event) => {
+      const command = (event as NativeAppCommandEvent).detail?.command
+      if (!editorHasFocus()) return
+      if (command === 'undo') {
+        event.preventDefault()
+        handleUndo()
+      }
+      if (command === 'redo') {
+        event.preventDefault()
+        handleRedo()
+      }
+    }
+
+    window.addEventListener('gitlocal:native-command', handleNativeCommand)
+    return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
+  })
+
   return (
     <div className="manual-editor-card manual-editor-expanded">
       <div className="manual-editor-header">
@@ -31,10 +89,24 @@ export default function InlineFileEditor({ path, content, busy = false, error, o
         </p>
       )}
       <textarea
+        ref={textareaRef}
         className="manual-editor-textarea"
         aria-label="Edit file content"
-        value={content}
-        onChange={(event) => onChange(event.target.value)}
+        value={history.present}
+        onChange={(event) => handleContentChange(event.target.value)}
+        onKeyDown={(event) => {
+          const isUndo = (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'z'
+          const isRedo = ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'z')
+            || (event.ctrlKey && event.key.toLowerCase() === 'y')
+
+          if (isUndo) {
+            event.preventDefault()
+            handleUndo()
+          } else if (isRedo) {
+            event.preventDefault()
+            handleRedo()
+          }
+        }}
         spellCheck={false}
       />
     </div>

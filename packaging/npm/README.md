@@ -29,6 +29,12 @@ Open a specific folder or repository:
 gitlocal ~/projects/my-app
 ```
 
+Open the last used folder, or your platform Documents folder on first launch:
+
+```sh
+gitlocal
+```
+
 Run without installing:
 
 ```sh
@@ -36,6 +42,8 @@ npx gitlocal
 ```
 
 GitLocal starts a local server, opens your browser, and prints the local URL. Keep the terminal process open while using the npm version.
+
+Rendered Markdown views include local print, Save as PDF through print, email/share, copy, and download fallback actions. The viewer also includes a Refresh button, focused undo/redo support while editing files, and panel-scoped Select All for the currently viewed content.
 
 ## More Documentation
 

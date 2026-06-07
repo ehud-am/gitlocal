@@ -118,7 +118,8 @@ gitlocal listening on http://localhost:54321
 Press **Ctrl+C** to stop the server.
 
 The macOS native app starts the same local server for the app session, loads it in an embedded WebKit window, and stops the managed service when the app quits.
-Native app menu and keyboard shortcuts support standard editing commands, preview-scoped Find, and Refresh for the current repository view.
+Native app menu and keyboard shortcuts support standard editing commands, preview-scoped Find, panel-scoped Select All, and Refresh for the current repository view.
+Rendered Markdown views include dedicated actions to print the rendered document, save it as PDF through the print dialog, start local email or system share flows, and use copy/download fallbacks when a share destination is unavailable.
 
 ### Open a folder or repository
 
@@ -149,7 +150,7 @@ Run `gitlocal` with no arguments:
 gitlocal
 ```
 
-If your current shell is already inside a git repository, GitLocal opens that repository immediately instead of showing the picker.
+When no path is provided, GitLocal reopens the last successfully used folder if it still exists. If there is no usable remembered folder, it starts from your Documents folder on macOS and Windows, from the configured Documents folder or `~/Documents` on Linux, and finally from your home folder if Documents is unavailable.
 
 From the picker you can:
 
@@ -165,9 +166,10 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 
 - **Browse the file tree** — expand and collapse folders lazily, whether the root is a plain folder or a git repository
 - **Read project knowledge comfortably** — Markdown renders with GitHub-like typography, tables, task lists, and code blocks so specs, plans, READMEs, and agent-generated docs are easy to review
+- **Share rendered Markdown** — print rendered Markdown, save it as PDF, prepare local email or system share flows, and fall back to copying or downloading when a destination is unavailable
 - **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
 - **Track file sync state in repositories** — repository file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
-- **Make small local file edits** — create, edit, and delete files from the viewer when human intervention is needed, without making editing the main product center of gravity
+- **Make small local file edits** — create, edit, and delete files from the viewer when human intervention is needed, with focused undo/redo support while editing and Select All scoped to the current content panel
 - **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
 - **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
 - **Manage repo identity locally** — save repository-local git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and make those settings visible to regular Git commands
@@ -175,7 +177,7 @@ GitLocal also clears stale saved branch and path state when you switch folders, 
 - **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
 - **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
 - **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker with files, folders, and git repository detection
-- **Smart startup detection** — running `gitlocal` inside a repo opens that repo immediately; passing a plain folder opens that folder as the active root
+- **Smart startup folder** — no-argument launches reopen the last used folder when possible, then fall back to the platform Documents folder or home folder
 - **Clear folder actions** — picker folders can be browsed deeper, initialized as git repos, or used as clone targets
 - **Light and dark themes** — GitHub-inspired light mode with matching dark mode support
 - **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone/setup actions use the local `git` executable only when you choose them

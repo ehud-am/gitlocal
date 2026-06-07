@@ -14,6 +14,7 @@ import {
   GitIdentityDialog,
   RepoBoundaryDialog,
 } from './components/AppDialogs'
+import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import { readViewerState, writeViewerState } from './services/viewerState'
@@ -109,6 +110,8 @@ export default function App() {
   const [folderDeleteError, setFolderDeleteError] = useState('')
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const [nativeFindToken, setNativeFindToken] = useState(0)
+  const [nativeSelectAllToken, setNativeSelectAllToken] = useState(0)
+  const [refreshingCurrentView, setRefreshingCurrentView] = useState(false)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
   const nativeRefreshPendingRef = useRef(false)
@@ -288,6 +291,7 @@ export default function App() {
   const refreshCurrentView = useCallback(async (): Promise<void> => {
     if (nativeRefreshPendingRef.current) return
     nativeRefreshPendingRef.current = true
+    setRefreshingCurrentView(true)
     setStatusMessage('Refreshing current view...')
     setTreeRefreshToken((value) => value + 1)
 
@@ -305,6 +309,7 @@ export default function App() {
       setStatusMessage('Current view refreshed.')
     } finally {
       nativeRefreshPendingRef.current = false
+      setRefreshingCurrentView(false)
     }
   }, [queryClient])
 
@@ -320,6 +325,12 @@ export default function App() {
       if (command === 'refresh') {
         event.preventDefault()
         void refreshCurrentView()
+        return
+      }
+
+      if (command === 'select-all-panel') {
+        event.preventDefault()
+        setNativeSelectAllToken((value) => value + 1)
       }
     }
 
@@ -742,14 +753,26 @@ export default function App() {
             <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
           </span>
           {info ? <span className="repo-name truncate text-sm text-[var(--muted-foreground)]">{info.name}</span> : null}
-          <label className="ml-auto inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
-            <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
-            <Switch
-              checked={darkMode}
-              aria-label="Toggle dark theme"
-              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-            />
-          </label>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={refreshingCurrentView}
+              onClick={() => { void refreshCurrentView() }}
+              aria-label="Refresh current page"
+            >
+              {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
+              <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
+              <Switch
+                checked={darkMode}
+                aria-label="Toggle dark theme"
+                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              />
+            </label>
+          </div>
         </header>
 
         <div className="app-body flex min-h-0 flex-1 pb-8">
@@ -875,6 +898,7 @@ export default function App() {
                   selectedPathLocalOnly={visibleSelectedPathLocalOnly}
                   selectedPathSyncState={selectedPathSyncState}
                   nativeFindToken={nativeFindToken}
+                  nativeSelectAllToken={nativeSelectAllToken}
                   branch={currentBranch}
                   isGitRepo={info?.isGitRepo}
                   onNavigate={handleSelectFile}

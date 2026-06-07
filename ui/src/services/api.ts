@@ -27,6 +27,9 @@ import type {
   SyncStatus,
   SshKeyListResponse,
   SshKeyValidationResponse,
+  StartupFolderResponse,
+  StartupFolderUpdateRequest,
+  StartupFolderUpdateResponse,
   TreeNode,
 } from '../types'
 
@@ -87,6 +90,12 @@ async function branchSwitchRequest(payload: BranchSwitchRequest): Promise<Branch
 
 export const api = {
   getInfo: (): Promise<RepoInfo> => request<RepoInfo>('/api/info'),
+
+  getStartupFolder: (): Promise<StartupFolderResponse> =>
+    request<StartupFolderResponse>('/api/startup-folder'),
+
+  updateStartupFolder: (payload: StartupFolderUpdateRequest): Promise<StartupFolderUpdateResponse> =>
+    mutate('/api/startup-folder', 'PUT', payload),
 
   getGitContext: (): Promise<GitContext | null> => request<GitContext | null>('/api/git/context'),
 

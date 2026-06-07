@@ -337,6 +337,27 @@ pre {
   border-radius: 8px;
 }
 
+.markdown-share-actions {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  padding: 0.75rem;
+}
+
+.markdown-share-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.markdown-share-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
@@ -364,6 +385,36 @@ pre {
   padding-left: 1rem;
   border-left: 4px solid var(--border);
   color: var(--muted-foreground);
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #1f2328;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .markdown-print-surface,
+  .markdown-print-surface * {
+    visibility: visible !important;
+  }
+
+  .markdown-print-surface {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 24px;
+    background: #fff;
+  }
+
+  .markdown-share-actions,
+  .markdown-code-toolbar,
+  .copy-button {
+    display: none !important;
+  }
 }
 
 .hljs {

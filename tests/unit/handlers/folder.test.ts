@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -154,6 +154,19 @@ describe('folder and repository open handlers', () => {
     expect(body.error).toBeTruthy()
   })
 
+  it('rejects invalid repository open JSON', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/open', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{bad-json',
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean; error: string }
+    expect(body.ok).toBe(false)
+    expect(body.error).toBe('Invalid JSON body')
+  })
+
   it('opens a selected file by using its parent folder as the active root', async () => {
     const app = createApp('')
     const client = testClient(app)
@@ -195,10 +208,18 @@ describe('folder and repository open handlers', () => {
   })
 
   it('updates server repoPath on success', async () => {
+    const prefPath = join(validDir, 'startup-preference.json')
+    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
     const app = createApp('')
     const client = testClient(app)
-    await client.api.repo.open.$post({ json: { path: validDir } })
-    expect(getRepoPath()).toBe(realpathSync(validDir))
+    try {
+      await client.api.repo.open.$post({ json: { path: validDir } })
+      expect(getRepoPath()).toBe(realpathSync(validDir))
+      expect(existsSync(prefPath)).toBe(true)
+    } finally {
+      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
+      rmSync(prefPath, { force: true })
+    }
   })
 
   it('returns ok:false when path field is missing', async () => {

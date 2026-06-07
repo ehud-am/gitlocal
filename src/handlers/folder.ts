@@ -17,6 +17,7 @@ import {
   validateRepo,
 } from '../git/repo.js'
 import { getPickerPath, setPickerPath } from '../server.js'
+import { rememberStartupFolder } from '../services/startup-preferences.js'
 import type {
   FolderBrowseEntry,
   FolderBrowseResponse,
@@ -171,6 +172,7 @@ export async function folderBrowseHandler(c: Context<{ Variables: Variables }>):
   }
 
   setPickerPath(currentPath)
+  rememberStartupFolder(currentPath, 'picker-open')
 
   const res: FolderBrowseResponse = {
     currentPath,
@@ -194,6 +196,7 @@ export async function folderCreateChildHandler(c: Context<{ Variables: Variables
 
   try {
     const path = createChildFolder(payload.parentPath ?? '', payload.name ?? '')
+    rememberStartupFolder(path, 'picker-open')
     return c.json({
       ok: true,
       error: '',
@@ -289,6 +292,7 @@ export async function folderInitRepositoryHandler(c: Context<{ Variables: Variab
 
   try {
     const path = initializeGitRepository(payload.path ?? '')
+    rememberStartupFolder(path, 'picker-open')
     return c.json({
       ok: true,
       error: '',
@@ -319,6 +323,7 @@ export async function folderCloneRepositoryHandler(c: Context<{ Variables: Varia
       /* v8 ignore next -- request validation tests pass an object even when fields are missing */
       payload.repositoryUrl ?? '',
     )
+    rememberStartupFolder(path, 'picker-open')
     return c.json({
       ok: true,
       error: '',

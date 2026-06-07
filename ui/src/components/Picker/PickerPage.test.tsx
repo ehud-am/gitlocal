@@ -6,6 +6,7 @@ import PickerPage from './PickerPage'
 
 vi.mock('../../services/api', () => ({
   api: {
+    getStartupFolder: vi.fn(),
     getFolderBrowse: vi.fn(),
     openRepository: vi.fn(),
     createChildFolder: vi.fn(),
@@ -37,6 +38,15 @@ beforeEach(() => {
   })
   window.history.replaceState(null, '', '/')
 
+  vi.mocked(api.getStartupFolder).mockResolvedValue({
+    path: '/Users/example',
+    source: 'last-used',
+    exists: true,
+    readable: true,
+    platformDefaultPath: '/Users/example/Documents',
+    lastUsedPath: '/Users/example',
+    fallbackReason: '',
+  })
   vi.mocked(api.getFolderBrowse).mockResolvedValue({
     currentPath: '/Users/example',
     parentPath: '/Users',
@@ -74,6 +84,46 @@ describe('PickerPage', () => {
 
     expect(screen.getAllByText('projects').length).toBeGreaterThan(0)
     expect(screen.getAllByText('gitlocal').length).toBeGreaterThan(0)
+  })
+
+  it('shows the Documents startup message when using the platform default folder', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/Users/example/Documents',
+      source: 'platform-default',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/Users/example/Documents',
+      lastUsedPath: '',
+      fallbackReason: '',
+    })
+
+    render(<PickerPage />)
+
+    expect(await screen.findByText(/started from your documents folder/i)).toBeInTheDocument()
+  })
+
+  it('shows the home fallback startup message and tolerates startup lookup failures', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/Users/example',
+      source: 'home-fallback',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/Users/example/Documents',
+      lastUsedPath: '/Users/example/missing',
+      fallbackReason: 'Last used folder is unavailable.',
+    })
+
+    const { unmount } = render(<PickerPage />)
+    expect(await screen.findByText(/last used folder is unavailable/i)).toBeInTheDocument()
+    unmount()
+
+    vi.mocked(api.getStartupFolder).mockRejectedValueOnce(new Error('startup failed'))
+    render(<PickerPage />)
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalled()
+    })
+    expect(screen.queryByText(/last used folder is unavailable/i)).not.toBeInTheDocument()
   })
 
   it('selects a folder when clicked', async () => {
@@ -179,6 +229,58 @@ describe('PickerPage', () => {
       pathType: 'none',
     }))
     expect(window.location.reload).toHaveBeenCalled()
+  })
+
+  it('browses into a regular child folder on double click', async () => {
+    vi.mocked(api.getFolderBrowse)
+      .mockResolvedValueOnce({
+        currentPath: '/Users/example/projects',
+        parentPath: '/Users/example',
+        homePath: '/Users/example',
+        roots: [{ name: '/', path: '/' }],
+        entries: [
+          {
+            name: 'notes',
+            path: '/Users/example/projects/notes',
+            type: 'dir',
+            isGitRepo: false,
+            gitState: 'outside-repository',
+            openMode: 'folder',
+          },
+        ],
+        error: '',
+        isGitRepo: false,
+        gitState: 'outside-repository',
+        openMode: 'folder',
+        canOpen: true,
+        canCreateChild: true,
+        canInitGit: true,
+        canCloneIntoChild: true,
+      })
+      .mockResolvedValueOnce({
+        currentPath: '/Users/example/projects/notes',
+        parentPath: '/Users/example/projects',
+        homePath: '/Users/example',
+        roots: [{ name: '/', path: '/' }],
+        entries: [],
+        error: '',
+        isGitRepo: false,
+        gitState: 'outside-repository',
+        openMode: 'folder',
+        canOpen: true,
+        canCreateChild: true,
+        canInitGit: true,
+        canCloneIntoChild: true,
+      })
+
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^notes folder$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/projects/notes')
+    })
+    expect(await screen.findByText('/Users/example/projects/notes')).toBeInTheDocument()
   })
 
   it('keeps a regular sibling beside a repository child as a browsable folder', async () => {

@@ -27,7 +27,7 @@ The packaged service is expected to bind only to loopback. The native wrapper lo
 
 - Start one managed local service process per app session.
 - Load the existing GitLocal viewer in a native WebKit window.
-- Provide standard macOS menu and keyboard commands for Copy, Cut, Paste, preview-scoped Find, and Refresh.
+- Provide standard macOS menu and keyboard commands for Copy, Cut, Paste, Undo, Redo, panel-scoped Select All, preview-scoped Find, Refresh, and Markdown print/share forwarding.
 - Show clear native errors for missing assets, startup failures, port readiness failures, and blocked app launch.
 - Stop the managed local service on close or quit.
 
@@ -38,8 +38,13 @@ The wrapper installs app menus for common Mac workflows while keeping product be
 - Edit > Copy and Command-C copy selected preview or editable text through WebKit.
 - Edit > Cut and Command-X cut only when editable WebKit content is focused.
 - Edit > Paste and Command-V paste only when editable WebKit content is focused.
+- Edit > Undo and Command-Z dispatch a GitLocal native command event so the focused React editor can undo the latest edit without changing unrelated fields.
+- Edit > Redo and Command-Shift-Z dispatch a GitLocal native command event so the focused React editor can reapply an undone edit.
+- Edit > Select All and Command-A dispatch a GitLocal native command event so the shared viewer selects the current content panel while preserving native field selection.
 - Edit > Find and Command-F dispatch a GitLocal native command event so the React viewer opens the current preview's in-file Find panel.
 - View > Refresh and Command-R dispatch a GitLocal native command event so the React viewer reloads local repository, tree, file, README, branch, and sync state without restarting the managed service.
+- View > Print Rendered Markdown dispatches a GitLocal native command event so the rendered Markdown print flow opens from the shared viewer.
+- View > Share Markdown dispatches a GitLocal native command event so the shared viewer can start the local share flow or fallback.
 
 ## Out Of Scope
 

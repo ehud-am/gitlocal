@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.9.5 - 2026-06-07
+
+- Added rendered Markdown output actions for printing, Save as PDF through print/save-to-PDF, email, Slack/system sharing, copy, and download fallbacks.
+- Added a prominent Refresh button that uses the same current-view reload behavior as the native Refresh command.
+- Added focused undo/redo handling for the inline file editor and native macOS Undo/Redo menu forwarding.
+- Added panel-scoped Select All handling so Command-A collects the current content panel without selecting app chrome, while focused fields keep native selection.
+- Changed no-argument startup to reopen the last used folder when available, otherwise start from the user's Documents folder with home-folder fallback.
+
 ## 0.9.4 - 2026-06-01
 
 - Fixed native macOS app menu and keyboard handling for standard Copy, Cut, Paste, Find, and Refresh commands.

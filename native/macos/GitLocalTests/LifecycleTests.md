@@ -27,3 +27,10 @@ These checks verify that the macOS wrapper behaves like a native app while still
 
 - Launch and quit the app twice.
 - Confirm each launch creates a fresh local service URL and the viewer loads.
+
+## Startup Folder
+
+- Launch `GitLocal.app` with no remembered folder preference. Confirm the app starts from the user's Documents folder when it exists, or home folder if Documents is unavailable.
+- Open a different local folder successfully, then quit the app.
+- Relaunch `GitLocal.app` without specifying a folder. Confirm it reopens the last used folder.
+- Delete or rename the remembered folder, then relaunch. Confirm the app falls back to Documents or home without a blocking startup error.
