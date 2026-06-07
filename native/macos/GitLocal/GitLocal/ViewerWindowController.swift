@@ -40,6 +40,26 @@ final class ViewerWindowController: NSWindowController {
         dispatchNativeCommand("refresh")
     }
 
+    @objc func undoEdit(_ sender: Any?) {
+        dispatchNativeCommand("undo")
+    }
+
+    @objc func redoEdit(_ sender: Any?) {
+        dispatchNativeCommand("redo")
+    }
+
+    @objc func selectAllInPanel(_ sender: Any?) {
+        dispatchNativeCommand("select-all-panel")
+    }
+
+    @objc func printMarkdown(_ sender: Any?) {
+        dispatchNativeCommand("print-markdown")
+    }
+
+    @objc func shareMarkdown(_ sender: Any?) {
+        dispatchNativeCommand("share-markdown")
+    }
+
     private func dispatchNativeCommand(_ command: String) {
         let escapedCommand = command.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")

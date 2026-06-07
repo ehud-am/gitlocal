@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server'
 import { validateRepo } from './git/repo.js'
 import { createApp } from './server.js'
+import { rememberStartupFolder, resolveStartupFolder } from './services/startup-preferences.js'
 
 function checkNodeVersion(): void {
   const [major] = process.versions.node.split('.').map(Number)
@@ -44,19 +45,23 @@ async function main(): Promise<void> {
   checkNodeVersion()
 
   const { repoPath, openSystemBrowser } = parseArgs(process.argv.slice(2))
-  const launchPath = repoPath || process.cwd()
+  const startupFolder = resolveStartupFolder({ explicitPath: repoPath })
+  const launchPath = startupFolder.path
   const openingCurrentRepo = !repoPath && validateRepo(launchPath)
-  const app = createApp(repoPath, { detectCurrentRepoOnEmptyPath: true })
+  const app = createApp(launchPath, { detectCurrentRepoOnEmptyPath: true })
+  if (startupFolder.readable) {
+    rememberStartupFolder(launchPath, repoPath ? 'explicit-launch' : 'native-open')
+  }
 
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }, async (info) => {
     const url = `http://127.0.0.1:${info.port}`
     console.log(`gitlocal listening on ${url}`)
     if (repoPath) {
-      console.log(`Serving: ${repoPath}`)
+      console.log(`Serving: ${launchPath}`)
     } else if (openingCurrentRepo) {
       console.log(`Serving current repository: ${launchPath}`)
     } else {
-      console.log('No folder specified — opening folder picker.')
+      console.log(`No folder specified — opening: ${launchPath}`)
     }
     if (openSystemBrowser) {
       await openBrowser(url)

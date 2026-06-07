@@ -21,6 +21,11 @@ import {
   validateRepo,
 } from '../git/repo.js'
 import { setPickerPath, setRepoPath } from '../server.js'
+import {
+  rememberStartupFolder,
+  resolveStartupFolder,
+  writeStartupFolderPreference,
+} from '../services/startup-preferences.js'
 import type {
   BranchSwitchRequest,
   CommitChangesRequest,
@@ -28,6 +33,7 @@ import type {
   LocalActionResponse,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
+  StartupFolderUpdateRequest,
 } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
@@ -50,6 +56,34 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
   }
   const info = getInfo(repoPath)
   return c.json(info)
+}
+
+export async function startupFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  return c.json(resolveStartupFolder())
+}
+
+export async function startupFolderUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let payload: StartupFolderUpdateRequest
+  try {
+    payload = await c.req.json<StartupFolderUpdateRequest>()
+  } catch {
+    return c.json({ ok: false, path: '', message: 'Invalid JSON body.' }, 400)
+  }
+
+  try {
+    const preference = writeStartupFolderPreference(payload.path ?? '', payload.source ?? 'picker-open')
+    return c.json({
+      ok: true,
+      path: preference.path,
+      message: 'Startup folder preference updated.',
+    })
+  } catch (error) {
+    return c.json({
+      ok: false,
+      path: payload.path ?? '',
+      message: error instanceof Error ? error.message : 'Could not update startup folder preference.',
+    }, 400)
+  }
 }
 
 export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -88,6 +122,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
 
     setRepoPath(rootPath)
     setPickerPath('')
+    rememberStartupFolder(rootPath, 'repo-open')
     const res: LocalActionResponse = {
       ok: true,
       error: '',
@@ -111,6 +146,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   const rootPath = resolvedInputPath
   setRepoPath(rootPath)
   setPickerPath('')
+  rememberStartupFolder(rootPath, 'repo-open')
   const res: LocalActionResponse = {
     ok: true,
     error: '',
@@ -131,8 +167,10 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
     return c.json({ ok: false, error: 'No repository is currently open' })
   }
 
+  const parentPath = dirname(repoPath)
   setRepoPath('')
-  setPickerPath(dirname(repoPath))
+  setPickerPath(parentPath)
+  rememberStartupFolder(parentPath, 'picker-open')
   return c.json({ ok: true, error: '' })
 }
 

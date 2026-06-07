@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { FileSyncState, FolderOperationResult, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
@@ -9,9 +9,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
+import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
+const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
 type EmptyStateAction = 'create-file'
 
@@ -35,6 +37,7 @@ interface Props {
   selectedPathLocalOnly?: boolean
   selectedPathSyncState?: FileSyncState | 'none'
   nativeFindToken?: number
+  nativeSelectAllToken?: number
   branch: string
   isGitRepo?: boolean
   onNavigate: (path: string) => void
@@ -175,6 +178,7 @@ export default function ContentPanel({
   selectedPathLocalOnly = false,
   selectedPathSyncState = 'none',
   nativeFindToken = 0,
+  nativeSelectAllToken = 0,
   branch,
   isGitRepo = false,
   onNavigate,
@@ -206,7 +210,10 @@ export default function ContentPanel({
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
   const fileFindInputRef = useRef<HTMLInputElement | null>(null)
+  const panelRootRef = useRef<HTMLDivElement | null>(null)
+  const selectionRootRef = useRef<HTMLElement | null>(null)
   const previousNativeFindTokenRef = useRef(nativeFindToken)
+  const previousNativeSelectAllTokenRef = useRef(nativeSelectAllToken)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -296,6 +303,35 @@ export default function ContentPanel({
       fileFindInputRef.current?.focus()
     }, 0)
   }, [canSearchCurrentFile, mode, nativeFindToken])
+
+  useEffect(() => {
+    if (nativeSelectAllToken === previousNativeSelectAllTokenRef.current) return
+    previousNativeSelectAllTokenRef.current = nativeSelectAllToken
+    selectCurrentPanelContents()
+  }, [nativeSelectAllToken])
+
+  function selectCurrentPanelContents(): boolean {
+    return selectContentPanelScope(panelRootRef.current, selectionRootRef.current) !== 'unavailable'
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (!isSelectAllShortcut(event.nativeEvent)) return
+    if (!selectCurrentPanelContents()) return
+    event.preventDefault()
+  }
+
+  function setSelectionRoot(element: HTMLElement | null): void {
+    selectionRootRef.current = element
+  }
+
+  function panelProps(className = 'content-panel') {
+    return {
+      ref: panelRootRef,
+      className,
+      tabIndex: -1,
+      onKeyDown: handlePanelKeyDown,
+    }
+  }
 
   function confirmDiscardIfNeeded(): boolean {
     if (!dirty) return true
@@ -486,7 +522,7 @@ export default function ContentPanel({
     }
 
     return (
-      <div className="content-panel">
+      <div {...panelProps()}>
         {hasIntro ? (
           <div className="content-directory-intro">
             {emptyStateTitle ? <h2 className="content-directory-title">{emptyStateTitle}</h2> : null}
@@ -503,52 +539,53 @@ export default function ContentPanel({
           </div>
         ) : null}
 
-        <section className="content-directory-panel" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
-          <div className="content-directory-header">
-            <div>
-              <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
-              <div className="content-active-heading-row">
-                <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}</h2>
-                {showSelectedLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+        <div ref={setSelectionRoot} className="content-panel-selection-root">
+          <section className="content-directory-panel" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
+            <div className="content-directory-header">
+              <div>
+                <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
+                <div className="content-active-heading-row">
+                  <h2 className="content-directory-heading">{formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}</h2>
+                  {showSelectedLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+                </div>
               </div>
-            </div>
-            {canMutateFiles ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="panel-icon-button content-actions-trigger"
-                    aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}`}
-                  >
-                    <KebabIcon />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
-                    {path ? 'New file here' : 'New file'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
-                    {path ? 'New folder here' : 'New folder'}
-                  </DropdownMenuItem>
-                  {canDeleteCurrentFolder ? (
-                    <DropdownMenuItem
-                      className="dropdown-danger"
-                      onSelect={() => onDeleteFolder?.(path)}
+              {canMutateFiles ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="panel-icon-button content-actions-trigger"
+                      aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}`}
                     >
-                      Delete folder
+                      <KebabIcon />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
+                      {path ? 'New file here' : 'New file'}
                     </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
+                    <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
+                      {path ? 'New folder here' : 'New folder'}
+                    </DropdownMenuItem>
+                    {canDeleteCurrentFolder ? (
+                      <DropdownMenuItem
+                        className="dropdown-danger"
+                        onSelect={() => onDeleteFolder?.(path)}
+                      >
+                        Delete folder
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
 
-          {isDirectoryLoading ? (
-            <div className="content-skeleton" aria-label="loading content" />
-          ) : (
-            <>
-              {rows.length > 0 ? (
-                <div className="content-directory-table-wrap">
+            {isDirectoryLoading ? (
+              <div className="content-skeleton" aria-label="loading content" />
+            ) : (
+              <>
+                {rows.length > 0 ? (
+                  <div className="content-directory-table-wrap">
                   <table className="content-directory-table" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
                     <thead>
                       <tr>
@@ -604,19 +641,19 @@ export default function ContentPanel({
                       })}
                     </tbody>
                   </table>
-                </div>
-              ) : null}
-              {entries.length === 0 ? (
-                <div className="content-directory-empty">
-                  <p>{emptyMessage}</p>
-                </div>
-              ) : null}
-            </>
-          )}
-        </section>
+                  </div>
+                ) : null}
+                {entries.length === 0 ? (
+                  <div className="content-directory-empty">
+                    <p>{emptyMessage}</p>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
 
-        {directoryReadmePath ? (
-          <section className="content-readme-panel" aria-label="folder readme">
+          {directoryReadmePath ? (
+            <section className="content-readme-panel" aria-label="folder readme">
             <div className="content-directory-header">
               <div>
                 <p className="content-directory-kicker">README</p>
@@ -634,15 +671,16 @@ export default function ContentPanel({
                 <CodeViewer content={directoryReadme.content} language={directoryReadme.language} />
               </Suspense>
             ) : null}
-          </section>
-        ) : null}
+            </section>
+          ) : null}
+        </div>
       </div>
     )
   }
 
   if (mode === 'create') {
     return (
-      <div className="content-panel">
+      <div {...panelProps()}>
         <div className="content-toolbar">
           <button type="button" className="btn-raw" onClick={() => {
             if (!confirmDiscardIfNeeded()) return
@@ -653,21 +691,23 @@ export default function ContentPanel({
             Back to viewer
           </button>
         </div>
-        <NewFileDraft
-          path={draftPath}
-          content={draftContent}
-          busy={busy}
-          error={formError}
-          onPathChange={setDraftPath}
-          onContentChange={setDraftContent}
-          onSave={() => { void handleCreateFile() }}
-          onCancel={() => {
-            if (!confirmDiscardIfNeeded()) return
-            setMode('view')
-            setDraftContent('')
-            setDraftPath('')
-          }}
-        />
+        <div ref={setSelectionRoot} className="content-panel-selection-root">
+          <NewFileDraft
+            path={draftPath}
+            content={draftContent}
+            busy={busy}
+            error={formError}
+            onPathChange={setDraftPath}
+            onContentChange={setDraftContent}
+            onSave={() => { void handleCreateFile() }}
+            onCancel={() => {
+              if (!confirmDiscardIfNeeded()) return
+              setMode('view')
+              setDraftContent('')
+              setDraftPath('')
+            }}
+          />
+        </div>
       </div>
     )
   }
@@ -675,7 +715,7 @@ export default function ContentPanel({
   if (mode === 'create-folder') {
     const parentPath = selectedPathType === 'dir' ? selectedPath : ''
     return (
-      <div className="content-panel">
+      <div {...panelProps()}>
         <div className="content-toolbar">
           <button type="button" className="btn-raw" onClick={() => {
             if (!confirmDiscardIfNeeded()) return
@@ -686,7 +726,7 @@ export default function ContentPanel({
             Back to viewer
           </button>
         </div>
-        <section className="content-directory-panel" aria-label="create folder">
+        <section ref={setSelectionRoot} className="content-directory-panel" aria-label="create folder">
           <div className="content-directory-header">
             <div>
               <p className="content-directory-kicker">New folder</p>
@@ -727,8 +767,8 @@ export default function ContentPanel({
   if (!selectedPath) {
     if (isDirectoryLoading) {
       return (
-        <div className="content-panel">
-          <div className="content-skeleton" aria-label="loading content" />
+        <div {...panelProps()}>
+          <div ref={setSelectionRoot} className="content-skeleton" aria-label="loading content" />
         </div>
       )
     }
@@ -739,8 +779,8 @@ export default function ContentPanel({
   if (selectedPathType === 'dir') {
     if (isDirectoryError && showSelectedLocalOnly) {
       return (
-        <div className="content-panel">
-          <p style={{ color: '#cf222e' }}>This local-only folder is no longer available.</p>
+        <div {...panelProps()}>
+          <p ref={setSelectionRoot} style={{ color: '#cf222e' }}>This local-only folder is no longer available.</p>
         </div>
       )
     }
@@ -749,16 +789,16 @@ export default function ContentPanel({
 
   if (isLoading) {
     return (
-      <div className="content-panel">
-        <div className="content-skeleton" aria-label="loading content" />
+      <div {...panelProps()}>
+        <div ref={setSelectionRoot} className="content-skeleton" aria-label="loading content" />
       </div>
     )
   }
 
   if (isError || !data) {
     return (
-      <div className="content-panel">
-        <p style={{ color: '#cf222e' }}>
+      <div {...panelProps()}>
+        <p ref={setSelectionRoot} style={{ color: '#cf222e' }}>
           {showSelectedLocalOnly ? 'This local-only file is no longer available.' : 'Failed to load file.'}
         </p>
       </div>
@@ -777,7 +817,7 @@ export default function ContentPanel({
         : `${fileFindMatches.length} ${fileFindMatches.length === 1 ? 'match' : 'matches'} in this file.`
 
   return (
-    <div className={`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`}>
+    <div {...panelProps(`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`)}>
       <div className="content-active-context">
         <div>
           <p className="content-directory-kicker">File</p>
@@ -974,53 +1014,74 @@ export default function ContentPanel({
         </section>
       ) : null}
 
-      {mode === 'edit' ? (
-        <InlineFileEditor
-          path={selectedPath}
-          content={draftContent}
-          busy={busy}
-          error={formError}
-          onChange={setDraftContent}
-          onSave={() => { void handleSaveEdit() }}
-          onCancel={() => {
-            if (!confirmDiscardIfNeeded()) return
-            setDraftContent(data.content)
-            setMode('view')
-          }}
-        />
-      ) : mode === 'confirm-delete' ? (
-        <DeleteFileDialog
-          path={selectedPath}
-          name={selectedFileName}
-          location={selectedFileLocation}
-          confirmationName={fileDeleteConfirmationName}
-          busy={busy}
-          error={formError}
-          onConfirmationNameChange={setFileDeleteConfirmationName}
-          onConfirm={() => { void handleDeleteFile() }}
-          onCancel={() => {
-            setFormError('')
-            setFileDeleteConfirmationName('')
-            setMode('view')
-          }}
-        />
-      ) : data.type === 'binary' ? (
-        <p className="binary-placeholder">Binary file — preview not available.</p>
-      ) : data.type === 'image' ? (
-        <img
-          className="content-image"
-          src={`data:image/*;base64,${data.content}`}
-          alt={selectedPath}
-        />
-      ) : data.type === 'markdown' && !showRaw ? (
-        <Suspense fallback={loadingFallback}>
-          <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
-        </Suspense>
-      ) : (
-        <Suspense fallback={loadingFallback}>
-          <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
-        </Suspense>
-      )}
+      <div className="content-panel-selection-root">
+        {mode === 'edit' ? (
+          <div ref={setSelectionRoot}>
+            <InlineFileEditor
+              path={selectedPath}
+              content={draftContent}
+              busy={busy}
+              error={formError}
+              onChange={setDraftContent}
+              onSave={() => { void handleSaveEdit() }}
+              onCancel={() => {
+                if (!confirmDiscardIfNeeded()) return
+                setDraftContent(data.content)
+                setMode('view')
+              }}
+            />
+          </div>
+        ) : mode === 'confirm-delete' ? (
+          <div ref={setSelectionRoot}>
+            <DeleteFileDialog
+              path={selectedPath}
+              name={selectedFileName}
+              location={selectedFileLocation}
+              confirmationName={fileDeleteConfirmationName}
+              busy={busy}
+              error={formError}
+              onConfirmationNameChange={setFileDeleteConfirmationName}
+              onConfirm={() => { void handleDeleteFile() }}
+              onCancel={() => {
+                setFormError('')
+                setFileDeleteConfirmationName('')
+                setMode('view')
+              }}
+            />
+          </div>
+        ) : data.type === 'binary' ? (
+          <p ref={setSelectionRoot} className="binary-placeholder">Binary file — preview not available.</p>
+        ) : data.type === 'image' ? (
+          <img
+            ref={setSelectionRoot}
+            className="content-image"
+            src={`data:image/*;base64,${data.content}`}
+            alt={selectedPath}
+          />
+        ) : data.type === 'markdown' && !showRaw ? (
+          <>
+            <Suspense fallback={loadingFallback}>
+              <MarkdownShareActions
+                path={selectedPath}
+                content={data.content}
+                hasUnsavedChanges={dirty}
+                onStatusMessage={onStatusMessage}
+              />
+            </Suspense>
+            <div ref={setSelectionRoot} className="markdown-print-surface" data-markdown-title={selectedFileName || selectedPath}>
+              <Suspense fallback={loadingFallback}>
+                <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
+              </Suspense>
+            </div>
+          </>
+        ) : (
+          <div ref={setSelectionRoot}>
+            <Suspense fallback={loadingFallback}>
+              <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
+            </Suspense>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

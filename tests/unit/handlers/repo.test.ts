@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
 import { createApp } from '../../../src/server.js'
+import { writeStartupFolderPreference } from '../../../src/services/startup-preferences.js'
 
 const APP_VERSION = JSON.parse(
   readFileSync(new URL('../../../package.json', import.meta.url), 'utf-8'),
@@ -142,6 +143,90 @@ describe('infoHandler', () => {
       expect(body.rootEntryCount).toBe(0)
     } finally {
       rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('startup folder handlers', () => {
+  it('returns the resolved startup folder', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-home-'))
+    const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-remembered-'))
+    const prefPath = join(home, 'preference.json')
+    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
+    writeStartupFolderPreference(remembered, 'repo-open', prefPath)
+
+    try {
+      const app = createApp('')
+      const res = await app.fetch(new Request('http://localhost/api/startup-folder'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { path: string; source: string }
+      expect(body.path).toBe(realpathSync(remembered))
+      expect(body.source).toBe('last-used')
+    } finally {
+      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
+      rmSync(home, { recursive: true, force: true })
+      rmSync(remembered, { recursive: true, force: true })
+    }
+  })
+
+  it('updates the remembered startup folder', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-folder-'))
+    const prefPath = join(dir, 'preference.json')
+    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
+
+    try {
+      const app = createApp('')
+      const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: dir, source: 'repo-open' }),
+      }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { ok: boolean; path: string }
+      expect(body.ok).toBe(true)
+      expect(body.path).toBe(realpathSync(dir))
+      expect(existsSync(prefPath)).toBe(true)
+    } finally {
+      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects invalid startup folder JSON', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: '{bad-json',
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json() as { ok: boolean; message: string }
+    expect(body.ok).toBe(false)
+    expect(body.message).toBe('Invalid JSON body.')
+  })
+
+  it('rejects unavailable startup folder updates', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-missing-'))
+    const prefPath = join(dir, 'preference.json')
+    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
+
+    try {
+      const app = createApp('')
+      const missing = join(dir, 'missing')
+      const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: missing, source: 'picker-open' }),
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; path: string; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.path).toBe(missing)
+      expect(body.message).toMatch(/startup folder is not available/i)
+    } finally {
+      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
@@ -329,6 +414,11 @@ describe('gitIdentityUpdateHandler', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{bad-json',
+      }))).status).toBe(400)
+      expect((await repoApp.fetch(new Request('http://localhost/api/git/identity/ssh-key/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
       }))).status).toBe(400)
     } finally {
       repo.cleanup()
@@ -839,6 +929,29 @@ describe('commitChangesHandler', () => {
       expect(body.ok).toBe(false)
       expect(body.status).toBe('blocked')
       expect(body.message).toMatch(/no local changes/i)
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('rejects missing commit messages from an otherwise valid commit request', async () => {
+    const repo = makeGitRepo()
+
+    try {
+      writeFileSync(join(repo.dir, 'README.md'), '# default commit message')
+
+      const app = createApp(repo.dir)
+      const res = await app.fetch(new Request('http://localhost/api/git/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }))
+
+      expect(res.status).toBe(400)
+      const body = await res.json() as { ok: boolean; status: string; message: string }
+      expect(body.ok).toBe(false)
+      expect(body.status).toBe('blocked')
+      expect(body.message).toBe('Enter a commit message before committing changes.')
     } finally {
       repo.cleanup()
     }

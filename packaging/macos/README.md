@@ -36,3 +36,5 @@ packaging/macos/
 The release process builds the shared GitLocal server/UI assets, builds `GitLocal.app`, packages the app with its runtime assets, creates a versioned artifact, computes the artifact checksum, and updates the project-owned Homebrew tap cask.
 
 The app distribution should not rely on a user's global npm installation during normal launch.
+
+The packaged native app should expose the shared viewer's current local workflows through the macOS menu where applicable, including Refresh, focused editor Undo/Redo, panel-scoped Select All, and rendered Markdown print/share forwarding. These commands remain thin WebKit-to-React command bridges; repository browsing and Markdown output behavior stay in the shared app code.

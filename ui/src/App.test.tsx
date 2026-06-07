@@ -339,6 +339,19 @@ describe('App', () => {
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
   })
 
+  it('refreshes the current page without changing the selected file context', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+
+    expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+  })
+
   it('toggles the theme and persists the preference', async () => {
     renderWithClient()
 

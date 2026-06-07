@@ -797,6 +797,48 @@ describe('ContentPanel', () => {
     })
   })
 
+  it('shows Markdown-specific share actions only for rendered markdown files', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ type: 'markdown', language: '', content: '# Hello' }),
+    )
+
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('region', { name: /markdown output actions/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
+    expect(screen.getByText(/saved markdown content/i)).toBeInTheDocument()
+
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'notes.txt', type: 'text', content: 'plain' }))
+    rerender(
+      <QueryClientProvider client={makeClient()}>
+        <ContentPanel
+          canMutateFiles
+          refreshToken={0}
+          selectedPath="notes.txt"
+          selectedPathType="file"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('region', { name: /markdown output actions/i })).not.toBeInTheDocument()
+  })
+
   it('shows code viewer for text files and supports raw mode', async () => {
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'main.go', language: 'go', content: 'package main' }))
     const onRawChange = vi.fn()
@@ -929,6 +971,70 @@ describe('ContentPanel', () => {
 
     fireEvent.change(input, { target: { value: 'toolbar-only-text' } })
     expect(screen.getByText(/no matches for "toolbar-only-text" in this file/i)).toBeInTheDocument()
+  })
+
+  it('selects only current content panel text with platform select-all', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'notes.txt', language: 'text', content: 'panel-only-content' }),
+    )
+
+    renderWithClient(
+      <>
+        <header>Global app header</header>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          selectedPath="notes.txt"
+          selectedPathType="file"
+          branch="main"
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+        <aside>Repository sidebar</aside>
+      </>,
+    )
+
+    expect(await screen.findByText('panel-only-content')).toBeInTheDocument()
+    const panel = document.querySelector('.content-panel') as HTMLElement
+    panel.focus()
+
+    fireEvent.keyDown(panel, { key: 'a', metaKey: true })
+
+    const selection = document.getSelection()?.toString() ?? ''
+    expect(selection).toContain('panel-only-content')
+    expect(selection).not.toContain('Global app header')
+    expect(selection).not.toContain('Repository sidebar')
+    expect(selection).not.toContain('notes.txt')
+  })
+
+  it('preserves focused file-search field select-all behavior', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'notes.txt', language: 'text', content: 'panel-only-content' }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="notes.txt"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('panel-only-content')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /find in file/i }))
+    const input = await screen.findByRole('searchbox', { name: /find in file query/i })
+    fireEvent.change(input, { target: { value: 'panel' } })
+
+    fireEvent.keyDown(input, { key: 'a', metaKey: true })
+
+    expect(input).toHaveFocus()
+    expect((input as HTMLInputElement).selectionStart).toBe(0)
+    expect((input as HTMLInputElement).selectionEnd).toBe('panel'.length)
+    expect(document.getSelection()?.toString()).not.toContain('panel-only-content')
   })
 
   it('refetches visible file content when the refresh token changes', async () => {

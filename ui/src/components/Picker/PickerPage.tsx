@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
 import { writeViewerState } from '../../services/viewerState'
-import type { FolderBrowseEntry } from '../../types'
+import type { FolderBrowseEntry, StartupFolderSource } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { MetaTag } from '../ui/meta-tag'
 
@@ -64,14 +64,31 @@ export default function PickerPage() {
   const [canCreateChild, setCanCreateChild] = useState(false)
   const [canInitGit, setCanInitGit] = useState(false)
   const [canCloneIntoChild, setCanCloneIntoChild] = useState(false)
+  const [startupSource, setStartupSource] = useState<StartupFolderSource | ''>('')
+  const [startupFallbackReason, setStartupFallbackReason] = useState('')
 
   const currentLabel = useMemo(() => currentPath || 'Choose a folder to begin', [currentPath])
   const hasFolderActions = canCreateChild || canInitGit || canCloneIntoChild || canOpen
+  const startupMessage = useMemo(() => {
+    if (!startupSource) return ''
+    if (startupSource === 'last-used') return 'GitLocal reopened your last used folder.'
+    if (startupSource === 'platform-default') return 'GitLocal started from your Documents folder.'
+    if (startupSource === 'home-fallback') return startupFallbackReason || 'GitLocal started from your home folder.'
+    return ''
+  }, [startupFallbackReason, startupSource])
 
   async function loadPath(nextPath?: string) {
     setBrowseLoading(true)
     setError('')
     try {
+      if (!nextPath) {
+        const startup = await api.getStartupFolder().catch(() => null)
+        setStartupSource(startup?.source ?? '')
+        setStartupFallbackReason(startup?.fallbackReason ?? '')
+      } else {
+        setStartupSource('')
+        setStartupFallbackReason('')
+      }
       const result = await api.getFolderBrowse(nextPath)
       setCurrentPath(result.currentPath)
       setParentPath(result.parentPath)
@@ -324,6 +341,7 @@ export default function PickerPage() {
             <p>
               Browse your machine, select a folder, and open it in GitLocal. Git repositories include branch, remote, and identity details.
             </p>
+            {startupMessage ? <p className="picker-helper">{startupMessage}</p> : null}
           </section>
 
           <section className="picker-browser">
@@ -431,7 +449,7 @@ export default function PickerPage() {
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
-              placeholder="/Users/you/projects"
+              placeholder="Enter a local folder path"
               aria-label="folder path"
               className="picker-input"
             />

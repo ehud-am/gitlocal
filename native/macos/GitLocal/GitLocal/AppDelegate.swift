@@ -49,6 +49,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
+        let undoItem = NSMenuItem(
+            title: "Undo",
+            action: #selector(ViewerWindowController.undoEdit(_:)),
+            keyEquivalent: "z"
+        )
+        undoItem.target = controller
+        editMenu.addItem(undoItem)
+        let redoItem = NSMenuItem(
+            title: "Redo",
+            action: #selector(ViewerWindowController.redoEdit(_:)),
+            keyEquivalent: "Z"
+        )
+        redoItem.target = controller
+        editMenu.addItem(redoItem)
+        editMenu.addItem(NSMenuItem.separator())
         editMenu.addItem(
             NSMenuItem(
                 title: "Cut",
@@ -70,6 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 keyEquivalent: "v"
             )
         )
+        let selectAllItem = NSMenuItem(
+            title: "Select All",
+            action: #selector(ViewerWindowController.selectAllInPanel(_:)),
+            keyEquivalent: "a"
+        )
+        selectAllItem.target = controller
+        editMenu.addItem(selectAllItem)
         editMenu.addItem(NSMenuItem.separator())
         let findItem = NSMenuItem(
             title: "Find",
@@ -90,6 +112,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         refreshItem.target = controller
         viewMenu.addItem(refreshItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        let printMarkdownItem = NSMenuItem(
+            title: "Print Rendered Markdown",
+            action: #selector(ViewerWindowController.printMarkdown(_:)),
+            keyEquivalent: "p"
+        )
+        printMarkdownItem.target = controller
+        viewMenu.addItem(printMarkdownItem)
+        let shareMarkdownItem = NSMenuItem(
+            title: "Share Markdown",
+            action: #selector(ViewerWindowController.shareMarkdown(_:)),
+            keyEquivalent: ""
+        )
+        shareMarkdownItem.target = controller
+        viewMenu.addItem(shareMarkdownItem)
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 

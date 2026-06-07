@@ -73,7 +73,23 @@ export interface GitIdentityUpdateResponse {
 export type SearchPresentation = 'collapsed' | 'expanded'
 export type SearchMode = 'name' | 'content' | 'both'
 export type ViewerPathType = 'file' | 'dir' | 'none'
-export type NativeAppCommand = 'find' | 'refresh'
+export type MarkdownShareAction =
+  | 'print'
+  | 'save-pdf'
+  | 'email'
+  | 'slack'
+  | 'system-share'
+  | 'copy-rendered'
+  | 'download-artifact'
+
+export type NativeAppCommand =
+  | 'find'
+  | 'refresh'
+  | 'undo'
+  | 'redo'
+  | 'select-all-panel'
+  | 'print-markdown'
+  | 'share-markdown'
 export interface NativeAppCommandEvent extends CustomEvent<{ command: NativeAppCommand }> {
   type: 'gitlocal:native-command'
 }
@@ -300,6 +316,30 @@ export interface LocalActionResponse {
   openMode?: LocalOpenMode
   repositoryRootPath?: string
   message?: string
+}
+
+export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
+export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
+
+export interface StartupFolderResponse {
+  path: string
+  source: StartupFolderSource
+  exists: boolean
+  readable: boolean
+  platformDefaultPath: string
+  lastUsedPath: string
+  fallbackReason: string
+}
+
+export interface StartupFolderUpdateRequest {
+  path: string
+  source: StartupFolderUpdateSource
+}
+
+export interface StartupFolderUpdateResponse {
+  ok: boolean
+  path: string
+  message: string
 }
 
 export interface FolderCreateChildRequest {

@@ -15,6 +15,8 @@ import {
   remoteSyncHandler,
   repositoryOpenHandler,
   repositoryParentFolderHandler,
+  startupFolderHandler,
+  startupFolderUpdateHandler,
 } from './handlers/repo.js'
 import {
   treeHandler,
@@ -100,6 +102,8 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
 
   // API routes
   app.get('/api/info', infoHandler)
+  app.get('/api/startup-folder', startupFolderHandler)
+  app.put('/api/startup-folder', startupFolderUpdateHandler)
   app.get('/api/branches', branchesHandler)
   app.post('/api/branches/switch', branchSwitchHandler)
   app.post('/api/git/commit', commitChangesHandler)
