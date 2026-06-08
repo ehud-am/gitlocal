@@ -73,11 +73,10 @@ export interface GitIdentityUpdateResponse {
 export type SearchPresentation = 'collapsed' | 'expanded'
 export type SearchMode = 'name' | 'content' | 'both'
 export type ViewerPathType = 'file' | 'dir' | 'none'
+export type CopyRepresentation = 'raw' | 'rendered'
+export type RenderedPdfOutputState = 'idle' | 'preparing' | 'ready' | 'saving' | 'saved' | 'failed'
 export type MarkdownShareAction =
-  | 'print'
   | 'save-pdf'
-  | 'email'
-  | 'slack'
   | 'system-share'
   | 'copy-rendered'
   | 'download-artifact'

@@ -222,6 +222,27 @@ describe('folder and repository open handlers', () => {
     }
   })
 
+  it('opens a symlinked git repository as the canonical repository root', async () => {
+    const linkPath = `${validDir}-link`
+    try {
+      symlinkSync(validDir, linkPath)
+      const app = createApp('')
+      const client = testClient(app)
+      const res = await client.api.repo.open.$post({ json: { path: linkPath } })
+      const body = await res.json()
+
+      expect(body.ok).toBe(true)
+      expect(body.rootPath).toBe(realpathSync(validDir))
+      expect(body.path).toBe(realpathSync(validDir))
+      expect(body.gitState).toBe('repository-root')
+      expect(body.openMode).toBe('repository')
+      expect(body.repositoryRootPath).toBe(realpathSync(validDir))
+      expect(getRepoPath()).toBe(realpathSync(validDir))
+    } finally {
+      rmSync(linkPath, { recursive: true, force: true })
+    }
+  })
+
   it('returns ok:false when path field is missing', async () => {
     const app = createApp('')
     const client = testClient(app)

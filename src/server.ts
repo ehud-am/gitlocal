@@ -66,7 +66,7 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
     const cwd = process.cwd()
     const cwdClassification = classifyLocalPath(cwd)
     if (options.detectCurrentRepoOnEmptyPath && cwdClassification.gitState === 'repository-root') {
-      currentRepoPath = cwdClassification.canonicalPath
+      currentRepoPath = cwdClassification.repositoryRootPath!
       currentPickerPath = ''
       return
     }
@@ -79,7 +79,7 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
   const resolvedPath = resolve(initialPath)
   const classification = classifyLocalPath(resolvedPath)
   if (classification.gitState === 'repository-root') {
-    currentRepoPath = classification.canonicalPath
+    currentRepoPath = classification.repositoryRootPath!
     currentPickerPath = ''
     return
   }

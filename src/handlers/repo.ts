@@ -143,7 +143,9 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
     return c.json(res)
   }
 
-  const rootPath = resolvedInputPath
+  const rootPath = classification.gitState === 'repository-root'
+    ? classification.repositoryRootPath!
+    : resolvedInputPath
   setRepoPath(rootPath)
   setPickerPath('')
   rememberStartupFolder(rootPath, 'repo-open')

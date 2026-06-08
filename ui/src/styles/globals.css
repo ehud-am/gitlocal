@@ -352,6 +352,12 @@ pre {
   gap: 0.5rem;
 }
 
+.text-file-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
 .markdown-share-note {
   margin: 0.5rem 0 0;
   color: var(--muted-foreground);
@@ -574,6 +580,28 @@ pre {
 .search-dismiss,
 .copy-button {
   padding: 0.5rem;
+}
+
+.copy-button-labeled {
+  padding: 0.5rem 0.8rem;
+}
+
+.copy-button-label {
+  line-height: 1;
+}
+
+.toolbar-icon {
+  flex: 0 0 auto;
+}
+
+.toolbar-icon.is-spinning {
+  animation: gitlocal-spin 0.9s linear infinite;
+}
+
+@keyframes gitlocal-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-trigger-button:hover,

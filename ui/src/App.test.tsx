@@ -352,6 +352,13 @@ describe('App', () => {
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
   })
 
+  it('shows an icon on the Refresh control', async () => {
+    renderWithClient()
+
+    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
+    expect(refresh.querySelector('svg')).toBeInTheDocument()
+  })
+
   it('toggles the theme and persists the preference', async () => {
     renderWithClient()
 
@@ -362,6 +369,13 @@ describe('App', () => {
       expect(setItem).toHaveBeenCalledWith('gitlocal-theme', 'dark')
     })
     expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('shows an icon on the Light/Dark Theme control', async () => {
+    renderWithClient()
+
+    const toggle = await screen.findByRole('switch', { name: /toggle dark theme/i })
+    expect(toggle.closest('label')?.querySelector('svg')).toBeInTheDocument()
   })
 
   it('updates the repository-local git identity from the header dialog', async () => {
@@ -481,6 +495,15 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
     expect(await screen.findByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
+  })
+
+  it('shows an icon on the Find in File control', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+
+    renderWithClient()
+
+    const find = await screen.findByRole('button', { name: /find in file/i })
+    expect(find.querySelector('svg')).toBeInTheDocument()
   })
 
   it('runs repository search only after explicit submit and uses the default combined mode', async () => {
