@@ -4,9 +4,10 @@ interface Props {
   getText: () => string
   className?: string
   label?: string
+  visibleLabel?: boolean
 }
 
-export default function CopyButton({ getText, className = 'copy-button', label = 'Copy' }: Props) {
+export default function CopyButton({ getText, className = 'copy-button', label = 'Copy', visibleLabel = false }: Props) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   async function handleCopy() {
@@ -20,7 +21,10 @@ export default function CopyButton({ getText, className = 'copy-button', label =
     }
   }
 
-  const text = status === 'copied' ? `Copied ${label.toLowerCase()}` : status === 'failed' ? `Retry ${label.toLowerCase()}` : label
+  const statusSubject = label.replace(/^copy\s*/i, '').trim().toLowerCase()
+  const copiedText = statusSubject ? `Copied ${statusSubject}` : 'Copied'
+  const retryText = statusSubject ? `Retry copy ${statusSubject}` : 'Retry Copy'
+  const text = status === 'copied' ? copiedText : status === 'failed' ? retryText : label
 
   return (
     <button
@@ -52,7 +56,7 @@ export default function CopyButton({ getText, className = 'copy-button', label =
           strokeLinecap="round"
         />
       </svg>
-      <span className="sr-only">{text}</span>
+      <span className={visibleLabel ? 'copy-button-label' : 'sr-only'}>{text}</span>
     </button>
   )
 }

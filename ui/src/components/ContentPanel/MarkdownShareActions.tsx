@@ -4,8 +4,8 @@ import type { NativeAppCommandEvent } from '../../types'
 import { Button } from '../ui/button'
 import {
   buildMarkdownOutputDetails,
-  type MarkdownOutputDetails,
 } from './markdown-output'
+import CopyButton from './CopyButton'
 
 interface Props {
   path: string
@@ -36,22 +36,10 @@ async function copyText(content: string): Promise<boolean> {
   return true
 }
 
-function buildMailto(details: MarkdownOutputDetails): string {
-  const subject = encodeURIComponent(details.title)
-  const body = encodeURIComponent(`${details.plainText}\n\nSource: ${details.sourcePath}`)
-  return `mailto:?subject=${subject}&body=${body}`
-}
-
 function actionLabel(action: MarkdownShareAction): string {
   switch (action) {
-    case 'print':
-      return 'Print'
     case 'save-pdf':
       return 'Save PDF'
-    case 'email':
-      return 'Email'
-    case 'slack':
-      return 'Slack'
     case 'system-share':
       return 'Share'
     case 'copy-rendered':
@@ -59,6 +47,27 @@ function actionLabel(action: MarkdownShareAction): string {
     case 'download-artifact':
       return 'Download'
   }
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M6.25 5.25l3.5-2.1M6.25 10.75l3.5 2.1" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="4" cy="8" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12" cy="2.75" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12" cy="13.25" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+function PdfIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M4 1.75h5.25L12 4.5v9.75H4z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M9.25 1.75V4.5H12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M5.75 10.75h4.5M5.75 8.25h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 export default function MarkdownShareActions({
@@ -77,7 +86,7 @@ export default function MarkdownShareActions({
       const command = (event as NativeAppCommandEvent).detail?.command
       if (command === 'print-markdown') {
         event.preventDefault()
-        void handleAction('print')
+        void handleAction('save-pdf')
       }
       if (command === 'share-markdown') {
         event.preventDefault()
@@ -91,18 +100,23 @@ export default function MarkdownShareActions({
 
   async function handleAction(action: MarkdownShareAction): Promise<void> {
     switch (action) {
-      case 'print':
       case 'save-pdf':
-        onStatusMessage?.(action === 'print'
-          ? 'Opening print for rendered Markdown.'
-          : 'Opening print. Choose Save as PDF in the print dialog.')
-        window.setTimeout(() => window.print(), 0)
+        try {
+          const pdfWindow = window.open('', '_blank')
+          if (!pdfWindow) {
+            onStatusMessage?.('Save PDF could not open a printable document in this browser.')
+            return
+          }
+          pdfWindow.document.open()
+          pdfWindow.document.write(details.pdfHtml)
+          pdfWindow.document.close()
+          pdfWindow.focus()
+          pdfWindow.setTimeout(() => pdfWindow.print(), 0)
+          onStatusMessage?.('Opened rendered content for Save PDF.')
+        } catch {
+          onStatusMessage?.('Save PDF could not be started in this browser.')
+        }
         return
-      case 'email':
-        window.location.href = buildMailto(details)
-        onStatusMessage?.('Prepared an email with the rendered Markdown text.')
-        return
-      case 'slack':
       case 'system-share':
         if (canUseNavigatorShare()) {
           try {
@@ -140,24 +154,15 @@ export default function MarkdownShareActions({
   return (
     <section className="markdown-share-actions" aria-label="Markdown output actions">
       <div className="markdown-share-actions-row">
-        <Button type="button" size="sm" onClick={() => { void handleAction('print') }}>
-          Print
-        </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('save-pdf') }}>
+          <PdfIcon />
           Save PDF
         </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('email') }}>
-          Email
-        </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('slack') }}>
-          Slack
-        </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('system-share') }}>
+          <ShareIcon />
           Share
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => { void handleAction('copy-rendered') }}>
-          Copy
-        </Button>
+        <CopyButton getText={() => details.plainText} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
       </div>
       <p className="markdown-share-note">{contentNotice}</p>
     </section>

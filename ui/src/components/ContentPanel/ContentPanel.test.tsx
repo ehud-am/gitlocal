@@ -815,7 +815,10 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByRole('region', { name: /markdown output actions/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
     expect(screen.getByText(/saved markdown content/i)).toBeInTheDocument()
 
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'notes.txt', type: 'text', content: 'plain' }))
@@ -837,6 +840,33 @@ describe('ContentPanel', () => {
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
     })
     expect(screen.queryByRole('region', { name: /markdown output actions/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a visible Copy button for raw text files and copies source content', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'notes.txt', type: 'text', content: 'plain source' }))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="notes.txt"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await screen.findByTestId('code-viewer')
+    const actions = screen.getByRole('group', { name: /text file actions/i })
+    fireEvent.click(within(actions).getByRole('button', { name: 'Copy' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('plain source'))
   })
 
   it('shows code viewer for text files and supports raw mode', async () => {

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.6 - 2026-06-08
+
+- Fixed patch regressions in the file action surface: Copy is now a visible icon-and-label button for text views, unsupported Email/Slack/Print actions were removed, Share has an icon, and Save PDF opens a clean rendered document for local PDF saving.
+- Hardened git folder recognition by preserving the canonical repository root when repositories are opened through path aliases such as symlinks.
+- Added icons to Refresh, Find in file, and Light/Dark theme controls without changing their existing behavior.
+
 ## 0.9.5 - 2026-06-07
 
 - Added rendered Markdown output actions for printing, Save as PDF through print/save-to-PDF, email, Slack/system sharing, copy, and download fallbacks.

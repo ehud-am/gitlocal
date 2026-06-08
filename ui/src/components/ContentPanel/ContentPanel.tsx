@@ -10,12 +10,22 @@ import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
+import CopyButton from './CopyButton'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
 type EmptyStateAction = 'create-file'
+
+function FindIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <circle cx="7" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 10l3 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 interface FileMutationEvent {
   result: ManualFileOperationResult
@@ -842,6 +852,7 @@ export default function ContentPanel({
                 }}
                 aria-pressed={fileFindOpen}
               >
+                <FindIcon />
                 Find in file
               </Button>
             ) : null}
@@ -1076,6 +1087,9 @@ export default function ContentPanel({
           </>
         ) : (
           <div ref={setSelectionRoot}>
+            <div className="text-file-actions" role="group" aria-label="text file actions">
+              <CopyButton getText={() => data.content} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
+            </div>
             <Suspense fallback={loadingFallback}>
               <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
             </Suspense>

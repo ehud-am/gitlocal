@@ -22,47 +22,47 @@ describe('MarkdownShareActions', () => {
     vi.restoreAllMocks()
   })
 
-  it('prints rendered Markdown through the browser print flow', async () => {
-    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+  function mockPdfWindow() {
     const onStatusMessage = vi.fn()
+    const print = vi.fn()
+    const write = vi.fn()
+    const pdfWindow = {
+      document: {
+        open: vi.fn(),
+        write,
+        close: vi.fn(),
+      },
+      focus: vi.fn(),
+      print,
+      setTimeout: (callback: () => void) => {
+        callback()
+        return 1
+      },
+    } as unknown as Window
+    vi.spyOn(window, 'open').mockReturnValue(pdfWindow)
 
+    return { onStatusMessage, print, write }
+  }
+
+  it('renders only supported Markdown actions', () => {
     render(
       <MarkdownShareActions
         path="docs/release.md"
         content={fixtureMarkdown}
         hasUnsavedChanges={false}
-        onStatusMessage={onStatusMessage}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Print' }))
-
-    await waitFor(() => expect(print).toHaveBeenCalled())
-    expect(onStatusMessage).toHaveBeenCalledWith('Opening print for rendered Markdown.')
+    expect(screen.queryByRole('button', { name: 'Print' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Slack' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
   })
 
-  it('prints rendered Markdown when the native command bridge requests it', async () => {
-    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
-    const onStatusMessage = vi.fn()
-
-    render(
-      <MarkdownShareActions
-        path="docs/release.md"
-        content={fixtureMarkdown}
-        hasUnsavedChanges={false}
-        onStatusMessage={onStatusMessage}
-      />,
-    )
-
-    window.dispatchEvent(new CustomEvent('gitlocal:native-command', { detail: { command: 'print-markdown' } }))
-
-    await waitFor(() => expect(print).toHaveBeenCalled())
-    expect(onStatusMessage).toHaveBeenCalledWith('Opening print for rendered Markdown.')
-  })
-
-  it('routes Save PDF through print with explicit PDF guidance', async () => {
-    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
-    const onStatusMessage = vi.fn()
+  it('opens rendered Markdown for Save PDF', async () => {
+    const { onStatusMessage, print, write } = mockPdfWindow()
 
     render(
       <MarkdownShareActions
@@ -76,10 +76,48 @@ describe('MarkdownShareActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save PDF' }))
 
     await waitFor(() => expect(print).toHaveBeenCalled())
-    expect(onStatusMessage).toHaveBeenCalledWith('Opening print. Choose Save as PDF in the print dialog.')
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('Release Notes'))
+    expect(write).toHaveBeenCalledWith(expect.not.stringContaining('app-header'))
+    expect(onStatusMessage).toHaveBeenCalledWith('Opened rendered content for Save PDF.')
   })
 
-  it('uses system share when available for Slack and Share actions', async () => {
+  it('opens rendered Markdown for Save PDF when the native print command bridge requests it', async () => {
+    const { onStatusMessage, print } = mockPdfWindow()
+
+    render(
+      <MarkdownShareActions
+        path="docs/release.md"
+        content={fixtureMarkdown}
+        hasUnsavedChanges={false}
+        onStatusMessage={onStatusMessage}
+      />,
+    )
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', { detail: { command: 'print-markdown' } }))
+
+    await waitFor(() => expect(print).toHaveBeenCalled())
+    expect(onStatusMessage).toHaveBeenCalledWith('Opened rendered content for Save PDF.')
+  })
+
+  it('reports when Save PDF cannot open a printable document', async () => {
+    vi.spyOn(window, 'open').mockReturnValue(null)
+    const onStatusMessage = vi.fn()
+
+    render(
+      <MarkdownShareActions
+        path="docs/release.md"
+        content={fixtureMarkdown}
+        hasUnsavedChanges={false}
+        onStatusMessage={onStatusMessage}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save PDF' }))
+
+    await waitFor(() => expect(onStatusMessage).toHaveBeenCalledWith('Save PDF could not open a printable document in this browser.'))
+  })
+
+  it('uses system share when available for Share actions', async () => {
     const share = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'share', { value: share, configurable: true })
     const onStatusMessage = vi.fn()
@@ -93,7 +131,7 @@ describe('MarkdownShareActions', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Slack' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
 
     await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Release Notes',
@@ -124,6 +162,26 @@ describe('MarkdownShareActions', () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Release Notes')))
     expect(onStatusMessage).toHaveBeenCalledWith('Share is not directly available, so GitLocal copied the rendered Markdown text.')
+  })
+
+  it('copies rendered Markdown from the visible Copy button', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    render(
+      <MarkdownShareActions
+        path="docs/release.md"
+        content={fixtureMarkdown}
+        hasUnsavedChanges={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Release Notes')))
   })
 
   it('shares rendered Markdown when the native command bridge requests it', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -70,6 +70,41 @@ describe('infoHandler', () => {
     expect(body.version).toBe(APP_VERSION.version)
     expect(body.hasCommits).toBe(true)
     expect(body.rootEntryCount).toBeGreaterThan(0)
+  })
+
+  it('returns repo metadata for a symlinked repository root using the canonical git root', async () => {
+    const linkPath = `${dir}-link`
+    try {
+      symlinkSync(dir, linkPath)
+      const app = createApp(linkPath)
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+      const body = await res.json()
+
+      expect(body.path).toBe(realpathSync(dir))
+      expect(body.isGitRepo).toBe(true)
+      expect(body.pickerMode).toBe(false)
+      expect(body.currentBranch).toBeTruthy()
+    } finally {
+      rmSync(linkPath, { recursive: true, force: true })
+    }
+  })
+
+  it('detects the current working directory as a repository when empty startup path detection is enabled', async () => {
+    const previousCwd = process.cwd()
+    process.chdir(dir)
+    try {
+      const app = createApp('', { detectCurrentRepoOnEmptyPath: true })
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+      const body = await res.json()
+
+      expect(body.path).toBe(realpathSync(dir))
+      expect(body.isGitRepo).toBe(true)
+      expect(body.pickerMode).toBe(false)
+    } finally {
+      process.chdir(previousCwd)
+    }
   })
 
   it('returns folder metadata for a plain folder root', async () => {
