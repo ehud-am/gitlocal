@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.7 - 2026-06-09
+
+- Fixed the README logo so it renders reliably from the hosted project README while staying backed by a committed repository asset.
+- Moved rendered Markdown share actions into the same toolbar row as Find in file, removing the dedicated sharing row and reclaiming vertical reading space.
+- Removed the redundant "Sharing uses the saved Markdown content." helper text while preserving existing Save PDF, Share, and Copy behavior.
+
 ## 0.9.6 - 2026-06-08
 
 - Fixed patch regressions in the file action surface: Copy is now a visible icon-and-label button for text views, unsupported Email/Slack/Print actions were removed, Share has an icon, and Save PDF opens a clean rendered document for local PDF saving.
