@@ -814,12 +814,15 @@ describe('ContentPanel', () => {
       />,
     )
 
-    expect(await screen.findByRole('region', { name: /markdown output actions/i })).toBeInTheDocument()
+    const findButton = await screen.findByRole('button', { name: /find in file/i })
+    const toolbar = findButton.parentElement
+    expect(toolbar).not.toBeNull()
+    expect(await within(toolbar as HTMLElement).findByRole('group', { name: /markdown output actions/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Print' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
-    expect(screen.getByText(/saved markdown content/i)).toBeInTheDocument()
+    expect(screen.queryByText(/saved markdown content/i)).not.toBeInTheDocument()
 
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'notes.txt', type: 'text', content: 'plain' }))
     rerender(
@@ -839,7 +842,7 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
     })
-    expect(screen.queryByRole('region', { name: /markdown output actions/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /markdown output actions/i })).not.toBeInTheDocument()
   })
 
   it('shows a visible Copy button for raw text files and copies source content', async () => {

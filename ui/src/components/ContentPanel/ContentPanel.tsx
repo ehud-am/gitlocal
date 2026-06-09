@@ -825,6 +825,7 @@ export default function ContentPanel({
       : fileFindMatches.length === 0
         ? `No matches for "${trimmedFileFindQuery}" in this file.`
         : `${fileFindMatches.length} ${fileFindMatches.length === 1 ? 'match' : 'matches'} in this file.`
+  const showMarkdownShareActions = mode === 'view' && data.type === 'markdown' && !showRaw
 
   return (
     <div {...panelProps(`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`)}>
@@ -855,6 +856,17 @@ export default function ContentPanel({
                 <FindIcon />
                 Find in file
               </Button>
+            ) : null}
+            {showMarkdownShareActions ? (
+              <Suspense fallback={loadingFallback}>
+                <MarkdownShareActions
+                  path={selectedPath}
+                  content={data.content}
+                  hasUnsavedChanges={dirty}
+                  inline
+                  onStatusMessage={onStatusMessage}
+                />
+              </Suspense>
             ) : null}
             {hasFileActions ? (
               <DropdownMenu>
@@ -1070,21 +1082,11 @@ export default function ContentPanel({
             alt={selectedPath}
           />
         ) : data.type === 'markdown' && !showRaw ? (
-          <>
+          <div ref={setSelectionRoot} className="markdown-print-surface" data-markdown-title={selectedFileName || selectedPath}>
             <Suspense fallback={loadingFallback}>
-              <MarkdownShareActions
-                path={selectedPath}
-                content={data.content}
-                hasUnsavedChanges={dirty}
-                onStatusMessage={onStatusMessage}
-              />
+              <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
             </Suspense>
-            <div ref={setSelectionRoot} className="markdown-print-surface" data-markdown-title={selectedFileName || selectedPath}>
-              <Suspense fallback={loadingFallback}>
-                <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
-              </Suspense>
-            </div>
-          </>
+          </div>
         ) : (
           <div ref={setSelectionRoot}>
             <div className="text-file-actions" role="group" aria-label="text file actions">

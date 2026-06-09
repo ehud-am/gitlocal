@@ -33,13 +33,13 @@ describe('npm package contents', () => {
     expect(npmReadme).not.toContain('brew install --cask gitlocal')
   })
 
-  it('keeps the GitHub README branded and explicit about unsigned macOS alpha builds', () => {
+  it('keeps the GitHub README branded and explicit about unsigned macOS beta builds', () => {
     const root = resolve(new URL('../..', import.meta.url).pathname)
     const githubReadme = readFileSync(resolve(root, 'README.md'), 'utf-8')
 
     expect(githubReadme).toContain('ui/public/gitlocal-logo.svg')
-    expect(githubReadme).toContain('alpha native distribution and is not signed or notarized')
+    expect(githubReadme).toContain('current Mac app is not signed or notarized')
     expect(githubReadme).toContain('xattr -dr com.apple.quarantine /Applications/GitLocal.app')
-    expect(githubReadme).toContain('Save repository-local `user.name`, `user.email`')
+    expect(githubReadme).toContain('repo-local `user.name`, `user.email`')
   })
 })

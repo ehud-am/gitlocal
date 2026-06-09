@@ -1,7 +1,7 @@
 # GitLocal
 
 <p align="center">
-  <img src="ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
+  <img src="https://raw.githubusercontent.com/ehud-am/gitlocal/main/ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
 </p>
 
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
@@ -19,70 +19,120 @@ Everything runs locally, there are no accounts or telemetry, and any clone, fetc
 
 ## Requirements
 
-| Dependency | Version |
-|-----------|---------|
-| Node.js | 22+ |
-| git | 2.22+ |
+| Dependency | npm package | macOS app |
+|-----------|-------------|-----------|
+| Node.js | 22+ | Bundled in the app |
+| git | 2.22+ | 2.22+ |
 
 ---
 
-## Install
+## Choose an Install
 
-GitLocal has two distributions that run the same app code.
+GitLocal has two ways to install the same product. The npm package is the mature cross-platform option. The macOS app is newer, easier to launch on a Mac, and currently unsigned.
 
-Measured on this branch, **90.7% of the implementation is shared** between the npm and macOS native distributions: 10,187 lines of shared app code in `src/` and `ui/src/`, compared with 1,040 macOS-distribution-specific lines in the Swift wrapper, Xcode/plist config, cask/package scripts, and release workflows. This excludes tests, docs, and generated build outputs.
+| Option | Best for | What you get | Tradeoff |
+|--------|----------|--------------|----------|
+| npm package | macOS, Windows, and Linux users who are comfortable with a terminal | One-command install, opens in your browser, mature distribution | The terminal process must stay open while GitLocal is running |
+| macOS app beta | Mac users who want GitLocal to behave like an app | Homebrew install, opens as `GitLocal.app`, no terminal needed after install | Unsigned beta app, so macOS shows security warnings on first launch |
 
-Choose the workflow that fits how you want to use GitLocal:
+Both options use the same GitLocal server and React viewer for a given release. The Mac app is a native wrapper around the same local app code, not a separate fork.
 
-### NPM package
+### Option 1: npm Package
 
 ```bash
 npm install -g gitlocal
 ```
 
-This is the simple cross-platform distribution for any system that supports Node.js and JavaScript. It installs with one command and opens GitLocal in your browser.
+Open a folder or repository:
 
-Tradeoff: it is not a native app. The terminal process that starts GitLocal must stay open while you use it.
+```bash
+gitlocal .
+```
 
-### macOS native app
+GitLocal starts a local server, opens your default browser, and prints the local URL:
 
-Mac users can install the native app distribution from the project tap when a macOS app artifact is published:
+```text
+gitlocal listening on http://localhost:54321
+```
+
+Keep that terminal window open while you use GitLocal. Press **Ctrl+C** when you want to stop it.
+
+You can also run GitLocal without installing it globally:
+
+```bash
+npx gitlocal
+```
+
+### Option 2: macOS App Beta
+
+Install with Homebrew:
 
 ```bash
 brew tap ehud-am/gitlocal
 brew install --cask gitlocal
 ```
 
-**Alpha and unsigned app notice:** `GitLocal.app` is currently an alpha native distribution and is not signed or notarized. macOS will show Apple security warning messages on first launch. To approve the unsigned app after installing it, run:
+Then open `GitLocal.app` from your Applications folder.
+
+The macOS app starts the same local GitLocal service in the background for the app session, shows the viewer in an embedded WebKit window, and stops the service when the app quits. You do not need to keep a terminal open.
+
+**Unsigned beta notice:** the current Mac app is not signed or notarized with an Apple Developer ID. macOS will show security warnings the first time you open it. After installing, approve the app with:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/GitLocal.app
 ```
 
-Then open `GitLocal.app` normally.
+Then open `GitLocal.app` normally. Future signed releases should remove this extra step.
 
-The Homebrew cask installs `GitLocal.app`, which runs as a native Mac app with an embedded WebKit browser. It uses the same GitLocal server and React viewer as the npm package, starts the local service for the app session, and does not require `npm install -g gitlocal` for normal app launch.
-
-Upgrade the native app through Homebrew:
+Upgrade the app:
 
 ```bash
 brew update
 brew upgrade --cask gitlocal
 ```
 
-Uninstall:
+Uninstall the app:
 
 ```bash
 brew uninstall --cask gitlocal
 ```
 
-### Run without installing
+### Which One Should I Use?
 
-```bash
-npx gitlocal
-```
+Use the npm package if you want the most mature and portable install path, especially on Windows or Linux.
 
-### From source
+Use the macOS app beta if you are on a Mac and want a normal app experience without a running terminal. It is aligned with the npm version, but the first-launch security warnings are expected until the app is signed and notarized.
+
+---
+
+## What GitLocal Helps With
+
+- **Browse local projects** with a lazy-loading file tree for regular folders and git repositories.
+- **Read Markdown clearly** with GitHub-like rendering for READMEs, specs, plans, tables, task lists, and code blocks.
+- **Review code with context** using line numbers, branch information, local path, remote details, and file sync state.
+- **Search intentionally** with repository search from the header and file-level find inside the current file.
+- **Make small edits** by creating, updating, and deleting files directly from the viewer.
+- **Manage folders** by creating child folders or deleting subfolders with typed confirmation and impact counts.
+- **Switch branches safely** with commit or discard confirmation when the working tree is dirty.
+- **Manage local git identity** by saving repo-local `user.name`, `user.email`, and optional SSH key settings.
+- **Share rendered Markdown** through print, Save as PDF, local email/share flows, copy, and download fallbacks.
+- **Stay local-first** because browsing, editing, and git actions run against your local filesystem and installed `git`; there are no accounts or telemetry.
+
+GitLocal supports light and dark themes. The macOS app also supports native menu and keyboard shortcuts for standard editing commands, preview-scoped Find, panel-scoped Select All, and Refresh.
+
+---
+
+## Homebrew Troubleshooting
+
+- If `brew` is not found, install Homebrew first from the official Homebrew site.
+- If installation reports a checksum mismatch, run `brew update` and retry. Do not bypass checksum verification.
+- If macOS blocks the beta app, run `xattr -dr com.apple.quarantine /Applications/GitLocal.app`, then launch it again.
+- If your macOS version or processor architecture is unsupported, use the npm package until a compatible native artifact is available.
+- If app launch fails, the npm browser workflow remains available as a fallback.
+
+---
+
+## From Source
 
 ```bash
 git clone https://github.com/ehud-am/gitlocal.git
@@ -104,105 +154,6 @@ node dist/cli.js ~/projects/my-app
 # Open the folder picker
 node dist/cli.js
 ```
-
----
-
-## Usage
-
-GitLocal starts a local HTTP server on a random available port, prints the URL, and opens your default browser automatically.
-
-```text
-gitlocal listening on http://localhost:54321
-```
-
-Press **Ctrl+C** to stop the server.
-
-The macOS native app starts the same local server for the app session, loads it in an embedded WebKit window, and stops the managed service when the app quits.
-Native app menu and keyboard shortcuts support standard editing commands, preview-scoped Find, panel-scoped Select All, and Refresh for the current repository view.
-Rendered Markdown views include dedicated actions to print the rendered document, save it as PDF through the print dialog, start local email or system share flows, and use copy/download fallbacks when a share destination is unavailable.
-
-### Open a folder or repository
-
-```bash
-gitlocal <path-to-git-repo>
-```
-
-**Examples:**
-
-```bash
-# View this repo
-gitlocal .
-
-# View a project by absolute path
-gitlocal ~/projects/my-app
-
-# View any folder; git repositories add branch and remote context
-gitlocal /tmp/not-a-repo
-```
-
-When a repository opens, GitLocal shows the README immediately if one is found. Plain folders open in the same viewer, without branch, remote, or git identity controls.
-
-### Open the folder picker
-
-Run `gitlocal` with no arguments:
-
-```bash
-gitlocal
-```
-
-When no path is provided, GitLocal reopens the last successfully used folder if it still exists. If there is no usable remembered folder, it starts from your Documents folder on macOS and Windows, from the configured Documents folder or `~/Documents` on Linux, and finally from your home folder if Documents is unavailable.
-
-From the picker you can:
-
-- double-click a regular folder row to move deeper into it, or double-click a git repository row to open it as a repository
-- select a file, folder, or git repository and open it with the single **Open** button
-- use the folder actions menu to create a subfolder, run `git init`, or clone into a child folder
-
-GitLocal also clears stale saved branch and path state when you switch folders, so reopening the app does not strand you on an invalid branch or file from a previous root.
-
----
-
-## What it does
-
-- **Browse the file tree** — expand and collapse folders lazily, whether the root is a plain folder or a git repository
-- **Read project knowledge comfortably** — Markdown renders with GitHub-like typography, tables, task lists, and code blocks so specs, plans, READMEs, and agent-generated docs are easy to review
-- **Share rendered Markdown** — print rendered Markdown, save it as PDF, prepare local email or system share flows, and fall back to copying or downloading when a destination is unavailable
-- **Reference code precisely** — code-oriented views include left-side line numbers for easier review and discussion
-- **Track file sync state in repositories** — repository file rows show when content changed locally, exists in local-only commits, changed upstream, or diverged between local and remote history
-- **Make small local file edits** — create, edit, and delete files from the viewer when human intervention is needed, with focused undo/redo support while editing and Select All scoped to the current content panel
-- **Manage folders in the viewer** — create direct child folders and delete the current subfolder from the main folder view with a typed-name confirmation that shows the affected file and folder counts
-- **Switch branches safely** — checkout local or remote-tracking branches, with commit/discard confirmation when the working tree is dirty
-- **Manage repo identity locally** — save repository-local git `user.name`, `user.email`, and SSH private key path, choose valid keys from your SSH folder, and make those settings visible to regular Git commands
-- **See repo context clearly** — GitHub-like header with branch, local path, remote repository, remote linkage, and repo-local identity loaded after the initial viewer shell
-- **Search deliberately** — repository-wide search opens only from the header search button, while file-level `Find in file` searches just the file you are currently viewing
-- **Auto-opens README** — when you open a repo, the README is shown immediately if one exists
-- **Folder picker** — run `gitlocal` with no arguments to open a browser-based folder picker with files, folders, and git repository detection
-- **Smart startup folder** — no-argument launches reopen the last used folder when possible, then fall back to the platform Documents folder or home folder
-- **Clear folder actions** — picker folders can be browsed deeper, initialized as git repos, or used as clone targets
-- **Light and dark themes** — GitHub-inspired light mode with matching dark mode support
-- **Local-first, remote optional** — core browsing and editing stay local-first, while remote clone/setup actions use the local `git` executable only when you choose them
-
-The fixed footer now shows the actual running GitLocal release version instead of a placeholder value, so support and release verification can rely on what the UI displays.
-Repository-wide search no longer takes over `Cmd/Ctrl+F`, so the browser's native page find stays available while GitLocal offers its own explicit repository search and current-file find tools.
-
----
-
-## Distribution Options
-
-| Channel | Platforms | Runtime experience | Best for | Tradeoff |
-|---------|-----------|--------------------|----------|----------|
-| npm | macOS, Windows, Linux | Local server opened in your browser | Cross-platform installs and automation | Requires a terminal process to stay open |
-| Homebrew cask | macOS | `GitLocal.app` with embedded WebKit viewer | Mac users who want native app launch | macOS only |
-
-Both channels use the same GitLocal server and React viewer for a given release. The native macOS app is a thin wrapper around the local service; it is not a separate product fork.
-
-### Homebrew troubleshooting
-
-- If `brew` is not found, install Homebrew first from the official Homebrew site.
-- If installation reports a checksum mismatch, run `brew update` and retry. Do not bypass checksum verification.
-- If macOS blocks the current alpha app, approve the unsigned bundle with `xattr -dr com.apple.quarantine /Applications/GitLocal.app`, then launch it again. Future signed/notarized releases should not require this approval path.
-- If your macOS version or processor architecture is unsupported, use the npm package until a compatible native artifact is available.
-- If a launch fails, the app should show a native error. The npm browser workflow remains available as a fallback.
 
 ---
 
