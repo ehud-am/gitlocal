@@ -11,6 +11,7 @@ interface Props {
   path: string
   content: string
   hasUnsavedChanges: boolean
+  inline?: boolean
   onStatusMessage?: (message: string) => void
 }
 
@@ -74,12 +75,10 @@ export default function MarkdownShareActions({
   path,
   content,
   hasUnsavedChanges,
+  inline = false,
   onStatusMessage,
 }: Props) {
   const details = buildMarkdownOutputDetails(path, content, hasUnsavedChanges)
-  const contentNotice = hasUnsavedChanges
-    ? 'Sharing uses the visible unsaved edits in this preview.'
-    : 'Sharing uses the saved Markdown content.'
 
   useEffect(() => {
     const handleNativeCommand = (event: Event) => {
@@ -151,20 +150,33 @@ export default function MarkdownShareActions({
     }
   }
 
+  const actions = (
+    <>
+      <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('save-pdf') }}>
+        <PdfIcon />
+        Save PDF
+      </Button>
+      <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('system-share') }}>
+        <ShareIcon />
+        Share
+      </Button>
+      <CopyButton getText={() => details.plainText} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
+    </>
+  )
+
+  if (inline) {
+    return (
+      <div className="markdown-share-actions markdown-share-actions-inline" role="group" aria-label="Markdown output actions">
+        {actions}
+      </div>
+    )
+  }
+
   return (
     <section className="markdown-share-actions" aria-label="Markdown output actions">
       <div className="markdown-share-actions-row">
-        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('save-pdf') }}>
-          <PdfIcon />
-          Save PDF
-        </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('system-share') }}>
-          <ShareIcon />
-          Share
-        </Button>
-        <CopyButton getText={() => details.plainText} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
+        {actions}
       </div>
-      <p className="markdown-share-note">{contentNotice}</p>
     </section>
   )
 }

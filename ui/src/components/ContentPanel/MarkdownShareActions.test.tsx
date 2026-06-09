@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownShareActions from './MarkdownShareActions'
 
@@ -59,6 +59,24 @@ describe('MarkdownShareActions', () => {
     expect(screen.getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+    expect(screen.queryByText(/sharing uses the saved markdown content/i)).not.toBeInTheDocument()
+  })
+
+  it('renders inline actions as an accessible toolbar group', () => {
+    render(
+      <MarkdownShareActions
+        path="docs/release.md"
+        content={fixtureMarkdown}
+        hasUnsavedChanges={false}
+        inline
+      />,
+    )
+
+    const actions = screen.getByRole('group', { name: /markdown output actions/i })
+    expect(actions).toBeInTheDocument()
+    expect(within(actions).getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
+    expect(within(actions).getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(within(actions).getByRole('button', { name: 'Copy' })).toBeInTheDocument()
   })
 
   it('opens rendered Markdown for Save PDF', async () => {
@@ -207,7 +225,7 @@ describe('MarkdownShareActions', () => {
     expect(onStatusMessage).toHaveBeenCalledWith('Shared rendered Markdown through the system share sheet.')
   })
 
-  it('discloses when visible unsaved edits are used', () => {
+  it('does not render sharing helper text for unsaved edits', () => {
     render(
       <MarkdownShareActions
         path="docs/release.md"
@@ -216,6 +234,6 @@ describe('MarkdownShareActions', () => {
       />,
     )
 
-    expect(screen.getByText(/visible unsaved edits/i)).toBeInTheDocument()
+    expect(screen.queryByText(/visible unsaved edits/i)).not.toBeInTheDocument()
   })
 })
