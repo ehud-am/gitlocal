@@ -35,6 +35,14 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 
 export default function FileTreeNode({ node, isExpanded, isSelected, depth, showLocalOnly, onClick }: Props) {
   const syncState = describeFileSyncState(node.syncState)
+  const generatedLocalState = node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')
+  const localLabel = generatedLocalState === 'generated'
+    ? 'generated'
+    : generatedLocalState === 'ignored'
+      ? 'ignored'
+      : generatedLocalState === 'local-only' || node.localOnly
+        ? 'local'
+        : ''
 
   return (
     <div
@@ -51,7 +59,7 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, show
       </span>
       <div className="file-tree-node-label">
         <span className="file-tree-node-name" title={node.name}>{node.name}</span>
-        {showLocalOnly && node.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+        {showLocalOnly && localLabel ? <MetaTag label={localLabel} icon="local-only" tone="neutral" compact /> : null}
         {syncState ? <MetaTag label={syncState.label} icon={syncState.icon} tone={syncState.tone} compact /> : null}
       </div>
     </div>

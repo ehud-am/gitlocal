@@ -15,6 +15,11 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   mkdirSync(join(dir, 'docs'))
   writeFileSync(join(dir, 'README.md'), '# Hello Search')
   writeFileSync(join(dir, 'docs', 'guide.md'), 'Searchable line\nAnother Line')
+  writeFileSync(join(dir, 'docs', 'plain.txt'), 'scope-token in plain text')
+  writeFileSync(join(dir, 'docs', 'scoped.md'), 'scope-token in markdown')
+  mkdirSync(join(dir, 'src'))
+  writeFileSync(join(dir, 'src', 'scoped.ts'), 'scope-token in source')
+  writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
   spawnSync('git', ['checkout', '-b', 'feature-search'], { cwd: dir })
@@ -99,7 +104,6 @@ describe('searchHandler', () => {
   })
 
   it('returns local-only matches for ignored files in current-branch searches', async () => {
-    writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
     writeFileSync(join(dir, 'ignored.txt'), 'ignored search body')
 
     const client = testClient(createApp(dir))
@@ -151,6 +155,24 @@ describe('searchHandler', () => {
       query: { query: 'docs', branch: 'feature-search', mode: 'name' },
     })
     expect((await res.json()).results.some((result: { path: string; type: string }) => result.path === 'docs' && result.type === 'dir')).toBe(true)
+  })
+
+  it('applies root and Markdown content scope to non-current branch searches', async () => {
+    const client = testClient(createApp(dir))
+    const res = await client.api.search.$get({
+      query: {
+        query: 'scope-token',
+        branch: 'feature-search',
+        mode: 'content',
+        rootPath: 'docs',
+        contentKinds: 'markdown',
+      },
+    })
+    const body = await res.json()
+
+    expect(body.results).toContainEqual(expect.objectContaining({ path: 'docs/scoped.md' }))
+    expect(body.results).not.toContainEqual(expect.objectContaining({ path: 'docs/plain.txt' }))
+    expect(body.results).not.toContainEqual(expect.objectContaining({ path: 'src/scoped.ts' }))
   })
 
   it('supports case-sensitive name matching on non-current branches', async () => {
@@ -207,6 +229,95 @@ describe('searchHandler', () => {
     expect(body.mode).toBe('both')
     expect(body.results.some((result: { matchType: string }) => result.matchType === 'name')).toBe(true)
     expect(body.results.some((result: { matchType: string }) => result.matchType === 'content')).toBe(true)
+  })
+
+  it('supports current-folder, markdown-focused, tracked-only, limit, and cursor search scope', async () => {
+    const client = testClient(createApp(dir))
+    const firstPage = await client.api.search.$get({
+      query: {
+        query: 'scope-token',
+        branch,
+        mode: 'content',
+        rootPath: 'docs',
+        contentKinds: 'markdown',
+        trackedMode: 'tracked-only',
+        limit: '1',
+      },
+    })
+    const firstBody = await firstPage.json()
+
+    expect(firstBody.scope).toMatchObject({
+      rootPath: 'docs',
+      targets: 'content',
+      contentKinds: 'markdown',
+      trackedMode: 'tracked-only',
+      limit: 1,
+    })
+    expect(firstBody.resultCount).toBe(1)
+    expect(firstBody.totalEstimate).toBe(1)
+    expect(firstBody.partial).toBe(false)
+    expect(firstBody.results).toEqual([
+      expect.objectContaining({
+        path: 'docs/scoped.md',
+        matchType: 'content',
+        generatedLocalState: 'tracked',
+        scopeLabel: 'Markdown content',
+      }),
+    ])
+
+    const paged = await client.api.search.$get({
+      query: {
+        query: 'scope-token',
+        branch,
+        mode: 'content',
+        trackedMode: 'tracked-only',
+        limit: '1',
+      },
+    })
+    const pageBody = await paged.json()
+
+    expect(pageBody.totalEstimate).toBeGreaterThan(1)
+    expect(pageBody.partial).toBe(true)
+    expect(pageBody.nextCursor).toBe('1')
+
+    const nextPage = await client.api.search.$get({
+      query: {
+        query: 'scope-token',
+        branch,
+        mode: 'content',
+        trackedMode: 'tracked-only',
+        limit: '1',
+        cursor: pageBody.nextCursor,
+      },
+    })
+    const nextBody = await nextPage.json()
+
+    expect(nextBody.results[0].path).not.toBe(pageBody.results[0].path)
+  })
+
+  it('requires explicit generated/local scope for ignored current-branch matches', async () => {
+    writeFileSync(join(dir, 'ignored.txt'), 'ignored search body')
+    const client = testClient(createApp(dir))
+
+    const trackedOnly = await client.api.search.$get({
+      query: { query: 'search body', branch, mode: 'content', trackedMode: 'tracked-only' },
+    })
+    const includeGeneratedLocal = await client.api.search.$get({
+      query: { query: 'search body', branch, mode: 'content', trackedMode: 'include-generated-local' },
+    })
+    const generatedLocalOnly = await client.api.search.$get({
+      query: { query: 'search body', branch, mode: 'content', trackedMode: 'generated-local-only' },
+    })
+
+    expect((await trackedOnly.json()).results).toEqual([])
+    expect((await includeGeneratedLocal.json()).results).toContainEqual(expect.objectContaining({
+      path: 'ignored.txt',
+      generatedLocalState: 'ignored',
+    }))
+    expect((await generatedLocalOnly.json()).results).toContainEqual(expect.objectContaining({
+      path: 'ignored.txt',
+      generatedLocalState: 'ignored',
+    }))
   })
 })
 

@@ -262,6 +262,8 @@ describe('manual file operation handlers', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.status).toBe('conflict')
+    expect(body.message).toContain('Your edit was not saved')
+    expect(body.message).toContain('Reload the file')
   })
 
   it('rejects creates with an empty path or non-string content', async () => {

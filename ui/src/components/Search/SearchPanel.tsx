@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { SearchMode, SearchResult } from '../../types'
+import type { SearchContentKind, SearchMode, SearchResult, SearchTrackedMode } from '../../types'
 import { Button } from '../ui/button'
 import SearchResults from './SearchResults'
 
@@ -10,8 +10,21 @@ interface Props {
   query: string
   mode: SearchMode
   caseSensitive: boolean
+  rootPath: string
+  currentFolderPath?: string
+  contentKinds: SearchContentKind
+  trackedMode: SearchTrackedMode
+  limit: number
   autoFocus?: boolean
-  onSearch: (search: { query: string; mode: SearchMode; caseSensitive: boolean }) => void
+  onSearch: (search: {
+    query: string
+    mode: SearchMode
+    caseSensitive: boolean
+    rootPath: string
+    contentKinds: SearchContentKind
+    trackedMode: SearchTrackedMode
+    limit: number
+  }) => void
   onSelectResult: (result: SearchResult) => void
   onDismiss: () => void
 }
@@ -32,6 +45,11 @@ export default function SearchPanel({
   query,
   mode,
   caseSensitive,
+  rootPath,
+  currentFolderPath = '',
+  contentKinds,
+  trackedMode,
+  limit,
   autoFocus = false,
   onSearch,
   onSelectResult,
@@ -41,6 +59,11 @@ export default function SearchPanel({
   const [searchNames, setSearchNames] = useState(modeIncludes(mode, 'name'))
   const [searchContents, setSearchContents] = useState(modeIncludes(mode, 'content'))
   const [draftCaseSensitive, setDraftCaseSensitive] = useState(caseSensitive)
+  const [draftRootPath, setDraftRootPath] = useState(rootPath)
+  const [draftContentKinds, setDraftContentKinds] = useState<SearchContentKind>(contentKinds)
+  const [draftTrackedMode, setDraftTrackedMode] = useState<SearchTrackedMode>(trackedMode)
+  const [draftLimit, setDraftLimit] = useState(limit)
+  const [cursor, setCursor] = useState('')
   const submittedQuery = query.trim()
   const submittedMode = mode
   const resolvedDraftMode = resolveMode(searchNames, searchContents)
@@ -51,9 +74,14 @@ export default function SearchPanel({
     draftQuery !== submittedQuery
     || resolvedDraftMode !== submittedMode
     || draftCaseSensitive !== caseSensitive
+    || draftRootPath !== rootPath
+    || draftContentKinds !== contentKinds
+    || draftTrackedMode !== trackedMode
+    || draftLimit !== limit
 
   useEffect(() => {
     setDraft(query)
+    setCursor('')
   }, [query])
 
   useEffect(() => {
@@ -65,9 +93,31 @@ export default function SearchPanel({
     setDraftCaseSensitive(caseSensitive)
   }, [caseSensitive])
 
+  useEffect(() => {
+    setDraftRootPath(rootPath)
+  }, [rootPath])
+
+  useEffect(() => {
+    setDraftContentKinds(contentKinds)
+  }, [contentKinds])
+
+  useEffect(() => {
+    setDraftTrackedMode(trackedMode)
+  }, [trackedMode])
+
+  useEffect(() => {
+    setDraftLimit(limit)
+  }, [limit])
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['search', branch, submittedQuery, submittedMode, caseSensitive],
-    queryFn: () => api.getSearchResults(submittedQuery, branch, submittedMode, caseSensitive),
+    queryKey: ['search', branch, submittedQuery, submittedMode, caseSensitive, rootPath, contentKinds, trackedMode, limit, cursor],
+    queryFn: () => api.getSearchResults(submittedQuery, branch, submittedMode, caseSensitive, {
+      rootPath,
+      contentKinds,
+      trackedMode,
+      limit,
+      cursor,
+    }),
     enabled: readyForResults,
   })
 
@@ -90,7 +140,12 @@ export default function SearchPanel({
       query: draftQuery,
       mode: resolvedDraftMode,
       caseSensitive: draftCaseSensitive,
+      rootPath: draftRootPath,
+      contentKinds: draftContentKinds,
+      trackedMode: draftTrackedMode,
+      limit: draftLimit,
     })
+    setCursor('')
   }
 
   return (
@@ -166,6 +221,52 @@ export default function SearchPanel({
             <span>Case sensitive</span>
           </label>
         </div>
+        <div className="search-scope-grid" role="group" aria-label="search scope">
+          <label>
+            <span>Folder scope</span>
+            <select
+              value={draftRootPath ? 'current' : 'repo'}
+              onChange={(event) => {
+                setDraftRootPath(event.target.value === 'current' ? currentFolderPath : '')
+              }}
+            >
+              <option value="repo">Whole repository</option>
+              <option value="current">Current folder{currentFolderPath ? `: ${currentFolderPath}` : ''}</option>
+            </select>
+          </label>
+          <label>
+            <span>Content scope</span>
+            <select
+              value={draftContentKinds}
+              onChange={(event) => setDraftContentKinds(event.target.value as SearchContentKind)}
+            >
+              <option value="all">All text</option>
+              <option value="markdown">Markdown only</option>
+            </select>
+          </label>
+          <label>
+            <span>Tracked files</span>
+            <select
+              value={draftTrackedMode}
+              onChange={(event) => setDraftTrackedMode(event.target.value as SearchTrackedMode)}
+            >
+              <option value="tracked-only">Tracked only</option>
+              <option value="include-generated-local">Include generated/local</option>
+              <option value="generated-local-only">Generated/local only</option>
+            </select>
+          </label>
+          <label>
+            <span>Limit</span>
+            <select
+              value={String(draftLimit)}
+              onChange={(event) => setDraftLimit(Number(event.target.value))}
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
       </form>
       <div className="search-controls">
         <span className="search-guidance">{guidanceMessage}</span>
@@ -183,7 +284,12 @@ export default function SearchPanel({
       ) : isError ? (
         <p className="search-empty">Search failed. Please try again.</p>
       ) : (
-        <SearchResults results={data?.results ?? []} onSelect={onSelectResult} />
+        <SearchResults
+          results={data?.results ?? []}
+          response={data}
+          onSelect={onSelectResult}
+          onLoadMore={data?.nextCursor ? () => setCursor(data.nextCursor ?? '') : undefined}
+        />
       )}
     </section>
   )

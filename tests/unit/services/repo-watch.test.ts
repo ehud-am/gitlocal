@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -75,6 +75,55 @@ describe('repo-watch', () => {
       expect(status.treeStatus).toBe('invalid')
       expect(status.resolvedPath).toBe('docs')
       expect(status.resolvedPathType).toBe('dir')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns an active refresh notice and changed-files summary when the active file is modified', () => {
+    const { dir, branch, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# Sync changed outside GitLocal')
+      const status = getSyncStatus(dir, branch, 'README.md')
+
+      expect(status.fileStatus).toBe('changed')
+      expect(status.pathSyncState).toBe('local-uncommitted')
+      expect(status.activePathNotice).toMatchObject({
+        path: 'README.md',
+        changeKind: 'refreshed',
+        message: 'README.md changed outside GitLocal and was refreshed.',
+        actionLabel: 'View changed files',
+      })
+      expect(status.changedFilesSummary).toMatchObject({
+        total: 1,
+        modified: 1,
+        tracked: 1,
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns a deletion notice and nearest-folder reconciliation for a removed active file', () => {
+    const { dir, branch, cleanup } = makeGitRepo()
+    try {
+      unlinkSync(join(dir, 'README.md'))
+      const status = getSyncStatus(dir, branch, 'README.md')
+
+      expect(status.fileStatus).toBe('deleted')
+      expect(status.treeStatus).toBe('invalid')
+      expect(status.resolvedPath).toBe('')
+      expect(status.resolvedPathType).toBe('none')
+      expect(status.activePathNotice).toMatchObject({
+        path: 'README.md',
+        changeKind: 'deleted',
+        message: 'README.md was deleted outside GitLocal. GitLocal moved to the nearest available folder.',
+        actionLabel: 'View changed files',
+      })
+      expect(status.changedFilesSummary).toMatchObject({
+        total: 1,
+        deleted: 1,
+      })
     } finally {
       cleanup()
     }

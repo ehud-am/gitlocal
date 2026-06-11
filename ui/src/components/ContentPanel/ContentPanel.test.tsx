@@ -98,6 +98,83 @@ describe('ContentPanel', () => {
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
+  it('renders root dashboard sections with key, recent, changed, and raw browsing shortcuts', async () => {
+    const onOpenPath = vi.fn()
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        isGitRepo
+        repoSummary={{
+          repoName: 'repo',
+          branch: 'main',
+          statusSummary: {
+            text: 'main has no local changes.',
+            tone: 'neutral',
+            remoteLabel: 'origin',
+            syncState: 'up-to-date',
+            localChangeCount: 0,
+            untrackedChangeCount: 0,
+          },
+          keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+          recentItems: [],
+          visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+        }}
+        navigationHints={{
+          keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+          recentItems: [],
+          changedItems: [{ path: 'docs/guide.md', name: 'guide.md', type: 'file', changeState: 'modified', generatedLocalState: 'tracked', sourcePath: '', canOpen: true, reviewHint: 'Modified locally' }],
+        }}
+        recentItems={[{ path: 'docs', type: 'folder', label: 'docs', available: true, lastViewedAt: '2026-06-11T12:00:00.000Z' }]}
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    expect(await screen.findByRole('region', { name: /repository dashboard/i })).toBeInTheDocument()
+    expect(screen.getByText(/main has no local changes/i)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /key documents/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /recent files/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /recently changed files/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /raw directory browsing/i })).toHaveTextContent('2 visible items')
+
+    fireEvent.click(within(screen.getByRole('region', { name: /key documents/i })).getByRole('button', { name: /README/i }))
+    expect(onOpenPath).toHaveBeenCalledWith('README.md', 'file', false)
+  })
+
+  it('filters root directory rows by generated/local visibility while keeping dashboard visible counts aligned', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        generatedLocalVisibility="hide"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
+    expect(within(directoryTable).getAllByText('README.md')).not.toHaveLength(0)
+    expect(screen.queryByText('dist')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /raw directory browsing/i })).toHaveTextContent('1 visible item')
+  })
+
   it('offers a create action from the empty state when mutation is allowed', async () => {
     vi.mocked(api.createFile).mockResolvedValue({
       ok: true,
@@ -348,6 +425,69 @@ describe('ContentPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps dirty folder creation open when Back to viewer is canceled', async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /^new folder$/i }))
+    fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: 'docs' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
+    expect(screen.getByLabelText(/folder name/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
+    expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
+  })
+
+  it('responds to native select-all token changes', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ content: 'hello\nworld' }))
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        nativeSelectAllToken={0}
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    expect(await screen.findByTestId('code-viewer')).toHaveTextContent('hello')
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          selectedPath="README.md"
+          selectedPathType="file"
+          branch="main"
+          nativeSelectAllToken={1}
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByTestId('code-viewer')).toHaveTextContent('world')
   })
 
   it('requests current folder deletion from the main folder action area without row delete controls', async () => {
@@ -1275,9 +1415,10 @@ describe('ContentPanel', () => {
     )
   })
 
-  it('shows update conflicts inline when save fails', async () => {
+  it('shows update conflicts inline and offers reload recovery when save fails', async () => {
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
-    vi.mocked(api.updateFile).mockRejectedValue({ error: 'The file changed on disk before your save completed.' })
+    vi.mocked(api.updateFile).mockRejectedValue({ error: 'The file changed on disk before your save completed. Your edit was not saved. Reload the file to review the latest version, then apply your changes again.' })
+    const onStatusMessage = vi.fn()
 
     renderWithClient(
       <ContentPanel
@@ -1288,6 +1429,7 @@ describe('ContentPanel', () => {
         branch="main"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
+        onStatusMessage={onStatusMessage}
       />,
     )
 
@@ -1297,6 +1439,12 @@ describe('ContentPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/changed on disk/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/edit was not saved/i)
+    fireEvent.click(screen.getByRole('button', { name: /reload from disk/i }))
+    await waitFor(() => {
+      expect(onStatusMessage).toHaveBeenCalledWith('Reloaded the file from disk.')
+    })
+    expect(screen.queryByLabelText(/edit file content/i)).not.toBeInTheDocument()
   })
 
   it('warns before discarding dirty edits', async () => {

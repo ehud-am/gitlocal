@@ -17,19 +17,32 @@ import {
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
-import { readViewerState, writeViewerState } from './services/viewerState'
+import {
+  readRecentItems,
+  readViewerState,
+  rememberRecentChangedItems,
+  rememberRecentItem,
+  writeViewerState,
+} from './services/viewerState'
 import type {
   Branch,
   BranchSwitchResponse,
+  ChangedFileItem,
+  ChangedFilesResponse,
   FileSyncState,
   FolderOperationResult,
+  GeneratedLocalVisibility,
   GitUserIdentity,
+  NavigationHintsResponse,
   NativeAppCommandEvent,
   RepoInfo,
+  RepoSummaryResponse,
   RepoSyncState,
+  SearchContentKind,
   SearchMode,
   SearchPresentation,
   SearchResult,
+  SearchTrackedMode,
   SshKeyCandidate,
   ViewerPathType,
 } from './types'
@@ -105,10 +118,15 @@ export default function App() {
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
   const [showRaw, setShowRaw] = useState(initialViewerState.raw)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
+  const [generatedLocalVisibility, setGeneratedLocalVisibility] = useState<GeneratedLocalVisibility>(initialViewerState.generatedLocalVisibility)
   const [searchPresentation, setSearchPresentation] = useState<SearchPresentation>(initialViewerState.searchPresentation)
   const [searchQuery, setSearchQuery] = useState(initialViewerState.searchQuery)
   const [searchMode, setSearchMode] = useState<SearchMode>(initialViewerState.searchMode)
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(initialViewerState.searchCaseSensitive)
+  const [searchRootPath, setSearchRootPath] = useState(initialViewerState.searchRootPath)
+  const [searchContentKind, setSearchContentKind] = useState<SearchContentKind>(initialViewerState.searchContentKind)
+  const [searchTrackedMode, setSearchTrackedMode] = useState<SearchTrackedMode>(initialViewerState.searchTrackedMode)
+  const [searchLimit, setSearchLimit] = useState(initialViewerState.searchLimit)
   const [pickerLoading, setPickerLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -130,6 +148,8 @@ export default function App() {
   const [folderDeleteConfirmationName, setFolderDeleteConfirmationName] = useState('')
   const [folderDeletePending, setFolderDeletePending] = useState(false)
   const [folderDeleteError, setFolderDeleteError] = useState('')
+  const [changedFiles, setChangedFiles] = useState<ChangedFilesResponse | null>(null)
+  const [recentItems, setRecentItems] = useState(() => readRecentItems())
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const [nativeFindToken, setNativeFindToken] = useState(0)
   const [nativeSelectAllToken, setNativeSelectAllToken] = useState(0)
@@ -171,6 +191,18 @@ export default function App() {
     queryFn: () => api.getSyncStatus(selectedPath, currentBranch),
     enabled: !!info?.isGitRepo && !hasRepoMismatch,
     refetchInterval: 3000,
+  })
+
+  const { data: repoSummary } = useQuery<RepoSummaryResponse>({
+    queryKey: ['repo-summary', currentBranch],
+    queryFn: () => api.getRepoSummary(currentBranch),
+    enabled: !!info?.isGitRepo && !hasRepoMismatch,
+  })
+
+  const { data: navigationHints } = useQuery<NavigationHintsResponse>({
+    queryKey: ['navigation-hints', currentBranch, generatedLocalVisibility],
+    queryFn: () => api.getNavigationHints(currentBranch, true, generatedLocalVisibility !== 'hide'),
+    enabled: !!info?.isGitRepo && !hasRepoMismatch,
   })
 
   useEffect(() => {
@@ -254,12 +286,17 @@ export default function App() {
       pathType: selectedPathType,
       raw: showRaw,
       sidebarCollapsed,
+      generatedLocalVisibility,
       searchPresentation,
       searchQuery,
       searchMode,
       searchCaseSensitive,
+      searchRootPath,
+      searchContentKind,
+      searchTrackedMode,
+      searchLimit,
     })
-  }, [currentBranch, searchCaseSensitive, searchMode, searchPresentation, searchQuery, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath])
+  }, [currentBranch, generatedLocalVisibility, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath])
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
@@ -282,7 +319,7 @@ export default function App() {
     lastRevisionRef.current = syncStatus.workingTreeRevision
 
     if (syncStatus.currentPath && syncStatus.currentPathType === 'missing') {
-      setStatusMessage(syncStatus.statusMessage)
+      setStatusMessage(syncStatus.activePathNotice?.message ?? syncStatus.statusMessage)
       setSelectedPath(syncStatus.resolvedPath)
       setSelectedPathType(syncStatus.resolvedPathType === 'missing' ? 'none' : syncStatus.resolvedPathType)
       setSelectedPathLocalOnly(false)
@@ -290,8 +327,8 @@ export default function App() {
       return
     }
 
-    if (syncStatus.statusMessage) {
-      setStatusMessage(syncStatus.statusMessage)
+    if (syncStatus.activePathNotice?.message || syncStatus.statusMessage) {
+      setStatusMessage(syncStatus.activePathNotice?.message ?? syncStatus.statusMessage)
     }
 
     if (selectedPath === syncStatus.currentPath && syncStatus.currentPathType !== 'missing') {
@@ -311,6 +348,7 @@ export default function App() {
   }, [hasUnsavedChanges])
 
   const refreshCurrentView = useCallback(async (): Promise<void> => {
+    if (hasUnsavedChanges && !window.confirm('Discard your unsaved file changes?')) return
     if (nativeRefreshPendingRef.current) return
     nativeRefreshPendingRef.current = true
     setRefreshingCurrentView(true)
@@ -333,7 +371,7 @@ export default function App() {
       nativeRefreshPendingRef.current = false
       setRefreshingCurrentView(false)
     }
-  }, [queryClient])
+  }, [hasUnsavedChanges, queryClient])
 
   useEffect(() => {
     const handleNativeCommand = (event: Event) => {
@@ -365,30 +403,106 @@ export default function App() {
     return window.confirm('Discard your unsaved file changes?')
   }
 
-  function handleSelectFile(path: string, localOnly = false) {
-    if (!confirmDiscardChanges()) return
+  function handleSelectFile(path: string, localOnly = false): boolean {
+    if (!confirmDiscardChanges()) return false
     setSelectedPath(path)
     setSelectedPathType(path ? 'file' : 'none')
     setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
+    if (path) {
+      setRecentItems(rememberRecentItem({
+        path,
+        type: 'file',
+        label: path.split('/').pop() || path,
+        available: true,
+      }))
+    }
+    return true
   }
 
-  function handleSelectFolder(path: string, localOnly = false) {
-    if (!confirmDiscardChanges()) return
+  function handleSelectFolder(path: string, localOnly = false): boolean {
+    if (!confirmDiscardChanges()) return false
     setSelectedPath(path)
     setSelectedPathType(path ? 'dir' : 'none')
     setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
+    if (path) {
+      setRecentItems(rememberRecentItem({
+        path,
+        type: 'folder',
+        label: path.split('/').pop() || path,
+        available: true,
+      }))
+    }
+    return true
+  }
+
+  function parentPathOf(path: string): string {
+    const boundary = path.lastIndexOf('/')
+    return boundary >= 0 ? path.slice(0, boundary) : ''
+  }
+
+  async function openChangedFiles(): Promise<void> {
+    try {
+      const response = await api.getChangedFiles(currentBranch, true)
+      setChangedFiles(response)
+      setRecentItems(rememberRecentChangedItems(response.items.slice(0, 8).map((item) => ({
+        path: item.path,
+        type: item.type === 'folder' ? 'folder' : 'file',
+        label: item.name,
+        available: item.canOpen,
+        lastChangedAt: response.checkedAt,
+      }))))
+    } catch {
+      setStatusMessage('GitLocal could not load changed files.')
+    }
+  }
+
+  function openSearch(): void {
+    setSearchPresentation('expanded')
+  }
+
+  function openRecentItems(): void {
+    setSelectedPath('')
+    setSelectedPathType('none')
+    setStatusMessage('Recent files are shown on the repository dashboard.')
+  }
+
+  function openKeyDocs(): void {
+    setSelectedPath('')
+    setSelectedPathType('none')
+    setStatusMessage('Key documents are shown on the repository dashboard.')
+  }
+
+  function openCurrentFolder(): void {
+    const currentFolder = selectedPathType === 'dir' ? selectedPath : parentPathOf(selectedPath)
+    handleSelectFolder(currentFolder, false)
+  }
+
+  function handleOpenChangedFile(item: ChangedFileItem): void {
+    const localOnly = item.generatedLocalState !== 'tracked'
+    if (!item.canOpen) {
+      const parentPath = parentPathOf(item.path)
+      handleSelectFolder(parentPath, false)
+      setStatusMessage(`${item.path} is no longer available. GitLocal opened its parent folder.`)
+      return
+    }
+
+    if (item.type === 'folder') {
+      handleSelectFolder(item.path, localOnly)
+      return
+    }
+
+    handleSelectFile(item.path, localOnly)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
-    if (result.type === 'dir') {
-      handleSelectFolder(result.path, result.localOnly)
-    } else {
-      handleSelectFile(result.path, result.localOnly)
-    }
+    const didNavigate = result.type === 'dir'
+      ? handleSelectFolder(result.path, result.localOnly)
+      : handleSelectFile(result.path, result.localOnly)
+    if (!didNavigate) return
     setSearchPresentation('collapsed')
     setSearchQuery('')
   }
@@ -802,7 +916,22 @@ export default function App() {
         <div className="app-body flex min-h-0 flex-1 pb-8">
           {sidebarCollapsed ? (
             <aside className="sidebar-rail flex w-14 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" aria-label="collapsed navigation">
-              <div className="sidebar-rail-toolbar flex justify-center p-3">
+              <div className="sidebar-rail-toolbar flex flex-col items-center gap-2 p-3">
+                <button type="button" className="rail-action" aria-label="Open repository search" title="Search" onClick={openSearch}>
+                  S
+                </button>
+                <button type="button" className="rail-action" aria-label="Open changed files" title="Changed files" onClick={() => { void openChangedFiles() }}>
+                  Δ
+                </button>
+                <button type="button" className="rail-action" aria-label="Show recent files" title="Recent files" onClick={openRecentItems}>
+                  R
+                </button>
+                <button type="button" className="rail-action" aria-label="Show key documents" title="Key documents" onClick={openKeyDocs}>
+                  K
+                </button>
+                <button type="button" className="rail-action" aria-label="Open current folder" title="Current folder" onClick={openCurrentFolder}>
+                  F
+                </button>
                 <button
                   type="button"
                   className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
@@ -817,6 +946,20 @@ export default function App() {
           ) : (
             <aside className="sidebar flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
               <div className="sidebar-toolbar flex justify-end p-3 pb-2">
+                {info?.isGitRepo ? (
+                  <label className="generated-local-toggle">
+                    <span>Files</span>
+                    <select
+                      aria-label="Generated and local files visibility"
+                      value={generatedLocalVisibility}
+                      onChange={(event) => setGeneratedLocalVisibility(event.target.value as GeneratedLocalVisibility)}
+                    >
+                      <option value="hide">Tracked</option>
+                      <option value="show">All</option>
+                      <option value="only">Local</option>
+                    </select>
+                  </label>
+                ) : null}
                 <button
                   type="button"
                   className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
@@ -834,6 +977,7 @@ export default function App() {
                   selectedPath={visibleSelectedPath}
                   selectedPathType={visibleSelectedPathType}
                   isGitRepo={info?.isGitRepo}
+                  generatedLocalVisibility={generatedLocalVisibility}
                   onSelect={(path, type, localOnly) => {
                     if (type === 'dir') {
                       handleSelectFolder(path, localOnly)
@@ -862,13 +1006,18 @@ export default function App() {
                 selectedPath={visibleSelectedPath}
                 selectedPathType={visibleSelectedPathType}
                 repoSync={repoSync}
+                repoSummary={repoSummary}
                 trackedChangeCount={trackedChangeCount}
                 untrackedChangeCount={untrackedChangeCount}
+                activePathNotice={syncStatus?.activePathNotice}
+                changedFiles={changedFiles}
                 onBranchChange={(nextBranch) => {
                   void handleBranchChange(nextBranch)
                 }}
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
-                onOpenSearch={info?.isGitRepo ? () => setSearchPresentation('expanded') : undefined}
+                onOpenSearch={info?.isGitRepo ? openSearch : undefined}
+                onOpenChangedFiles={info?.isGitRepo ? () => { void openChangedFiles() } : undefined}
+                onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 branchSwitchDialog={
@@ -895,12 +1044,21 @@ export default function App() {
                     query={searchQuery}
                     mode={searchMode}
                     caseSensitive={searchCaseSensitive}
+                    rootPath={searchRootPath}
+                    currentFolderPath={visibleSelectedPathType === 'dir' ? visibleSelectedPath : parentPathOf(visibleSelectedPath)}
+                    contentKinds={searchContentKind}
+                    trackedMode={searchTrackedMode}
+                    limit={searchLimit}
                     autoFocus
-                    onSearch={({ query, mode, caseSensitive }) => {
+                    onSearch={({ query, mode, caseSensitive, rootPath, contentKinds, trackedMode, limit }) => {
                       setSearchPresentation('expanded')
                       setSearchQuery(query)
                       setSearchMode(mode)
                       setSearchCaseSensitive(caseSensitive)
+                      setSearchRootPath(rootPath)
+                      setSearchContentKind(contentKinds)
+                      setSearchTrackedMode(trackedMode)
+                      setSearchLimit(limit)
                     }}
                     onSelectResult={handleSelectSearchResult}
                     onDismiss={handleDismissSearch}
@@ -925,6 +1083,10 @@ export default function App() {
                   nativeSelectAllToken={nativeSelectAllToken}
                   branch={currentBranch}
                   isGitRepo={info?.isGitRepo}
+                  repoSummary={repoSummary}
+                  navigationHints={navigationHints}
+                  recentItems={recentItems}
+                  generatedLocalVisibility={generatedLocalVisibility}
                   onNavigate={handleSelectFile}
                   onOpenPath={(path, type, localOnly) => {
                     if (type === 'dir') {

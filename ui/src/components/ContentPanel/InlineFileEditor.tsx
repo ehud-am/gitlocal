@@ -16,11 +16,13 @@ interface Props {
   onChange: (value: string) => void
   onSave: () => void
   onCancel: () => void
+  onReloadFromDisk?: () => void
 }
 
-export default function InlineFileEditor({ path, content, busy = false, error, onChange, onSave, onCancel }: Props) {
+export default function InlineFileEditor({ path, content, busy = false, error, onChange, onSave, onCancel, onReloadFromDisk }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [history, setHistory] = useState<EditorHistoryState>(() => createEditorHistory(content))
+  const isConflict = Boolean(error && /changed on disk|revision token|reload/i.test(error))
 
   useEffect(() => {
     setHistory(createEditorHistory(content))
@@ -84,9 +86,21 @@ export default function InlineFileEditor({ path, content, busy = false, error, o
         </div>
       </div>
       {error && (
-        <p className="manual-editor-error" role="alert">
-          {error}
-        </p>
+        <div className={`manual-editor-error ${isConflict ? 'manual-editor-conflict' : ''}`} role="alert">
+          <p>{error}</p>
+          {isConflict ? (
+            <div className="manual-editor-recovery-actions">
+              <button type="button" className="btn-raw" onClick={() => textareaRef.current?.focus()} disabled={busy}>
+                Keep editing
+              </button>
+              {onReloadFromDisk ? (
+                <button type="button" className="btn-raw btn-primary" onClick={onReloadFromDisk} disabled={busy}>
+                  Reload from disk
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       )}
       <textarea
         ref={textareaRef}

@@ -36,6 +36,11 @@ export function selectElementContents(element: HTMLElement): boolean {
   const selection = element.ownerDocument.getSelection()
   if (!selection) return false
 
+  const focusedSelectionTarget = element.querySelector('[data-content-selection-target]')
+  if (focusedSelectionTarget instanceof HTMLElement) {
+    return selectElementContents(focusedSelectionTarget)
+  }
+
   const editableDraft = element.querySelector('textarea')
   if (editableDraft instanceof HTMLTextAreaElement) {
     editableDraft.focus()

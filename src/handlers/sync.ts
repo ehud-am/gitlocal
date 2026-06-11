@@ -30,6 +30,16 @@ export async function syncHandler(c: Context<{ Variables: Variables }>): Promise
       },
       statusMessage: '',
       checkedAt: new Date().toISOString(),
+      changedFilesSummary: {
+        total: 0,
+        modified: 0,
+        added: 0,
+        deleted: 0,
+        renamed: 0,
+        untracked: 0,
+        remoteRelevant: 0,
+        tracked: 0,
+      },
     })
   }
 

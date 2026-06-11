@@ -6,17 +6,23 @@ import type {
   Branch,
   BranchSwitchRequest,
   BranchSwitchResponse,
+  ChangedFileItem,
+  ChangedFileState,
   CommitChangesResponse,
   Commit,
   FileSyncState,
+  GeneratedLocalState,
   GitContext,
   GitIdentityUpdateResponse,
   GitUserIdentity,
+  KeyDocumentItem,
   LocalPathClassification,
   RemoteSyncResponse,
   RepoSyncState,
   RepoInfo,
   RepoRemoteContext,
+  RepositoryStatusSummary,
+  RepositoryStatusTone,
   TreeNode,
 } from '../types.js'
 import {
@@ -104,6 +110,7 @@ function writeGitConfig(repoPath: string, key: string, value: string): void {
 function unsetGitConfig(repoPath: string, key: string): void {
   const result = runGitCapture(repoPath, 'config', '--local', '--unset', key)
   if (result.status !== 0 && result.status !== 5 && !result.stderr.includes('No such section') && !result.stderr.includes('No such key')) {
+    /* v8 ignore next -- defensive for unexpected git config failures not reproducible through product flows */
     throw new Error(result.stderr.trim() || `Unable to clear ${key}.`)
   }
 }
@@ -992,6 +999,195 @@ export function getWorkingTreeSyncSummary(repoPath: string): {
     trackedChangeCount: analysis.changes.trackedPaths.length,
     untrackedChangeCount: analysis.changes.untrackedPaths.length,
     repoSync: analysis.repoSync,
+  }
+}
+
+function isLikelyGeneratedPath(path: string): boolean {
+  const normalized = normalizeRepoRelativePath(path)
+  return /(^|\/)(node_modules|dist|build|coverage|\.vite|\.next|\.turbo|target|DerivedData)(\/|$)/.test(normalized)
+}
+
+function isTrackedRepoPath(repoPath: string, filePath: string): boolean {
+  const normalized = normalizeRepoRelativePath(filePath)
+  if (!normalized) return false
+  const result = runGitCapture(repoPath, 'ls-files', '--error-unmatch', normalized)
+  return result.status === 0
+}
+
+export function classifyGeneratedLocalState(repoPath: string, filePath: string): GeneratedLocalState {
+  const normalized = normalizeRepoRelativePath(filePath)
+  if (!normalized || !validateRepo(repoPath)) return 'unknown'
+  if (isTrackedRepoPath(repoPath, normalized)) return 'tracked'
+  const trackedType = getTrackedPathType(repoPath, normalized)
+  if (trackedType !== 'missing') return 'tracked'
+  if (isIgnoredPath(repoPath, normalized)) return isLikelyGeneratedPath(normalized) ? 'generated' : 'ignored'
+  return getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only'
+}
+
+function parsePorcelainChangeState(line: string): { path: string; sourcePath: string; changeState: ChangedFileState } {
+  const indexStatus = line[0] ?? ' '
+  const worktreeStatus = line[1] ?? ' '
+  const rawPath = line.slice(3).trim()
+  const [sourcePath = '', destinationPath = ''] = rawPath.split(' -> ')
+  const path = normalizeRepoRelativePath(destinationPath || sourcePath)
+
+  if (line.startsWith('?? ')) {
+    return { path, sourcePath: '', changeState: 'untracked' }
+  }
+
+  if (indexStatus === 'R' || worktreeStatus === 'R') {
+    return {
+      path,
+      sourcePath: normalizeRepoRelativePath(sourcePath),
+      changeState: 'renamed',
+    }
+  }
+
+  if (indexStatus === 'D' || worktreeStatus === 'D') {
+    return { path, sourcePath: '', changeState: 'deleted' }
+  }
+
+  if (indexStatus === 'A' || worktreeStatus === 'A') {
+    return { path, sourcePath: '', changeState: 'added' }
+  }
+
+  return { path, sourcePath: '', changeState: 'modified' }
+}
+
+function getWorkingTreeChangeDetails(repoPath: string): Array<{
+  path: string
+  sourcePath: string
+  changeState: ChangedFileState
+}> {
+  const result = runGitCapture(repoPath, 'status', '--porcelain=v1', '-uall')
+  if (result.status !== 0 || !result.stdout) return []
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map(parsePorcelainChangeState)
+    .filter((entry) => Boolean(entry.path))
+}
+
+function mapPathTypeForReview(pathType: ReturnType<typeof getPathType>): ChangedFileItem['type'] {
+  if (pathType === 'file') return 'file'
+  if (pathType === 'dir') return 'folder'
+  if (pathType === 'missing') return 'missing'
+  /* v8 ignore next -- changed-file items are always concrete paths from git status */
+  return 'unknown'
+}
+
+function describeChangedFile(changeState: ChangedFileState, generatedLocalState: GeneratedLocalState): string {
+  if (changeState === 'deleted') return 'Deleted locally'
+  if (changeState === 'added') return 'Added locally'
+  if (changeState === 'renamed') return 'Renamed locally'
+  if (changeState === 'untracked') return generatedLocalState === 'generated' ? 'Generated local file' : 'Local-only file'
+  return 'Modified locally'
+}
+
+export function buildChangedFileItems(repoPath: string, includeGeneratedLocal = false): ChangedFileItem[] {
+  return getWorkingTreeChangeDetails(repoPath)
+    .map((entry) => {
+      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      const pathType = getPathType(repoPath, entry.path)
+      const canOpen = pathType === 'file' || pathType === 'dir'
+      return {
+        path: entry.path,
+        name: basename(entry.path),
+        type: mapPathTypeForReview(pathType),
+        changeState: entry.changeState,
+        generatedLocalState,
+        sourcePath: entry.sourcePath,
+        canOpen,
+        reviewHint: canOpen
+          ? describeChangedFile(entry.changeState, generatedLocalState)
+          : 'This path no longer exists. Open its parent folder to review context.',
+      } satisfies ChangedFileItem
+    })
+    .filter((item) => includeGeneratedLocal || item.generatedLocalState === 'tracked' || item.changeState === 'untracked')
+    .sort((left, right) => left.path.localeCompare(right.path))
+}
+
+export function summarizeChangedFiles(items: ChangedFileItem[]): {
+  total: number
+  modified: number
+  added: number
+  deleted: number
+  renamed: number
+  untracked: number
+  remoteRelevant: number
+  tracked: number
+} {
+  const count = (state: ChangedFileState): number => items.filter((item) => item.changeState === state).length
+  return {
+    total: items.length,
+    modified: count('modified'),
+    added: count('added'),
+    deleted: count('deleted'),
+    renamed: count('renamed'),
+    untracked: count('untracked'),
+    remoteRelevant: items.filter((item) => item.changeState === 'local-committed' || item.changeState === 'remote-committed' || item.changeState === 'diverged').length,
+    tracked: items.filter((item) => item.generatedLocalState === 'tracked').length,
+  }
+}
+
+export function findKeyDocuments(repoPath: string): KeyDocumentItem[] {
+  const candidates: Array<Omit<KeyDocumentItem, 'available'>> = [
+    { path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview' },
+    { path: 'AGENTS.md', label: 'Agent instructions', category: 'agent-instructions', reason: 'Codex and agent guidance' },
+    { path: 'specs', label: 'Specs', category: 'specs', reason: 'Feature specifications' },
+    { path: 'docs', label: 'Docs', category: 'docs', reason: 'Project documentation' },
+  ]
+
+  return candidates
+    .map((candidate) => ({
+      ...candidate,
+      available: getPathType(repoPath, candidate.path) !== 'missing',
+    }))
+    .filter((candidate) => candidate.available)
+}
+
+function toneForRepoSync(repoSync: RepoSyncState, localChangeCount: number): RepositoryStatusTone {
+  if (repoSync.mode === 'diverged' || repoSync.mode === 'unavailable') return 'warning'
+  if (repoSync.mode === 'behind') return 'warning'
+  if (repoSync.mode === 'ahead' || localChangeCount > 0) return 'info'
+  return 'neutral'
+}
+
+function describeRemoteSync(repoSync: RepoSyncState, branchLabel: string): string {
+  if (repoSync.mode === 'local-only') return `${branchLabel} has no upstream remote configured.`
+  if (repoSync.mode === 'unavailable') return `${branchLabel} remote status is unavailable locally.`
+  if (repoSync.mode === 'ahead') return `${branchLabel} is ${repoSync.aheadCount} commit${repoSync.aheadCount === 1 ? '' : 's'} ahead of ${repoSync.upstreamRef}.`
+  if (repoSync.mode === 'behind') return `${branchLabel} is ${repoSync.behindCount} commit${repoSync.behindCount === 1 ? '' : 's'} behind ${repoSync.upstreamRef}.`
+  if (repoSync.mode === 'diverged') return `${branchLabel} and ${repoSync.upstreamRef} both have commits to review.`
+  return `${branchLabel} is up to date with ${repoSync.upstreamRef || repoSync.remoteName || 'its remote'}.`
+}
+
+export function buildRepositoryStatusSummary(repoPath: string, branch = ''): RepositoryStatusSummary {
+  const repoName = basename(repoPath) || 'Repository'
+  const branchLabel = branch || getCurrentBranch(repoPath) || 'current branch'
+  const syncSummary = getWorkingTreeSyncSummary(repoPath)
+  const localChangeCount = syncSummary.trackedChangeCount + syncSummary.untrackedChangeCount
+  const hasHistory = hasCommits(repoPath)
+  const remoteDescription = describeRemoteSync(syncSummary.repoSync, branchLabel)
+  const localDescription = !hasHistory
+    ? ' It has no commits yet.'
+    : localChangeCount > 0
+    ? ` It has ${localChangeCount} local ${localChangeCount === 1 ? 'change' : 'changes'} to review.`
+    : ' It has no local changes.'
+
+  return {
+    repoName,
+    branchLabel,
+    remoteLabel: syncSummary.repoSync.remoteName || (syncSummary.repoSync.hasUpstream ? syncSummary.repoSync.upstreamRef : 'Local only'),
+    syncState: syncSummary.repoSync.mode,
+    syncDescription: `${remoteDescription}${localDescription}`,
+    localChangeCount,
+    untrackedChangeCount: syncSummary.untrackedChangeCount,
+    statusTone: toneForRepoSync(syncSummary.repoSync, localChangeCount),
+    detailBadges: [
+      { label: syncSummary.repoSync.mode, tone: toneForRepoSync(syncSummary.repoSync, localChangeCount) },
+      ...(localChangeCount > 0 ? [{ label: `${localChangeCount} local changes`, tone: 'info' as const }] : []),
+    ],
   }
 }
 

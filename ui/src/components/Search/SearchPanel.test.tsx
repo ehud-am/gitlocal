@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SearchPanel from './SearchPanel'
-import type { SearchMode } from '../../types'
+import type { SearchContentKind, SearchMode, SearchTrackedMode } from '../../types'
 
 vi.mock('../../services/api', () => ({
   api: {
@@ -31,6 +31,11 @@ function SearchPanelHarness({
   initialQuery = '',
   initialMode = 'both',
   initialCaseSensitive = false,
+  initialRootPath = '',
+  currentFolderPath = 'docs',
+  initialContentKinds = 'all',
+  initialTrackedMode = 'tracked-only',
+  initialLimit = 50,
   onSearch = vi.fn(),
   onSelectResult = vi.fn(),
   onDismiss = vi.fn(),
@@ -40,7 +45,20 @@ function SearchPanelHarness({
   initialQuery?: string
   initialMode?: SearchMode
   initialCaseSensitive?: boolean
-  onSearch?: (value: { query: string; mode: SearchMode; caseSensitive: boolean }) => void
+  initialRootPath?: string
+  currentFolderPath?: string
+  initialContentKinds?: SearchContentKind
+  initialTrackedMode?: SearchTrackedMode
+  initialLimit?: number
+  onSearch?: (value: {
+    query: string
+    mode: SearchMode
+    caseSensitive: boolean
+    rootPath: string
+    contentKinds: SearchContentKind
+    trackedMode: SearchTrackedMode
+    limit: number
+  }) => void
   onSelectResult?: (value: { path: string; type: 'file' | 'dir'; matchType: 'name' | 'content'; localOnly: boolean }) => void
   onDismiss?: () => void
   autoFocus?: boolean
@@ -50,6 +68,10 @@ function SearchPanelHarness({
       query: initialQuery,
       mode: initialMode,
       caseSensitive: initialCaseSensitive,
+      rootPath: initialRootPath,
+      contentKinds: initialContentKinds,
+      trackedMode: initialTrackedMode,
+      limit: initialLimit,
     })
 
     return (
@@ -58,6 +80,11 @@ function SearchPanelHarness({
         query={search.query}
         mode={search.mode}
         caseSensitive={search.caseSensitive}
+        rootPath={search.rootPath}
+        currentFolderPath={currentFolderPath}
+        contentKinds={search.contentKinds}
+        trackedMode={search.trackedMode}
+        limit={search.limit}
         autoFocus={autoFocus}
         onSearch={(next) => {
           onSearch(next)
@@ -80,6 +107,9 @@ describe('SearchPanel', () => {
       branch: 'main',
       mode: 'both',
       caseSensitive: false,
+      resultCount: 1,
+      totalEstimate: 1,
+      partial: false,
       results: [{ path: 'docs/guide.md', type: 'file', matchType: 'name', localOnly: false }],
     })
   })
@@ -128,8 +158,18 @@ describe('SearchPanel', () => {
       query: 'docs',
       mode: 'content',
       caseSensitive: false,
+      rootPath: '',
+      contentKinds: 'all',
+      trackedMode: 'tracked-only',
+      limit: 50,
     })
-    expect(vi.mocked(api.getSearchResults)).toHaveBeenCalledWith('docs', 'main', 'content', false)
+    expect(vi.mocked(api.getSearchResults)).toHaveBeenCalledWith('docs', 'main', 'content', false, {
+      rootPath: '',
+      contentKinds: 'all',
+      trackedMode: 'tracked-only',
+      limit: 50,
+      cursor: '',
+    })
     expect(await screen.findByText('docs/guide.md')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /docs\/guide\.md/i }))
@@ -158,8 +198,14 @@ describe('SearchPanel', () => {
       query: 'Searchable',
       mode: 'both',
       caseSensitive: true,
+      rootPath: '',
+      contentKinds: 'all',
+      trackedMode: 'tracked-only',
+      limit: 50,
     })
-    expect(vi.mocked(api.getSearchResults)).toHaveBeenCalledWith('Searchable', 'main', 'both', true)
+    expect(vi.mocked(api.getSearchResults)).toHaveBeenCalledWith('Searchable', 'main', 'both', true, expect.objectContaining({
+      trackedMode: 'tracked-only',
+    }))
   })
 
   it('shows loading and error states for active searches', async () => {
@@ -190,6 +236,9 @@ describe('SearchPanel', () => {
       branch: 'main',
       mode: 'both',
       caseSensitive: false,
+      resultCount: 0,
+      totalEstimate: 0,
+      partial: false,
       results: [],
     })
 
@@ -229,5 +278,109 @@ describe('SearchPanel', () => {
     fireEvent.click(screen.getByLabelText(/file names/i))
     expect(screen.getByText(/press search or enter to run the updated query/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^search$/i })).toBeEnabled()
+  })
+
+  it('submits explicit scope controls and renders partial result metadata', async () => {
+    const onSearch = vi.fn()
+    vi.mocked(api.getSearchResults)
+      .mockResolvedValueOnce({
+        query: 'guide',
+        branch: 'main',
+        mode: 'both',
+        caseSensitive: false,
+        resultCount: 1,
+        totalEstimate: 3,
+        partial: true,
+        nextCursor: '1',
+        results: [{
+          path: 'docs/guide.md',
+          type: 'file',
+          matchType: 'content',
+          line: 2,
+          snippet: 'guide',
+          localOnly: false,
+          scopeLabel: 'Markdown content',
+          generatedLocalState: 'tracked',
+        }],
+      })
+      .mockResolvedValueOnce({
+        query: 'guide',
+        branch: 'main',
+        mode: 'both',
+        caseSensitive: false,
+        resultCount: 1,
+        totalEstimate: 3,
+        partial: true,
+        nextCursor: '2',
+        results: [{
+          path: 'docs/next.md',
+          type: 'file',
+          matchType: 'content',
+          localOnly: false,
+        }],
+      })
+
+    renderWithClient(
+      <SearchPanelHarness
+        initialQuery=""
+        currentFolderPath="docs"
+        onSearch={onSearch}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search query/i }), {
+      target: { value: 'guide' },
+    })
+    fireEvent.change(screen.getByLabelText(/folder scope/i), { target: { value: 'current' } })
+    fireEvent.change(screen.getByLabelText(/content scope/i), { target: { value: 'markdown' } })
+    fireEvent.change(screen.getByLabelText(/tracked files/i), { target: { value: 'include-generated-local' } })
+    fireEvent.change(screen.getByLabelText(/limit/i), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    expect(onSearch).toHaveBeenCalledWith({
+      query: 'guide',
+      mode: 'both',
+      caseSensitive: false,
+      rootPath: 'docs',
+      contentKinds: 'markdown',
+      trackedMode: 'include-generated-local',
+      limit: 25,
+    })
+    expect(await screen.findByText(/showing 1 of 3 results/i)).toBeInTheDocument()
+    expect(screen.getByText(/markdown content/i)).toBeInTheDocument()
+    expect(screen.getByText(/more matches are available/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /load more/i }))
+    await waitFor(() => {
+      expect(vi.mocked(api.getSearchResults)).toHaveBeenLastCalledWith('guide', 'main', 'both', false, expect.objectContaining({
+        rootPath: 'docs',
+        contentKinds: 'markdown',
+        trackedMode: 'include-generated-local',
+        limit: 25,
+        cursor: '1',
+      }))
+    })
+  })
+
+  it('can switch an existing current-folder scope back to the whole repository', async () => {
+    const onSearch = vi.fn()
+
+    renderWithClient(
+      <SearchPanelHarness
+        initialQuery="guide"
+        initialRootPath="docs"
+        currentFolderPath=""
+        onSearch={onSearch}
+      />,
+    )
+
+    expect(await screen.findByText('docs/guide.md')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/folder scope/i), { target: { value: 'repo' } })
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({
+      query: 'guide',
+      rootPath: '',
+    }))
   })
 })
