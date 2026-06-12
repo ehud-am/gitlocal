@@ -13,6 +13,9 @@ const getInitialTheme = vi.fn(() => 'light')
 vi.mock('./services/viewerState', () => ({
   readViewerState: () => readViewerState(),
   writeViewerState: (...args: unknown[]) => writeViewerState(...args),
+  readRecentItems: () => [],
+  rememberRecentItem: vi.fn((item) => item),
+  rememberRecentChangedItems: vi.fn((items) => items),
 }))
 
 vi.mock('./services/theme', () => ({
@@ -88,13 +91,9 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
   default: (props: {
     branch: string
     branchDisabled?: boolean
-    commitDisabled?: boolean
-    syncDisabled?: boolean
     syncActionLabel?: string
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
-    onCommitChanges?: () => void
-    onSyncWithRemote?: () => void
     onOpenSearch?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
@@ -103,15 +102,11 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
         {JSON.stringify({
           branch: props.branch,
           branchDisabled: props.branchDisabled,
-          commitDisabled: props.commitDisabled,
-          syncDisabled: props.syncDisabled,
           syncActionLabel: props.syncActionLabel,
         })}
       </div>
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
-      <button type="button" onClick={() => props.onCommitChanges?.()}>open-commit</button>
-      <button type="button" onClick={() => props.onSyncWithRemote?.()}>sync-remote</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
       {props.branchSwitchDialog}
     </div>
@@ -474,7 +469,7 @@ describe('App logic', () => {
     expect(screen.queryByRole('heading', { name: /leave this repository/i })).not.toBeInTheDocument()
   })
 
-  it('validates git identity without exposing commit or remote sync callbacks', async () => {
+  it('validates git identity without calling commit or remote sync APIs', async () => {
     renderApp()
 
     fireEvent.click(await screen.findByRole('button', { name: 'open-identity' }))
@@ -484,8 +479,6 @@ describe('App logic', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/git name and email must both be set or both be cleared/i)
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    fireEvent.click(screen.getByRole('button', { name: 'sync-remote' }))
     expect(screen.queryByRole('textbox', { name: /commit message/i })).not.toBeInTheDocument()
     expect(api.commitChanges).not.toHaveBeenCalled()
     expect(api.syncWithRemote).not.toHaveBeenCalled()

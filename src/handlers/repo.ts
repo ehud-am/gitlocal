@@ -10,11 +10,15 @@ import {
   commitWorkingTreeChanges,
   getAppVersion,
   getBranches,
+  buildChangedFileItems,
+  buildRepositoryStatusSummary,
   getCommits,
   getCurrentBranch,
   getGitContext,
   getInfo,
   findReadme,
+  findKeyDocuments,
+  summarizeChangedFiles,
   setRepoGitIdentity,
   switchBranch,
   syncCurrentBranchWithRemote,
@@ -28,9 +32,12 @@ import {
 } from '../services/startup-preferences.js'
 import type {
   BranchSwitchRequest,
+  ChangedFilesResponse,
   CommitChangesRequest,
   GitIdentityUpdateRequest,
   LocalActionResponse,
+  NavigationHintsResponse,
+  RepoSummaryResponse,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
   StartupFolderUpdateRequest,
@@ -187,6 +194,68 @@ export async function gitContextHandler(c: Context<{ Variables: Variables }>): P
   const repoPath = c.get('repoPath')
   if (!repoPath || !validateRepo(repoPath)) return c.json(null)
   return c.json(getGitContext(repoPath))
+}
+
+export async function repositorySummaryHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath || !validateRepo(repoPath)) {
+    return c.json({ error: 'No repository loaded' }, 400)
+  }
+
+  const branch = c.req.query('branch') || getCurrentBranch(repoPath) || 'HEAD'
+  const summary = buildRepositoryStatusSummary(repoPath, branch)
+  const response: RepoSummaryResponse = {
+    repoName: summary.repoName,
+    branch,
+    statusSummary: {
+      text: summary.syncDescription,
+      tone: summary.statusTone,
+      remoteLabel: summary.remoteLabel,
+      syncState: summary.syncState,
+      localChangeCount: summary.localChangeCount,
+      untrackedChangeCount: summary.untrackedChangeCount,
+    },
+    keyDocuments: findKeyDocuments(repoPath),
+    recentItems: [],
+    visibility: {
+      generatedLocalMode: 'hide',
+      hiddenCount: 0,
+    },
+  }
+  return c.json(response)
+}
+
+export async function repositoryChangesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath || !validateRepo(repoPath)) {
+    return c.json({ error: 'No repository loaded' }, 400)
+  }
+
+  const includeGeneratedLocal = c.req.query('includeGeneratedLocal') === 'true'
+  const branch = c.req.query('branch') || getCurrentBranch(repoPath) || 'HEAD'
+  const items = buildChangedFileItems(repoPath, includeGeneratedLocal)
+  const response: ChangedFilesResponse = {
+    branch,
+    checkedAt: new Date().toISOString(),
+    summary: summarizeChangedFiles(items),
+    items,
+  }
+  return c.json(response)
+}
+
+export async function repositoryNavigationHintsHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath || !validateRepo(repoPath)) {
+    return c.json({ error: 'No repository loaded' }, 400)
+  }
+
+  const includeGeneratedLocal = c.req.query('includeGeneratedLocal') === 'true'
+  const response: NavigationHintsResponse = {
+    keyDocuments: findKeyDocuments(repoPath),
+    recentItems: [],
+    changedItems: buildChangedFileItems(repoPath, includeGeneratedLocal).slice(0, 10),
+  }
+  return c.json(response)
 }
 
 export async function commitsHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

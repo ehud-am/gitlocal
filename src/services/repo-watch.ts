@@ -1,14 +1,59 @@
 import {
   getPathSyncState,
-  getRepoSyncState,
+  buildChangedFileItems,
   getPathType,
-  getWorkingTreeChanges,
   getWorkingTreeSyncSummary,
   getWorkingTreeRevision,
   isWorkingTreeBranch,
   nearestExistingRepoPath,
+  summarizeChangedFiles,
 } from '../git/repo.js'
-import type { SyncStatus } from '../types.js'
+import type { BackgroundChangeNotice, ChangedFilesSummary, SyncStatus } from '../types.js'
+
+function emptyChangedFilesSummary(): ChangedFilesSummary {
+  return {
+    total: 0,
+    modified: 0,
+    added: 0,
+    deleted: 0,
+    renamed: 0,
+    untracked: 0,
+    remoteRelevant: 0,
+    tracked: 0,
+  }
+}
+
+function buildActivePathNotice(
+  currentPath: string,
+  fileStatus: SyncStatus['fileStatus'],
+  pathSyncState: SyncStatus['pathSyncState'],
+  checkedAt: string,
+): BackgroundChangeNotice | undefined {
+  if (!currentPath) return undefined
+  if (fileStatus === 'deleted') {
+    return {
+      path: currentPath,
+      changeKind: 'deleted',
+      detectedAt: checkedAt,
+      lastRefreshedAt: checkedAt,
+      message: `${currentPath} was deleted outside GitLocal. GitLocal moved to the nearest available folder.`,
+      actionLabel: 'View changed files',
+    }
+  }
+
+  if (fileStatus === 'changed' || pathSyncState === 'local-uncommitted') {
+    return {
+      path: currentPath,
+      changeKind: 'refreshed',
+      detectedAt: checkedAt,
+      lastRefreshedAt: checkedAt,
+      message: `${currentPath} changed outside GitLocal and was refreshed.`,
+      actionLabel: 'View changed files',
+    }
+  }
+
+  return undefined
+}
 
 export function getSyncStatus(repoPath: string, branch: string, currentPath: string): SyncStatus {
   const checkedAt = new Date().toISOString()
@@ -36,6 +81,7 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
       },
       statusMessage: '',
       checkedAt,
+      changedFilesSummary: emptyChangedFilesSummary(),
     }
   }
 
@@ -46,12 +92,17 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
   const resolvedPathType = getPathType(repoPath, resolvedPath)
 
   const treeStatus = currentPathType === 'missing' ? 'invalid' : 'unchanged'
+  const pathSyncState = currentPathType === 'file' ? getPathSyncState(repoPath, currentPath) : 'none'
   const fileStatus =
     currentPathType === 'missing'
       ? 'deleted'
-      : 'unchanged'
+      : pathSyncState === 'local-uncommitted'
+        ? 'changed'
+        : 'unchanged'
   const syncSummary = getWorkingTreeSyncSummary(repoPath)
-  const pathSyncState = currentPathType === 'file' ? getPathSyncState(repoPath, currentPath) : 'none'
+  const changedFilesSummary = summarizeChangedFiles(buildChangedFileItems(repoPath, true))
+  const activePathNotice = buildActivePathNotice(currentPath, fileStatus, pathSyncState, checkedAt)
+  const statusMessage = activePathNotice?.message ?? ''
 
   return {
     branch,
@@ -67,7 +118,9 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
     trackedChangeCount: syncSummary.trackedChangeCount,
     untrackedChangeCount: syncSummary.untrackedChangeCount,
     repoSync: syncSummary.repoSync,
-    statusMessage: '',
+    statusMessage,
     checkedAt,
+    activePathNotice,
+    changedFilesSummary,
   }
 }

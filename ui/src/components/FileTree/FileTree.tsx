@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { TreeNode } from '../../types'
+import type { GeneratedLocalVisibility, TreeNode } from '../../types'
 import FileTreeNode from './FileTreeNode'
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   selectedPath: string
   selectedPathType: 'file' | 'dir' | 'none'
   isGitRepo?: boolean
+  generatedLocalVisibility?: GeneratedLocalVisibility
   onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
 }
 
@@ -20,7 +21,29 @@ interface NodeState {
   error: boolean
 }
 
-export default function FileTree({ branch, refreshToken, selectedPath, selectedPathType, isGitRepo = false, onSelect }: Props) {
+function isTrackedNode(node: TreeNode): boolean {
+  return (node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')) === 'tracked'
+}
+
+function filterNodes(nodes: TreeNode[], visibility: GeneratedLocalVisibility, activePath: string): TreeNode[] {
+  if (visibility === 'show') return nodes
+  return nodes.filter((node) => {
+    const activeException = Boolean(activePath && (node.path === activePath || activePath.startsWith(`${node.path}/`) || node.path.startsWith(`${activePath}/`)))
+    const tracked = isTrackedNode(node)
+    if (visibility === 'only') return !tracked || activeException
+    return tracked || activeException
+  })
+}
+
+export default function FileTree({
+  branch,
+  refreshToken,
+  selectedPath,
+  selectedPathType,
+  isGitRepo = false,
+  generatedLocalVisibility = 'show',
+  onSelect,
+}: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
 
   const { data: roots, isLoading, isError } = useQuery({
@@ -149,11 +172,15 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
     }, Promise.resolve())
   }, [selectedPath, selectedPathType, branch, nodeStates])
 
-  const renderNodes = (nodes: TreeNode[], depth: number): React.ReactNode => (
+  const renderNodes = (nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
     <>
-      {nodes.map(node => {
+      {filterNodes(nodes, generatedLocalVisibility, selectedPath)
+        .filter((node) => !ancestorPaths.has(node.path))
+        .map(node => {
         const state = nodeStates.get(node.path)
         const isExpanded = state?.expanded ?? false
+        const childAncestorPaths = new Set(ancestorPaths)
+        childAncestorPaths.add(node.path)
         return (
           <React.Fragment key={node.path}>
             <FileTreeNode
@@ -178,7 +205,7 @@ export default function FileTree({ branch, refreshToken, selectedPath, selectedP
                     Loading...
                   </div>
                 )}
-                {state?.children && renderNodes(state.children, depth + 1)}
+                {state?.children && renderNodes(state.children, depth + 1, childAncestorPaths)}
               </div>
             )}
           </React.Fragment>

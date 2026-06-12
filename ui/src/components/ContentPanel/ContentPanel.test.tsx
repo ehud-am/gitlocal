@@ -52,6 +52,11 @@ async function openFileActionsMenu() {
 }
 
 async function openFolderActionsMenu() {
+  const treeTab = await screen.findByRole('tab', { name: /tree view/i }).catch(() => null)
+  if (treeTab?.getAttribute('aria-selected') === 'false') {
+    await userEvent.setup().click(treeTab)
+    await waitFor(() => expect(treeTab).toHaveAttribute('aria-selected', 'true'))
+  }
   const trigger = await screen.findByRole('button', { name: /folder actions/i })
   await userEvent.setup().click(trigger)
   await waitFor(() => {
@@ -77,6 +82,7 @@ describe('ContentPanel', () => {
     vi.clearAllMocks()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(api.getTree).mockResolvedValue([])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
   })
 
   it('shows the root directory table with a parent-scope row when no file is selected', async () => {
@@ -96,6 +102,159 @@ describe('ContentPanel', () => {
     expect(screen.getByRole('button', { name: /open parent folder outside this repository/i })).toBeInTheDocument()
     expect(screen.getByText(/does not have any visible files yet/i)).toBeInTheDocument()
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
+  })
+
+  it('renders root dashboard sections with key, recent, changed, and raw browsing shortcuts', async () => {
+    const onOpenPath = vi.fn()
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        isGitRepo
+        repoSummary={{
+          repoName: 'repo',
+          branch: 'main',
+          statusSummary: {
+            text: 'main has no local changes.',
+            tone: 'neutral',
+            remoteLabel: 'origin',
+            syncState: 'up-to-date',
+            localChangeCount: 0,
+            untrackedChangeCount: 0,
+          },
+          keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+          recentItems: [],
+          visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+        }}
+        navigationHints={{
+          keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+          recentItems: [],
+          changedItems: [{ path: 'docs/guide.md', name: 'guide.md', type: 'file', changeState: 'modified', generatedLocalState: 'tracked', sourcePath: '', canOpen: true, reviewHint: 'Modified locally' }],
+        }}
+        recentItems={[{ path: 'docs', type: 'folder', label: 'docs', available: true, lastViewedAt: '2026-06-11T12:00:00.000Z' }]}
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    expect(await screen.findByRole('region', { name: /repository dashboard/i })).toBeInTheDocument()
+    expect(screen.getByText(/main has no local changes/i)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /key documents/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /recent files/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /recently changed files/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /raw directory browsing/i })).toHaveTextContent('2 visible items')
+
+    fireEvent.click(within(screen.getByRole('region', { name: /key documents/i })).getByRole('button', { name: /README/i }))
+    expect(onOpenPath).toHaveBeenCalledWith('README.md', 'file', false)
+  })
+
+  it('defaults folder tabs to README before Tree view when a git README exists', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+    ])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: 'README.md' })
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'README.md', type: 'markdown', content: '# Root readme' }))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        isGitRepo
+        repoSummary={{
+          repoName: 'repo',
+          branch: 'main',
+          statusSummary: {
+            text: 'main has no local changes.',
+            tone: 'neutral',
+            remoteLabel: 'origin',
+            syncState: 'up-to-date',
+            localChangeCount: 0,
+            untrackedChangeCount: 0,
+          },
+          keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+          recentItems: [],
+          visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+        }}
+        navigationHints={{ keyDocuments: [], recentItems: [], changedItems: [] }}
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    const tabs = await screen.findByRole('tablist', { name: /folder views/i })
+    expect(within(tabs).queryByRole('tab', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['README', 'Tree view'])
+    expect(within(tabs).getByRole('tab', { name: 'README' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(tabs).getByRole('tab', { name: 'Tree view' })).toHaveAttribute('aria-selected', 'false')
+    expect(await screen.findByRole('heading', { name: 'Root readme' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /repository dashboard/i })).not.toBeInTheDocument()
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Tree view' }))
+    expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Root readme' })).not.toBeInTheDocument()
+  })
+
+  it('defaults non-git folder tabs to README before Tree view when a README entry exists', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false },
+    ])
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'README.md', type: 'markdown', content: '# Plain folder readme' }))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch=""
+        isGitRepo={false}
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    const tabs = await screen.findByRole('tablist', { name: /folder views/i })
+    expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['README', 'Tree view'])
+    expect(within(tabs).getByRole('tab', { name: 'README' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('heading', { name: 'Plain folder readme' })).toBeInTheDocument()
+  })
+
+  it('filters root directory rows by generated/local visibility in Tree view', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        generatedLocalVisibility="hide"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Tree view' }))
+    const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
+    expect(within(directoryTable).getAllByText('README.md')).not.toHaveLength(0)
+    expect(screen.queryByText('dist')).not.toBeInTheDocument()
   })
 
   it('offers a create action from the empty state when mutation is allowed', async () => {
@@ -348,6 +507,69 @@ describe('ContentPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps dirty folder creation open when Back to viewer is canceled', async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /^new folder$/i }))
+    fireEvent.change(screen.getByLabelText(/folder name/i), { target: { value: 'docs' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
+    expect(screen.getByLabelText(/folder name/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
+    expect(screen.queryByLabelText(/folder name/i)).not.toBeInTheDocument()
+  })
+
+  it('responds to native select-all token changes', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ content: 'hello\nworld' }))
+
+    const client = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="README.md"
+        selectedPathType="file"
+        branch="main"
+        nativeSelectAllToken={0}
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    expect(await screen.findByTestId('code-viewer')).toHaveTextContent('hello')
+    rerender(
+      <QueryClientProvider client={client}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          selectedPath="README.md"
+          selectedPathType="file"
+          branch="main"
+          nativeSelectAllToken={1}
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByTestId('code-viewer')).toHaveTextContent('world')
   })
 
   it('requests current folder deletion from the main folder action area without row delete controls', async () => {
@@ -797,7 +1019,7 @@ describe('ContentPanel', () => {
     })
   })
 
-  it('shows Markdown-specific share actions only for rendered markdown files', async () => {
+  it('keeps rendered Markdown copy visible while moving save and share into the file menu', async () => {
     vi.mocked(api.getFile).mockResolvedValue(
       makeTextFile({ type: 'markdown', language: '', content: '# Hello' }),
     )
@@ -819,9 +1041,13 @@ describe('ContentPanel', () => {
     expect(toolbar).not.toBeNull()
     expect(await within(toolbar as HTMLElement).findByRole('group', { name: /markdown output actions/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Print' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save PDF' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save PDF' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
+    expect(within(toolbar as HTMLElement).getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+    await openFileActionsMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Save PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /view raw/i }))
     expect(screen.queryByText(/saved markdown content/i)).not.toBeInTheDocument()
 
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'notes.txt', type: 'text', content: 'plain' }))
@@ -866,8 +1092,9 @@ describe('ContentPanel', () => {
     )
 
     await screen.findByTestId('code-viewer')
-    const actions = screen.getByRole('group', { name: /text file actions/i })
-    fireEvent.click(within(actions).getByRole('button', { name: 'Copy' }))
+    const toolbar = screen.getByRole('button', { name: /find in file/i }).parentElement
+    expect(toolbar).not.toBeNull()
+    fireEvent.click(within(toolbar as HTMLElement).getByRole('button', { name: 'Copy' }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('plain source'))
   })
@@ -1275,9 +1502,10 @@ describe('ContentPanel', () => {
     )
   })
 
-  it('shows update conflicts inline when save fails', async () => {
+  it('shows update conflicts inline and offers reload recovery when save fails', async () => {
     vi.mocked(api.getFile).mockResolvedValue(makeTextFile())
-    vi.mocked(api.updateFile).mockRejectedValue({ error: 'The file changed on disk before your save completed.' })
+    vi.mocked(api.updateFile).mockRejectedValue({ error: 'The file changed on disk before your save completed. Your edit was not saved. Reload the file to review the latest version, then apply your changes again.' })
+    const onStatusMessage = vi.fn()
 
     renderWithClient(
       <ContentPanel
@@ -1288,6 +1516,7 @@ describe('ContentPanel', () => {
         branch="main"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
+        onStatusMessage={onStatusMessage}
       />,
     )
 
@@ -1297,6 +1526,12 @@ describe('ContentPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/changed on disk/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/edit was not saved/i)
+    fireEvent.click(screen.getByRole('button', { name: /reload from disk/i }))
+    await waitFor(() => {
+      expect(onStatusMessage).toHaveBeenCalledWith('Reloaded the file from disk.')
+    })
+    expect(screen.queryByLabelText(/edit file content/i)).not.toBeInTheDocument()
   })
 
   it('warns before discarding dirty edits', async () => {

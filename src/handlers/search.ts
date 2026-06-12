@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { spawnGit, isWorkingTreeBranch } from '../git/repo.js'
-import { searchWorkingTreeByContent, searchWorkingTreeByName } from '../git/tree.js'
-import type { SearchMode, SearchResponse, SearchResult } from '../types.js'
+import { searchWorkingTreeScoped } from '../git/tree.js'
+import type { SearchContentKind, SearchMode, SearchResponse, SearchResult, SearchScope, SearchTrackedMode } from '../types.js'
 
 type Variables = { repoPath: string }
 
@@ -12,6 +12,64 @@ export function normalizeMode(value: string | undefined): SearchMode {
 
 function parseCaseSensitive(value: string | undefined): boolean {
   return value === 'true'
+}
+
+function parseContentKinds(value: string | undefined): SearchContentKind {
+  return value === 'markdown' ? 'markdown' : 'all'
+}
+
+function parseTrackedMode(value: string | undefined): SearchTrackedMode {
+  if (value === 'tracked-only' || value === 'include-generated-local' || value === 'generated-local-only') return value
+  return 'include-generated-local'
+}
+
+function parseLimit(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed)) return 50
+  return Math.min(200, Math.max(1, parsed))
+}
+
+function parseCursor(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
+function buildSearchScope(c: Context<{ Variables: Variables }>, mode: SearchMode, caseSensitive: boolean): SearchScope {
+  return {
+    rootPath: (c.req.query('rootPath') ?? '').trim().replace(/^\/+|\/+$/g, ''),
+    targets: mode,
+    contentKinds: parseContentKinds(c.req.query('contentKinds')),
+    trackedMode: parseTrackedMode(c.req.query('trackedMode')),
+    caseSensitive,
+    limit: parseLimit(c.req.query('limit')),
+    cursor: c.req.query('cursor'),
+  }
+}
+
+function isMarkdownPath(path: string): boolean {
+  return /\.(md|markdown|mdx|mdown)$/i.test(path)
+}
+
+function filterLegacyResultsByScope(results: SearchResult[], scope: SearchScope): SearchResult[] {
+  return results.filter((result) => {
+    if (scope.rootPath && result.path !== scope.rootPath && !result.path.startsWith(`${scope.rootPath}/`)) return false
+    if (scope.contentKinds === 'markdown' && result.matchType === 'content' && !isMarkdownPath(result.path)) return false
+    return true
+  })
+}
+
+function paginateResults(results: SearchResult[], scope: SearchScope): Pick<SearchResponse, 'resultCount' | 'totalEstimate' | 'partial' | 'nextCursor' | 'results'> {
+  const offset = parseCursor(scope.cursor)
+  const page = results.slice(offset, offset + scope.limit)
+  const nextOffset = offset + page.length
+  const partial = nextOffset < results.length
+  return {
+    resultCount: page.length,
+    totalEstimate: results.length,
+    partial,
+    nextCursor: partial ? String(nextOffset) : undefined,
+    results: page,
+  }
 }
 
 export function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
@@ -65,26 +123,6 @@ function searchGitTreeByName(repoPath: string, branch: string, query: string, ca
   return results
 }
 
-function searchWorkingTreeByTrackedName(repoPath: string, query: string, caseSensitive: boolean): SearchResult[] {
-  return searchWorkingTreeByName(repoPath, query, caseSensitive).map((entry) => ({
-    path: entry.path,
-    type: entry.type,
-    matchType: 'name' as const,
-    localOnly: entry.localOnly,
-  }))
-}
-
-function searchWorkingTreeByTrackedContent(repoPath: string, query: string, caseSensitive: boolean): SearchResult[] {
-  return searchWorkingTreeByContent(repoPath, query, caseSensitive).map((entry) => ({
-    path: entry.path,
-    type: entry.type,
-    matchType: 'content' as const,
-    line: entry.line,
-    snippet: entry.snippet,
-    localOnly: entry.localOnly,
-  }))
-}
-
 function searchGitTreeByContent(repoPath: string, branch: string, query: string, caseSensitive: boolean): SearchResult[] {
   const args = ['grep', '-n']
   if (!caseSensitive) args.push('-i')
@@ -118,32 +156,43 @@ export async function searchHandler(c: Context<{ Variables: Variables }>): Promi
   const branch = c.req.query('branch') ?? 'HEAD'
   const mode = normalizeMode(c.req.query('mode'))
   const caseSensitive = parseCaseSensitive(c.req.query('caseSensitive'))
+  const scope = buildSearchScope(c, mode, caseSensitive)
 
   if (query.length < 3) {
-    const empty: SearchResponse = { query, branch, mode, caseSensitive, results: [] }
+    const empty: SearchResponse = {
+      query,
+      branch,
+      mode,
+      caseSensitive,
+      scope,
+      resultCount: 0,
+      totalEstimate: 0,
+      partial: false,
+      results: [],
+    }
     return c.json(empty)
   }
 
   const searchWorkingTree = isWorkingTreeBranch(repoPath, branch)
-  const nameResults =
-    mode === 'content'
-      ? []
-      : searchWorkingTree
-        ? searchWorkingTreeByTrackedName(repoPath, query, caseSensitive)
-        : searchGitTreeByName(repoPath, branch, query, caseSensitive)
-  const contentResults =
-    mode === 'name'
-      ? []
-      : searchWorkingTree
-        ? searchWorkingTreeByTrackedContent(repoPath, query, caseSensitive)
-        : searchGitTreeByContent(repoPath, branch, query, caseSensitive)
+  const scopedResults = searchWorkingTree
+    ? searchWorkingTreeScoped(repoPath, query, scope)
+    : filterLegacyResultsByScope(
+      [
+        ...(mode === 'content' ? [] : searchGitTreeByName(repoPath, branch, query, caseSensitive)),
+        ...(mode === 'name' ? [] : searchGitTreeByContent(repoPath, branch, query, caseSensitive)),
+      ],
+      scope,
+    )
+
+  const page = paginateResults(sortSearchResults(dedupeSearchResults(scopedResults)), scope)
 
   const response: SearchResponse = {
     query,
     branch,
     mode,
     caseSensitive,
-    results: sortSearchResults(dedupeSearchResults([...nameResults, ...contentResults])),
+    scope,
+    ...page,
   }
   return c.json(response)
 }

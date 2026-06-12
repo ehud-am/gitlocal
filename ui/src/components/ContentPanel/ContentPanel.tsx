@@ -1,7 +1,17 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../services/api'
-import type { FileSyncState, FolderOperationResult, ManualFileOperationResult, TreeNode, ViewerPathType } from '../../types'
+import type {
+  GeneratedLocalVisibility,
+  NavigationHintsResponse,
+  RecentItem,
+  RepoSummaryResponse,
+  FileSyncState,
+  FolderOperationResult,
+  ManualFileOperationResult,
+  TreeNode,
+  ViewerPathType,
+} from '../../types'
 import DeleteFileDialog from './DeleteFileDialog'
 import InlineFileEditor from './InlineFileEditor'
 import NewFileDraft from './NewFileDraft'
@@ -16,6 +26,7 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
+type FolderViewTab = 'readme' | 'tree'
 type EmptyStateAction = 'create-file'
 
 function FindIcon() {
@@ -50,6 +61,10 @@ interface Props {
   nativeSelectAllToken?: number
   branch: string
   isGitRepo?: boolean
+  repoSummary?: RepoSummaryResponse
+  navigationHints?: NavigationHintsResponse
+  recentItems?: RecentItem[]
+  generatedLocalVisibility?: GeneratedLocalVisibility
   onNavigate: (path: string) => void
   onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
   onDirtyChange?: (value: boolean) => void
@@ -131,6 +146,11 @@ function buildSuggestedDraftPath(folderPath: string, entries: TreeNode[]): strin
   return folderPath ? `${folderPath}/${filename}` : filename
 }
 
+function findReadmePathFromEntries(entries?: TreeNode[]): string {
+  const readme = entries?.find((entry) => entry.type === 'file' && entry.name.toLowerCase() === 'readme.md')
+  return readme?.path ?? ''
+}
+
 function getMutationErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message
   if (error && typeof error === 'object') {
@@ -191,6 +211,10 @@ export default function ContentPanel({
   nativeSelectAllToken = 0,
   branch,
   isGitRepo = false,
+  repoSummary,
+  navigationHints,
+  recentItems = [],
+  generatedLocalVisibility = 'hide',
   onNavigate,
   onOpenPath,
   onDirtyChange,
@@ -219,11 +243,13 @@ export default function ContentPanel({
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
+  const [folderViewTab, setFolderViewTab] = useState<FolderViewTab>('tree')
   const fileFindInputRef = useRef<HTMLInputElement | null>(null)
   const panelRootRef = useRef<HTMLDivElement | null>(null)
   const selectionRootRef = useRef<HTMLElement | null>(null)
   const previousNativeFindTokenRef = useRef(nativeFindToken)
   const previousNativeSelectAllTokenRef = useRef(nativeSelectAllToken)
+  const previousRootDefaultKeyRef = useRef('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -246,16 +272,25 @@ export default function ContentPanel({
     queryFn: () => api.getReadme(directoryPath, branch),
     enabled: showingDirectoryView && isGitRepo,
   })
-  const directoryReadmePath = readmeLookup?.path ?? ''
+  const directoryReadmePath = isGitRepo ? (readmeLookup?.path ?? '') : findReadmePathFromEntries(directoryEntries)
   const { data: directoryReadme, isLoading: isDirectoryReadmeLoading } = useQuery({
     queryKey: ['directory-readme', directoryReadmePath, branch, refreshToken],
     queryFn: () => api.getFile(directoryReadmePath, branch, false),
-    enabled: showingDirectoryView && isGitRepo && Boolean(directoryReadmePath),
+    enabled: showingDirectoryView && Boolean(directoryReadmePath),
   })
 
   useEffect(() => {
     setShowRaw(raw)
   }, [selectedPath, raw])
+
+  useEffect(() => {
+    if (!showingDirectoryView) return
+    const defaultKey = `${branch}:${directoryPath}:${directoryReadmePath || 'no-readme'}`
+    if (previousRootDefaultKeyRef.current === defaultKey) return
+
+    previousRootDefaultKeyRef.current = defaultKey
+    setFolderViewTab(directoryReadmePath ? 'readme' : 'tree')
+  }, [branch, directoryPath, directoryReadmePath, showingDirectoryView])
 
   useEffect(() => {
     setMode('view')
@@ -381,6 +416,19 @@ export default function ContentPanel({
     }
   }
 
+  async function reloadFileFromDisk(): Promise<void> {
+    setBusy(true)
+    setFormError('')
+    setDraftContent(data?.content ?? '')
+    setMode('view')
+    try {
+      await refreshFileQueries()
+      onStatusMessage?.('Reloaded the file from disk.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleCreateFile(): Promise<void> {
     setBusy(true)
     setFormError('')
@@ -485,6 +533,104 @@ export default function ContentPanel({
   const hasFileActions = canToggleRaw || canMutateFiles
   const showSelectedLocalOnly = isGitRepo && selectedPathLocalOnly
 
+  function isTrackedEntry(entry: TreeNode): boolean {
+    return (entry.generatedLocalState ?? (entry.localOnly ? 'local-only' : 'tracked')) === 'tracked'
+  }
+
+  function filterVisibleEntries(entries: TreeNode[]): TreeNode[] {
+    if (generatedLocalVisibility === 'show') return entries
+    return entries.filter((entry) => {
+      const activeException = Boolean(selectedPath && (entry.path === selectedPath || selectedPath.startsWith(`${entry.path}/`) || entry.path.startsWith(`${selectedPath}/`)))
+      const tracked = isTrackedEntry(entry)
+      if (generatedLocalVisibility === 'only') return !tracked || activeException
+      return tracked || activeException
+    })
+  }
+
+  function renderShortcutButton(item: { path: string; label: string; type?: 'file' | 'folder'; available?: boolean; reason?: string }, fallbackType: 'file' | 'dir'): JSX.Element {
+    const itemType = item.type === 'folder' || fallbackType === 'dir' ? 'dir' : 'file'
+    return (
+      <button
+        key={`${item.path}:${item.label}`}
+        type="button"
+        className="dashboard-shortcut"
+        disabled={item.available === false}
+        onClick={() => onOpenPath(item.path, itemType, false)}
+      >
+        <span className="dashboard-shortcut-label">{item.label}</span>
+        <span className="dashboard-shortcut-path">{item.reason ?? item.path}</span>
+      </button>
+    )
+  }
+
+  function renderRootDashboard(entries: TreeNode[]): JSX.Element | null {
+    if (selectedPathType !== 'none') return null
+    const keyDocuments = navigationHints?.keyDocuments ?? repoSummary?.keyDocuments ?? []
+    const changedItems = navigationHints?.changedItems ?? []
+    const recent = recentItems.length > 0 ? recentItems : navigationHints?.recentItems ?? repoSummary?.recentItems ?? []
+
+    return (
+      <section className="root-dashboard" aria-label="repository dashboard">
+        <div className="root-dashboard-header">
+          <div>
+            <p className="content-directory-kicker">Repository dashboard</p>
+            <h2 className="content-directory-heading">{repoSummary?.repoName ?? 'Repository'}</h2>
+          </div>
+          {repoSummary?.statusSummary ? (
+            <p className={`repo-dashboard-status repo-dashboard-status-${repoSummary.statusSummary.tone}`}>
+              {repoSummary.statusSummary.text}
+            </p>
+          ) : null}
+        </div>
+        {keyDocuments.length > 0 ? (
+          <section className="dashboard-section" aria-label="key documents">
+            <h3>Key documents</h3>
+            <div className="dashboard-shortcut-grid">
+              {keyDocuments.slice(0, 6).map((item) => renderShortcutButton({
+                path: item.path,
+                label: item.label,
+                available: item.available,
+                reason: item.reason,
+              }, item.category === 'docs' || item.category === 'specs' || item.category === 'folder' ? 'dir' : 'file'))}
+            </div>
+          </section>
+        ) : null}
+        {recent.length > 0 ? (
+          <section className="dashboard-section" aria-label="recent files">
+            <h3>Recent files</h3>
+            <div className="dashboard-shortcut-grid">
+              {recent.slice(0, 6).map((item) => renderShortcutButton({
+                path: item.path,
+                label: item.label,
+                type: item.type,
+                available: item.available,
+                reason: item.lastChangedAt ? 'Changed recently' : 'Viewed recently',
+              }, item.type === 'folder' ? 'dir' : 'file'))}
+            </div>
+          </section>
+        ) : null}
+        {changedItems.length > 0 ? (
+          <section className="dashboard-section" aria-label="recently changed files">
+            <h3>Recently changed</h3>
+            <div className="dashboard-shortcut-grid">
+              {changedItems.slice(0, 6).map((item) => renderShortcutButton({
+                path: item.path,
+                label: item.name,
+                type: item.type === 'folder' ? 'folder' : 'file',
+                available: item.canOpen,
+                reason: item.reviewHint,
+              }, item.type === 'folder' ? 'dir' : 'file'))}
+            </div>
+          </section>
+        ) : null}
+        <section className="dashboard-section" aria-label="raw directory browsing">
+          <h3>Browse repository files</h3>
+          <p>{entries.length} visible {entries.length === 1 ? 'item' : 'items'} in the repository root.</p>
+        </section>
+      </section>
+    )
+  }
+
   function renderDirectoryList(path: string, entries: TreeNode[]): JSX.Element {
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
     const isRootView = selectedPathType === 'none'
@@ -512,15 +658,17 @@ export default function ContentPanel({
             displayPath: 'Leave the current repository scope',
           }
         : null
+    const visibleEntries = filterVisibleEntries(entries)
     const rows: DirectoryRow[] = [
       ...(parentRow ? [parentRow] : []),
-      ...entries.map((entry) => ({
+      ...visibleEntries.map((entry) => ({
         ...entry,
         isParent: false,
         exitsRepo: false,
         displayPath: entry.path,
       })),
     ]
+    const showFolderTabs = Boolean(directoryReadmePath)
 
     function openDirectoryRow(entry: DirectoryRow): void {
       if (entry.exitsRepo) {
@@ -550,7 +698,41 @@ export default function ContentPanel({
         ) : null}
 
         <div ref={setSelectionRoot} className="content-panel-selection-root">
-          <section className="content-directory-panel" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
+          {showFolderTabs ? (
+            <div className="root-view-tabs" role="tablist" aria-label="folder views">
+              <button
+                type="button"
+                id="folder-tab-readme"
+                role="tab"
+                className="root-view-tab"
+                aria-selected={folderViewTab === 'readme'}
+                aria-controls="folder-tab-panel-readme"
+                onClick={() => setFolderViewTab('readme')}
+              >
+                README
+              </button>
+              <button
+                type="button"
+                id="folder-tab-tree"
+                role="tab"
+                className="root-view-tab"
+                aria-selected={folderViewTab === 'tree'}
+                aria-controls="folder-tab-panel-tree"
+                onClick={() => setFolderViewTab('tree')}
+              >
+                Tree view
+              </button>
+            </div>
+          ) : null}
+          {!showFolderTabs ? renderRootDashboard(visibleEntries) : null}
+          {!showFolderTabs || folderViewTab === 'tree' ? (
+          <section
+            id="folder-tab-panel-tree"
+            role={showFolderTabs ? 'tabpanel' : undefined}
+            aria-labelledby={showFolderTabs ? 'folder-tab-tree' : undefined}
+            className="content-directory-panel"
+            aria-label={path ? `Contents of ${path}` : 'Current folder contents'}
+          >
             <div className="content-directory-header">
               <div>
                 <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
@@ -653,7 +835,7 @@ export default function ContentPanel({
                   </table>
                   </div>
                 ) : null}
-                {entries.length === 0 ? (
+                {visibleEntries.length === 0 ? (
                   <div className="content-directory-empty">
                     <p>{emptyMessage}</p>
                   </div>
@@ -661,9 +843,16 @@ export default function ContentPanel({
               </>
             )}
           </section>
+          ) : null}
 
-          {directoryReadmePath ? (
-            <section className="content-readme-panel" aria-label="folder readme">
+          {directoryReadmePath && folderViewTab === 'readme' ? (
+            <section
+              id="folder-tab-panel-readme"
+              role="tabpanel"
+              aria-labelledby="folder-tab-readme"
+              className="content-readme-panel"
+              aria-label="folder readme"
+            >
             <div className="content-directory-header">
               <div>
                 <p className="content-directory-kicker">README</p>
@@ -826,9 +1015,14 @@ export default function ContentPanel({
         ? `No matches for "${trimmedFileFindQuery}" in this file.`
         : `${fileFindMatches.length} ${fileFindMatches.length === 1 ? 'match' : 'matches'} in this file.`
   const showMarkdownShareActions = mode === 'view' && data.type === 'markdown' && !showRaw
+  const showSourceCopyAction = mode === 'view' && canSearchCurrentFile && !showMarkdownShareActions
+  const activeContentPanelClass = [
+    'content-panel',
+    mode === 'edit' ? 'content-panel-editing' : '',
+  ].filter(Boolean).join(' ')
 
   return (
-    <div {...panelProps(`content-panel${mode === 'edit' ? ' content-panel-editing' : ''}`)}>
+    <div {...panelProps(activeContentPanelClass)}>
       <div className="content-active-context">
         <div>
           <p className="content-directory-kicker">File</p>
@@ -864,9 +1058,13 @@ export default function ContentPanel({
                   content={data.content}
                   hasUnsavedChanges={dirty}
                   inline
+                  actions={['copy-rendered']}
                   onStatusMessage={onStatusMessage}
                 />
               </Suspense>
+            ) : null}
+            {showSourceCopyAction ? (
+              <CopyButton getText={() => data.content} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
             ) : null}
             {hasFileActions ? (
               <DropdownMenu>
@@ -880,6 +1078,19 @@ export default function ContentPanel({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {showMarkdownShareActions ? (
+                    <Suspense fallback={null}>
+                      <MarkdownShareActions
+                        path={selectedPath}
+                        content={data.content}
+                        hasUnsavedChanges={dirty}
+                        mode="menu"
+                        actions={['save-pdf', 'system-share']}
+                        listenToNativeCommands={false}
+                        onStatusMessage={onStatusMessage}
+                      />
+                    </Suspense>
+                  ) : null}
                   {canToggleRaw ? (
                     <DropdownMenuItem
                       onSelect={() => {
@@ -1052,6 +1263,7 @@ export default function ContentPanel({
                 setDraftContent(data.content)
                 setMode('view')
               }}
+              onReloadFromDisk={() => { void reloadFileFromDisk() }}
             />
           </div>
         ) : mode === 'confirm-delete' ? (
@@ -1082,16 +1294,24 @@ export default function ContentPanel({
             alt={selectedPath}
           />
         ) : data.type === 'markdown' && !showRaw ? (
-          <div ref={setSelectionRoot} className="markdown-print-surface" data-markdown-title={selectedFileName || selectedPath}>
+          <div
+            ref={setSelectionRoot}
+            className="markdown-print-surface"
+            data-markdown-title={selectedFileName || selectedPath}
+            data-content-selection-target
+          >
             <Suspense fallback={loadingFallback}>
-              <MarkdownRenderer content={data.content} onNavigate={onNavigate} />
+              <MarkdownRenderer
+                content={data.content}
+                currentPath={selectedPath}
+                findQuery={fileFindOpen ? fileFindQuery : ''}
+                findCaseSensitive={fileFindCaseSensitive}
+                onNavigate={onNavigate}
+              />
             </Suspense>
           </div>
         ) : (
           <div ref={setSelectionRoot}>
-            <div className="text-file-actions" role="group" aria-label="text file actions">
-              <CopyButton getText={() => data.content} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
-            </div>
             <Suspense fallback={loadingFallback}>
               <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
             </Suspense>

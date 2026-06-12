@@ -15,6 +15,9 @@ import {
   remoteSyncHandler,
   repositoryOpenHandler,
   repositoryParentFolderHandler,
+  repositoryChangesHandler,
+  repositoryNavigationHintsHandler,
+  repositorySummaryHandler,
   startupFolderHandler,
   startupFolderUpdateHandler,
 } from './handlers/repo.js'
@@ -128,6 +131,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/folder/clone-repository', folderCloneRepositoryHandler)
   app.post('/api/repo/open', repositoryOpenHandler)
   app.post('/api/repo/parent-folder', repositoryParentFolderHandler)
+  app.get('/api/repo/summary', repositorySummaryHandler)
+  app.get('/api/repo/changes', repositoryChangesHandler)
+  app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
 

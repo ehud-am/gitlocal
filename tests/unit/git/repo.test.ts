@@ -61,6 +61,11 @@ import {
   deleteWorkingTreeFolder,
   listWorkingTreeDirectoryEntries,
   getRepoSshKeyPath,
+  classifyGeneratedLocalState,
+  findKeyDocuments,
+  buildChangedFileItems,
+  summarizeChangedFiles,
+  buildRepositoryStatusSummary,
 } from '../../../src/git/repo.js'
 
 afterEach(() => {
@@ -194,6 +199,236 @@ describe('validateRepo', () => {
     const { dir, cleanup } = makeGitRepo()
     try {
       expect(validateRepo(join(dir, 'docs'))).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+})
+
+describe('viewer usability repo helpers', () => {
+  it('rejects invalid SSH key paths when updating repository identity', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      expect(() => setRepoGitIdentity(dir, 'Test User', 'test@test.com', join(dir, 'missing-key'))).toThrow(
+        /SSH private key file could not be read/,
+      )
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('classifies tracked, local-only, ignored, and generated paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'scratch.log\nnode_modules/\n')
+      spawnSync('git', ['add', '.gitignore'], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['commit', '-m', 'ignore generated files'], { cwd: dir, env: isolatedGitEnv() })
+      writeFileSync(join(dir, 'local.txt'), 'local only')
+      writeFileSync(join(dir, 'scratch.log'), 'ignored')
+      mkdirSync(join(dir, 'node_modules'))
+      writeFileSync(join(dir, 'node_modules', 'bundle.js'), 'generated')
+
+      expect(classifyGeneratedLocalState(dir, 'README.md')).toBe('tracked')
+      expect(classifyGeneratedLocalState(dir, 'local.txt')).toBe('local-only')
+      expect(classifyGeneratedLocalState(dir, 'scratch.log')).toBe('ignored')
+      expect(classifyGeneratedLocalState(dir, 'node_modules/bundle.js')).toBe('generated')
+      expect(classifyGeneratedLocalState(dir, 'missing.txt')).toBe('unknown')
+      expect(classifyGeneratedLocalState('', 'README.md')).toBe('unknown')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('discovers available key repository documents', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'AGENTS.md'), 'instructions')
+      mkdirSync(join(dir, 'specs'))
+
+      const docs = findKeyDocuments(dir)
+
+      expect(docs).toContainEqual(expect.objectContaining({ path: 'README.md', category: 'README' }))
+      expect(docs).toContainEqual(expect.objectContaining({ path: 'AGENTS.md', category: 'agent-instructions' }))
+      expect(docs).toContainEqual(expect.objectContaining({ path: 'specs', category: 'specs' }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('maps changed-file items with review hints and summary counts', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      writeFileSync(join(dir, 'new-note.md'), 'new')
+      rmSync(join(dir, 'notes.txt'))
+
+      const items = buildChangedFileItems(dir, true)
+      const summary = summarizeChangedFiles(items)
+
+      expect(items).toContainEqual(expect.objectContaining({
+        path: 'README.md',
+        changeState: 'modified',
+        generatedLocalState: 'tracked',
+        canOpen: true,
+      }))
+      expect(items).toContainEqual(expect.objectContaining({
+        path: 'new-note.md',
+        changeState: 'untracked',
+        generatedLocalState: 'local-only',
+        canOpen: true,
+      }))
+      expect(items).toContainEqual(expect.objectContaining({
+        path: 'notes.txt',
+        changeState: 'deleted',
+        type: 'missing',
+        canOpen: false,
+      }))
+      expect(summary).toMatchObject({ total: 3, modified: 1, deleted: 1, untracked: 1, tracked: 2 })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('maps staged added and renamed changed-file items', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'staged-new.md'), 'new')
+      spawnSync('git', ['add', 'staged-new.md'], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['mv', 'main.ts', 'renamed-main.ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      const items = buildChangedFileItems(dir, true)
+
+      expect(items).toContainEqual(expect.objectContaining({
+        path: 'staged-new.md',
+        changeState: 'added',
+        reviewHint: 'Added locally',
+      }))
+      expect(items).toContainEqual(expect.objectContaining({
+        path: 'renamed-main.ts',
+        sourcePath: 'main.ts',
+        changeState: 'renamed',
+        reviewHint: 'Renamed locally',
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('builds a plain-language local-only repository summary', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      const summary = buildRepositoryStatusSummary(dir, 'main')
+
+      expect(summary.repoName).toBeTruthy()
+      expect(summary.branchLabel).toBe('main')
+      expect(summary.remoteLabel).toBe('Local only')
+      expect(summary.syncDescription).toContain('no upstream remote configured')
+      expect(summary.syncDescription).toContain('1 local change')
+      expect(summary.statusTone).toBe('info')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('builds a neutral summary for an up-to-date repository with an upstream', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const remote = makeBareRepo()
+    try {
+      spawnSync('git', ['remote', 'add', 'origin', remote.dir], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: dir, env: isolatedGitEnv() })
+
+      const summary = buildRepositoryStatusSummary(dir, 'main')
+
+      expect(summary.remoteLabel).toBe('origin')
+      expect(summary.syncState).toBe('up-to-date')
+      expect(summary.syncDescription).toContain('up to date')
+      expect(summary.syncDescription).toContain('no local changes')
+      expect(summary.statusTone).toBe('neutral')
+    } finally {
+      cleanup()
+      remote.cleanup()
+    }
+  })
+
+  it('describes ahead, behind, and diverged upstream states', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const remote = makeBareRepo()
+    const collaboratorDir = mkdtempSync(join(tmpdir(), 'gitlocal-collab-'))
+    try {
+      git(dir, 'remote', 'add', 'origin', remote.dir)
+      git(dir, 'push', '-u', 'origin', 'HEAD')
+
+      writeFileSync(join(dir, 'ahead.md'), 'ahead')
+      git(dir, 'add', 'ahead.md')
+      git(dir, 'commit', '-m', 'ahead change')
+      expect(buildRepositoryStatusSummary(dir, 'main')).toMatchObject({
+        syncState: 'ahead',
+        statusTone: 'info',
+      })
+      expect(buildRepositoryStatusSummary(dir, 'main').syncDescription).toContain('ahead')
+
+      git(dir, 'push')
+      rmSync(collaboratorDir, { recursive: true, force: true })
+      git(tmpdir(), 'clone', remote.dir, collaboratorDir)
+      git(collaboratorDir, 'config', 'user.email', 'test@test.com')
+      git(collaboratorDir, 'config', 'user.name', 'Test User')
+      writeFileSync(join(collaboratorDir, 'behind.md'), 'behind')
+      git(collaboratorDir, 'add', 'behind.md')
+      git(collaboratorDir, 'commit', '-m', 'behind change')
+      git(collaboratorDir, 'push')
+      git(dir, 'fetch', 'origin')
+
+      const behindSummary = buildRepositoryStatusSummary(dir, 'main')
+      expect(behindSummary.syncState).toBe('behind')
+      expect(behindSummary.statusTone).toBe('warning')
+      expect(behindSummary.syncDescription).toContain('behind')
+
+      writeFileSync(join(dir, 'diverged.md'), 'diverged')
+      git(dir, 'add', 'diverged.md')
+      git(dir, 'commit', '-m', 'diverged change')
+
+      const divergedSummary = buildRepositoryStatusSummary(dir, 'main')
+      expect(divergedSummary.syncState).toBe('diverged')
+      expect(divergedSummary.statusTone).toBe('warning')
+      expect(divergedSummary.syncDescription).toContain('both have commits')
+    } finally {
+      cleanup()
+      remote.cleanup()
+      rmSync(collaboratorDir, { recursive: true, force: true })
+    }
+  })
+
+  it('describes repositories with no commits in plain language', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-empty-summary-'))
+    try {
+      git(dir, 'init')
+      git(dir, 'config', 'user.email', 'test@test.com')
+      git(dir, 'config', 'user.name', 'Test User')
+
+      const summary = buildRepositoryStatusSummary(dir, 'main')
+
+      expect(summary.syncState).toBe('local-only')
+      expect(summary.syncDescription).toContain('no commits yet')
+      expect(summary.remoteLabel).toBe('Local only')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('describes unavailable upstream state in plain language', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      git(dir, 'remote', 'add', 'origin', dir)
+      git(dir, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
+      git(dir, 'branch', '--set-upstream-to=origin/main')
+      git(dir, 'update-ref', 'refs/remotes/origin/main', git(dir, 'rev-parse', 'HEAD^{tree}'))
+
+      const summary = buildRepositoryStatusSummary(dir, 'main')
+
+      expect(summary.syncState).toBe('unavailable')
+      expect(summary.statusTone).toBe('warning')
+      expect(summary.syncDescription).toContain('remote status is unavailable')
     } finally {
       cleanup()
     }

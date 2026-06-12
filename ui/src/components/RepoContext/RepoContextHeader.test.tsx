@@ -171,6 +171,189 @@ describe('RepoContextHeader', () => {
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toBeDisabled()
   })
 
+  it('renders active change notices and changed-file review entries', () => {
+    const onOpenChangedFiles = vi.fn()
+    const onOpenChangedFile = vi.fn()
+    const onCloseChangedFiles = vi.fn()
+
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[{ name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true }]}
+        selectedPath="README.md"
+        selectedPathType="file"
+        trackedChangeCount={2}
+        untrackedChangeCount={1}
+        activePathNotice={{
+          path: 'README.md',
+          changeKind: 'refreshed',
+          detectedAt: '2026-06-11T12:00:00.000Z',
+          lastRefreshedAt: '2026-06-11T12:00:00.000Z',
+          message: 'README.md changed outside GitLocal and was refreshed.',
+          actionLabel: 'View changed files',
+        }}
+        changedFiles={{
+          branch: 'main',
+          checkedAt: '2026-06-11T12:00:00.000Z',
+          summary: { total: 3, modified: 1, added: 0, deleted: 1, renamed: 0, untracked: 1, remoteRelevant: 0, tracked: 2 },
+          items: [
+            {
+              path: 'README.md',
+              name: 'README.md',
+              type: 'file',
+              changeState: 'modified',
+              generatedLocalState: 'tracked',
+              sourcePath: '',
+              canOpen: true,
+              reviewHint: 'Modified locally',
+            },
+            {
+              path: 'docs/deleted.md',
+              name: 'deleted.md',
+              type: 'missing',
+              changeState: 'deleted',
+              generatedLocalState: 'tracked',
+              sourcePath: '',
+              canOpen: false,
+              reviewHint: 'Open parent folder',
+            },
+            {
+              path: 'scratch.md',
+              name: 'scratch.md',
+              type: 'file',
+              changeState: 'untracked',
+              generatedLocalState: 'local-only',
+              sourcePath: '',
+              canOpen: true,
+              reviewHint: 'Local-only file',
+            },
+          ],
+        }}
+        onBranchChange={vi.fn()}
+        onOpenChangedFiles={onOpenChangedFiles}
+        onCloseChangedFiles={onCloseChangedFiles}
+        onOpenChangedFile={onOpenChangedFile}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(/changed outside GitLocal/i)
+    expect(screen.queryByRole('button', { name: /^changed files$/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view changed files/i }))
+    expect(onOpenChangedFiles).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('region', { name: /changed files/i })).toHaveTextContent('README.md')
+    expect(screen.getByText(/local-only/i)).toBeInTheDocument()
+    expect(screen.getByText(/unavailable/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /docs\/deleted\.md/i }))
+    expect(onOpenChangedFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'docs/deleted.md', canOpen: false }))
+    fireEvent.click(screen.getByRole('button', { name: /close changed files/i }))
+    expect(onCloseChangedFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders a plain-language repository status summary with supporting facts', () => {
+    const onOpenChangedFiles = vi.fn()
+
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: {
+            user: null,
+            remote: {
+              name: 'origin',
+              fetchUrl: 'git@github.com:ehud-am/gitlocal.git',
+              webUrl: 'https://github.com/ehud-am/gitlocal',
+              selectionReason: 'origin',
+            },
+          },
+        }}
+        branch="main"
+        branches={[{ name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true }]}
+        selectedPath=""
+        selectedPathType="none"
+        repoSummary={{
+          repoName: 'gitlocal',
+          branch: 'main',
+          statusSummary: {
+            text: 'main is 1 commit behind origin/main. It has 2 local changes to review.',
+            tone: 'warning',
+            remoteLabel: 'origin',
+            syncState: 'behind',
+            localChangeCount: 2,
+            untrackedChangeCount: 1,
+          },
+          keyDocuments: [],
+          recentItems: [],
+          visibility: { generatedLocalMode: 'hide', hiddenCount: 3 },
+        }}
+        onBranchChange={vi.fn()}
+        onOpenChangedFiles={onOpenChangedFiles}
+      />,
+    )
+
+    const summary = screen.getByRole('region', { name: /repository status summary/i })
+    expect(summary).toHaveTextContent('main is 1 commit behind origin/main')
+    expect(summary).toHaveTextContent('Branchmain')
+    expect(summary).toHaveTextContent('Remoteorigin')
+    expect(summary).toHaveTextContent('Local changes2')
+    expect(screen.queryByRole('button', { name: /^changed files$/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /review changed files/i }))
+    expect(onOpenChangedFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders a closeable empty changed-files state after review', () => {
+    const onCloseChangedFiles = vi.fn()
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[{ name: 'main', isCurrent: true }]}
+        selectedPath=""
+        selectedPathType="none"
+        changedFiles={{
+          branch: 'main',
+          checkedAt: '2026-06-11T12:00:00.000Z',
+          summary: { total: 0, modified: 0, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 0 },
+          items: [],
+        }}
+        onBranchChange={vi.fn()}
+        onCloseChangedFiles={onCloseChangedFiles}
+      />,
+    )
+
+    expect(screen.getByRole('region', { name: /changed files/i })).toHaveTextContent(/no changed files/i)
+    fireEvent.click(screen.getByRole('button', { name: /close changed files/i }))
+    expect(onCloseChangedFiles).toHaveBeenCalledTimes(1)
+  })
+
   it('renders plain folder context without git-only controls', () => {
     render(
       <RepoContextHeader

@@ -108,10 +108,12 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 ## What GitLocal Helps With
 
 - **Browse local projects** with a lazy-loading file tree for regular folders and git repositories.
-- **Read Markdown clearly** with GitHub-like rendering for READMEs, specs, plans, tables, task lists, and code blocks.
-- **Review code with context** using line numbers, branch information, local path, remote details, and file sync state.
-- **Search intentionally** with repository search from the header and file-level find inside the current file.
-- **Make small edits** by creating, updating, and deleting files directly from the viewer.
+- **Read Markdown clearly** in the normal repository viewer with GitHub-like rendering, relative links, heading anchors, rendered find highlights, and share/copy actions.
+- **Start from useful repository context** with a root dashboard for status, key documents, recent files, recently changed files, and raw directory browsing.
+- **Review background changes** with active-file refresh/deletion notices and a changed-files panel for modified, deleted, untracked, generated, and local-only paths.
+- **Search intentionally** with a separate repository search surface, current-folder and Markdown-focused scopes, generated/local controls, result counts, and file-level find inside the current file.
+- **Understand git state quickly** through a plain-language repository summary with branch, remote, sync, and local-change context backed by technical badges.
+- **Make small edits safely** by creating, updating, and deleting files directly from the viewer with dirty-navigation warnings and revision-token conflict protection.
 - **Manage folders** by creating child folders or deleting subfolders with typed confirmation and impact counts.
 - **Switch branches safely** with commit or discard confirmation when the working tree is dirty.
 - **Manage local git identity** by saving repo-local `user.name`, `user.email`, and optional SSH key settings.
@@ -300,7 +302,7 @@ packaging/macos/        — Homebrew cask, package, checksum, and release helper
 - **Primary npm toolchain** — build, test, and install the cross-platform package via `npm`; macOS app packaging adds scoped Swift and shell/Ruby release helpers outside the npm package
 - **Shared app code across distributions** — npm and Homebrew use the same TypeScript server and React UI; the Mac wrapper only owns native windowing, service lifecycle, and packaging
 - **Hash-based routing** — `HashRouter` means the server only needs to serve `index.html` for all non-asset routes
-- **Local-first editing and repo awareness** — GitLocal can create, update, and delete files in folder roots and repository working trees while using git commands for branch and repository metadata
+- **Local-first editing and repo awareness** — GitLocal can create, update, and delete files in folder roots and repository working trees while using git commands for branch, repository metadata, changed files, and conflict-safe revision checks
 
 ---
 
@@ -322,9 +324,12 @@ All endpoints are served under `/api/`:
 | `POST /api/git/identity/ssh-key/validate` | Validate an arbitrary SSH private key path before saving it |
 | `GET /api/tree?path=&branch=` | Directory listing (dirs first, alphabetical) |
 | `GET /api/file?path=&branch=` | File content with type and language detection |
-| `GET /api/search?query=&branch=&mode=&caseSensitive=` | Repository search across file names, file contents, or both |
+| `GET /api/repo/summary?branch=` | Plain-language repository status, key documents, and local/generated visibility context |
+| `GET /api/repo/changes?branch=&includeGeneratedLocal=` | Changed-file review items with status, availability, and local/generated labels |
+| `GET /api/repo/navigation-hints?branch=&includeRecent=&includeGeneratedLocal=` | Key documents and navigation shortcuts for the root dashboard |
+| `GET /api/search?query=&branch=&mode=&caseSensitive=&rootPath=&contentKinds=&trackedMode=&limit=&cursor=` | Scoped repository search across file names, contents, Markdown, current folder, and generated/local modes |
 | `POST /api/file` | Create a new file in the current folder root or repository working tree |
-| `PUT /api/file` | Update an existing file using its revision token |
+| `PUT /api/file` | Update an existing file using its revision token, returning a conflict if the file changed on disk |
 | `DELETE /api/file` | Delete an existing file using its revision token |
 | `POST /api/folder` | Create a direct child folder in the current folder root or repository working tree |
 | `GET /api/folder/delete-preview?path=` | Preview recursive folder deletion impact before confirmation |

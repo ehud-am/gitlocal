@@ -13,17 +13,22 @@ import type {
   GitIdentityUpdateRequest,
   GitIdentityUpdateResponse,
   GitContext,
+  ChangedFilesResponse,
   ManualFileMutationRequest,
   ManualFileOperationResult,
+  NavigationHintsResponse,
   FolderCloneRepositoryRequest,
   FolderCreateChildRequest,
   FolderBrowseResponse,
   FolderInitRepositoryRequest,
   LocalActionResponse,
   RepoInfo,
+  RepoSummaryResponse,
   RemoteSyncResponse,
+  SearchContentKind,
   SearchMode,
   SearchResponse,
+  SearchTrackedMode,
   SyncStatus,
   SshKeyListResponse,
   SshKeyValidationResponse,
@@ -34,6 +39,14 @@ import type {
 } from '../types'
 
 const BASE = ''
+
+interface SearchOptions {
+  rootPath?: string
+  contentKinds?: SearchContentKind
+  trackedMode?: SearchTrackedMode
+  limit?: number
+  cursor?: string
+}
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(BASE + path)
@@ -98,6 +111,34 @@ export const api = {
     mutate('/api/startup-folder', 'PUT', payload),
 
   getGitContext: (): Promise<GitContext | null> => request<GitContext | null>('/api/git/context'),
+
+  getRepoSummary: (branch?: string): Promise<RepoSummaryResponse> => {
+    const params = new URLSearchParams()
+    if (branch) params.set('branch', branch)
+    const qs = params.toString()
+    return request(`/api/repo/summary${qs ? '?' + qs : ''}`)
+  },
+
+  getChangedFiles: (branch?: string, includeGeneratedLocal = false): Promise<ChangedFilesResponse> => {
+    const params = new URLSearchParams()
+    if (branch) params.set('branch', branch)
+    if (includeGeneratedLocal) params.set('includeGeneratedLocal', 'true')
+    const qs = params.toString()
+    return request(`/api/repo/changes${qs ? '?' + qs : ''}`)
+  },
+
+  getNavigationHints: (
+    branch?: string,
+    includeRecent = true,
+    includeGeneratedLocal = false,
+  ): Promise<NavigationHintsResponse> => {
+    const params = new URLSearchParams()
+    if (branch) params.set('branch', branch)
+    if (!includeRecent) params.set('includeRecent', 'false')
+    if (includeGeneratedLocal) params.set('includeGeneratedLocal', 'true')
+    const qs = params.toString()
+    return request(`/api/repo/navigation-hints${qs ? '?' + qs : ''}`)
+  },
 
   getBranches: (): Promise<Branch[]> => request('/api/branches'),
 
@@ -175,10 +216,16 @@ export const api = {
     branch?: string,
     mode: SearchMode = 'both',
     caseSensitive = false,
+    options: SearchOptions = {},
   ): Promise<SearchResponse> => {
     const params = new URLSearchParams({ query, mode })
     if (branch) params.set('branch', branch)
     if (caseSensitive) params.set('caseSensitive', 'true')
+    if (options.rootPath) params.set('rootPath', options.rootPath)
+    if (options.contentKinds) params.set('contentKinds', options.contentKinds)
+    if (options.trackedMode) params.set('trackedMode', options.trackedMode)
+    if (options.limit !== undefined) params.set('limit', String(options.limit))
+    if (options.cursor) params.set('cursor', options.cursor)
     return request(`/api/search?${params.toString()}`)
   },
 

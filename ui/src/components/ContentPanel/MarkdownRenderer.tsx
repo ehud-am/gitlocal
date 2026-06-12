@@ -5,30 +5,58 @@ import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css'
 import CopyButton from './CopyButton'
 import CodeViewer from './CodeViewer'
+import { createUniqueHeadingId, resolveMarkdownLink, stripHiddenMarkdownComments } from './markdown-navigation'
+import { flattenRenderableText, hasMarkdownFindQuery, splitMarkdownFindSegments } from './markdown-find'
 
 interface Props {
   content: string
+  currentPath?: string
+  findQuery?: string
+  findCaseSensitive?: boolean
   onNavigate: (path: string) => void
 }
 
-function stripHiddenMarkdownComments(content: string): string {
-  return content
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^\[\/\/\]:\s*#\s*\(.*\)\s*$/gm, '')
-    .replace(/^\[comment\]:\s*#\s*\(.*\)\s*$/gim, '')
-}
-
-function flattenText(node: ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') return String(node)
-  if (Array.isArray(node)) return node.map(flattenText).join('')
-  if (node && typeof node === 'object' && 'props' in node) {
-    return flattenText((node as { props?: { children?: ReactNode } }).props?.children ?? '')
-  }
-  return ''
-}
-
-export default function MarkdownRenderer({ content, onNavigate }: Props) {
+export default function MarkdownRenderer({
+  content,
+  currentPath = '',
+  findQuery = '',
+  findCaseSensitive = false,
+  onNavigate,
+}: Props) {
   const renderContent = stripHiddenMarkdownComments(content)
+  const headingIds = new Map<string, number>()
+  const shouldHighlight = hasMarkdownFindQuery(findQuery)
+
+  function renderHighlightedText(text: string): ReactNode {
+    if (!shouldHighlight) return text
+    return splitMarkdownFindSegments(text, findQuery, findCaseSensitive).map((segment, index) =>
+      segment.match ? (
+        <mark key={`${segment.text}:${index}`} className="markdown-find-highlight">
+          {segment.text}
+        </mark>
+      ) : (
+        segment.text
+      ),
+    )
+  }
+
+  function renderHighlightedChildren(children: ReactNode): ReactNode {
+    if (!shouldHighlight) return children
+    if (typeof children === 'string' || typeof children === 'number') return renderHighlightedText(String(children))
+    if (Array.isArray(children)) {
+      return children.map((child, index) => (
+        <span key={index}>{renderHighlightedChildren(child)}</span>
+      ))
+    }
+    return children
+  }
+
+  function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, children: ReactNode): ReactNode {
+    const HeadingTag = `h${level}` as const
+    const text = flattenRenderableText(children)
+    const id = createUniqueHeadingId(text, headingIds)
+    return <HeadingTag id={id}>{renderHighlightedChildren(children)}</HeadingTag>
+  }
 
   return (
     <div className="markdown-body">
@@ -45,9 +73,7 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault()
-                    // Decode URI components and strip leading ./
-                    const decoded = decodeURIComponent(href).replace(/^\.\//, '')
-                    onNavigate(decoded)
+                    onNavigate(resolveMarkdownLink(href, currentPath))
                   }}
                 >
                   {children}
@@ -56,8 +82,16 @@ export default function MarkdownRenderer({ content, onNavigate }: Props) {
             }
             return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
           },
+          p: ({ children }) => <p>{renderHighlightedChildren(children)}</p>,
+          li: ({ children }) => <li>{renderHighlightedChildren(children)}</li>,
+          h1: ({ children }) => renderHeading(1, children),
+          h2: ({ children }) => renderHeading(2, children),
+          h3: ({ children }) => renderHeading(3, children),
+          h4: ({ children }) => renderHeading(4, children),
+          h5: ({ children }) => renderHeading(5, children),
+          h6: ({ children }) => renderHeading(6, children),
           code: ({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: ReactNode }) => {
-            const rawText = flattenText(children)
+            const rawText = flattenRenderableText(children)
             const text = rawText.replace(/\n$/, '')
             const isBlockCode = inline === false || className?.startsWith('language-') || rawText.includes('\n')
             const languageMatch = className?.match(/language-([\w-]+)/)

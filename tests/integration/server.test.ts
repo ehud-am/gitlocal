@@ -211,6 +211,36 @@ describe('Server integration', () => {
     expect(Array.isArray(body)).toBe(true)
   })
 
+  it('GET repo usability API surfaces return summary, changes, and navigation hints', async () => {
+    const repo = makeGitRepo()
+    try {
+      writeFileSync(join(repo.dir, 'README.md'), '# Changed integration test')
+      writeFileSync(join(repo.dir, 'new-note.md'), 'new local note')
+      const app = createApp(repo.dir)
+
+      const summaryRes = await app.fetch(new Request('http://localhost/api/repo/summary'))
+      const changesRes = await app.fetch(new Request('http://localhost/api/repo/changes?includeGeneratedLocal=true'))
+      const hintsRes = await app.fetch(new Request('http://localhost/api/repo/navigation-hints'))
+
+      expect(summaryRes.status).toBe(200)
+      expect(changesRes.status).toBe(200)
+      expect(hintsRes.status).toBe(200)
+
+      const summary = await summaryRes.json() as { statusSummary: { text: string; localChangeCount: number } }
+      const changes = await changesRes.json() as { summary: { total: number }; items: Array<{ path: string }> }
+      const hints = await hintsRes.json() as { keyDocuments: Array<{ path: string }>; changedItems: Array<{ path: string }> }
+
+      expect(summary.statusSummary.text).toContain('local changes')
+      expect(summary.statusSummary.localChangeCount).toBe(2)
+      expect(changes.summary.total).toBe(2)
+      expect(changes.items).toContainEqual(expect.objectContaining({ path: 'new-note.md' }))
+      expect(hints.keyDocuments).toContainEqual(expect.objectContaining({ path: 'README.md' }))
+      expect(hints.changedItems).toContainEqual(expect.objectContaining({ path: 'README.md' }))
+    } finally {
+      repo.cleanup()
+    }
+  })
+
   it('GET /api/git/context includes git context for the repo header', async () => {
     const repo = makeGitRepo()
     const remoteDir = mkdtempSync(join(tmpdir(), 'gitlocal-remote-context-'))

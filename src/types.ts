@@ -225,6 +225,7 @@ export interface TreeNode {
   type: 'file' | 'dir'
   localOnly: boolean
   syncState?: FileSyncState
+  generatedLocalState?: GeneratedLocalState
 }
 
 export type FileEncoding = 'utf-8' | 'base64' | 'none'
@@ -352,6 +353,135 @@ export interface FolderCloneRepositoryRequest {
 
 export type SearchMode = 'name' | 'content' | 'both'
 export type SearchMatchType = 'name' | 'content'
+export type GeneratedLocalVisibility = 'hide' | 'show' | 'only'
+export type GeneratedLocalState = 'tracked' | 'local-only' | 'generated' | 'ignored' | 'unknown'
+export type SearchContentKind = 'all' | 'markdown'
+export type SearchTrackedMode = 'tracked-only' | 'include-generated-local' | 'generated-local-only'
+export type RepositoryStatusTone = 'neutral' | 'info' | 'warning' | 'danger'
+export type KeyDocumentCategory = 'README' | 'agent-instructions' | 'specs' | 'docs' | 'recent' | 'changed' | 'folder'
+export type ChangedFileState =
+  | 'modified'
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'untracked'
+  | 'local-only'
+  | 'local-committed'
+  | 'remote-committed'
+  | 'diverged'
+  | 'clean'
+  | 'unknown'
+export type BackgroundChangeKind = 'refreshed' | 'modified' | 'deleted' | 'moved' | 'unavailable' | 'conflict'
+
+export interface ReadingPreference {
+  sidebarCollapsed: boolean
+  generatedLocalVisibility: GeneratedLocalVisibility
+  defaultSearchScope: SearchScope
+}
+
+export interface RepositoryStatusSummary {
+  repoName: string
+  branchLabel: string
+  remoteLabel: string
+  syncState: RepoSyncMode
+  syncDescription: string
+  localChangeCount: number
+  untrackedChangeCount: number
+  statusTone: RepositoryStatusTone
+  detailBadges: Array<{ label: string; tone: RepositoryStatusTone }>
+}
+
+export interface RepositoryStatusSummaryPayload {
+  text: string
+  tone: RepositoryStatusTone
+  remoteLabel: string
+  syncState: RepoSyncMode
+  localChangeCount: number
+  untrackedChangeCount: number
+}
+
+export interface ChangedFilesSummary {
+  total: number
+  modified: number
+  added: number
+  deleted: number
+  renamed: number
+  untracked: number
+  remoteRelevant: number
+  tracked?: number
+}
+
+export interface ChangedFileItem {
+  path: string
+  name: string
+  type: 'file' | 'folder' | 'missing' | 'unknown'
+  changeState: ChangedFileState
+  generatedLocalState: GeneratedLocalState
+  sourcePath: string
+  canOpen: boolean
+  reviewHint: string
+}
+
+export interface KeyDocumentItem {
+  path: string
+  label: string
+  category: KeyDocumentCategory
+  reason: string
+  available: boolean
+}
+
+export interface RecentItem {
+  path: string
+  type: 'file' | 'folder'
+  label: string
+  lastViewedAt?: string
+  lastChangedAt?: string
+  available: boolean
+}
+
+export interface BackgroundChangeNotice {
+  path: string
+  changeKind: BackgroundChangeKind
+  detectedAt: string
+  lastRefreshedAt: string
+  message: string
+  actionLabel?: string
+}
+
+export interface SearchScope {
+  rootPath: string
+  targets: SearchMode
+  contentKinds: SearchContentKind
+  trackedMode: SearchTrackedMode
+  caseSensitive: boolean
+  limit: number
+  cursor?: string
+}
+
+export interface RepoSummaryResponse {
+  repoName: string
+  branch: string
+  statusSummary: RepositoryStatusSummaryPayload
+  keyDocuments: KeyDocumentItem[]
+  recentItems: RecentItem[]
+  visibility: {
+    generatedLocalMode: GeneratedLocalVisibility
+    hiddenCount: number
+  }
+}
+
+export interface ChangedFilesResponse {
+  branch: string
+  checkedAt: string
+  summary: ChangedFilesSummary
+  items: ChangedFileItem[]
+}
+
+export interface NavigationHintsResponse {
+  keyDocuments: KeyDocumentItem[]
+  recentItems: RecentItem[]
+  changedItems: ChangedFileItem[]
+}
 
 export interface SearchRequest {
   query: string
@@ -367,6 +497,9 @@ export interface SearchResult {
   snippet?: string
   line?: number
   localOnly: boolean
+  changeState?: ChangedFileState
+  generatedLocalState?: GeneratedLocalState
+  scopeLabel?: string
 }
 
 export interface SearchResponse {
@@ -374,6 +507,11 @@ export interface SearchResponse {
   branch: string
   mode: SearchMode
   caseSensitive: boolean
+  scope?: SearchScope
+  resultCount?: number
+  totalEstimate?: number
+  partial?: boolean
+  nextCursor?: string
   results: SearchResult[]
 }
 
@@ -393,4 +531,6 @@ export interface SyncStatus {
   repoSync: RepoSyncState
   statusMessage: string
   checkedAt: string
+  activePathNotice?: BackgroundChangeNotice
+  changedFilesSummary?: ChangedFilesSummary
 }
