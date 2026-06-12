@@ -1546,8 +1546,7 @@ pre {
 }
 
 .picker-sidebar .sidebar-toggle-button,
-.picker-sidebar-rail .sidebar-toggle-button,
-.rail-action {
+.picker-sidebar-rail .sidebar-toggle-button {
   display: inline-flex;
   width: 2rem;
   height: 2rem;
@@ -1564,16 +1563,9 @@ pre {
 .picker-sidebar .sidebar-toggle-button:hover,
 .picker-sidebar .sidebar-toggle-button:focus-visible,
 .picker-sidebar-rail .sidebar-toggle-button:hover,
-.picker-sidebar-rail .sidebar-toggle-button:focus-visible,
-.rail-action:hover,
-.rail-action:focus-visible {
+.picker-sidebar-rail .sidebar-toggle-button:focus-visible {
   background: var(--muted);
   color: var(--foreground);
-}
-
-.rail-action {
-  font-size: 0.75rem;
-  font-weight: 700;
 }
 
 .generated-local-toggle {

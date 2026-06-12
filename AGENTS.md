@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-11
+Auto-generated from all feature plans. Last updated: 2026-06-12
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -42,6 +42,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-11
 - No database; behavior derives from local filesystem contents, git metadata, browser URL/local UI state, and in-memory server/UI state (024-fix-share-toolbar)
 - TypeScript 5.x on Node.js 22+ for server/CLI and React UI + Existing Hono local server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; no new runtime dependency planned (025-viewer-usability-upgrades)
 - No database; runtime state remains derived from local filesystem contents, git metadata, browser URL/local UI state, local browser storage for viewer preferences/recent items, and in-memory server/UI state (025-viewer-usability-upgrades)
+- TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, jest-axe setup already present (026-cleanup-collapsed-sidebar)
+- No new storage; existing viewer URL/local state continues to preserve sidebar collapsed preference (026-cleanup-collapsed-sidebar)
 
 ## Project Structure
 
@@ -77,9 +79,9 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 026-cleanup-collapsed-sidebar: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, jest-axe setup already present
 - 025-viewer-usability-upgrades: Added TypeScript 5.x on Node.js 22+ for server/CLI and React UI + Existing Hono local server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; no new runtime dependency planned
 - 024-fix-share-toolbar: Added TypeScript 5.x on Node.js 22+ for server/CLI and React UI + Existing React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; no new runtime dependency planned
-- 023-share-copy-regressions: Added TypeScript 5.x on Node.js 22+ for server/CLI and React UI; Swift 5.x only if existing macOS wrapper command parity is touched + Existing Hono server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; no new runtime dependency planned
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -87,5 +89,5 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/025-viewer-usability-upgrades/plan.md`
+`specs/026-cleanup-collapsed-sidebar/plan.md`
 <!-- SPECKIT END -->

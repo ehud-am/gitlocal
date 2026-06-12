@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.9 - 2026-06-12
+
+- Cleaned up the collapsed left navigation rail so it shows only one expand control instead of several one-letter shortcut buttons.
+- Preserved repository search, changed-file review, recent files, key documents, and current-folder workflows through the expanded panel and main dashboard.
+- Fixed the README logo so the same committed asset renders on GitHub and inside GitLocal's local Markdown viewer.
+- Added regression coverage for collapsed-sidebar usability, keyboard/a11y behavior, picker parity, responsive rail styling, and local README image rendering.
+
 ## 0.9.8 - 2026-06-12
 
 - Added viewer usability upgrades for README-first folder views, rendered Markdown find highlights, scoped repository search, changed-file review, repository status summaries, and safer rare-edit conflict handling.

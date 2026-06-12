@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -858,45 +859,29 @@ describe('App', () => {
   })
 
   it('collapses and restores the repository tree rail', async () => {
-    vi.mocked(api.getChangedFiles).mockResolvedValueOnce({
-      branch: 'main',
-      checkedAt: '2026-06-11T12:00:00.000Z',
-      summary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
-      items: [{
-        path: 'docs',
-        name: 'docs',
-        type: 'folder',
-        changeState: 'modified',
-        generatedLocalState: 'tracked',
-        sourcePath: '',
-        canOpen: true,
-        reviewHint: 'Modified locally',
-      }],
-    })
-    renderWithClient()
+    const { container } = renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
     const collapsedRail = await screen.findByLabelText(/collapsed navigation/i)
     expect(collapsedRail).toBeInTheDocument()
-    expect(within(collapsedRail).getByRole('button', { name: /open repository search/i })).toBeInTheDocument()
-    expect(within(collapsedRail).getByRole('button', { name: /open changed files/i })).toBeInTheDocument()
-    expect(within(collapsedRail).getByRole('button', { name: /show recent files/i })).toBeInTheDocument()
-    expect(within(collapsedRail).getByRole('button', { name: /show key documents/i })).toBeInTheDocument()
-    expect(within(collapsedRail).getByRole('button', { name: /open current folder/i })).toBeInTheDocument()
-    fireEvent.click(within(collapsedRail).getByRole('button', { name: /open changed files/i }))
-
-    await waitFor(() => {
-      expect(api.getChangedFiles).toHaveBeenCalledWith('main', true)
-    })
-    const changedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
-    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /docs/i }))
-
-    await waitFor(() => {
-      expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
-    })
+    expect(within(collapsedRail).getAllByRole('button')).toHaveLength(1)
+    expect(within(collapsedRail).getByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+    expect(within(collapsedRail).queryByRole('button', { name: /open repository search/i })).not.toBeInTheDocument()
+    expect(within(collapsedRail).queryByRole('button', { name: /open changed files/i })).not.toBeInTheDocument()
+    expect(within(collapsedRail).queryByRole('button', { name: /show recent files/i })).not.toBeInTheDocument()
+    expect(within(collapsedRail).queryByRole('button', { name: /show key documents/i })).not.toBeInTheDocument()
+    expect(within(collapsedRail).queryByRole('button', { name: /open current folder/i })).not.toBeInTheDocument()
+    const expandNavigation = within(collapsedRail).getByRole('button', { name: /expand navigation/i })
+    for (let tabCount = 0; tabCount < 10 && document.activeElement !== expandNavigation; tabCount += 1) {
+      await userEvent.tab()
+    }
+    expect(expandNavigation).toHaveFocus()
+    expect((await axe(container)).violations).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
     expect(await screen.findByRole('tree', { name: /repository files/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /open repository search/i }))
+    expect(await screen.findByRole('searchbox', { name: /search query/i })).toBeInTheDocument()
   })
 
   it('shows root dashboard shortcuts and navigates from key documents', async () => {

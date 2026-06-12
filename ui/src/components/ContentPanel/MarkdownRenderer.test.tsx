@@ -1,9 +1,61 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import MarkdownRenderer from './MarkdownRenderer'
 import { resolveMarkdownLink } from './markdown-navigation'
 
 describe('MarkdownRenderer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('renders README HTML logo tags as local repository images', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'image',
+        content: 'PHN2Zy8+',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MarkdownRenderer
+        content={'<p align="center">\n  <img src="ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">\n</p>'}
+        currentPath="README.md"
+        branch="main"
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const logo = await screen.findByRole('img', { name: /gitlocal icon/i })
+    expect(logo).toHaveAttribute('src', 'data:image/svg+xml;base64,PHN2Zy8+')
+    expect(logo).toHaveAttribute('width', '96')
+    expect(logo).toHaveAttribute('height', '96')
+    expect(fetchMock).toHaveBeenCalledWith('/api/file?path=ui%2Fpublic%2Fgitlocal-logo.svg&branch=main')
+  })
+
+  it('resolves relative markdown images from the current Markdown path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'image',
+        content: 'aW1hZ2U=',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MarkdownRenderer
+        content={'![Diagram](./diagram.png)'}
+        currentPath="docs/README.md"
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('img', { name: /diagram/i })).toHaveAttribute('src', 'data:image/png;base64,aW1hZ2U=')
+    expect(fetchMock).toHaveBeenCalledWith('/api/file?path=docs%2Fdiagram.png')
+  })
+
   it('renders copy buttons only for fenced code blocks and copies the selected block', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {

@@ -460,7 +460,10 @@ describe('PickerPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
 
-    expect(await screen.findByLabelText(/collapsed navigation/i)).toBeInTheDocument()
+    const collapsedRail = await screen.findByLabelText(/collapsed navigation/i)
+    expect(collapsedRail).toBeInTheDocument()
+    expect(within(collapsedRail).getAllByRole('button')).toHaveLength(1)
+    expect(within(collapsedRail).getByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
     expect(layout).toHaveClass('picker-layout-collapsed')
 
     fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))

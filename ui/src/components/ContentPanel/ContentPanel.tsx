@@ -863,7 +863,7 @@ export default function ContentPanel({
               <div className="content-skeleton" aria-label="loading content" />
             ) : directoryReadme?.type === 'markdown' ? (
               <Suspense fallback={loadingFallback}>
-                <MarkdownRenderer content={directoryReadme.content} onNavigate={onNavigate} />
+                <MarkdownRenderer content={directoryReadme.content} currentPath={directoryReadmePath} branch={branch} onNavigate={onNavigate} />
               </Suspense>
             ) : directoryReadme?.type === 'text' ? (
               <Suspense fallback={loadingFallback}>
@@ -1304,6 +1304,7 @@ export default function ContentPanel({
               <MarkdownRenderer
                 content={data.content}
                 currentPath={selectedPath}
+                branch={branch}
                 findQuery={fileFindOpen ? fileFindQuery : ''}
                 findCaseSensitive={fileFindCaseSensitive}
                 onNavigate={onNavigate}
