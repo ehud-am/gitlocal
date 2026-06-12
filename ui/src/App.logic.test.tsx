@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -424,7 +424,9 @@ describe('App logic', () => {
     await waitFor(() => {
       expect(screen.getByTestId('header-props')).toHaveTextContent('"branch":"main"')
     })
-    expect(screen.getByLabelText(/collapsed navigation/i)).toBeInTheDocument()
+    const collapsedRail = screen.getByLabelText(/collapsed navigation/i)
+    expect(collapsedRail).toBeInTheDocument()
+    expect(within(collapsedRail).getAllByRole('button')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
     expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
     initialRender.unmount()

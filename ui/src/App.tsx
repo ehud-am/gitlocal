@@ -468,23 +468,6 @@ export default function App() {
     setSearchPresentation('expanded')
   }
 
-  function openRecentItems(): void {
-    setSelectedPath('')
-    setSelectedPathType('none')
-    setStatusMessage('Recent files are shown on the repository dashboard.')
-  }
-
-  function openKeyDocs(): void {
-    setSelectedPath('')
-    setSelectedPathType('none')
-    setStatusMessage('Key documents are shown on the repository dashboard.')
-  }
-
-  function openCurrentFolder(): void {
-    const currentFolder = selectedPathType === 'dir' ? selectedPath : parentPathOf(selectedPath)
-    handleSelectFolder(currentFolder, false)
-  }
-
   function handleOpenChangedFile(item: ChangedFileItem): void {
     const localOnly = item.generatedLocalState !== 'tracked'
     if (!item.canOpen) {
@@ -921,21 +904,6 @@ export default function App() {
           {sidebarCollapsed ? (
             <aside className="sidebar-rail flex w-14 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" aria-label="collapsed navigation">
               <div className="sidebar-rail-toolbar flex flex-col items-center gap-2 p-3">
-                <button type="button" className="rail-action" aria-label="Open repository search" title="Search" onClick={openSearch}>
-                  S
-                </button>
-                <button type="button" className="rail-action" aria-label="Open changed files" title="Changed files" onClick={() => { void openChangedFiles() }}>
-                  Δ
-                </button>
-                <button type="button" className="rail-action" aria-label="Show recent files" title="Recent files" onClick={openRecentItems}>
-                  R
-                </button>
-                <button type="button" className="rail-action" aria-label="Show key documents" title="Key documents" onClick={openKeyDocs}>
-                  K
-                </button>
-                <button type="button" className="rail-action" aria-label="Open current folder" title="Current folder" onClick={openCurrentFolder}>
-                  F
-                </button>
                 <button
                   type="button"
                   className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"

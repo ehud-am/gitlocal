@@ -1,7 +1,7 @@
 # GitLocal
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ehud-am/gitlocal/main/ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
+  <img src="ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
 </p>
 
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
