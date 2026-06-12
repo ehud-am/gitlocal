@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.9.8 - 2026-06-12
+
+- Added viewer usability upgrades for README-first folder views, rendered Markdown find highlights, scoped repository search, changed-file review, repository status summaries, and safer rare-edit conflict handling.
+- Added QA-level automated coverage for search partial results, stale external-edit refresh handling, narrow-window layout, stale save protection, and large search result pagination.
+- Fixed repository status summaries so external file refreshes invalidate summary and navigation hint data instead of leaving stale local-change counts visible.
+- Improved narrow-window layout so the sidebar stacks above content instead of squeezing the viewer into a narrow strip.
+- Removed obsolete commit dialog/header callback code and stale CSS selectors left behind by earlier UI revisions.
+
 ## 0.9.7 - 2026-06-09
 
 - Fixed the README logo so it renders reliably from the hosted project README while staying backed by a committed repository asset.
