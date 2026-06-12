@@ -98,6 +98,49 @@ describe('FileTree', () => {
     expect(screen.queryAllByText(/^local$/i)).toHaveLength(1)
   })
 
+  it('filters generated and local-only entries while preserving the active path exception', async () => {
+    mockedApi.getTree.mockImplementation(async (path?: string) => {
+      if (path === 'dist') {
+        return [{ name: 'bundle.js', path: 'dist/bundle.js', type: 'file', localOnly: true, generatedLocalState: 'generated' }]
+      }
+      return [
+        { name: 'src', path: 'src', type: 'dir', localOnly: false, generatedLocalState: 'tracked' },
+        { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+        { name: 'scratch.md', path: 'scratch.md', type: 'file', localOnly: true, generatedLocalState: 'local-only' },
+      ]
+    })
+
+    renderWithClient(
+      <FileTree
+        {...defaultProps}
+        isGitRepo
+        selectedPath="dist/bundle.js"
+        selectedPathType="file"
+        generatedLocalVisibility="hide"
+      />,
+    )
+
+    expect(await screen.findByText('src')).toBeInTheDocument()
+    expect(screen.getByText('dist')).toBeInTheDocument()
+    expect(screen.queryByText('scratch.md')).not.toBeInTheDocument()
+  })
+
+  it('can show only generated and local-only entries with clear labels', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+      { name: '.env', path: '.env', type: 'file', localOnly: true, generatedLocalState: 'ignored' },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} isGitRepo generatedLocalVisibility="only" />)
+
+    expect(await screen.findByText('dist')).toBeInTheDocument()
+    expect(screen.getByText('.env')).toBeInTheDocument()
+    expect(screen.getByText(/generated/i)).toBeInTheDocument()
+    expect(screen.getByText(/ignored/i)).toBeInTheDocument()
+    expect(screen.queryByText('README.md')).not.toBeInTheDocument()
+  })
+
   it('does not show local-only cues for plain folders', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: '.env', path: '.env', type: 'file', localOnly: true },

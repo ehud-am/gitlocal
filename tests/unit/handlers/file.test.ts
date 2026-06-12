@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { chmodSync, existsSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync, mkdirSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
@@ -262,6 +262,32 @@ describe('manual file operation handlers', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.status).toBe('conflict')
+    expect(body.message).toContain('Your edit was not saved')
+    expect(body.message).toContain('Reload the file')
+  })
+
+  it('blocks a stale save after the file changes externally and preserves disk content', async () => {
+    const app = createApp(dir)
+    const readRes = await app.fetch(new Request(`http://localhost/api/file?path=${encodeURIComponent('README.md')}&branch=${branch}`))
+    const readBody = await readRes.json()
+
+    writeFileSync(join(dir, 'README.md'), '# External update\n')
+
+    const updateRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'README.md',
+        content: '# Stale overwrite attempt\n',
+        revisionToken: readBody.revisionToken,
+      }),
+    }))
+
+    expect(updateRes.status).toBe(409)
+    const updateBody = await updateRes.json()
+    expect(updateBody.status).toBe('conflict')
+    expect(updateBody.message).toContain('changed on disk')
+    expect(readFileSync(join(dir, 'README.md'), 'utf-8')).toBe('# External update\n')
   })
 
   it('rejects creates with an empty path or non-string content', async () => {

@@ -1,8 +1,9 @@
 import { statSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import type { TreeNode } from '../types.js'
+import type { GeneratedLocalVisibility, SearchResult, SearchScope, TreeNode } from '../types.js'
 import {
+  classifyGeneratedLocalState,
   getTrackedPathType,
   listWorkingTreeDirectoryEntries,
   normalizeRepoRelativePath,
@@ -92,6 +93,32 @@ function readSnippet(filePath: string, query: string, caseSensitive: boolean): {
   return null
 }
 
+function isMarkdownPath(path: string): boolean {
+  return /\.(md|markdown|mdx|mdown)$/i.test(path)
+}
+
+function matchesTrackedMode(repoPath: string, path: string, trackedMode: SearchScope['trackedMode']): boolean {
+  const state = classifyGeneratedLocalState(repoPath, path)
+  if (trackedMode === 'tracked-only') return state === 'tracked'
+  if (trackedMode === 'generated-local-only') return state !== 'tracked'
+  return true
+}
+
+export function filterTreeByGeneratedLocalVisibility(
+  nodes: TreeNode[],
+  visibility: GeneratedLocalVisibility,
+  activePath = '',
+): TreeNode[] {
+  if (visibility === 'show') return nodes
+  return nodes.filter((node) => {
+    const generatedLocalState = node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')
+    const isTracked = generatedLocalState === 'tracked'
+    const isActivePath = activePath && (node.path === activePath || activePath.startsWith(`${node.path}/`))
+    if (visibility === 'only') return !isTracked || Boolean(isActivePath)
+    return isTracked || Boolean(isActivePath)
+  })
+}
+
 export function searchWorkingTreeByName(repoPath: string, query: string, caseSensitive: boolean): TreeNode[] {
   const entries = getSearchableWorkingTreeEntries(repoPath)
   const needle = caseSensitive ? query : query.toLowerCase()
@@ -115,4 +142,54 @@ export function searchWorkingTreeByContent(repoPath: string, query: string, case
   }
 
   return matches
+}
+
+export function searchWorkingTreeScoped(repoPath: string, query: string, scope: SearchScope): SearchResult[] {
+  const normalizedRoot = normalizeRepoRelativePath(scope.rootPath)
+  const entries = getSearchableWorkingTreeEntries(repoPath, normalizedRoot)
+    .filter((entry) => matchesTrackedMode(repoPath, entry.path, scope.trackedMode))
+  const needle = scope.caseSensitive ? query : query.toLowerCase()
+  const results: SearchResult[] = []
+
+  if (scope.targets !== 'content') {
+    for (const entry of entries) {
+      const hay = scope.caseSensitive ? entry.path : entry.path.toLowerCase()
+      if (!needle || !hay.includes(needle)) continue
+      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      results.push({
+        path: entry.path,
+        type: entry.type,
+        matchType: 'name',
+        localOnly: entry.localOnly,
+        generatedLocalState,
+        scopeLabel: normalizedRoot ? `Inside ${normalizedRoot}` : 'Repository',
+      })
+    }
+  }
+
+  if (scope.targets !== 'name') {
+    const contentEntries = entries
+      .filter((entry) => entry.type === 'file')
+      .filter((entry) => scope.contentKinds !== 'markdown' || isMarkdownPath(entry.path))
+
+    for (const entry of contentEntries) {
+      const fullPath = resolve(repoPath, entry.path)
+      if (statSync(fullPath).size > 512_000) continue
+      const snippet = readSnippet(fullPath, query, scope.caseSensitive)
+      if (!snippet) continue
+      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      results.push({
+        path: entry.path,
+        type: 'file',
+        matchType: 'content',
+        line: snippet.line,
+        snippet: snippet.snippet,
+        localOnly: entry.localOnly,
+        generatedLocalState,
+        scopeLabel: scope.contentKinds === 'markdown' ? 'Markdown content' : 'File content',
+      })
+    }
+  }
+
+  return results
 }

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { Branch, RepoInfo, RepoSyncState, ViewerPathType } from '../../types'
+import type { BackgroundChangeNotice, Branch, ChangedFilesResponse, ChangedFileItem, RepoInfo, RepoSummaryResponse, RepoSyncState, ViewerPathType } from '../../types'
 import { describeRepoSyncState } from '../../lib/sync'
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
@@ -12,16 +12,18 @@ interface Props {
   selectedPath: string
   selectedPathType: ViewerPathType
   repoSync?: RepoSyncState
+  repoSummary?: RepoSummaryResponse
   trackedChangeCount?: number
   untrackedChangeCount?: number
+  activePathNotice?: BackgroundChangeNotice
+  changedFiles?: ChangedFilesResponse | null
   onBranchChange: (branch: string) => void
   onEditGitIdentity?: () => void
-  onCommitChanges?: () => void
-  onSyncWithRemote?: () => void
   onOpenSearch?: () => void
+  onOpenChangedFiles?: () => void
+  onCloseChangedFiles?: () => void
+  onOpenChangedFile?: (item: ChangedFileItem) => void
   branchDisabled?: boolean
-  commitDisabled?: boolean
-  syncDisabled?: boolean
   syncActionLabel?: string
   branchSwitchDialog?: ReactNode
 }
@@ -76,11 +78,17 @@ export default function RepoContextHeader({
   selectedPath,
   selectedPathType,
   repoSync,
+  repoSummary,
   trackedChangeCount = 0,
   untrackedChangeCount = 0,
+  activePathNotice,
+  changedFiles,
   onBranchChange,
   onEditGitIdentity,
   onOpenSearch,
+  onOpenChangedFiles,
+  onCloseChangedFiles,
+  onOpenChangedFile,
   branchDisabled = false,
   branchSwitchDialog,
 }: Props) {
@@ -91,10 +99,12 @@ export default function RepoContextHeader({
   const remoteWebUrl = remote?.webUrl ?? ''
   const remotePath = remote?.webUrl || remote?.fetchUrl || ''
   const repoSyncBadge = describeRepoSyncState(repoSync)
-  const changeSummary = trackedChangeCount + untrackedChangeCount
+  const summaryLocalChangeCount = repoSummary?.statusSummary.localChangeCount
+  const changeSummary = summaryLocalChangeCount ?? (trackedChangeCount + untrackedChangeCount)
   const isGitRepo = Boolean(info?.isGitRepo)
   const repoName = info?.name || (isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
+  const statusSummary = repoSummary?.statusSummary
 
   return (
     <section className="repo-context-header overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] shadow-sm">
@@ -149,6 +159,90 @@ export default function RepoContextHeader({
             {onOpenSearch ? <SearchTrigger onOpen={onOpenSearch} /> : null}
           </div>
         </div>
+
+        {activePathNotice ? (
+          <div className="background-change-notice" role="status">
+            <p>{activePathNotice.message}</p>
+            {onOpenChangedFiles ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onOpenChangedFiles}>
+                {activePathNotice.actionLabel ?? 'View changed files'}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isGitRepo && statusSummary ? (
+          <section className={`repo-status-summary repo-status-summary-${statusSummary.tone}`} aria-label="repository status summary">
+            <p>{statusSummary.text}</p>
+            <dl>
+              <div>
+                <dt>Branch</dt>
+                <dd>{repoSummary.branch || branch || 'current branch'}</dd>
+              </div>
+              <div>
+                <dt>Remote</dt>
+                <dd>{statusSummary.remoteLabel || 'Not configured'}</dd>
+              </div>
+              <div>
+                <dt>Local changes</dt>
+                <dd>{statusSummary.localChangeCount}</dd>
+              </div>
+            </dl>
+            {onOpenChangedFiles && statusSummary.localChangeCount > 0 ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onOpenChangedFiles}>
+                Review changed files
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+
+        {changedFiles && changedFiles.items.length > 0 ? (
+          <section className="changed-files-panel" aria-label="changed files">
+            <div className="changed-files-panel-header">
+              <p className="changed-files-title">Changed files</p>
+              <div className="changed-files-panel-actions">
+                <span>{changedFiles.summary.total} {changedFiles.summary.total === 1 ? 'path' : 'paths'}</span>
+                {onCloseChangedFiles ? (
+                  <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <ul>
+              {changedFiles.items.map((item) => (
+                <li key={`${item.changeState}:${item.path}`}>
+                  <button type="button" onClick={() => onOpenChangedFile?.(item)}>
+                    <span className="changed-file-path">{item.path}</span>
+                    <span className="changed-file-meta">
+                      {item.changeState}
+                      {item.generatedLocalState !== 'tracked' ? ` · ${item.generatedLocalState}` : ''}
+                      {!item.canOpen ? ' · unavailable' : ''}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : changedFiles ? (
+          <section className="changed-files-panel" aria-label="changed files">
+            <div className="changed-files-panel-header">
+              <p className="changed-files-title">Changed files</p>
+              {onCloseChangedFiles ? (
+                <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                    <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </Button>
+              ) : null}
+            </div>
+            <p>No changed files to review.</p>
+          </section>
+        ) : null}
 
         {detailsExpanded ? (
           <div className="grid gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2">

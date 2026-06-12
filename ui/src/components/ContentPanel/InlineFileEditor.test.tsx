@@ -3,6 +3,32 @@ import { describe, expect, it, vi } from 'vitest'
 import InlineFileEditor from './InlineFileEditor'
 
 describe('InlineFileEditor undo and redo', () => {
+  it('offers conflict recovery actions without losing the draft', () => {
+    const onReloadFromDisk = vi.fn()
+    const onChange = vi.fn()
+
+    render(
+      <InlineFileEditor
+        path="README.md"
+        content="draft"
+        error="The file changed on disk before your save completed. Your edit was not saved. Reload the file to review the latest version, then apply your changes again."
+        onChange={onChange}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onReloadFromDisk={onReloadFromDisk}
+      />,
+    )
+
+    const textarea = screen.getByLabelText(/edit file content/i)
+    fireEvent.change(textarea, { target: { value: 'local draft' } })
+    fireEvent.click(screen.getByRole('button', { name: /keep editing/i }))
+    expect(document.activeElement).toBe(textarea)
+    expect(textarea).toHaveValue('local draft')
+
+    fireEvent.click(screen.getByRole('button', { name: /reload from disk/i }))
+    expect(onReloadFromDisk).toHaveBeenCalledTimes(1)
+  })
+
   it('handles standard undo and redo keyboard shortcuts in the focused editor', () => {
     const onChange = vi.fn()
 

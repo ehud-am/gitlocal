@@ -35,17 +35,6 @@ interface GitIdentityDialogProps {
   onSave: () => void
 }
 
-interface CommitChangesDialogProps {
-  open: boolean
-  pending: boolean
-  error: string
-  message: string
-  onOpenChange: (open: boolean) => void
-  onMessageChange: (value: string) => void
-  onCancel: () => void
-  onCommit: () => void
-}
-
 interface FolderDeleteDialogProps {
   open: boolean
   pending: boolean
@@ -187,58 +176,6 @@ export function GitIdentityDialog({
           </Button>
           <Button type="button" onClick={onSave} disabled={controlsDisabled}>
             {pending ? 'Saving...' : 'Save identity'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-export function CommitChangesDialog({
-  open,
-  pending,
-  error,
-  message,
-  onOpenChange,
-  onMessageChange,
-  onCancel,
-  onCommit,
-}: CommitChangesDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Commit local changes</DialogTitle>
-          <DialogDescription>
-            GitLocal will stage all current repository changes and create a local commit.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="text-sm font-medium text-[var(--foreground)]">Commit message</span>
-            <Input
-              value={message}
-              onChange={(event) => onMessageChange(event.target.value)}
-              placeholder="Describe the current work"
-              aria-label="Commit message"
-              disabled={pending}
-            />
-          </label>
-
-          {error ? (
-            <p role="alert" className="text-sm text-[var(--danger)]">
-              {error}
-            </p>
-          ) : null}
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={onCommit} disabled={pending}>
-            {pending ? 'Committing...' : 'Commit changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

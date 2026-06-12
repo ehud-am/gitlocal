@@ -199,7 +199,7 @@ export async function updateFileHandler(c: Context<{ Variables: Variables }>): P
 
   const currentToken = getFileRevisionToken(repoPath, path)
   if (!currentToken || currentToken !== payload.revisionToken) {
-    return mutationBlocked('update', path, 'The file changed on disk before your save completed.', 409)
+    return mutationBlocked('update', path, 'The file changed on disk before your save completed. Your edit was not saved. Reload the file to review the latest version, then apply your changes again.', 409)
   }
 
   try {

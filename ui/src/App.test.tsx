@@ -25,6 +25,9 @@ vi.mock('./services/api', () => ({
     getFolderDeletePreview: vi.fn(),
     deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
+    getChangedFiles: vi.fn(),
+    getRepoSummary: vi.fn(),
+    getNavigationHints: vi.fn(),
     getFolderBrowse: vi.fn(),
     openRepository: vi.fn(),
     switchBranch: vi.fn(),
@@ -205,6 +208,32 @@ describe('App', () => {
       caseSensitive: false,
       results: [],
     })
+    vi.mocked(api.getChangedFiles).mockResolvedValue({
+      branch: 'main',
+      checkedAt: '2026-06-11T12:00:00.000Z',
+      summary: { total: 0, modified: 0, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 0 },
+      items: [],
+    })
+    vi.mocked(api.getRepoSummary).mockResolvedValue({
+      repoName: 'repo',
+      branch: 'main',
+      statusSummary: {
+        text: 'main has no local changes.',
+        tone: 'neutral',
+        remoteLabel: 'origin',
+        syncState: 'up-to-date',
+        localChangeCount: 0,
+        untrackedChangeCount: 0,
+      },
+      keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+      recentItems: [],
+      visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+    })
+    vi.mocked(api.getNavigationHints).mockResolvedValue({
+      keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+      recentItems: [],
+      changedItems: [],
+    })
     vi.mocked(api.createFolder).mockResolvedValue({
       ok: true,
       operation: 'create-folder',
@@ -318,6 +347,7 @@ describe('App', () => {
 
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     fireEvent.click(await screen.findByRole('button', { name: /open parent folder outside this repository/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -339,6 +369,110 @@ describe('App', () => {
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
   })
 
+  it('shows active file refresh notices and opens changed files from repository context', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file')
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+      resolvedPath: 'README.md',
+      resolvedPathType: 'file',
+      fileStatus: 'changed',
+      pathSyncState: 'local-uncommitted',
+      trackedChangeCount: 1,
+      activePathNotice: {
+        path: 'README.md',
+        changeKind: 'refreshed',
+        detectedAt: '2026-06-11T12:00:00.000Z',
+        lastRefreshedAt: '2026-06-11T12:00:00.000Z',
+        message: 'README.md changed outside GitLocal and was refreshed.',
+        actionLabel: 'View changed files',
+      },
+      changedFilesSummary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+    }))
+    vi.mocked(api.getChangedFiles).mockResolvedValue({
+      branch: 'main',
+      checkedAt: '2026-06-11T12:00:00.000Z',
+      summary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+      items: [{
+        path: 'README.md',
+        name: 'README.md',
+        type: 'file',
+        changeState: 'modified',
+        generatedLocalState: 'tracked',
+        sourcePath: '',
+        canOpen: true,
+        reviewHint: 'Modified locally',
+      }],
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('status').some((status) => /changed outside GitLocal/i.test(status.textContent ?? ''))).toBe(true)
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /view changed files/i }))
+    const changedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
+    expect(changedFilesRegion).toHaveTextContent('README.md')
+    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /close changed files/i }))
+    expect(screen.queryByRole('region', { name: /changed files/i })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /view changed files/i }))
+    const reopenedChangedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
+    fireEvent.click(within(reopenedChangedFilesRegion).getByRole('button', { name: /README\.md/i }))
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
+    })
+  })
+
+  it('reconciles deleted active files and opens the parent folder from changed files', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/missing.md&pathType=file')
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'docs/missing.md',
+      currentPathType: 'missing',
+      resolvedPath: 'docs',
+      resolvedPathType: 'dir',
+      fileStatus: 'deleted',
+      treeStatus: 'invalid',
+      trackedChangeCount: 1,
+      activePathNotice: {
+        path: 'docs/missing.md',
+        changeKind: 'deleted',
+        detectedAt: '2026-06-11T12:00:00.000Z',
+        lastRefreshedAt: '2026-06-11T12:00:00.000Z',
+        message: 'docs/missing.md was deleted outside GitLocal. GitLocal moved to the nearest available folder.',
+        actionLabel: 'View changed files',
+      },
+      changedFilesSummary: { total: 1, modified: 0, added: 0, deleted: 1, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+    }))
+    vi.mocked(api.getChangedFiles).mockResolvedValueOnce({
+      branch: 'main',
+      checkedAt: '2026-06-11T12:00:00.000Z',
+      summary: { total: 1, modified: 0, added: 0, deleted: 1, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+      items: [{
+        path: 'docs/missing.md',
+        name: 'missing.md',
+        type: 'missing',
+        changeState: 'deleted',
+        generatedLocalState: 'tracked',
+        sourcePath: '',
+        canOpen: false,
+        reviewHint: 'Deleted locally',
+      }],
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('status').some((status) => /deleted outside GitLocal/i.test(status.textContent ?? ''))).toBe(true)
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /view changed files/i }))
+    const changedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
+    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /docs\/missing\.md/i }))
+
+    expect(await screen.findByText(/opened its parent folder/i)).toBeInTheDocument()
+    expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
+  })
+
   it('refreshes the current page without changing the selected file context', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
 
@@ -350,6 +484,101 @@ describe('App', () => {
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
     expect(await screen.findByText('guide content')).toBeInTheDocument()
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+  })
+
+  it('refreshes repository summary and navigation hints after an external file change', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file')
+    vi.mocked(api.getRepoSummary)
+      .mockResolvedValueOnce({
+        repoName: 'repo',
+        branch: 'main',
+        statusSummary: {
+          text: 'main has no local changes.',
+          tone: 'neutral',
+          remoteLabel: 'origin',
+          syncState: 'up-to-date',
+          localChangeCount: 0,
+          untrackedChangeCount: 0,
+        },
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+      })
+      .mockResolvedValue({
+        repoName: 'repo',
+        branch: 'main',
+        statusSummary: {
+          text: 'main has 1 local change to review.',
+          tone: 'info',
+          remoteLabel: 'origin',
+          syncState: 'up-to-date',
+          localChangeCount: 1,
+          untrackedChangeCount: 0,
+        },
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+      })
+    vi.mocked(api.getNavigationHints)
+      .mockResolvedValueOnce({
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        changedItems: [],
+      })
+      .mockResolvedValue({
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        changedItems: [{
+          path: 'README.md',
+          name: 'README.md',
+          type: 'file',
+          changeState: 'modified',
+          generatedLocalState: 'tracked',
+          sourcePath: '',
+          canOpen: true,
+          reviewHint: 'Modified locally',
+        }],
+      })
+    vi.mocked(api.getSyncStatus)
+      .mockResolvedValueOnce(buildSyncStatus({
+        currentPath: 'README.md',
+        currentPathType: 'file',
+        resolvedPath: 'README.md',
+        resolvedPathType: 'file',
+        workingTreeRevision: 'before-change',
+      }))
+      .mockResolvedValue(buildSyncStatus({
+        currentPath: 'README.md',
+        currentPathType: 'file',
+        resolvedPath: 'README.md',
+        resolvedPathType: 'file',
+        workingTreeRevision: 'after-change',
+        fileStatus: 'changed',
+        pathSyncState: 'local-uncommitted',
+        trackedChangeCount: 1,
+        activePathNotice: {
+          path: 'README.md',
+          changeKind: 'refreshed',
+          detectedAt: '2026-06-11T12:00:00.000Z',
+          lastRefreshedAt: '2026-06-11T12:00:00.000Z',
+          message: 'README.md changed outside GitLocal and was refreshed.',
+          actionLabel: 'View changed files',
+        },
+        changedFilesSummary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+      }))
+
+    renderWithClient()
+
+    expect(await screen.findByText('main has no local changes.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+
+    expect(await screen.findByText('main has 1 local change to review.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getRepoSummary).toHaveBeenCalledWith('main')
+      expect(vi.mocked(api.getRepoSummary).mock.calls.length).toBeGreaterThanOrEqual(2)
+      expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, false)
+      expect(vi.mocked(api.getNavigationHints).mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
   })
 
   it('shows an icon on the Refresh control', async () => {
@@ -512,6 +741,9 @@ describe('App', () => {
       branch: 'main',
       mode: 'both',
       caseSensitive: false,
+      resultCount: 1,
+      totalEstimate: 1,
+      partial: false,
       results: [{ path: 'docs', type: 'dir', matchType: 'name', localOnly: false }],
     })
 
@@ -522,25 +754,216 @@ describe('App', () => {
       target: { value: 'docs' },
     })
 
-    expect(api.getSearchResults).not.toHaveBeenCalledWith('docs', 'main', 'both', false)
+    expect(api.getSearchResults).not.toHaveBeenCalledWith('docs', 'main', 'both', false, expect.anything())
 
     fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
 
     await waitFor(() => {
-      expect(api.getSearchResults).toHaveBeenCalledWith('docs', 'main', 'both', false)
+      expect(api.getSearchResults).toHaveBeenCalledWith('docs', 'main', 'both', false, expect.objectContaining({
+        rootPath: '',
+        contentKinds: 'all',
+        trackedMode: 'tracked-only',
+        limit: 50,
+      }))
     })
     const searchLayer = await screen.findByTestId('search-layer')
     expect(await within(searchLayer).findByRole('button', { name: /docs/i })).toBeInTheDocument()
   })
 
+  it('preserves the active file context while scoped search opens, selects, and closes', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    vi.mocked(api.getSearchResults).mockResolvedValueOnce({
+      query: 'guide',
+      branch: 'main',
+      mode: 'both',
+      caseSensitive: false,
+      resultCount: 1,
+      totalEstimate: 1,
+      partial: false,
+      results: [{
+        path: 'docs/README.md',
+        type: 'file',
+        matchType: 'content',
+        snippet: 'guide',
+        line: 1,
+        localOnly: false,
+        scopeLabel: 'Markdown content',
+      }],
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
+    expect(screen.getByText('guide content')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: /search query/i }), {
+      target: { value: 'guide' },
+    })
+    fireEvent.change(screen.getByLabelText(/folder scope/i), { target: { value: 'current' } })
+    fireEvent.change(screen.getByLabelText(/content scope/i), { target: { value: 'markdown' } })
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
+
+    await waitFor(() => {
+      expect(api.getSearchResults).toHaveBeenCalledWith('guide', 'main', 'both', false, expect.objectContaining({
+        rootPath: 'docs',
+        contentKinds: 'markdown',
+      }))
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /docs\/README\.md/i }))
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/README.md', 'main', false)
+    })
+    expect(screen.queryByTestId('search-layer')).not.toBeInTheDocument()
+  })
+
+  it('keeps dirty edits when search result, refresh, and branch navigation are canceled', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    vi.mocked(api.getSearchResults).mockResolvedValueOnce({
+      query: 'readme',
+      branch: 'main',
+      mode: 'both',
+      caseSensitive: false,
+      resultCount: 1,
+      totalEstimate: 1,
+      partial: false,
+      results: [{ path: 'README.md', type: 'file', matchType: 'name', localOnly: false }],
+    })
+
+    renderWithClient()
+
+    await screen.findByText('guide content')
+    await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty guide' } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /open repository search/i }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /search query/i }), { target: { value: 'readme' } })
+    fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /README\.md/i }))
+
+    expect(confirmSpy).toHaveBeenCalledWith('Discard your unsaved file changes?')
+    expect(screen.getByTestId('search-layer')).toBeInTheDocument()
+    expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
+    expect(api.getFile).not.toHaveBeenCalledWith('README.md', 'main', false)
+
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    expect(screen.queryByText(/refreshing current view/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
+
+    fireEvent.change(screen.getByRole('combobox', { name: /branch selector/i }), { target: { value: 'origin/release' } })
+    expect(api.switchBranch).not.toHaveBeenCalled()
+    expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('main')
+  })
+
   it('collapses and restores the repository tree rail', async () => {
+    vi.mocked(api.getChangedFiles).mockResolvedValueOnce({
+      branch: 'main',
+      checkedAt: '2026-06-11T12:00:00.000Z',
+      summary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+      items: [{
+        path: 'docs',
+        name: 'docs',
+        type: 'folder',
+        changeState: 'modified',
+        generatedLocalState: 'tracked',
+        sourcePath: '',
+        canOpen: true,
+        reviewHint: 'Modified locally',
+      }],
+    })
     renderWithClient()
 
     fireEvent.click(await screen.findByRole('button', { name: /collapse navigation/i }))
-    expect(await screen.findByLabelText(/collapsed navigation/i)).toBeInTheDocument()
+    const collapsedRail = await screen.findByLabelText(/collapsed navigation/i)
+    expect(collapsedRail).toBeInTheDocument()
+    expect(within(collapsedRail).getByRole('button', { name: /open repository search/i })).toBeInTheDocument()
+    expect(within(collapsedRail).getByRole('button', { name: /open changed files/i })).toBeInTheDocument()
+    expect(within(collapsedRail).getByRole('button', { name: /show recent files/i })).toBeInTheDocument()
+    expect(within(collapsedRail).getByRole('button', { name: /show key documents/i })).toBeInTheDocument()
+    expect(within(collapsedRail).getByRole('button', { name: /open current folder/i })).toBeInTheDocument()
+    fireEvent.click(within(collapsedRail).getByRole('button', { name: /open changed files/i }))
+
+    await waitFor(() => {
+      expect(api.getChangedFiles).toHaveBeenCalledWith('main', true)
+    })
+    const changedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
+    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /docs/i }))
+
+    await waitFor(() => {
+      expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
+    })
 
     fireEvent.click(screen.getByRole('button', { name: /expand navigation/i }))
     expect(await screen.findByRole('tree', { name: /repository files/i })).toBeInTheDocument()
+  })
+
+  it('shows root dashboard shortcuts and navigates from key documents', async () => {
+    window.history.replaceState(null, '', '/?branch=main')
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+    ])
+    renderWithClient()
+
+    expect(await screen.findByRole('region', { name: /repository dashboard/i })).toBeInTheDocument()
+    const keyDocuments = screen.getByRole('region', { name: /key documents/i })
+    expect(keyDocuments).toBeInTheDocument()
+    fireEvent.click(within(keyDocuments).getByRole('button', { name: /README.*Repository overview/i }))
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
+    })
+  })
+
+  it('loads repository summary into the header and propagates generated/local visibility state', async () => {
+    vi.mocked(api.getRepoSummary).mockResolvedValue({
+      repoName: 'repo',
+      branch: 'main',
+      statusSummary: {
+        text: 'main is up to date with origin/main. It has 2 local changes to review.',
+        tone: 'info',
+        remoteLabel: 'origin',
+        syncState: 'up-to-date',
+        localChangeCount: 2,
+        untrackedChangeCount: 1,
+      },
+      keyDocuments: [],
+      recentItems: [],
+      visibility: { generatedLocalMode: 'hide', hiddenCount: 4 },
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByRole('region', { name: /repository status summary/i })).toHaveTextContent('2 local changes')
+    expect(screen.getByRole('button', { name: /review changed files/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'show' } })
+
+    await waitFor(() => {
+      expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, true)
+    })
+  })
+
+  it('updates generated and local visibility in navigation and search state', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient()
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    expect(within(tree).getByText('README.md')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'only' } })
+
+    await waitFor(() => {
+      expect(within(tree).getByText('dist')).toBeInTheDocument()
+    })
+    expect(within(tree).queryByText('README.md')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, true)
+    })
   })
 
   it('falls back to the current repository branch when the saved branch is unavailable', async () => {
@@ -700,9 +1123,11 @@ describe('App', () => {
   it('creates a folder from the current folder view', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder here/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), {
@@ -719,8 +1144,10 @@ describe('App', () => {
   it('requires exact typed confirmation before deleting a folder', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete folder$/i }))
 
@@ -756,6 +1183,7 @@ describe('App', () => {
   it('cancels typed file delete confirmation without deleting the file', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const readmeButtons = await screen.findAllByRole('button', { name: /open file README\.md/i })
     fireEvent.click(readmeButtons[0])
     await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))

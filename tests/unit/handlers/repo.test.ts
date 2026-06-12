@@ -182,6 +182,91 @@ describe('infoHandler', () => {
   })
 })
 
+describe('repository viewer usability handlers', () => {
+  it('returns repository summary with plain-language status and key docs', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/summary?branch=main'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as {
+        repoName: string
+        branch: string
+        statusSummary: { text: string; syncState: string; localChangeCount: number }
+        keyDocuments: Array<{ path: string }>
+      }
+
+      expect(body.repoName).toBeTruthy()
+      expect(body.branch).toBe('main')
+      expect(body.statusSummary.text).toContain('no upstream remote configured')
+      expect(body.statusSummary.syncState).toBe('local-only')
+      expect(body.keyDocuments).toContainEqual(expect.objectContaining({ path: 'README.md' }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns changed-file items and summary counts', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      writeFileSync(join(dir, 'new-note.md'), 'new')
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/changes?includeGeneratedLocal=true'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as {
+        summary: { total: number; modified: number; untracked: number }
+        items: Array<{ path: string; changeState: string }>
+      }
+
+      expect(body.summary).toMatchObject({ total: 2, modified: 1, untracked: 1 })
+      expect(body.items).toContainEqual(expect.objectContaining({ path: 'README.md', changeState: 'modified' }))
+      expect(body.items).toContainEqual(expect.objectContaining({ path: 'new-note.md', changeState: 'untracked' }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns navigation hints with key documents and changed items', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/navigation-hints'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as {
+        keyDocuments: Array<{ path: string }>
+        recentItems: unknown[]
+        changedItems: Array<{ path: string }>
+      }
+
+      expect(body.keyDocuments).toContainEqual(expect.objectContaining({ path: 'README.md' }))
+      expect(body.recentItems).toEqual([])
+      expect(body.changedItems).toContainEqual(expect.objectContaining({ path: 'README.md' }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns 400 for repo summary when no repository is loaded', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/summary'))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'No repository loaded' })
+  })
+
+  it('returns 400 for changed files and navigation hints when no repository is loaded', async () => {
+    const app = createApp('')
+    const changesRes = await app.fetch(new Request('http://localhost/api/repo/changes'))
+    const hintsRes = await app.fetch(new Request('http://localhost/api/repo/navigation-hints'))
+
+    expect(changesRes.status).toBe(400)
+    expect(hintsRes.status).toBe(400)
+    expect(await changesRes.json()).toMatchObject({ error: 'No repository loaded' })
+    expect(await hintsRes.json()).toMatchObject({ error: 'No repository loaded' })
+  })
+})
+
 describe('startup folder handlers', () => {
   it('returns the resolved startup folder', async () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-home-'))

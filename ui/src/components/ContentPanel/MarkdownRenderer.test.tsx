@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import MarkdownRenderer from './MarkdownRenderer'
+import { resolveMarkdownLink } from './markdown-navigation'
 
 describe('MarkdownRenderer', () => {
   it('renders copy buttons only for fenced code blocks and copies the selected block', async () => {
@@ -82,4 +83,34 @@ describe('MarkdownRenderer', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Guide' }))
     expect(onNavigate).toHaveBeenCalledWith('docs/guide.md')
   })
+
+  it('resolves nested relative links from the current Markdown path', () => {
+    const onNavigate = vi.fn()
+
+    render(
+      <MarkdownRenderer
+        content={'[Guide](../guide.md)'}
+        currentPath="specs/025-viewer-usability-upgrades/spec.md"
+        onNavigate={onNavigate}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: 'Guide' }))
+    expect(onNavigate).toHaveBeenCalledWith('specs/guide.md')
+    expect(resolveMarkdownLink('./notes.md#details', 'docs/readme.md')).toBe('docs/notes.md#details')
+  })
+
+  it('adds stable unique IDs to rendered headings', () => {
+    render(
+      <MarkdownRenderer
+        content={'# Overview\n\n## Details\n\n## Details'}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelector('h1#overview')).toHaveTextContent('Overview')
+    expect(document.querySelector('h2#details')).toHaveTextContent('Details')
+    expect(document.querySelector('h2#details-2')).toHaveTextContent('Details')
+  })
+
 })

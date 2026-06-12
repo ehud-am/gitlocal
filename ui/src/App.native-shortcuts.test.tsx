@@ -9,6 +9,9 @@ const writeViewerState = vi.fn()
 vi.mock('./services/viewerState', () => ({
   readViewerState: () => readViewerState(),
   writeViewerState: (...args: unknown[]) => writeViewerState(...args),
+  readRecentItems: () => [],
+  rememberRecentItem: vi.fn((item) => item),
+  rememberRecentChangedItems: vi.fn((items) => items),
 }))
 
 vi.mock('./services/theme', () => ({
