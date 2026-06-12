@@ -29,7 +29,6 @@ import type {
   FolderOperation,
   FolderOperationResult,
   FolderOperationStatus,
-  LocalActionResponse,
 } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }

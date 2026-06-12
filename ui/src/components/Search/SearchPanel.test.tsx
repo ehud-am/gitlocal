@@ -230,6 +230,48 @@ describe('SearchPanel', () => {
     })
   })
 
+  it('replaces the loading state with bounded partial results when a large search completes', async () => {
+    let resolveSearch: ((value: Awaited<ReturnType<typeof api.getSearchResults>>) => void) | undefined
+    vi.mocked(api.getSearchResults).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve
+        }),
+    )
+
+    renderWithClient(
+      <SearchPanelHarness initialQuery="GitLocal" initialLimit={25} />,
+    )
+
+    expect(await screen.findByText(/searching/i)).toBeInTheDocument()
+
+    resolveSearch?.({
+      query: 'GitLocal',
+      branch: 'main',
+      mode: 'both',
+      caseSensitive: false,
+      resultCount: 25,
+      totalEstimate: 224,
+      partial: true,
+      nextCursor: '25',
+      results: [{
+        path: 'README.md',
+        type: 'file',
+        matchType: 'content',
+        line: 12,
+        snippet: 'GitLocal is a local folder and git repository viewer.',
+        localOnly: false,
+        generatedLocalState: 'tracked',
+        scopeLabel: 'File content',
+      }],
+    })
+
+    expect(await screen.findByText(/showing 25 of 224 results/i)).toBeInTheDocument()
+    expect(screen.queryByText(/searching/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/more matches are available/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /load more/i })).toBeEnabled()
+  })
+
   it('renders an empty result list when the API returns no matches', async () => {
     vi.mocked(api.getSearchResults).mockResolvedValueOnce({
       query: 'none',

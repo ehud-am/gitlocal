@@ -19,14 +19,11 @@ interface Props {
   changedFiles?: ChangedFilesResponse | null
   onBranchChange: (branch: string) => void
   onEditGitIdentity?: () => void
-  onCommitChanges?: () => void
-  onSyncWithRemote?: () => void
   onOpenSearch?: () => void
   onOpenChangedFiles?: () => void
+  onCloseChangedFiles?: () => void
   onOpenChangedFile?: (item: ChangedFileItem) => void
   branchDisabled?: boolean
-  commitDisabled?: boolean
-  syncDisabled?: boolean
   syncActionLabel?: string
   branchSwitchDialog?: ReactNode
 }
@@ -90,6 +87,7 @@ export default function RepoContextHeader({
   onEditGitIdentity,
   onOpenSearch,
   onOpenChangedFiles,
+  onCloseChangedFiles,
   onOpenChangedFile,
   branchDisabled = false,
   branchSwitchDialog,
@@ -159,11 +157,6 @@ export default function RepoContextHeader({
               </label>
             ) : null}
             {onOpenSearch ? <SearchTrigger onOpen={onOpenSearch} /> : null}
-            {onOpenChangedFiles && changeSummary > 0 ? (
-              <Button type="button" variant="secondary" size="sm" onClick={onOpenChangedFiles}>
-                Changed files
-              </Button>
-            ) : null}
           </div>
         </div>
 
@@ -207,7 +200,17 @@ export default function RepoContextHeader({
           <section className="changed-files-panel" aria-label="changed files">
             <div className="changed-files-panel-header">
               <p className="changed-files-title">Changed files</p>
-              <span>{changedFiles.summary.total} {changedFiles.summary.total === 1 ? 'path' : 'paths'}</span>
+              <div className="changed-files-panel-actions">
+                <span>{changedFiles.summary.total} {changedFiles.summary.total === 1 ? 'path' : 'paths'}</span>
+                {onCloseChangedFiles ? (
+                  <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <ul>
               {changedFiles.items.map((item) => (
@@ -226,6 +229,17 @@ export default function RepoContextHeader({
           </section>
         ) : changedFiles ? (
           <section className="changed-files-panel" aria-label="changed files">
+            <div className="changed-files-panel-header">
+              <p className="changed-files-title">Changed files</p>
+              {onCloseChangedFiles ? (
+                <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                    <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </Button>
+              ) : null}
+            </div>
             <p>No changed files to review.</p>
           </section>
         ) : null}

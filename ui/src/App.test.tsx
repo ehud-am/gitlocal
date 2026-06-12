@@ -347,6 +347,7 @@ describe('App', () => {
 
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     fireEvent.click(await screen.findByRole('button', { name: /open parent folder outside this repository/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -388,7 +389,7 @@ describe('App', () => {
       },
       changedFilesSummary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
     }))
-    vi.mocked(api.getChangedFiles).mockResolvedValueOnce({
+    vi.mocked(api.getChangedFiles).mockResolvedValue({
       branch: 'main',
       checkedAt: '2026-06-11T12:00:00.000Z',
       summary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
@@ -412,7 +413,11 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('button', { name: /view changed files/i }))
     const changedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
     expect(changedFilesRegion).toHaveTextContent('README.md')
-    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /README\.md/i }))
+    fireEvent.click(within(changedFilesRegion).getByRole('button', { name: /close changed files/i }))
+    expect(screen.queryByRole('region', { name: /changed files/i })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /view changed files/i }))
+    const reopenedChangedFilesRegion = await screen.findByRole('region', { name: /changed files/i })
+    fireEvent.click(within(reopenedChangedFilesRegion).getByRole('button', { name: /README\.md/i }))
 
     await waitFor(() => {
       expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
@@ -479,6 +484,101 @@ describe('App', () => {
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
     expect(await screen.findByText('guide content')).toBeInTheDocument()
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+  })
+
+  it('refreshes repository summary and navigation hints after an external file change', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file')
+    vi.mocked(api.getRepoSummary)
+      .mockResolvedValueOnce({
+        repoName: 'repo',
+        branch: 'main',
+        statusSummary: {
+          text: 'main has no local changes.',
+          tone: 'neutral',
+          remoteLabel: 'origin',
+          syncState: 'up-to-date',
+          localChangeCount: 0,
+          untrackedChangeCount: 0,
+        },
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+      })
+      .mockResolvedValue({
+        repoName: 'repo',
+        branch: 'main',
+        statusSummary: {
+          text: 'main has 1 local change to review.',
+          tone: 'info',
+          remoteLabel: 'origin',
+          syncState: 'up-to-date',
+          localChangeCount: 1,
+          untrackedChangeCount: 0,
+        },
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        visibility: { generatedLocalMode: 'hide', hiddenCount: 0 },
+      })
+    vi.mocked(api.getNavigationHints)
+      .mockResolvedValueOnce({
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        changedItems: [],
+      })
+      .mockResolvedValue({
+        keyDocuments: [{ path: 'README.md', label: 'README', category: 'README', reason: 'Repository overview', available: true }],
+        recentItems: [],
+        changedItems: [{
+          path: 'README.md',
+          name: 'README.md',
+          type: 'file',
+          changeState: 'modified',
+          generatedLocalState: 'tracked',
+          sourcePath: '',
+          canOpen: true,
+          reviewHint: 'Modified locally',
+        }],
+      })
+    vi.mocked(api.getSyncStatus)
+      .mockResolvedValueOnce(buildSyncStatus({
+        currentPath: 'README.md',
+        currentPathType: 'file',
+        resolvedPath: 'README.md',
+        resolvedPathType: 'file',
+        workingTreeRevision: 'before-change',
+      }))
+      .mockResolvedValue(buildSyncStatus({
+        currentPath: 'README.md',
+        currentPathType: 'file',
+        resolvedPath: 'README.md',
+        resolvedPathType: 'file',
+        workingTreeRevision: 'after-change',
+        fileStatus: 'changed',
+        pathSyncState: 'local-uncommitted',
+        trackedChangeCount: 1,
+        activePathNotice: {
+          path: 'README.md',
+          changeKind: 'refreshed',
+          detectedAt: '2026-06-11T12:00:00.000Z',
+          lastRefreshedAt: '2026-06-11T12:00:00.000Z',
+          message: 'README.md changed outside GitLocal and was refreshed.',
+          actionLabel: 'View changed files',
+        },
+        changedFilesSummary: { total: 1, modified: 1, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 1 },
+      }))
+
+    renderWithClient()
+
+    expect(await screen.findByText('main has no local changes.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+
+    expect(await screen.findByText('main has 1 local change to review.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getRepoSummary).toHaveBeenCalledWith('main')
+      expect(vi.mocked(api.getRepoSummary).mock.calls.length).toBeGreaterThanOrEqual(2)
+      expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, false)
+      expect(vi.mocked(api.getNavigationHints).mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
   })
 
   it('shows an icon on the Refresh control', async () => {
@@ -801,6 +901,10 @@ describe('App', () => {
 
   it('shows root dashboard shortcuts and navigates from key documents', async () => {
     window.history.replaceState(null, '', '/?branch=main')
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+    ])
     renderWithClient()
 
     expect(await screen.findByRole('region', { name: /repository dashboard/i })).toBeInTheDocument()
@@ -1019,9 +1123,11 @@ describe('App', () => {
   it('creates a folder from the current folder view', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder here/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), {
@@ -1038,8 +1144,10 @@ describe('App', () => {
   it('requires exact typed confirmation before deleting a folder', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
     fireEvent.click(docsButtons[0])
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete folder$/i }))
 
@@ -1075,6 +1183,7 @@ describe('App', () => {
   it('cancels typed file delete confirmation without deleting the file', async () => {
     renderWithClient()
 
+    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     const readmeButtons = await screen.findAllByRole('button', { name: /open file README\.md/i })
     fireEvent.click(readmeButtons[0])
     await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))

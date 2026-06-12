@@ -174,6 +174,7 @@ describe('RepoContextHeader', () => {
   it('renders active change notices and changed-file review entries', () => {
     const onOpenChangedFiles = vi.fn()
     const onOpenChangedFile = vi.fn()
+    const onCloseChangedFiles = vi.fn()
 
     render(
       <RepoContextHeader
@@ -241,11 +242,13 @@ describe('RepoContextHeader', () => {
         }}
         onBranchChange={vi.fn()}
         onOpenChangedFiles={onOpenChangedFiles}
+        onCloseChangedFiles={onCloseChangedFiles}
         onOpenChangedFile={onOpenChangedFile}
       />,
     )
 
     expect(screen.getByRole('status')).toHaveTextContent(/changed outside GitLocal/i)
+    expect(screen.queryByRole('button', { name: /^changed files$/i })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /view changed files/i }))
     expect(onOpenChangedFiles).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('region', { name: /changed files/i })).toHaveTextContent('README.md')
@@ -254,6 +257,8 @@ describe('RepoContextHeader', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /docs\/deleted\.md/i }))
     expect(onOpenChangedFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'docs/deleted.md', canOpen: false }))
+    fireEvent.click(screen.getByRole('button', { name: /close changed files/i }))
+    expect(onCloseChangedFiles).toHaveBeenCalledTimes(1)
   })
 
   it('renders a plain-language repository status summary with supporting facts', () => {
@@ -309,11 +314,13 @@ describe('RepoContextHeader', () => {
     expect(summary).toHaveTextContent('Branchmain')
     expect(summary).toHaveTextContent('Remoteorigin')
     expect(summary).toHaveTextContent('Local changes2')
+    expect(screen.queryByRole('button', { name: /^changed files$/i })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /review changed files/i }))
     expect(onOpenChangedFiles).toHaveBeenCalledTimes(1)
   })
 
-  it('renders an empty changed-files state after review', () => {
+  it('renders a closeable empty changed-files state after review', () => {
+    const onCloseChangedFiles = vi.fn()
     render(
       <RepoContextHeader
         info={{
@@ -338,10 +345,13 @@ describe('RepoContextHeader', () => {
           items: [],
         }}
         onBranchChange={vi.fn()}
+        onCloseChangedFiles={onCloseChangedFiles}
       />,
     )
 
     expect(screen.getByRole('region', { name: /changed files/i })).toHaveTextContent(/no changed files/i)
+    fireEvent.click(screen.getByRole('button', { name: /close changed files/i }))
+    expect(onCloseChangedFiles).toHaveBeenCalledTimes(1)
   })
 
   it('renders plain folder context without git-only controls', () => {

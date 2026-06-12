@@ -5,6 +5,13 @@
 **Status**: Draft  
 **Input**: User description: "Build a spec for all 15 usability-review recommendations for GitLocal UI. Target user is a semi-technical product manager using Codex or another AI coding agent, with high-frequency local file and Markdown viewing, low-frequency edits, and repository-aware support while files may change in the background."
 
+## Clarifications
+
+### Session 2026-06-11
+
+- Q: Which root-view tab should be selected by default when a repository README exists? → A: Default to README.
+- Q: How should folder tabs and changed-files entry points be simplified? → A: README then Tree only.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read Markdown Clearly in the Normal Viewer (Priority: P1)
@@ -19,7 +26,7 @@ A semi-technical product manager opens a local repository and reads Markdown-hea
 
 1. **Given** a Markdown file in a nested folder contains a relative link, **When** the user follows the link, **Then** the target resolves relative to the current Markdown file's folder.
 2. **Given** the user searches within the current Markdown file, **When** matches are found, **Then** matches are highlighted in the rendered document and the active match is visible.
-3. **Given** the user needs to export or reuse rendered Markdown, **When** they use visible read-oriented actions, **Then** they can copy, save, or share the rendered output without entering edit mode.
+3. **Given** the user needs to export or reuse rendered Markdown, **When** they use read-oriented actions, **Then** they can copy rendered content directly while save-to-PDF and share remain discoverable from the file actions menu without entering edit mode.
 
 ---
 
@@ -71,7 +78,7 @@ A user wants GitLocal to surface important documents and recent activity instead
 1. **Given** a repository has common Markdown files or folders, **When** the user opens the repository root, **Then** GitLocal surfaces likely entry points such as README, agent instructions, specs, docs, and recent Markdown files.
 2. **Given** files were recently viewed or changed, **When** the user uses recent navigation, **Then** they can return to those files without scanning the tree.
 3. **Given** navigation is collapsed, **When** the user uses the collapsed rail, **Then** they can still reach search, changed files, recent files, key docs, and the current folder.
-4. **Given** the root folder is open, **When** the user reviews the landing surface, **Then** it prioritizes repository status, key docs, recent activity, and high-value folders before raw directory details.
+4. **Given** any Git repository or non-Git folder has a README, **When** the user opens that folder, **Then** GitLocal shows README and Tree view tabs in that order and selects README by default for reading.
 
 ---
 
@@ -86,7 +93,8 @@ A user needs a quick, plain-language understanding of branch, remote, and local 
 **Acceptance Scenarios**:
 
 1. **Given** a repository is on a branch with a remote, **When** the user views the repository header, **Then** they see a concise sentence explaining branch and remote status.
-2. **Given** local changes exist, **When** the repository header is visible, **Then** the summary includes a clear count and a way to open changed files.
+2. **Given** local changes exist, **When** the repository header is visible, **Then** the summary includes a clear count and a single way to open changed files.
+3. **Given** the changed-files panel is open, **When** the user finishes reviewing it, **Then** they can close the panel without navigating away.
 3. **Given** local-only or generated files exist, **When** the user views the tree or folder list, **Then** they can tell whether these files are part of the repository or only present locally.
 
 ---
@@ -129,7 +137,7 @@ A user occasionally edits, creates, or deletes files, but these controls should 
 - **FR-003**: GitLocal MUST resolve relative Markdown links from the folder containing the current Markdown document.
 - **FR-004**: GitLocal MUST preserve support for same-document anchors, external links, email links, missing targets, and links that cannot be opened safely.
 - **FR-005**: GitLocal MUST provide find-in-file for rendered Markdown with visible in-document highlighting and active-match navigation.
-- **FR-006**: GitLocal MUST keep rendered Markdown actions such as copy, save, and share discoverable without requiring edit mode.
+- **FR-006**: GitLocal MUST keep rendered Markdown actions such as copy, save, and share discoverable without requiring edit mode, with copy visible in the reading toolbar and save-to-PDF/share placed in the file actions menu.
 - **FR-007**: GitLocal MUST detect background changes to the active file and communicate that the visible content was refreshed or is no longer available.
 - **FR-008**: GitLocal MUST provide a changed-files view that includes modified, added, deleted, renamed, untracked, local-only, and remote-relevant states when those states are known.
 - **FR-009**: GitLocal MUST provide a concise changed-files entry point from the repository header or another always-visible repository context area.
@@ -140,7 +148,7 @@ A user occasionally edits, creates, or deletes files, but these controls should 
 - **FR-014**: GitLocal MUST preserve the user's active file context when search is opened, scrolled, dismissed, or used to open a result.
 - **FR-015**: GitLocal MUST allow users to hide or show generated/local-only folders in tree, folder list, and search surfaces.
 - **FR-016**: GitLocal MUST provide prominent shortcuts to high-value documents and locations, including README, agent instructions, specs, docs, recently viewed files, and recently changed files when available.
-- **FR-017**: GitLocal MUST provide a repository root dashboard that prioritizes repository status, key documents, recent activity, and changed files before raw directory browsing.
+- **FR-017**: GitLocal MUST provide README and Tree view tabs, in that order, for any Git repository or non-Git folder with a README, defaulting to README while preserving direct access to raw folder browsing through Tree view.
 - **FR-018**: GitLocal MUST make collapsed navigation useful by exposing quick access to search, changed files, recent files, key docs, current folder, and navigation expansion.
 - **FR-019**: GitLocal MUST provide a plain-language repository status summary covering branch, remote availability, sync direction, and local changes.
 - **FR-020**: GitLocal MUST keep raw technical badges available as supporting detail without relying on them as the only explanation of repository state.
@@ -154,6 +162,8 @@ A user occasionally edits, creates, or deletes files, but these controls should 
 - **FR-028**: GitLocal MUST avoid exposing destructive actions as primary actions in high-frequency reading surfaces.
 - **FR-029**: GitLocal MUST support repositories that are local-only, remote clones, empty, or actively changing in the background.
 - **FR-030**: GitLocal MUST make external background changes understandable without requiring users to read terminal output.
+- **FR-031**: GitLocal MUST keep the raw Markdown/text copy action on the same toolbar row as find-in-file and the file actions menu to reduce vertical space usage.
+- **FR-032**: GitLocal MUST avoid duplicate changed-files buttons in the repository header and MUST provide a close control for the changed-files panel.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -171,7 +181,7 @@ A user occasionally edits, creates, or deletes files, but these controls should 
 - **SC-001**: A target user can open a repository, read a long Markdown file in the normal viewer, use rendered find, and follow a relative Markdown link in under 30 seconds.
 - **SC-002**: In usability testing, at least 85% of target users can identify what changed after an external file modification without using the terminal.
 - **SC-003**: At least 90% of repository searches with 100 or more matches show usable first results, result counts, and scope controls within 3 seconds for a typical project repository.
-- **SC-004**: A target user can find and open README, agent instructions, specs, or recently changed files from the root view in under 20 seconds.
+- **SC-004**: A target user can find and open README, agent instructions, specs, or recently changed files from the root view in under 20 seconds, and any folder README is visible by default when available.
 - **SC-005**: At least 85% of target users correctly explain whether local changes exist and whether the branch is in sync after viewing the repository status summary.
 - **SC-006**: Users can hide generated/local-only folders from navigation and search, then restore visibility, without losing the active file.
 - **SC-007**: Find-in-file on rendered Markdown highlights the active match and enables next/previous navigation for files with at least 25 matches.

@@ -26,6 +26,7 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
+type FolderViewTab = 'readme' | 'tree'
 type EmptyStateAction = 'create-file'
 
 function FindIcon() {
@@ -145,6 +146,11 @@ function buildSuggestedDraftPath(folderPath: string, entries: TreeNode[]): strin
   return folderPath ? `${folderPath}/${filename}` : filename
 }
 
+function findReadmePathFromEntries(entries?: TreeNode[]): string {
+  const readme = entries?.find((entry) => entry.type === 'file' && entry.name.toLowerCase() === 'readme.md')
+  return readme?.path ?? ''
+}
+
 function getMutationErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message
   if (error && typeof error === 'object') {
@@ -237,11 +243,13 @@ export default function ContentPanel({
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
+  const [folderViewTab, setFolderViewTab] = useState<FolderViewTab>('tree')
   const fileFindInputRef = useRef<HTMLInputElement | null>(null)
   const panelRootRef = useRef<HTMLDivElement | null>(null)
   const selectionRootRef = useRef<HTMLElement | null>(null)
   const previousNativeFindTokenRef = useRef(nativeFindToken)
   const previousNativeSelectAllTokenRef = useRef(nativeSelectAllToken)
+  const previousRootDefaultKeyRef = useRef('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -264,16 +272,25 @@ export default function ContentPanel({
     queryFn: () => api.getReadme(directoryPath, branch),
     enabled: showingDirectoryView && isGitRepo,
   })
-  const directoryReadmePath = readmeLookup?.path ?? ''
+  const directoryReadmePath = isGitRepo ? (readmeLookup?.path ?? '') : findReadmePathFromEntries(directoryEntries)
   const { data: directoryReadme, isLoading: isDirectoryReadmeLoading } = useQuery({
     queryKey: ['directory-readme', directoryReadmePath, branch, refreshToken],
     queryFn: () => api.getFile(directoryReadmePath, branch, false),
-    enabled: showingDirectoryView && isGitRepo && Boolean(directoryReadmePath),
+    enabled: showingDirectoryView && Boolean(directoryReadmePath),
   })
 
   useEffect(() => {
     setShowRaw(raw)
   }, [selectedPath, raw])
+
+  useEffect(() => {
+    if (!showingDirectoryView) return
+    const defaultKey = `${branch}:${directoryPath}:${directoryReadmePath || 'no-readme'}`
+    if (previousRootDefaultKeyRef.current === defaultKey) return
+
+    previousRootDefaultKeyRef.current = defaultKey
+    setFolderViewTab(directoryReadmePath ? 'readme' : 'tree')
+  }, [branch, directoryPath, directoryReadmePath, showingDirectoryView])
 
   useEffect(() => {
     setMode('view')
@@ -651,6 +668,7 @@ export default function ContentPanel({
         displayPath: entry.path,
       })),
     ]
+    const showFolderTabs = Boolean(directoryReadmePath)
 
     function openDirectoryRow(entry: DirectoryRow): void {
       if (entry.exitsRepo) {
@@ -680,8 +698,41 @@ export default function ContentPanel({
         ) : null}
 
         <div ref={setSelectionRoot} className="content-panel-selection-root">
-          {renderRootDashboard(visibleEntries)}
-          <section className="content-directory-panel" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
+          {showFolderTabs ? (
+            <div className="root-view-tabs" role="tablist" aria-label="folder views">
+              <button
+                type="button"
+                id="folder-tab-readme"
+                role="tab"
+                className="root-view-tab"
+                aria-selected={folderViewTab === 'readme'}
+                aria-controls="folder-tab-panel-readme"
+                onClick={() => setFolderViewTab('readme')}
+              >
+                README
+              </button>
+              <button
+                type="button"
+                id="folder-tab-tree"
+                role="tab"
+                className="root-view-tab"
+                aria-selected={folderViewTab === 'tree'}
+                aria-controls="folder-tab-panel-tree"
+                onClick={() => setFolderViewTab('tree')}
+              >
+                Tree view
+              </button>
+            </div>
+          ) : null}
+          {!showFolderTabs ? renderRootDashboard(visibleEntries) : null}
+          {!showFolderTabs || folderViewTab === 'tree' ? (
+          <section
+            id="folder-tab-panel-tree"
+            role={showFolderTabs ? 'tabpanel' : undefined}
+            aria-labelledby={showFolderTabs ? 'folder-tab-tree' : undefined}
+            className="content-directory-panel"
+            aria-label={path ? `Contents of ${path}` : 'Current folder contents'}
+          >
             <div className="content-directory-header">
               <div>
                 <p className="content-directory-kicker">{path ? 'Folder' : 'Current folder'}</p>
@@ -792,9 +843,16 @@ export default function ContentPanel({
               </>
             )}
           </section>
+          ) : null}
 
-          {directoryReadmePath ? (
-            <section className="content-readme-panel" aria-label="folder readme">
+          {directoryReadmePath && folderViewTab === 'readme' ? (
+            <section
+              id="folder-tab-panel-readme"
+              role="tabpanel"
+              aria-labelledby="folder-tab-readme"
+              className="content-readme-panel"
+              aria-label="folder readme"
+            >
             <div className="content-directory-header">
               <div>
                 <p className="content-directory-kicker">README</p>
@@ -957,6 +1015,7 @@ export default function ContentPanel({
         ? `No matches for "${trimmedFileFindQuery}" in this file.`
         : `${fileFindMatches.length} ${fileFindMatches.length === 1 ? 'match' : 'matches'} in this file.`
   const showMarkdownShareActions = mode === 'view' && data.type === 'markdown' && !showRaw
+  const showSourceCopyAction = mode === 'view' && canSearchCurrentFile && !showMarkdownShareActions
   const activeContentPanelClass = [
     'content-panel',
     mode === 'edit' ? 'content-panel-editing' : '',
@@ -999,9 +1058,13 @@ export default function ContentPanel({
                   content={data.content}
                   hasUnsavedChanges={dirty}
                   inline
+                  actions={['copy-rendered']}
                   onStatusMessage={onStatusMessage}
                 />
               </Suspense>
+            ) : null}
+            {showSourceCopyAction ? (
+              <CopyButton getText={() => data.content} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
             ) : null}
             {hasFileActions ? (
               <DropdownMenu>
@@ -1015,6 +1078,19 @@ export default function ContentPanel({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {showMarkdownShareActions ? (
+                    <Suspense fallback={null}>
+                      <MarkdownShareActions
+                        path={selectedPath}
+                        content={data.content}
+                        hasUnsavedChanges={dirty}
+                        mode="menu"
+                        actions={['save-pdf', 'system-share']}
+                        listenToNativeCommands={false}
+                        onStatusMessage={onStatusMessage}
+                      />
+                    </Suspense>
+                  ) : null}
                   {canToggleRaw ? (
                     <DropdownMenuItem
                       onSelect={() => {
@@ -1236,9 +1312,6 @@ export default function ContentPanel({
           </div>
         ) : (
           <div ref={setSelectionRoot}>
-            <div className="text-file-actions" role="group" aria-label="text file actions">
-              <CopyButton getText={() => data.content} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
-            </div>
             <Suspense fallback={loadingFallback}>
               <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
             </Suspense>

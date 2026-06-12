@@ -315,6 +315,8 @@ export default function App() {
     if (lastRevisionRef.current && lastRevisionRef.current !== syncStatus.workingTreeRevision) {
       queryClient.invalidateQueries({ queryKey: ['tree'] }).catch(() => {})
       queryClient.invalidateQueries({ queryKey: ['file'] }).catch(() => {})
+      queryClient.invalidateQueries({ queryKey: ['repo-summary'] }).catch(() => {})
+      queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }).catch(() => {})
     }
     lastRevisionRef.current = syncStatus.workingTreeRevision
 
@@ -365,6 +367,8 @@ export default function App() {
         queryClient.invalidateQueries({ queryKey: ['readme'] }),
         queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
         queryClient.invalidateQueries({ queryKey: ['sync'] }),
+        queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
       ])
       setStatusMessage('Current view refreshed.')
     } finally {
@@ -1017,6 +1021,7 @@ export default function App() {
                 onEditGitIdentity={info?.isGitRepo ? openGitIdentityDialog : undefined}
                 onOpenSearch={info?.isGitRepo ? openSearch : undefined}
                 onOpenChangedFiles={info?.isGitRepo ? () => { void openChangedFiles() } : undefined}
+                onCloseChangedFiles={() => setChangedFiles(null)}
                 onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}

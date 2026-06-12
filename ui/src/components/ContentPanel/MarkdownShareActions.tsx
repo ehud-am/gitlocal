@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { MarkdownShareAction } from '../../types'
 import type { NativeAppCommandEvent } from '../../types'
 import { Button } from '../ui/button'
+import { DropdownMenuItem } from '../ui/dropdown-menu'
 import {
   buildMarkdownOutputDetails,
 } from './markdown-output'
@@ -12,6 +13,9 @@ interface Props {
   content: string
   hasUnsavedChanges: boolean
   inline?: boolean
+  mode?: 'toolbar' | 'menu' | 'standalone'
+  actions?: MarkdownShareAction[]
+  listenToNativeCommands?: boolean
   onStatusMessage?: (message: string) => void
 }
 
@@ -76,11 +80,17 @@ export default function MarkdownShareActions({
   content,
   hasUnsavedChanges,
   inline = false,
+  mode = inline ? 'toolbar' : 'standalone',
+  actions: requestedActions,
+  listenToNativeCommands = true,
   onStatusMessage,
 }: Props) {
   const details = buildMarkdownOutputDetails(path, content, hasUnsavedChanges)
+  const enabledActions = requestedActions ?? ['save-pdf', 'system-share', 'copy-rendered']
 
   useEffect(() => {
+    if (!listenToNativeCommands) return undefined
+
     const handleNativeCommand = (event: Event) => {
       const command = (event as NativeAppCommandEvent).detail?.command
       if (command === 'print-markdown') {
@@ -150,24 +160,52 @@ export default function MarkdownShareActions({
     }
   }
 
-  const actions = (
+  if (mode === 'menu') {
+    return (
+      <>
+        {enabledActions.includes('save-pdf') ? (
+          <DropdownMenuItem onSelect={() => { void handleAction('save-pdf') }}>
+            Save PDF
+          </DropdownMenuItem>
+        ) : null}
+        {enabledActions.includes('system-share') ? (
+          <DropdownMenuItem onSelect={() => { void handleAction('system-share') }}>
+            Share
+          </DropdownMenuItem>
+        ) : null}
+        {enabledActions.includes('download-artifact') ? (
+          <DropdownMenuItem onSelect={() => { void handleAction('download-artifact') }}>
+            Download Markdown
+          </DropdownMenuItem>
+        ) : null}
+      </>
+    )
+  }
+
+  const renderedActions = (
     <>
-      <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('save-pdf') }}>
-        <PdfIcon />
-        Save PDF
-      </Button>
-      <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('system-share') }}>
-        <ShareIcon />
-        Share
-      </Button>
-      <CopyButton getText={() => details.plainText} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
+      {enabledActions.includes('save-pdf') ? (
+        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('save-pdf') }}>
+          <PdfIcon />
+          Save PDF
+        </Button>
+      ) : null}
+      {enabledActions.includes('system-share') ? (
+        <Button type="button" size="sm" variant="secondary" onClick={() => { void handleAction('system-share') }}>
+          <ShareIcon />
+          Share
+        </Button>
+      ) : null}
+      {enabledActions.includes('copy-rendered') ? (
+        <CopyButton getText={() => details.plainText} className="copy-button copy-button-labeled" label="Copy" visibleLabel />
+      ) : null}
     </>
   )
 
   if (inline) {
     return (
       <div className="markdown-share-actions markdown-share-actions-inline" role="group" aria-label="Markdown output actions">
-        {actions}
+        {renderedActions}
       </div>
     )
   }
@@ -175,7 +213,7 @@ export default function MarkdownShareActions({
   return (
     <section className="markdown-share-actions" aria-label="Markdown output actions">
       <div className="markdown-share-actions-row">
-        {actions}
+        {renderedActions}
       </div>
     </section>
   )

@@ -369,12 +369,6 @@ pre {
   gap: 0.5rem;
 }
 
-.text-file-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.75rem;
-}
-
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
@@ -565,11 +559,6 @@ pre {
   min-height: 7rem;
 }
 
-.search-trigger-shell {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .search-trigger-button,
 .search-dismiss,
 .copy-button,
@@ -686,7 +675,6 @@ pre {
 
 .search-panel-subtitle,
 .search-guidance,
-.search-shortcut-hint,
 .search-empty {
   color: var(--muted-foreground);
   font-size: 0.875rem;
@@ -871,6 +859,55 @@ pre {
 }
 
 @media (max-width: 720px) {
+  .app-header {
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .app-header .repo-name {
+    display: none;
+  }
+
+  .app-header .ml-auto {
+    gap: 0.4rem;
+  }
+
+  .app-header .ml-auto > label,
+  .app-header .ml-auto > button {
+    padding-inline: 0.6rem;
+  }
+
+  .app-body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-height: 42vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-rail {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-rail-toolbar {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .content-area,
+  .viewer-stage {
+    min-width: 0;
+  }
+
+  .viewer-stage {
+    padding: 0.75rem;
+  }
+
   .search-toolbar,
   .search-controls,
   .search-result-button,
@@ -910,12 +947,6 @@ pre {
   justify-content: center;
 }
 
-.content-empty-stack {
-  max-width: 34rem;
-  text-align: center;
-}
-
-.content-empty-title,
 .content-directory-heading,
 .manual-editor-header h3 {
   margin: 0;
@@ -954,8 +985,7 @@ pre {
 .manual-delete-copy,
 .picker-helper,
 .picker-error,
-.picker-entry-badge,
-.picker-sidebar-label {
+.picker-entry-badge {
   color: var(--muted-foreground);
 }
 
@@ -974,7 +1004,36 @@ pre {
 .root-dashboard {
   display: grid;
   gap: 0.85rem;
-  margin-bottom: 1rem;
+}
+
+.root-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.root-view-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0.55rem 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.root-view-tab:hover,
+.root-view-tab:focus-visible {
+  color: var(--foreground);
+  outline: none;
+}
+
+.root-view-tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--foreground);
 }
 
 .root-dashboard-header {
@@ -1079,8 +1138,7 @@ pre {
   margin-bottom: 1rem;
 }
 
-.content-active-heading-row,
-.content-directory-name-row {
+.content-active-heading-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1184,6 +1242,12 @@ pre {
   font-size: 0.8rem;
 }
 
+.changed-files-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .changed-files-title {
   margin: 0;
   color: var(--foreground);
@@ -1198,7 +1262,7 @@ pre {
   list-style: none;
 }
 
-.changed-files-panel button {
+.changed-files-panel ul button {
   display: flex;
   width: 100%;
   align-items: center;
@@ -1212,8 +1276,8 @@ pre {
   text-align: left;
 }
 
-.changed-files-panel button:hover,
-.changed-files-panel button:focus-visible {
+.changed-files-panel ul button:hover,
+.changed-files-panel ul button:focus-visible {
   background: var(--muted);
   outline: none;
 }
@@ -1325,10 +1389,6 @@ pre {
   color: var(--muted-foreground);
 }
 
-.content-directory-meta {
-  min-width: 0;
-}
-
 .content-directory-name {
   color: var(--foreground);
   font-weight: 600;
@@ -1360,21 +1420,6 @@ pre {
 
 .binary-placeholder {
   color: var(--muted-foreground);
-}
-
-.local-only-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--danger);
-  padding: 0.15rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.local-only-badge-compact {
-  padding: 0.12rem 0.45rem;
 }
 
 .manual-editor-card {
@@ -1621,7 +1666,6 @@ pre {
 }
 
 .picker-entry-main,
-.picker-nav-button,
 .picker-submit {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1677,7 +1721,6 @@ pre {
   white-space: nowrap;
 }
 
-.picker-nav-button,
 .picker-submit {
   padding: 0.55rem 0.8rem;
 }

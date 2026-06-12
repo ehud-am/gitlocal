@@ -1,9 +1,7 @@
 import {
   getPathSyncState,
-  getRepoSyncState,
   buildChangedFileItems,
   getPathType,
-  getWorkingTreeChanges,
   getWorkingTreeSyncSummary,
   getWorkingTreeRevision,
   isWorkingTreeBranch,

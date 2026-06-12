@@ -319,6 +319,42 @@ describe('searchHandler', () => {
       generatedLocalState: 'ignored',
     }))
   })
+
+  it('returns bounded partial metadata for large result sets', async () => {
+    const largeDir = mkdtempSync(join(tmpdir(), 'gitlocal-large-search-test-'))
+    try {
+      spawnSync('git', ['init'], { cwd: largeDir })
+      spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: largeDir })
+      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: largeDir })
+      mkdirSync(join(largeDir, 'docs'))
+      for (let index = 0; index < 80; index += 1) {
+        writeFileSync(join(largeDir, 'docs', `page-${index}.md`), `GitLocal large result ${index}\n`)
+      }
+      spawnSync('git', ['add', '.'], { cwd: largeDir })
+      spawnSync('git', ['commit', '-m', 'large search fixture'], { cwd: largeDir })
+      const largeBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: largeDir, encoding: 'utf-8' }).stdout.trim()
+      const client = testClient(createApp(largeDir))
+
+      const res = await client.api.search.$get({
+        query: {
+          query: 'GitLocal',
+          branch: largeBranch,
+          mode: 'content',
+          trackedMode: 'tracked-only',
+          limit: '25',
+        },
+      })
+      const body = await res.json()
+
+      expect(body.resultCount).toBe(25)
+      expect(body.results).toHaveLength(25)
+      expect(body.totalEstimate).toBeGreaterThan(25)
+      expect(body.partial).toBe(true)
+      expect(body.nextCursor).toBe('25')
+    } finally {
+      rmSync(largeDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('search helper utilities', () => {

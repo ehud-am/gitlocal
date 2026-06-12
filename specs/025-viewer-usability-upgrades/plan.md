@@ -7,7 +7,7 @@
 
 ## Summary
 
-Upgrade GitLocal from a capable repository/file viewer into a calmer AI-agent review cockpit for semi-technical product managers. The implementation will keep the existing local-first TypeScript/React architecture, add no new runtime dependency by default, and extend current viewer state, repo sync, search, content-panel, sidebar, and Markdown rendering surfaces. Core work includes clearer normal-view Markdown reading with in-document find highlights and relative-link handling, separate scoped repository search, changed-files and recent/key-doc navigation, plain-language repo status, local/generated visibility controls, stronger background-change notices, and safer low-frequency edit affordances.
+Upgrade GitLocal from a capable repository/file viewer into a calmer AI-agent review cockpit for semi-technical product managers. The implementation will keep the existing local-first TypeScript/React architecture, add no new runtime dependency by default, and extend current viewer state, repo sync, search, content-panel, sidebar, and Markdown rendering surfaces. Core work includes clearer normal-view Markdown reading with in-document find highlights and relative-link handling, separate scoped repository search, changed-files and recent/key-doc navigation, plain-language repo status, local/generated visibility controls, stronger background-change notices, safer low-frequency edit affordances, lower-attention Markdown actions, README-first folder tabs for Git and non-Git folders, and simplified changed-files entry points.
 
 ## Technical Context
 
@@ -127,7 +127,7 @@ Resolved decisions:
 - Changed-files view should be a navigation/review surface, not a full diff tool.
 - Search should keep explicit scopes, result limits, generated/local inclusion controls, and partial-result messaging.
 - Generated/local visibility should be a persistent viewer preference shared by tree, folder, dashboard, and search surfaces.
-- Root dashboard should prioritize key docs, recent items, changed files, and repo status while keeping raw folder browsing available.
+- Root dashboard should prioritize key docs, recent items, changed files, and repo status while keeping raw folder browsing available when no README is available. When a Git or non-Git folder has a README, the folder view should expose README and Tree view tabs in that order and default to README to optimize for reading.
 - Rare edit actions remain secondary and conflict-safe.
 
 ## Phase 1: Design & Contracts
@@ -141,7 +141,7 @@ Design artifacts:
 
 Contract scope:
 
-- UI contract defines observable behavior for normal-view Markdown find/link handling, search, changed-files, dashboard, collapsed navigation, repo status, and rare edit controls.
+- UI contract defines observable behavior for normal-view Markdown find/link handling, lower-attention Markdown action placement, search, changed-files panel open/close behavior, README-first folder tabs, dashboard fallback, collapsed navigation, repo status, and rare edit controls.
 - Local API contract defines intended request/response surfaces for repo summary, changed files, key docs/recent items, scoped search, and sync/background notices.
 - No external service, account, telemetry, or hosted-share contract is introduced.
 

@@ -218,6 +218,35 @@
 
 ---
 
+## Phase 10: Follow-up Reading Attention Polish
+
+**Purpose**: Reduce toolbar attention load and make README-first root reading easier while preserving access to dashboard and tree views.
+
+- [X] T088 [P] Update ContentPanel tests for Markdown action menu placement, raw copy toolbar placement, and README-first root tabs in `ui/src/components/ContentPanel/ContentPanel.test.tsx`
+- [X] T089 Move rendered Markdown save-to-PDF and share actions into the file actions menu while keeping copy visible in `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T090 Move raw Markdown/text copy onto the same toolbar row as find-in-file and file actions in `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T091 Add README-first folder tabs with Tree view as the secondary tab when a README is available in `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T092 Update toolbar/tab styles for compact reading controls in `ui/src/styles/globals.css`
+- [X] T093 Run focused ContentPanel tests and fix regressions in `ui/src/components/ContentPanel/ContentPanel.test.tsx`
+- [X] T094 Run `npm test` and `npm run build` after the follow-up polish implementation
+
+---
+
+## Phase 11: Follow-up Folder Tabs and Changed-Files Polish
+
+**Purpose**: Remove the dashboard tab, make README-first tabs work for Git and non-Git folders, and simplify changed-files review controls.
+
+- [X] T095 [P] Update ContentPanel tests for README-first two-tab folder behavior in Git and non-Git folders in `ui/src/components/ContentPanel/ContentPanel.test.tsx`
+- [X] T096 [P] Update App and RepoContextHeader tests for single changed-files entry point and closeable changed-files panel in `ui/src/App.test.tsx` and `ui/src/components/RepoContext/RepoContextHeader.test.tsx`
+- [X] T097 Remove Dashboard from the folder tab strip and order tabs as README then Tree view in `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T098 Detect README tabs for non-Git folders using visible folder entries in `ui/src/components/ContentPanel/ContentPanel.tsx`
+- [X] T099 Remove the duplicate changed-files header button and add a close control to the changed-files panel in `ui/src/components/RepoContext/RepoContextHeader.tsx` and `ui/src/App.tsx`
+- [X] T100 Update tab and changed-files panel styles for the simplified controls in `ui/src/styles/globals.css`
+- [X] T101 Run focused UI tests for ContentPanel, RepoContextHeader, and App changed-files flows
+- [X] T102 Run `npm test` and `npm run build` after the follow-up implementation
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -231,6 +260,8 @@
 - **Phase 7 US5**: Depends on Phase 2. Can run in parallel with US4 after foundation.
 - **Phase 8 US6**: Depends on Phase 2 and should be validated after US3 interaction changes because dirty guards span search and navigation flows.
 - **Phase 9 Polish**: Depends on the desired user stories being complete.
+- **Phase 10 Follow-up Reading Attention Polish**: Depends on Phase 9 and refines US1/US4 behavior without changing server contracts.
+- **Phase 11 Follow-up Folder Tabs and Changed-Files Polish**: Depends on Phase 10 and refines US2/US4 behavior without changing server contracts.
 
 ### User Story Dependencies
 

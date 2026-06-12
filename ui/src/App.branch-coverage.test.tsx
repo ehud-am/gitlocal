@@ -87,8 +87,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     branch: string
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
-    onCommitChanges?: () => void
-    onSyncWithRemote?: () => void
     onOpenSearch?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
@@ -97,8 +95,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onBranchChange(props.branch)}>switch-same-branch</button>
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
-      <button type="button" onClick={() => props.onCommitChanges?.()}>open-commit</button>
-      <button type="button" onClick={() => props.onSyncWithRemote?.()}>sync-remote</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
       {props.branchSwitchDialog}
     </div>
@@ -191,25 +187,6 @@ vi.mock('./components/AppDialogs', () => ({
         <input aria-label="Git user email" value={props.email} onChange={(event) => props.onEmailChange(event.target.value)} />
         <button type="button" onClick={() => props.onOpenChange(false)}>close-identity</button>
         <button type="button" onClick={props.onSave}>save-identity</button>
-        <span>{props.pending ? 'pending' : 'idle'}</span>
-      </div>
-    ) : null
-  ),
-  CommitChangesDialog: (props: {
-    open: boolean
-    pending: boolean
-    error: string
-    message: string
-    onOpenChange: (open: boolean) => void
-    onMessageChange: (value: string) => void
-    onCommit: () => void
-  }) => (
-    props.open ? (
-      <div data-testid="commit-dialog">
-        <span>{props.error}</span>
-        <input aria-label="Commit message" value={props.message} onChange={(event) => props.onMessageChange(event.target.value)} />
-        <button type="button" onClick={() => props.onOpenChange(false)}>close-commit</button>
-        <button type="button" onClick={props.onCommit}>submit-commit</button>
         <span>{props.pending ? 'pending' : 'idle'}</span>
       </div>
     ) : null
@@ -607,8 +584,6 @@ describe('App branch coverage', () => {
       expect(screen.queryByTestId('identity-dialog')).not.toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
-    expect(screen.queryByTestId('commit-dialog')).not.toBeInTheDocument()
     expect(api.commitChanges).not.toHaveBeenCalled()
   })
 
@@ -629,7 +604,6 @@ describe('App branch coverage', () => {
     expect(screen.getByRole('textbox', { name: /git user email/i })).toHaveValue('')
     fireEvent.click(screen.getByRole('button', { name: 'close-identity' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'open-commit' }))
     expect(screen.queryByRole('textbox', { name: /commit message/i })).not.toBeInTheDocument()
   })
 
