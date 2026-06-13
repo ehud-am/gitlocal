@@ -49,6 +49,7 @@ import type {
 import {
   describeBranchTarget,
   getErrorMessage,
+  shouldRefreshActiveFileAfterSyncChange,
   updateBranchCacheAfterSwitch,
 } from './lib/app-helpers'
 import { getRepoSyncActionLabel } from './lib/sync'
@@ -314,7 +315,9 @@ export default function App() {
 
     if (lastRevisionRef.current && lastRevisionRef.current !== syncStatus.workingTreeRevision) {
       queryClient.invalidateQueries({ queryKey: ['tree'] }).catch(() => {})
-      queryClient.invalidateQueries({ queryKey: ['file'] }).catch(() => {})
+      if (shouldRefreshActiveFileAfterSyncChange(syncStatus)) {
+        queryClient.invalidateQueries({ queryKey: ['file'] }).catch(() => {})
+      }
       queryClient.invalidateQueries({ queryKey: ['repo-summary'] }).catch(() => {})
       queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }).catch(() => {})
     }

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.10 - 2026-06-12
+
+- Fixed background Markdown refresh flicker by avoiding active-file refetches when only other repository paths changed.
+- Kept local Markdown image sources visible across rerenders while still refreshing them in the background.
+- Fixed parent-folder navigation so cached empty directory results cannot make a non-empty parent appear empty.
+- Updated audited build dependencies to clear current `esbuild`/Vite security advisories.
+
 ## 0.9.9 - 2026-06-12
 
 - Cleaned up the collapsed left navigation rail so it shows only one expand control instead of several one-letter shortcut buttons.

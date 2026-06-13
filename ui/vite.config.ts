@@ -17,8 +17,14 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          markdown: ['react-markdown', 'remark-gfm', 'rehype-highlight'],
+        manualChunks(id) {
+          if (
+            id.includes('/node_modules/react-markdown/')
+            || id.includes('/node_modules/remark-gfm/')
+            || id.includes('/node_modules/rehype-highlight/')
+          ) {
+            return 'markdown'
+          }
         },
       },
     },

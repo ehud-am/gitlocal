@@ -428,6 +428,38 @@ describe('ContentPanel', () => {
     expect(screen.getByLabelText(/new file path/i)).toHaveValue('docs/README.md')
   })
 
+  it('refetches a parent folder even when a fresh empty directory result is cached', async () => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: 30_000,
+        },
+      },
+    })
+    client.setQueryData(['tree', 'docs', 'main', 0], [])
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      client,
+    )
+
+    expect(screen.getByLabelText(/loading content/i)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
+    expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
+  })
+
   it('creates folders from the current directory and reports mutation completion', async () => {
     vi.mocked(api.createFolder).mockResolvedValue({
       ok: true,
