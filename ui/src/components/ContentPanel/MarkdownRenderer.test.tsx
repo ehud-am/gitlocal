@@ -56,6 +56,42 @@ describe('MarkdownRenderer', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/file?path=docs%2Fdiagram.png')
   })
 
+  it('keeps cached local image sources during markdown rerenders', async () => {
+    const pendingRefresh = new Promise(() => {})
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        type: 'image',
+        content: 'Y2FjaGVk',
+      }),
+    }).mockReturnValueOnce(pendingRefresh)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { rerender } = render(
+      <MarkdownRenderer
+        content={'![Logo](./assets/logo.svg)'}
+        currentPath="docs/README.md"
+        branch="rerender-cache"
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const logo = await screen.findByRole('img', { name: /logo/i })
+    expect(logo).toHaveAttribute('src', 'data:image/svg+xml;base64,Y2FjaGVk')
+
+    rerender(
+      <MarkdownRenderer
+        content={'![Logo](./assets/logo.svg)'}
+        currentPath="docs/README.md"
+        branch="rerender-cache"
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: /logo/i })).toHaveAttribute('src', 'data:image/svg+xml;base64,Y2FjaGVk')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('renders copy buttons only for fenced code blocks and copies the selected block', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {

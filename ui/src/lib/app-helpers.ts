@@ -1,4 +1,4 @@
-import type { Branch, BranchSwitchResponse } from '../types'
+import type { Branch, BranchSwitchResponse, SyncStatus } from '../types'
 
 type BranchScope = 'local' | 'remote'
 
@@ -66,4 +66,8 @@ export function getErrorMessage(error: unknown, fallback: string): string {
     return maybePayload.error ?? maybePayload.message ?? fallback
   }
   return fallback
+}
+
+export function shouldRefreshActiveFileAfterSyncChange(syncStatus: Pick<SyncStatus, 'fileStatus'>): boolean {
+  return syncStatus.fileStatus !== 'unchanged'
 }

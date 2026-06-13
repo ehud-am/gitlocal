@@ -3,6 +3,7 @@ import {
   branchMatchesTarget,
   describeBranchTarget,
   getErrorMessage,
+  shouldRefreshActiveFileAfterSyncChange,
   sortBranchOptions,
   updateBranchCacheAfterSwitch,
 } from './lib/app-helpers'
@@ -109,5 +110,12 @@ describe('App helpers', () => {
     expect(getErrorMessage({ message: 'oops' }, 'fallback')).toBe('oops')
     expect(getErrorMessage({ detail: 'no message' }, 'fallback')).toBe('fallback')
     expect(getErrorMessage('unknown', 'fallback')).toBe('fallback')
+  })
+
+  it('refreshes the active file only when sync reports that active file changed', () => {
+    expect(shouldRefreshActiveFileAfterSyncChange({ fileStatus: 'unchanged' })).toBe(false)
+    expect(shouldRefreshActiveFileAfterSyncChange({ fileStatus: 'changed' })).toBe(true)
+    expect(shouldRefreshActiveFileAfterSyncChange({ fileStatus: 'deleted' })).toBe(true)
+    expect(shouldRefreshActiveFileAfterSyncChange({ fileStatus: 'unavailable' })).toBe(true)
   })
 })

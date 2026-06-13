@@ -261,22 +261,26 @@ export default function ContentPanel({
   const {
     data: directoryEntries,
     isLoading: isDirectoryLoading,
+    isFetching: isDirectoryFetching,
     isError: isDirectoryError,
   } = useQuery({
     queryKey: ['tree', directoryPath, branch, refreshToken],
     queryFn: () => api.getTree(directoryPath, branch),
     enabled: showingDirectoryView,
+    staleTime: 0,
   })
   const { data: readmeLookup } = useQuery({
     queryKey: ['readme', directoryPath, branch, refreshToken],
     queryFn: () => api.getReadme(directoryPath, branch),
     enabled: showingDirectoryView && isGitRepo,
+    staleTime: 0,
   })
   const directoryReadmePath = isGitRepo ? (readmeLookup?.path ?? '') : findReadmePathFromEntries(directoryEntries)
   const { data: directoryReadme, isLoading: isDirectoryReadmeLoading } = useQuery({
     queryKey: ['directory-readme', directoryReadmePath, branch, refreshToken],
     queryFn: () => api.getFile(directoryReadmePath, branch, false),
     enabled: showingDirectoryView && Boolean(directoryReadmePath),
+    staleTime: 0,
   })
 
   useEffect(() => {
@@ -528,6 +532,7 @@ export default function ContentPanel({
   const canToggleRaw = data?.type === 'markdown' || data?.type === 'text'
   const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
   const visibleDirectoryEntries = directoryEntries ?? []
+  const showDirectorySkeleton = isDirectoryLoading || (isDirectoryFetching && visibleDirectoryEntries.length === 0)
   const selectedFileName = selectedPathType === 'file' ? basenameOf(selectedPath) : ''
   const selectedFileLocation = selectedPathType === 'file' ? parentPathOf(selectedPath) : ''
   const hasFileActions = canToggleRaw || canMutateFiles
@@ -772,7 +777,7 @@ export default function ContentPanel({
               ) : null}
             </div>
 
-            {isDirectoryLoading ? (
+            {showDirectorySkeleton ? (
               <div className="content-skeleton" aria-label="loading content" />
             ) : (
               <>
@@ -964,7 +969,7 @@ export default function ContentPanel({
   }
 
   if (!selectedPath) {
-    if (isDirectoryLoading) {
+    if (showDirectorySkeleton) {
       return (
         <div {...panelProps()}>
           <div ref={setSelectionRoot} className="content-skeleton" aria-label="loading content" />

@@ -22,6 +22,8 @@ interface MarkdownImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   branch?: string
 }
 
+const markdownImageSourceCache = new Map<string, string>()
+
 function imageMimeTypeForPath(path: string): string {
   const ext = path.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase() ?? ''
   if (ext === 'svg') return 'image/svg+xml'
@@ -82,7 +84,11 @@ function parseMarkdownImageDimensions(title?: string): Pick<ImgHTMLAttributes<HT
 }
 
 function MarkdownImage({ src = '', alt = '', title, currentPath, branch, ...props }: MarkdownImageProps) {
-  const [resolvedSrc, setResolvedSrc] = useState(() => isLocalMarkdownResource(src) ? '' : src)
+  const resolvedPath = isLocalMarkdownResource(src) ? resolveMarkdownLink(src, currentPath).split('#')[0] : ''
+  const cacheKey = resolvedPath ? `${branch ?? ''}:${resolvedPath}` : ''
+  const [resolvedSrc, setResolvedSrc] = useState(() => (
+    cacheKey ? (markdownImageSourceCache.get(cacheKey) ?? '') : src
+  ))
   const dimensions = parseMarkdownImageDimensions(title)
 
   useEffect(() => {
@@ -95,7 +101,6 @@ function MarkdownImage({ src = '', alt = '', title, currentPath, branch, ...prop
       }
     }
 
-    const resolvedPath = resolveMarkdownLink(src, currentPath).split('#')[0]
     const params = new URLSearchParams({ path: resolvedPath })
     if (branch) params.set('branch', branch)
 
@@ -103,7 +108,9 @@ function MarkdownImage({ src = '', alt = '', title, currentPath, branch, ...prop
       .then((response) => response.ok ? response.json() as Promise<{ content?: string; type?: string }> : null)
       .then((file) => {
         if (!active || file?.type !== 'image' || !file.content) return
-        setResolvedSrc(`data:${imageMimeTypeForPath(resolvedPath)};base64,${file.content}`)
+        const dataUri = `data:${imageMimeTypeForPath(resolvedPath)};base64,${file.content}`
+        markdownImageSourceCache.set(cacheKey, dataUri)
+        setResolvedSrc(dataUri)
       })
       .catch(() => {
         if (active) setResolvedSrc(src)
@@ -112,7 +119,7 @@ function MarkdownImage({ src = '', alt = '', title, currentPath, branch, ...prop
     return () => {
       active = false
     }
-  }, [branch, currentPath, src])
+  }, [branch, cacheKey, currentPath, resolvedPath, src])
 
   return <img {...props} {...dimensions} src={resolvedSrc} alt={alt} />
 }
