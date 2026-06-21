@@ -20,4 +20,15 @@ describe('global responsive layout styles', () => {
     expect(narrowBlock).toContain('.content-area')
     expect(narrowBlock).toContain('min-width: 0')
   })
+
+  it('defines stable wrapping styles for markdown metadata visualization', () => {
+    expect(css).toContain('.markdown-metadata')
+    expect(css).toContain('border: 1px solid var(--border)')
+    expect(css).toContain('.markdown-metadata-row')
+    expect(css).toContain('grid-template-columns: minmax(96px, max-content) minmax(0, 1fr)')
+    expect(css).toContain('.markdown-metadata-value')
+    expect(css).toContain('overflow-wrap: anywhere')
+    expect(css).toContain('.markdown-metadata-raw')
+    expect(css).toContain('white-space: pre-wrap')
+  })
 })

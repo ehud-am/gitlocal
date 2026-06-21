@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.11 - 2026-06-21
+
+- Added structured rendering for Markdown YAML front matter so skill files and similar docs show metadata separately from the Markdown body instead of as a broken bold text block.
+- Preserved raw Markdown source, copy/share output, relative links, local images, find highlighting, heading anchors, and code-block copy behavior for files with front matter.
+- Added regression coverage for nested metadata, arrays, booleans, malformed front matter, incomplete delimiters, horizontal rules, and delimiter-like fenced code.
+
 ## 0.9.10 - 2026-06-12
 
 - Fixed background Markdown refresh flicker by avoiding active-file refetches when only other repository paths changed.

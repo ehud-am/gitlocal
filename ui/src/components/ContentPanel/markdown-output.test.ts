@@ -55,4 +55,21 @@ describe('markdown output helpers', () => {
   it('includes printable HTML in output details', () => {
     expect(buildMarkdownOutputDetails('docs/release.md', '# Release Notes', false).pdfHtml).toContain('Release Notes')
   })
+
+  it('preserves front matter in source-oriented output details', () => {
+    const content = [
+      '---',
+      'name: "skill"',
+      'metadata:',
+      '  author: "gitlocal"',
+      '---',
+      '# Skill',
+    ].join('\n')
+    const details = buildMarkdownOutputDetails('skills/SKILL.md', content, false)
+
+    expect(details.markdown).toBe(content)
+    expect(details.plainText).toContain('name: "skill"')
+    expect(details.plainText).toContain('author: "gitlocal"')
+    expect(details.title).toBe('Skill')
+  })
 })
