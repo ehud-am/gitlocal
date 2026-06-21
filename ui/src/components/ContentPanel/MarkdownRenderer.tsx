@@ -7,6 +7,7 @@ import CopyButton from './CopyButton'
 import CodeViewer from './CodeViewer'
 import { createUniqueHeadingId, resolveMarkdownLink, stripHiddenMarkdownComments } from './markdown-navigation'
 import { flattenRenderableText, hasMarkdownFindQuery, splitMarkdownFindSegments } from './markdown-find'
+import { parseMarkdownFrontMatter, type MetadataEntry } from './markdown-frontmatter'
 
 interface Props {
   content: string
@@ -124,6 +125,24 @@ function MarkdownImage({ src = '', alt = '', title, currentPath, branch, ...prop
   return <img {...props} {...dimensions} src={resolvedSrc} alt={alt} />
 }
 
+function MetadataEntryView({ entry }: { entry: MetadataEntry }) {
+  return (
+    <li className={`markdown-metadata-entry markdown-metadata-entry-${entry.kind}`}>
+      <div className="markdown-metadata-row">
+        <span className="markdown-metadata-key">{entry.label}</span>
+        {entry.value ? <span className="markdown-metadata-value">{entry.value}</span> : null}
+      </div>
+      {entry.children?.length ? (
+        <ul className="markdown-metadata-children">
+          {entry.children.map((child, index) => (
+            <MetadataEntryView key={`${child.kind}:${child.label}:${child.value ?? ''}:${index}`} entry={child} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  )
+}
+
 export default function MarkdownRenderer({
   content,
   currentPath = '',
@@ -132,7 +151,8 @@ export default function MarkdownRenderer({
   findCaseSensitive = false,
   onNavigate,
 }: Props) {
-  const renderContent = normalizeHtmlImages(stripHiddenMarkdownComments(content))
+  const parsedContent = parseMarkdownFrontMatter(content)
+  const renderContent = normalizeHtmlImages(stripHiddenMarkdownComments(parsedContent.bodyContent))
   const headingIds = new Map<string, number>()
   const shouldHighlight = hasMarkdownFindQuery(findQuery)
 
@@ -169,6 +189,28 @@ export default function MarkdownRenderer({
 
   return (
     <div className="markdown-body">
+      {parsedContent.frontMatter ? (
+        <section className="markdown-metadata" aria-labelledby="markdown-metadata-title">
+          <div className="markdown-metadata-heading">
+            <h2 id="markdown-metadata-title">Document metadata</h2>
+            <span className="markdown-metadata-lines">
+              Lines {parsedContent.frontMatter.startLine}-{parsedContent.frontMatter.endLine}
+            </span>
+          </div>
+          {parsedContent.frontMatter.message ? (
+            <p className="markdown-metadata-message">{parsedContent.frontMatter.message}</p>
+          ) : null}
+          {parsedContent.frontMatter.entries.length ? (
+            <ul className="markdown-metadata-list">
+              {parsedContent.frontMatter.entries.map((entry, index) => (
+                <MetadataEntryView key={`${entry.kind}:${entry.label}:${entry.value ?? ''}:${index}`} entry={entry} />
+              ))}
+            </ul>
+          ) : (
+            <pre className="markdown-metadata-raw">{parsedContent.frontMatter.rawText || '(empty)'}</pre>
+          )}
+        </section>
+      ) : null}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}

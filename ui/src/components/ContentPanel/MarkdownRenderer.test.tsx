@@ -201,4 +201,144 @@ describe('MarkdownRenderer', () => {
     expect(document.querySelector('h2#details-2')).toHaveTextContent('Details')
   })
 
+  it('renders skill-style front matter in a distinct metadata region', () => {
+    render(
+      <MarkdownRenderer
+        content={[
+          '---',
+          'name: "speckit-specify"',
+          'description: "Create a specification"',
+          'compatibility: "Requires spec-kit"',
+          'metadata:',
+          '  author: "github-spec-kit"',
+          '---',
+          '',
+          '# User Input',
+        ].join('\n')}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const metadata = screen.getByRole('region', { name: /document metadata/i })
+    expect(metadata).toHaveTextContent('name')
+    expect(metadata).toHaveTextContent('speckit-specify')
+    expect(metadata).toHaveTextContent('description')
+    expect(metadata).toHaveTextContent('Create a specification')
+    expect(metadata).toHaveTextContent('metadata')
+    expect(metadata).toHaveTextContent('author')
+    expect(metadata).toHaveTextContent('github-spec-kit')
+    expect(screen.getByRole('heading', { name: 'User Input' })).toBeInTheDocument()
+  })
+
+  it('renders the markdown body after front matter with normal markdown behavior', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const onNavigate = vi.fn()
+
+    render(
+      <MarkdownRenderer
+        content={[
+          '---',
+          'title: "Guide"',
+          '---',
+          '',
+          '# Guide',
+          '',
+          'A **strong** paragraph with [relative](./next.md).',
+          '',
+          '- item',
+          '',
+          '```ts',
+          'const frontMatter = false',
+          '```',
+        ].join('\n')}
+        currentPath="docs/guide.md"
+        onNavigate={onNavigate}
+      />,
+    )
+
+    expect(document.querySelector('h1#guide')).toHaveTextContent('Guide')
+    expect(screen.getByText('strong').tagName).toBe('STRONG')
+    fireEvent.click(screen.getByRole('link', { name: 'relative' }))
+    expect(onNavigate).toHaveBeenCalledWith('docs/next.md')
+    expect(screen.getByText('item').tagName).toBe('LI')
+    expect(screen.getByRole('button', { name: /copy code block/i })).toBeInTheDocument()
+  })
+
+  it('renders nested metadata and list values readably', () => {
+    render(
+      <MarkdownRenderer
+        content={[
+          '---',
+          'enabled: true',
+          'retries: 3',
+          'tags: ["docs", "skills"]',
+          'metadata:',
+          '  reviewers:',
+          '    - product',
+          '    - engineering',
+          '---',
+          '# Body',
+        ].join('\n')}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const metadata = screen.getByRole('region', { name: /document metadata/i })
+    expect(metadata).toHaveTextContent('enabled')
+    expect(metadata).toHaveTextContent('true')
+    expect(metadata).toHaveTextContent('retries')
+    expect(metadata).toHaveTextContent('3')
+    expect(metadata).toHaveTextContent('tags')
+    expect(metadata).toHaveTextContent('docs, skills')
+    expect(metadata).toHaveTextContent('reviewers')
+    expect(metadata).toHaveTextContent('product')
+    expect(metadata).toHaveTextContent('engineering')
+  })
+
+  it('does not show metadata visualization for ordinary markdown', () => {
+    render(
+      <MarkdownRenderer
+        content={'# Ordinary\n\n---\n\n```yaml\n---\nname: sample\n---\n```'}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('region', { name: /document metadata/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ordinary' })).toBeInTheDocument()
+    expect(screen.getByText('sample')).toBeInTheDocument()
+  })
+
+  it('keeps malformed bounded front matter readable without hiding body content', () => {
+    render(
+      <MarkdownRenderer
+        content={'---\nname: ok\nnot yaml\n---\n# Body'}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const metadata = screen.getByRole('region', { name: /document metadata/i })
+    expect(metadata).toHaveTextContent('Some metadata lines could not be structured.')
+    expect(metadata).toHaveTextContent('not yaml')
+    expect(screen.getByRole('heading', { name: 'Body' })).toBeInTheDocument()
+  })
+
+  it('keeps incomplete yaml-shaped front matter readable as fallback text', () => {
+    render(
+      <MarkdownRenderer
+        content={'---\nname: missing-close\n# Body'}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    const metadata = screen.getByRole('region', { name: /document metadata/i })
+    expect(metadata).toHaveTextContent('Front matter starts here but has no closing delimiter.')
+    expect(metadata).toHaveTextContent('name: missing-close')
+    expect(metadata).toHaveTextContent('# Body')
+    expect(screen.queryByRole('heading', { name: 'Body' })).not.toBeInTheDocument()
+  })
+
 })
