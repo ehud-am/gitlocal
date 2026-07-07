@@ -1,21 +1,32 @@
 import AppKit
+import CoreServices
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var service: GitLocalService?
     private var windowController: ViewerWindowController?
+    private var pendingOpenFilePaths: [String] = []
+    private var serviceStarted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let service = GitLocalService()
         self.service = service
+        serviceStarted = true
+        let initialOpenPath = pendingOpenFilePaths.last
 
-        service.start { [weak self] result in
+        service.start(openPath: initialOpenPath) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let url):
-                    let controller = ViewerWindowController(url: url)
+                    let controller = ViewerWindowController(
+                        url: url,
+                        onDefaultReaderSetupRequested: { [weak self] in
+                            self?.setDefaultMarkdownReader() ?? .failure(AppDelegateError.unavailable)
+                        }
+                    )
                     self?.windowController = controller
                     self?.installMainMenu(for: controller)
                     controller.showWindow(self)
+                    self?.flushPendingOpenFiles(excluding: initialOpenPath)
                 case .failure(let error):
                     AppErrorPresenter.show(error)
                     NSApp.terminate(self)
@@ -32,11 +43,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         service?.stop()
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let markdownPaths = urls
+            .filter { $0.isFileURL && Self.isSupportedMarkdownURL($0) }
+            .map(\.path)
+        guard !markdownPaths.isEmpty else { return }
+
+        NSApp.activate(ignoringOtherApps: true)
+        pendingOpenFilePaths.append(contentsOf: markdownPaths)
+        if !serviceStarted {
+            return
+        }
+        flushPendingOpenFiles()
+    }
+
+    private static func isSupportedMarkdownURL(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext == "md" || ext == "markdown"
+    }
+
+    private func flushPendingOpenFiles(excluding excludedPath: String? = nil) {
+        guard let controller = windowController else { return }
+        let pathsToSend = pendingOpenFilePaths.filter { $0 != excludedPath }
+        pendingOpenFilePaths.removeAll()
+        for path in pathsToSend {
+            controller.openMarkdownFile(path)
+        }
+    }
+
     private func installMainMenu(for controller: ViewerWindowController) {
         let mainMenu = NSMenu()
 
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu(title: "GitLocal")
+        let defaultMarkdownReaderItem = NSMenuItem(
+            title: "Set as Default Markdown Reader",
+            action: #selector(ViewerWindowController.setDefaultMarkdownReader(_:)),
+            keyEquivalent: ""
+        )
+        defaultMarkdownReaderItem.target = controller
+        appMenu.addItem(defaultMarkdownReaderItem)
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(
             NSMenuItem(
                 title: "Quit GitLocal",
@@ -131,5 +178,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(viewMenuItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    private func setDefaultMarkdownReader() -> Result<String, Error> {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            return .failure(AppDelegateError.missingBundleIdentifier)
+        }
+
+        if isDefaultMarkdownReader(bundleIdentifier: bundleIdentifier) {
+            return .success("GitLocal is already the default Markdown reader.")
+        }
+
+        let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
+        var failedTypes: [String] = []
+        for contentType in contentTypes {
+            let status = LSSetDefaultRoleHandlerForContentType(
+                contentType as CFString,
+                LSRolesMask.all,
+                bundleIdentifier as CFString
+            )
+            if status != noErr {
+                failedTypes.append(contentType)
+            }
+        }
+
+        if failedTypes.count == contentTypes.count {
+            return .failure(AppDelegateError.defaultReaderSetupFailed)
+        }
+
+        return .success("GitLocal is now the default Markdown reader.")
+    }
+
+    private func isDefaultMarkdownReader(bundleIdentifier: String) -> Bool {
+        let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
+        return contentTypes.contains { contentType in
+            guard let handler = LSCopyDefaultRoleHandlerForContentType(
+                contentType as CFString,
+                LSRolesMask.all
+            )?.takeRetainedValue() as String? else {
+                return false
+            }
+            return handler == bundleIdentifier
+        }
+    }
+}
+
+private enum AppDelegateError: LocalizedError {
+    case missingBundleIdentifier
+    case defaultReaderSetupFailed
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .missingBundleIdentifier:
+            return "GitLocal could not read its bundle identifier."
+        case .defaultReaderSetupFailed:
+            return "macOS did not allow GitLocal to become the default Markdown reader."
+        case .unavailable:
+            return "Default Markdown reader setup is unavailable."
+        }
     }
 }

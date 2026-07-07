@@ -16,6 +16,8 @@ vi.mock('./services/viewerState', () => ({
   readRecentItems: () => [],
   rememberRecentItem: vi.fn((item) => item),
   rememberRecentChangedItems: vi.fn((items) => items),
+  readDefaultReaderPromptPreference: () => ({ status: 'not-asked', askedAt: '' }),
+  writeDefaultReaderPromptPreference: vi.fn((preference) => preference),
 }))
 
 vi.mock('./services/theme', () => ({
@@ -145,6 +147,9 @@ vi.mock('./components/AppFooter', () => ({
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getStartupOpenTarget: vi.fn(),
+    getDefaultReaderPreference: vi.fn(),
+    updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
@@ -277,6 +282,17 @@ describe('App logic', () => {
 
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
+      message: 'Default Markdown reader preference loaded.',
+    })
+    vi.mocked(api.updateDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'declined', askedAt: 'now', answeredAt: 'now', message: 'Not now.' },
+      message: 'Default Markdown reader preference updated.',
+    })
     vi.mocked(api.getGitContext).mockResolvedValue(buildInfo().gitContext)
     vi.mocked(api.getBranches).mockResolvedValue([
       { name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true },
@@ -571,15 +587,10 @@ describe('App logic', () => {
   })
 
   it('handles direct successful switches and sync-status refreshes after a branch change', async () => {
-    vi.mocked(api.getSyncStatus)
-      .mockResolvedValueOnce(buildSyncStatus({ currentPath: '', currentPathType: 'none' }))
-      .mockResolvedValueOnce(buildSyncStatus({
-        currentPath: 'README.md',
-        currentPathType: 'missing',
-        resolvedPath: 'docs',
-        resolvedPathType: 'dir',
-        statusMessage: 'Moved to docs.',
-      }))
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+    }))
     vi.mocked(api.switchBranch)
       .mockResolvedValueOnce({
         ok: true,
@@ -600,6 +611,17 @@ describe('App logic', () => {
 
     readViewerState.mockReturnValue(buildViewerState({ path: 'README.md', pathType: 'file' }))
     renderApp()
+    await waitFor(() => {
+      expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"README.md"')
+    })
+
+    vi.mocked(api.getSyncStatus).mockResolvedValueOnce(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'missing',
+      resolvedPath: 'docs',
+      resolvedPathType: 'dir',
+      statusMessage: 'Moved to docs.',
+    }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'switch-branch' }))
     expect(await screen.findByText(/switched cleanly/i)).toBeInTheDocument()

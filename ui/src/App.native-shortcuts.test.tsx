@@ -12,6 +12,8 @@ vi.mock('./services/viewerState', () => ({
   readRecentItems: () => [],
   rememberRecentItem: vi.fn((item) => item),
   rememberRecentChangedItems: vi.fn((items) => items),
+  readDefaultReaderPromptPreference: () => ({ status: 'not-asked', askedAt: '' }),
+  writeDefaultReaderPromptPreference: vi.fn((preference) => preference),
 }))
 
 vi.mock('./services/theme', () => ({

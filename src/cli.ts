@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server'
-import { validateRepo } from './git/repo.js'
-import { createApp } from './server.js'
+import { classifyLocalPath, validateRepo } from './git/repo.js'
+import { createApp, getRepoPath, getStartupOpenTarget } from './server.js'
 import { rememberStartupFolder, resolveStartupFolder } from './services/startup-preferences.js'
 
 function checkNodeVersion(): void {
@@ -45,18 +45,31 @@ async function main(): Promise<void> {
   checkNodeVersion()
 
   const { repoPath, openSystemBrowser } = parseArgs(process.argv.slice(2))
-  const startupFolder = resolveStartupFolder({ explicitPath: repoPath })
-  const launchPath = startupFolder.path
+  const explicitClassification = repoPath ? classifyLocalPath(repoPath) : null
+  const explicitFileLaunch = explicitClassification?.pathType === 'file' || (repoPath && !explicitClassification?.exists)
+  const startupFolder = explicitFileLaunch ? null : resolveStartupFolder({ explicitPath: repoPath })
+  const launchPath = explicitFileLaunch ? repoPath : startupFolder!.path
   const openingCurrentRepo = !repoPath && validateRepo(launchPath)
-  const app = createApp(launchPath, { detectCurrentRepoOnEmptyPath: true })
-  if (startupFolder.readable) {
+  const app = createApp(launchPath, {
+    detectCurrentRepoOnEmptyPath: true,
+    initialOpenSource: explicitFileLaunch ? 'explicit-launch' : undefined,
+  })
+  const startupTarget = getStartupOpenTarget()
+  if (startupTarget?.status === 'accepted' && getRepoPath()) {
+    rememberStartupFolder(getRepoPath(), 'explicit-launch')
+  } else if (startupFolder?.readable) {
     rememberStartupFolder(launchPath, repoPath ? 'explicit-launch' : 'native-open')
   }
 
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }, async (info) => {
     const url = `http://127.0.0.1:${info.port}`
     console.log(`gitlocal listening on ${url}`)
-    if (repoPath) {
+    if (startupTarget?.status === 'accepted') {
+      console.log(`Serving: ${startupTarget.rootPath}`)
+      console.log(`Selected file: ${startupTarget.selectedPath}`)
+    } else if (startupTarget) {
+      console.log(startupTarget.message)
+    } else if (repoPath) {
       console.log(`Serving: ${launchPath}`)
     } else if (openingCurrentRepo) {
       console.log(`Serving current repository: ${launchPath}`)

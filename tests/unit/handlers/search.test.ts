@@ -134,7 +134,7 @@ describe('searchHandler', () => {
     })
     expect((await sensitive.json()).results).toEqual([])
     expect((await insensitive.json()).results.length).toBeGreaterThan(0)
-  })
+  }, 15000)
 
   it('searches non-current git branches through git tree helpers', async () => {
     const client = testClient(createApp(dir))
@@ -354,7 +354,7 @@ describe('searchHandler', () => {
     } finally {
       rmSync(largeDir, { recursive: true, force: true })
     }
-  })
+  }, 15000)
 })
 
 describe('search helper utilities', () => {

@@ -149,4 +149,46 @@ describe('api client viewer usability endpoints', () => {
     expect(result.activePathNotice?.changeKind).toBe('refreshed')
     expect(result.changedFilesSummary?.total).toBe(1)
   })
+
+  it('requests startup-open and default-reader preference endpoints', async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockJsonResponse({ target: null }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
+        message: 'loaded',
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        preference: {
+          status: 'declined',
+          askedAt: '2026-07-05T12:00:00.000Z',
+          answeredAt: '2026-07-05T12:01:00.000Z',
+          message: 'Not now.',
+        },
+        message: 'updated',
+      }))
+
+    await api.getStartupOpenTarget()
+    await api.getDefaultReaderPreference()
+    await api.updateDefaultReaderPreference({
+      status: 'declined',
+      askedAt: '2026-07-05T12:00:00.000Z',
+      answeredAt: '2026-07-05T12:01:00.000Z',
+      message: 'Not now.',
+    })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/startup-open-target')
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/default-reader-preference')
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/default-reader-preference', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'declined',
+        askedAt: '2026-07-05T12:00:00.000Z',
+        answeredAt: '2026-07-05T12:01:00.000Z',
+        message: 'Not now.',
+      }),
+    })
+  })
 })

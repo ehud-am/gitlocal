@@ -35,6 +35,14 @@ function filterNodes(nodes: TreeNode[], visibility: GeneratedLocalVisibility, ac
   })
 }
 
+function filterDotfiles(nodes: TreeNode[], showDotfiles: boolean, activePath: string): TreeNode[] {
+  if (showDotfiles) return nodes
+  return nodes.filter((node) => {
+    const activeException = Boolean(activePath && (node.path === activePath || activePath.startsWith(`${node.path}/`)))
+    return !node.name.startsWith('.') || activeException
+  })
+}
+
 export default function FileTree({
   branch,
   refreshToken,
@@ -45,6 +53,7 @@ export default function FileTree({
   onSelect,
 }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
+  const [showDotfiles, setShowDotfiles] = useState(true)
 
   const { data: roots, isLoading, isError } = useQuery({
     queryKey: ['tree', '', branch, refreshToken],
@@ -174,7 +183,7 @@ export default function FileTree({
 
   const renderNodes = (nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
     <>
-      {filterNodes(nodes, generatedLocalVisibility, selectedPath)
+      {filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), showDotfiles, selectedPath)
         .filter((node) => !ancestorPaths.has(node.path))
         .map(node => {
         const state = nodeStates.get(node.path)
@@ -229,8 +238,20 @@ export default function FileTree({
   }
 
   return (
-    <div className="file-tree" role="tree" aria-label="Repository files">
-      {roots && renderNodes(roots, 0)}
+    <div className="file-tree-shell">
+      <div className="file-tree-controls">
+        <label className="dotfile-toggle">
+          <input
+            type="checkbox"
+            checked={!showDotfiles}
+            onChange={(event) => setShowDotfiles(!event.target.checked)}
+          />
+          <span>Hide .* files</span>
+        </label>
+      </div>
+      <div className="file-tree" role="tree" aria-label="Repository files">
+        {roots && renderNodes(roots, 0)}
+      </div>
     </div>
   )
 }

@@ -26,7 +26,6 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
-type FolderViewTab = 'readme' | 'tree'
 type EmptyStateAction = 'create-file'
 
 function FindIcon() {
@@ -243,13 +242,12 @@ export default function ContentPanel({
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
-  const [folderViewTab, setFolderViewTab] = useState<FolderViewTab>('tree')
+  const [showDotfiles, setShowDotfiles] = useState(true)
   const fileFindInputRef = useRef<HTMLInputElement | null>(null)
   const panelRootRef = useRef<HTMLDivElement | null>(null)
   const selectionRootRef = useRef<HTMLElement | null>(null)
   const previousNativeFindTokenRef = useRef(nativeFindToken)
   const previousNativeSelectAllTokenRef = useRef(nativeSelectAllToken)
-  const previousRootDefaultKeyRef = useRef('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['file', selectedPath, branch, showRaw, refreshToken],
@@ -286,15 +284,6 @@ export default function ContentPanel({
   useEffect(() => {
     setShowRaw(raw)
   }, [selectedPath, raw])
-
-  useEffect(() => {
-    if (!showingDirectoryView) return
-    const defaultKey = `${branch}:${directoryPath}:${directoryReadmePath || 'no-readme'}`
-    if (previousRootDefaultKeyRef.current === defaultKey) return
-
-    previousRootDefaultKeyRef.current = defaultKey
-    setFolderViewTab(directoryReadmePath ? 'readme' : 'tree')
-  }, [branch, directoryPath, directoryReadmePath, showingDirectoryView])
 
   useEffect(() => {
     setMode('view')
@@ -543,12 +532,19 @@ export default function ContentPanel({
   }
 
   function filterVisibleEntries(entries: TreeNode[]): TreeNode[] {
-    if (generatedLocalVisibility === 'show') return entries
-    return entries.filter((entry) => {
+    const generatedFilteredEntries = generatedLocalVisibility === 'show'
+      ? entries
+      : entries.filter((entry) => {
       const activeException = Boolean(selectedPath && (entry.path === selectedPath || selectedPath.startsWith(`${entry.path}/`) || entry.path.startsWith(`${selectedPath}/`)))
       const tracked = isTrackedEntry(entry)
       if (generatedLocalVisibility === 'only') return !tracked || activeException
       return tracked || activeException
+    })
+
+    if (showDotfiles) return generatedFilteredEntries
+    return generatedFilteredEntries.filter((entry) => {
+      const activeException = Boolean(selectedPath && (entry.path === selectedPath || selectedPath.startsWith(`${entry.path}/`)))
+      return !entry.name.startsWith('.') || activeException
     })
   }
 
@@ -664,6 +660,9 @@ export default function ContentPanel({
           }
         : null
     const visibleEntries = filterVisibleEntries(entries)
+    const hiddenDotfileCount = showDotfiles
+      ? 0
+      : entries.filter((entry) => entry.name.startsWith('.') && !visibleEntries.some((visibleEntry) => visibleEntry.path === entry.path)).length
     const rows: DirectoryRow[] = [
       ...(parentRow ? [parentRow] : []),
       ...visibleEntries.map((entry) => ({
@@ -673,8 +672,6 @@ export default function ContentPanel({
         displayPath: entry.path,
       })),
     ]
-    const showFolderTabs = Boolean(directoryReadmePath)
-
     function openDirectoryRow(entry: DirectoryRow): void {
       if (entry.exitsRepo) {
         onBrowseParent?.()
@@ -703,38 +700,7 @@ export default function ContentPanel({
         ) : null}
 
         <div ref={setSelectionRoot} className="content-panel-selection-root">
-          {showFolderTabs ? (
-            <div className="root-view-tabs" role="tablist" aria-label="folder views">
-              <button
-                type="button"
-                id="folder-tab-readme"
-                role="tab"
-                className="root-view-tab"
-                aria-selected={folderViewTab === 'readme'}
-                aria-controls="folder-tab-panel-readme"
-                onClick={() => setFolderViewTab('readme')}
-              >
-                README
-              </button>
-              <button
-                type="button"
-                id="folder-tab-tree"
-                role="tab"
-                className="root-view-tab"
-                aria-selected={folderViewTab === 'tree'}
-                aria-controls="folder-tab-panel-tree"
-                onClick={() => setFolderViewTab('tree')}
-              >
-                Tree view
-              </button>
-            </div>
-          ) : null}
-          {!showFolderTabs ? renderRootDashboard(visibleEntries) : null}
-          {!showFolderTabs || folderViewTab === 'tree' ? (
           <section
-            id="folder-tab-panel-tree"
-            role={showFolderTabs ? 'tabpanel' : undefined}
-            aria-labelledby={showFolderTabs ? 'folder-tab-tree' : undefined}
             className="content-directory-panel"
             aria-label={path ? `Contents of ${path}` : 'Current folder contents'}
           >
@@ -746,35 +712,53 @@ export default function ContentPanel({
                   {showSelectedLocalOnly && path ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
                 </div>
               </div>
-              {canMutateFiles ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="panel-icon-button content-actions-trigger"
-                      aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}`}
-                    >
-                      <KebabIcon />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
-                      {path ? 'New file here' : 'New file'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
-                      {path ? 'New folder here' : 'New folder'}
-                    </DropdownMenuItem>
-                    {canDeleteCurrentFolder ? (
-                      <DropdownMenuItem
-                        className="dropdown-danger"
-                        onSelect={() => onDeleteFolder?.(path)}
+              <div className="content-directory-controls">
+                {directoryReadmePath ? (
+                  <a className="content-readme-jump" href="#folder-readme">
+                    README
+                  </a>
+                ) : null}
+                <label className="dotfile-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!showDotfiles}
+                    onChange={(event) => setShowDotfiles(!event.target.checked)}
+                  />
+                  <span>Hide .* files</span>
+                </label>
+                {hiddenDotfileCount > 0 ? (
+                  <span className="dotfile-toggle-count">{hiddenDotfileCount} hidden</span>
+                ) : null}
+                {canMutateFiles ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="panel-icon-button content-actions-trigger"
+                        aria-label={`Folder actions for ${formatActivePathLabel(path, selectedPathLocalOnly, isGitRepo)}`}
                       >
-                        Delete folder
+                        <KebabIcon />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => { void beginCreateMode() }}>
+                        {path ? 'New file here' : 'New file'}
                       </DropdownMenuItem>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
+                      <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
+                        {path ? 'New folder here' : 'New folder'}
+                      </DropdownMenuItem>
+                      {canDeleteCurrentFolder ? (
+                        <DropdownMenuItem
+                          className="dropdown-danger"
+                          onSelect={() => onDeleteFolder?.(path)}
+                        >
+                          Delete folder
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
             </div>
 
             {showDirectorySkeleton ? (
@@ -848,35 +832,36 @@ export default function ContentPanel({
               </>
             )}
           </section>
-          ) : null}
-
-          {directoryReadmePath && folderViewTab === 'readme' ? (
+          {!directoryReadmePath ? renderRootDashboard(visibleEntries) : null}
+          {directoryReadmePath ? (
             <section
-              id="folder-tab-panel-readme"
-              role="tabpanel"
-              aria-labelledby="folder-tab-readme"
+              id="folder-readme"
               className="content-readme-panel"
               aria-label="folder readme"
             >
-            <div className="content-directory-header">
-              <div>
-                <p className="content-directory-kicker">README</p>
-                <h2 className="content-directory-heading">{directoryReadmePath}</h2>
+              <div className="content-directory-header">
+                <div>
+                  <p className="content-directory-kicker">README</p>
+                  <h2 className="content-directory-heading">{directoryReadmePath}</h2>
+                </div>
               </div>
-            </div>
-            {isDirectoryReadmeLoading ? (
-              <div className="content-skeleton" aria-label="loading content" />
-            ) : directoryReadme?.type === 'markdown' ? (
-              <Suspense fallback={loadingFallback}>
-                <MarkdownRenderer content={directoryReadme.content} currentPath={directoryReadmePath} branch={branch} onNavigate={onNavigate} />
-              </Suspense>
-            ) : directoryReadme?.type === 'text' ? (
-              <Suspense fallback={loadingFallback}>
-                <CodeViewer content={directoryReadme.content} language={directoryReadme.language} />
-              </Suspense>
-            ) : null}
+              {isDirectoryReadmeLoading ? (
+                <div className="content-skeleton" aria-label="loading content" />
+              ) : directoryReadme?.type === 'markdown' ? (
+                <Suspense fallback={loadingFallback}>
+                  <MarkdownRenderer content={directoryReadme.content} currentPath={directoryReadmePath} branch={branch} onNavigate={onNavigate} />
+                </Suspense>
+              ) : directoryReadme?.type === 'text' ? (
+                <Suspense fallback={loadingFallback}>
+                  <CodeViewer content={directoryReadme.content} language={directoryReadme.language} />
+                </Suspense>
+              ) : null}
             </section>
-          ) : null}
+          ) : (
+            <section className="content-no-readme-panel" aria-label="folder readme unavailable">
+              <p>No README is available for this folder.</p>
+            </section>
+          )}
         </div>
       </div>
     )

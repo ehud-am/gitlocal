@@ -84,6 +84,32 @@ describe('FileTree', () => {
     })
   })
 
+  it('shows dotfiles by default and hides them when the dotfile checkbox is enabled', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    expect(await screen.findByText('.env')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox', { name: /hide \.\* files/i }))
+    expect(screen.queryByText('.env')).not.toBeInTheDocument()
+    expect(screen.getByText('README.md')).toBeInTheDocument()
+  })
+
+  it('keeps the active dotfile visible when dotfiles are hidden', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} selectedPath=".env" selectedPathType="file" />)
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: /hide \.\* files/i }))
+    expect(screen.getByText('.env')).toBeInTheDocument()
+  })
+
   it('shows a local-only cue for ignored tree entries in git repos', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: '.env', path: '.env', type: 'file', localOnly: true },

@@ -1,4 +1,6 @@
 import type {
+  DefaultReaderPreference,
+  DefaultReaderPreferenceStatus,
   GeneratedLocalVisibility,
   RecentItem,
   SearchContentKind,
@@ -9,7 +11,15 @@ import type {
 } from '../types'
 
 const RECENT_ITEMS_KEY = 'gitlocal:recent-items'
+const DEFAULT_READER_PROMPT_KEY = 'gitlocal:default-markdown-reader-prompt'
 const MAX_RECENT_ITEMS = 12
+
+const DEFAULT_READER_PROMPT: DefaultReaderPreference = {
+  status: 'not-asked',
+  askedAt: '',
+  answeredAt: '',
+  message: '',
+}
 
 const DEFAULTS: ViewerState = {
   repoPath: '',
@@ -62,6 +72,12 @@ function parsePositiveInt(value: string | null, fallback: number): number {
   if (value === null) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function parseDefaultReaderPromptStatus(value: unknown): DefaultReaderPreferenceStatus {
+  return value === 'accepted' || value === 'declined' || value === 'failed' || value === 'not-asked'
+    ? value
+    : 'not-asked'
 }
 
 export function readViewerState(): ViewerState {
@@ -128,6 +144,42 @@ export function clearViewerPath(): ViewerState {
 
 export function resetViewerState(): void {
   writeParams(new URLSearchParams())
+}
+
+export function readDefaultReaderPromptPreference(): DefaultReaderPreference {
+  try {
+    if (typeof window.localStorage?.getItem !== 'function') return { ...DEFAULT_READER_PROMPT }
+    const raw = window.localStorage.getItem(DEFAULT_READER_PROMPT_KEY)
+    if (!raw) return { ...DEFAULT_READER_PROMPT }
+    const parsed = JSON.parse(raw) as Partial<DefaultReaderPreference>
+    return {
+      status: parseDefaultReaderPromptStatus(parsed.status),
+      askedAt: typeof parsed.askedAt === 'string' ? parsed.askedAt : '',
+      answeredAt: typeof parsed.answeredAt === 'string' ? parsed.answeredAt : '',
+      message: typeof parsed.message === 'string' ? parsed.message : '',
+    }
+  } catch {
+    return { ...DEFAULT_READER_PROMPT }
+  }
+}
+
+export function writeDefaultReaderPromptPreference(
+  status: DefaultReaderPreferenceStatus,
+  message = '',
+): DefaultReaderPreference {
+  const current = readDefaultReaderPromptPreference()
+  const now = new Date().toISOString()
+  const preference: DefaultReaderPreference = {
+    status,
+    askedAt: current.askedAt || now,
+    answeredAt: status === 'not-asked' ? '' : now,
+    message,
+  }
+
+  if (typeof window.localStorage?.setItem === 'function') {
+    window.localStorage.setItem(DEFAULT_READER_PROMPT_KEY, JSON.stringify(preference))
+  }
+  return preference
 }
 
 function readRecentItemsFromStorage(): RecentItem[] {

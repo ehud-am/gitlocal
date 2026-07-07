@@ -88,6 +88,9 @@ export interface LocalPathClassification {
 
 export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
 export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
+export type StartupOpenSource = 'explicit-launch' | 'native-file-open' | 'picker-open' | 'repo-open'
+export type StartupOpenStatus = 'pending' | 'accepted' | 'blocked' | 'failed'
+export type DefaultReaderPreferenceStatus = 'not-asked' | 'accepted' | 'declined' | 'failed'
 
 export interface StartupFolderResolution {
   path: string
@@ -113,6 +116,44 @@ export interface StartupFolderUpdateRequest {
 export interface StartupFolderUpdateResponse {
   ok: boolean
   path: string
+  message: string
+}
+
+export interface StartupOpenTarget {
+  source: StartupOpenSource
+  inputPath: string
+  rootPath: string
+  selectedPath: string
+  selectedPathType: ViewerPathType
+  status: StartupOpenStatus
+  message: string
+  receivedAt: string
+  gitState?: LocalGitState
+  openMode?: LocalOpenMode
+  repositoryRootPath?: string
+}
+
+export interface StartupOpenTargetResponse {
+  target: StartupOpenTarget | null
+}
+
+export interface DefaultReaderPreference {
+  status: DefaultReaderPreferenceStatus
+  askedAt: string
+  answeredAt: string
+  message: string
+}
+
+export interface DefaultReaderPreferenceUpdateRequest {
+  status: DefaultReaderPreferenceStatus
+  message?: string
+  askedAt?: string
+  answeredAt?: string
+}
+
+export interface DefaultReaderPreferenceResponse {
+  ok: boolean
+  preference: DefaultReaderPreference
   message: string
 }
 

@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { createApp, getRepoPath, setRepoPath } from '../../src/server.js'
+import {
+  createApp,
+  getPickerPath,
+  getRepoPath,
+  getStartupOpenTarget,
+  resolveOpenTarget,
+  setRepoPath,
+  setStartupOpenTarget,
+} from '../../src/server.js'
 
 const APP_VERSION = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'),
@@ -75,6 +83,28 @@ describe('Server integration', () => {
     expect(body.rootEntryCount).toBeGreaterThan(0)
   })
 
+  it('serves a clear fallback when the built UI entrypoint is unavailable', async () => {
+    const indexPath = new URL('../../ui/dist/index.html', import.meta.url)
+    const backupPath = new URL(`../../ui/dist/index.html.${process.pid}.bak`, import.meta.url)
+    let renamed = false
+
+    if (existsSync(indexPath)) {
+      renameSync(indexPath, backupPath)
+      renamed = true
+    }
+
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/deep/link'))
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('UI not built')
+    } finally {
+      if (renamed) {
+        renameSync(backupPath, indexPath)
+      }
+    }
+  })
+
   it('opens a repository child directly at startup as a repository', async () => {
     const mixed = makeMixedPlainParent()
     try {
@@ -88,6 +118,124 @@ describe('Server integration', () => {
     } finally {
       mixed.cleanup()
     }
+  })
+
+  it('opens a Markdown file at startup with selected-file target metadata', async () => {
+    const repo = makeGitRepo()
+    const docs = join(repo.dir, 'docs')
+    mkdirSync(docs)
+    const filePath = join(docs, 'guide.md')
+    writeFileSync(filePath, '# Guide')
+
+    try {
+      const app = createApp(filePath, { initialOpenSource: 'explicit-launch' })
+      const infoRes = await app.fetch(new Request('http://localhost/api/info'))
+      const info = await infoRes.json() as { path: string; isGitRepo: boolean; pickerMode: boolean }
+      expect(info.isGitRepo).toBe(true)
+      expect(info.pickerMode).toBe(false)
+      expect(realpathSync(info.path)).toBe(realpathSync(repo.dir))
+
+      const targetRes = await app.fetch(new Request('http://localhost/api/startup-open-target'))
+      const targetBody = await targetRes.json() as { target: { status: string; rootPath: string; selectedPath: string; selectedPathType: string } }
+      expect(targetBody.target).toMatchObject({
+        status: 'accepted',
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+      })
+      expect(realpathSync(targetBody.target.rootPath)).toBe(realpathSync(repo.dir))
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('opens a Markdown file launched directly without an explicit native source', async () => {
+    const repo = makeGitRepo()
+    const filePath = join(repo.dir, 'README.md')
+
+    try {
+      const app = createApp(filePath)
+      const infoRes = await app.fetch(new Request('http://localhost/api/info'))
+      const info = await infoRes.json() as { path: string; isGitRepo: boolean }
+      expect(info.isGitRepo).toBe(true)
+      expect(realpathSync(info.path)).toBe(realpathSync(repo.dir))
+      expect(getStartupOpenTarget()).toMatchObject({
+        status: 'accepted',
+        source: 'explicit-launch',
+        selectedPath: 'README.md',
+      })
+    } finally {
+      repo.cleanup()
+    }
+  })
+
+  it('exposes explicit startup-open setter state and blocks blank or folder direct targets', () => {
+    setStartupOpenTarget(null)
+    expect(getStartupOpenTarget()).toBeNull()
+
+    const blocked = resolveOpenTarget('', 'native-file-open')
+    expect(blocked).toMatchObject({
+      status: 'blocked',
+      inputPath: '',
+      selectedPathType: 'none',
+      message: 'path is required',
+    })
+
+    const folder = resolveOpenTarget(dir, 'native-file-open')
+    expect(folder).toMatchObject({
+      status: 'blocked',
+      selectedPathType: 'none',
+    })
+    expect(folder.message).toMatch(/only markdown files/i)
+
+    const missingPath = join(tmpdir(), `gitlocal-missing-${process.pid}.md`)
+    const missing = resolveOpenTarget(missingPath, 'native-file-open')
+    expect(missing).toMatchObject({
+      status: 'failed',
+      selectedPathType: 'none',
+    })
+    expect(missing.message).toMatch(/does not exist/i)
+
+    const unsupportedDir = mkdtempSync(join(tmpdir(), 'gitlocal-unsupported-path-'))
+    const fifoPath = join(unsupportedDir, 'notes.md')
+    try {
+      const fifo = spawnSync('mkfifo', [fifoPath])
+      expect(fifo.status).toBe(0)
+      const unsupported = resolveOpenTarget(fifoPath, 'native-file-open')
+      expect(unsupported).toMatchObject({
+        status: 'blocked',
+        selectedPathType: 'none',
+      })
+      expect(unsupported.message).toMatch(/not a folder or file/i)
+    } finally {
+      rmSync(unsupportedDir, { recursive: true, force: true })
+    }
+
+    setStartupOpenTarget(blocked)
+    expect(getStartupOpenTarget()).toBe(blocked)
+    setStartupOpenTarget(null)
+  })
+
+  it('falls back to picker mode for blocked native file-open folder requests', () => {
+    const cwd = process.cwd()
+
+    createApp(dir, { initialOpenSource: 'native-file-open' })
+
+    expect(getRepoPath()).toBe('')
+    expect(getPickerPath()).toBe(cwd)
+    expect(getStartupOpenTarget()).toMatchObject({
+      status: 'blocked',
+      selectedPathType: 'none',
+    })
+  })
+
+  it('keeps unresolved explicit launch paths as the requested workspace path', () => {
+    const missingPath = join(tmpdir(), `gitlocal-missing-workspace-${process.pid}`)
+
+    createApp(missingPath)
+
+    expect(getRepoPath()).toBe(missingPath)
+    expect(getPickerPath()).toBe('')
+    expect(getStartupOpenTarget()).toBeNull()
   })
 
   it('keeps repository child classification consistent between parent browse and open', async () => {

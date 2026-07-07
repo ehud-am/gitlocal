@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.12 - 2026-07-07
+
+- Added optional macOS Markdown default-reader setup, including first-run consent and a later `GitLocal > Set as Default Markdown Reader` menu action.
+- Added Finder Markdown open handling so double-clicked `.md` and `.markdown` files activate GitLocal, select the requested file, and render it in preview with the right folder context.
+- Reworked folder pages to show visible file navigation first and README content below it, with a quick README jump link when available.
+- Added a dotfile visibility checkbox for denser folder browsing and hardened failed native file opens so stale previews are not shown.
+
 ## 0.9.11 - 2026-06-21
 
 - Added structured rendering for Markdown YAML front matter so skill files and similar docs show metadata separately from the Markdown body instead of as a broken bold text block.

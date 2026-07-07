@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { SyncStatus } from './types'
+import type { ChangedFileItem, SyncStatus } from './types'
 
 const readViewerState = vi.fn()
 const writeViewerState = vi.fn()
@@ -16,6 +16,8 @@ vi.mock('./services/viewerState', () => ({
   readRecentItems: () => [],
   rememberRecentItem: vi.fn((item) => item),
   rememberRecentChangedItems: vi.fn((items) => items),
+  readDefaultReaderPromptPreference: () => ({ status: 'not-asked', askedAt: '' }),
+  writeDefaultReaderPromptPreference: vi.fn((preference) => preference),
 }))
 
 vi.mock('./services/theme', () => ({
@@ -88,6 +90,9 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
     onOpenSearch?: () => void
+    onOpenChangedFiles?: () => void
+    onOpenChangedFile?: (item: ChangedFileItem) => void
+    changedFiles?: { items: ChangedFileItem[] } | null
     branchSwitchDialog?: React.ReactNode
   }) => (
     <div>
@@ -96,6 +101,12 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
+      <button type="button" onClick={() => props.onOpenChangedFiles?.()}>open-changed-files</button>
+      {props.changedFiles?.items.map((item) => (
+        <button key={item.path} type="button" onClick={() => props.onOpenChangedFile?.(item)}>
+          changed:{item.path}
+        </button>
+      ))}
       {props.branchSwitchDialog}
     </div>
   ),
@@ -175,6 +186,7 @@ vi.mock('./components/AppDialogs', () => ({
     error: string
     name: string
     email: string
+    sshKeysMessage?: string
     onOpenChange: (open: boolean) => void
     onNameChange: (value: string) => void
     onEmailChange: (value: string) => void
@@ -183,6 +195,7 @@ vi.mock('./components/AppDialogs', () => ({
     props.open ? (
       <div data-testid="identity-dialog">
         <span>{props.error}</span>
+        <span>{props.sshKeysMessage}</span>
         <input aria-label="Git user name" value={props.name} onChange={(event) => props.onNameChange(event.target.value)} />
         <input aria-label="Git user email" value={props.email} onChange={(event) => props.onEmailChange(event.target.value)} />
         <button type="button" onClick={() => props.onOpenChange(false)}>close-identity</button>
@@ -223,6 +236,9 @@ vi.mock('./components/AppDialogs', () => ({
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getStartupOpenTarget: vi.fn(),
+    getDefaultReaderPreference: vi.fn(),
+    updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
@@ -239,6 +255,7 @@ vi.mock('./services/api', () => ({
     getFolderDeletePreview: vi.fn(),
     deleteFolder: vi.fn(),
     getSearchResults: vi.fn(),
+    getChangedFiles: vi.fn(),
     getFolderBrowse: vi.fn(),
     openRepository: vi.fn(),
     switchBranch: vi.fn(),
@@ -366,6 +383,17 @@ describe('App branch coverage', () => {
 
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
+      message: 'Default Markdown reader preference loaded.',
+    })
+    vi.mocked(api.updateDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'declined', askedAt: 'now', answeredAt: 'now', message: 'Not now.' },
+      message: 'Default Markdown reader preference updated.',
+    })
     vi.mocked(api.getGitContext).mockResolvedValue(buildInfo().gitContext)
     vi.mocked(api.getBranches).mockResolvedValue([
       { name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true },
@@ -434,6 +462,12 @@ describe('App branch coverage', () => {
       status: 'deleted',
       message: 'Folder deleted successfully.',
     })
+    vi.mocked(api.getChangedFiles).mockResolvedValue({
+      checkedAt: '2026-07-06T00:00:00.000Z',
+      branch: 'main',
+      summary: { total: 0, modified: 0, added: 0, deleted: 0, renamed: 0, untracked: 0, remoteRelevant: 0, tracked: 0 },
+      items: [],
+    })
   })
 
   it('reconciles missing paths, clears raw mode, and warns before unload when dirty', async () => {
@@ -444,13 +478,23 @@ describe('App branch coverage', () => {
     }))
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
       currentPath: 'README.md',
+      currentPathType: 'file',
+    }))
+
+    renderApp()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"README.md"')
+    })
+
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
       currentPathType: 'missing',
       resolvedPath: '',
       resolvedPathType: 'missing',
       statusMessage: 'README.md moved away.',
     }))
-
-    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
 
     await waitFor(() => {
       expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":""')
@@ -587,6 +631,116 @@ describe('App branch coverage', () => {
     expect(api.commitChanges).not.toHaveBeenCalled()
   })
 
+  it('covers changed-files load failures and folder changed-file navigation', async () => {
+    vi.mocked(api.getChangedFiles)
+      .mockRejectedValueOnce(new Error('changed files failed'))
+      .mockResolvedValueOnce({
+        checkedAt: '2026-07-06T00:00:00.000Z',
+        branch: 'main',
+        summary: { total: 1, modified: 0, added: 0, deleted: 0, renamed: 0, untracked: 1, remoteRelevant: 0, tracked: 0 },
+        items: [{
+          path: 'docs',
+          name: 'docs',
+          type: 'folder',
+          changeState: 'untracked',
+          generatedLocalState: 'local-only',
+          sourcePath: '',
+          canOpen: true,
+          reviewHint: 'Review folder',
+        }],
+      })
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'open-changed-files' }))
+    expect(await screen.findByText(/could not load changed files/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'open-changed-files' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'changed:docs' }))
+    expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"docs"')
+    expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"dir"')
+  })
+
+  it('shows default messages for failed startup opens and SSH key loading failures', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
+      target: {
+        status: 'failed',
+        source: 'native-file-open',
+        inputPath: '/tmp/missing.md',
+        rootPath: '',
+        selectedPath: '',
+        selectedPathType: 'none',
+        message: '',
+        receivedAt: '2026-07-06T00:00:00.000Z',
+      },
+    })
+    vi.mocked(api.getGitIdentitySshKeys).mockRejectedValueOnce(new Error('SSH key scan failed.'))
+
+    renderApp()
+
+    expect(await screen.findByText(/could not open the requested startup file/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'open-identity' }))
+    expect(await screen.findByText(/ssh key scan failed/i)).toBeInTheDocument()
+  })
+
+  it('loads answered default-reader preferences after native availability', async () => {
+    vi.mocked(api.getDefaultReaderPreference).mockResolvedValueOnce({
+      ok: true,
+      preference: { status: 'declined', askedAt: '2026-07-06T00:00:00.000Z', answeredAt: '2026-07-06T00:00:01.000Z', message: 'Not now.' },
+      message: 'Default Markdown reader preference loaded.',
+    })
+
+    renderApp()
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-available' },
+    }))
+
+    await waitFor(() => {
+      expect(api.getDefaultReaderPreference).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole('region', { name: /default markdown reader setup/i })).not.toBeInTheDocument()
+  })
+
+  it('records a failed default-reader setup request when the native bridge is unavailable', async () => {
+    renderApp()
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-available' },
+    }))
+    fireEvent.click(await screen.findByRole('button', { name: /set as default/i }))
+
+    expect(await screen.findByText(/default markdown reader setup is only available/i)).toBeInTheDocument()
+    expect(api.updateDefaultReaderPreference).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }))
+  })
+
+  it('handles native default-reader and file-open failure events', async () => {
+    renderApp()
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-setup-failed' },
+    }))
+    expect(await screen.findByText(/could not update the default markdown reader/i)).toBeInTheDocument()
+    expect(api.updateDefaultReaderPreference).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }))
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'open-file' },
+    }))
+    expect(await screen.findByText(/macos did not provide a path/i)).toBeInTheDocument()
+
+    vi.mocked(api.openRepository).mockRejectedValueOnce(new Error('Native open failed.'))
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'open-file', path: '/tmp/repo/README.md' },
+    }))
+    expect(await screen.findByText(/native open failed/i)).toBeInTheDocument()
+
+    vi.mocked(api.openRepository).mockResolvedValueOnce({ ok: false, error: '', message: '' })
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'open-file', path: '/tmp/repo/README.md' },
+    }))
+    expect(await screen.findByText(/could not open that file/i)).toBeInTheDocument()
+  })
+
   it('uses fallback dialog values when repository metadata is incomplete', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
       name: null,
@@ -609,14 +763,12 @@ describe('App branch coverage', () => {
 
   it('covers branch switch early returns, follow-up confirmations, and retained-path updates', async () => {
     readViewerState.mockReturnValue(buildViewerState({ path: 'README.md', pathType: 'file' }))
-    vi.mocked(api.getSyncStatus)
-      .mockResolvedValueOnce(buildSyncStatus())
-      .mockResolvedValueOnce(buildSyncStatus({
-        currentPath: 'README.md',
-        currentPathType: 'file',
-        resolvedPath: 'README.md',
-        resolvedPathType: 'file',
-      }))
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+      resolvedPath: 'README.md',
+      resolvedPathType: 'file',
+    }))
     vi.mocked(api.switchBranch)
       .mockResolvedValueOnce({
         ok: false,
@@ -636,6 +788,10 @@ describe('App branch coverage', () => {
 
     renderApp()
 
+    await waitFor(() => {
+      expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"README.md"')
+    })
+
     fireEvent.click(await screen.findByRole('button', { name: 'switch-same-branch' }))
     expect(api.switchBranch).not.toHaveBeenCalled()
 
@@ -649,12 +805,46 @@ describe('App branch coverage', () => {
     expect(await screen.findByTestId('branch-switch-dialog')).toBeInTheDocument()
 
     fireEvent.change(screen.getByRole('textbox', { name: /branch switch commit message/i }), { target: { value: '' } })
+    vi.mocked(api.getSyncStatus).mockResolvedValueOnce(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+      resolvedPath: 'README.md',
+      resolvedPathType: 'file',
+    }))
     fireEvent.click(screen.getByRole('button', { name: 'discard-branch-switch' }))
     await waitFor(() => {
       expect(screen.getByTestId('header-branch')).toHaveTextContent('release')
     })
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"README.md"')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"file"')
+  })
+
+  it('refreshes active file queries after changed-file sync revisions', async () => {
+    readViewerState.mockReturnValue(buildViewerState({ path: 'README.md', pathType: 'file' }))
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+      fileStatus: 'unchanged',
+      workingTreeRevision: 'rev-1',
+    }))
+
+    renderApp()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"README.md"')
+      expect(api.getSyncStatus).toHaveBeenCalledWith('README.md', 'main')
+    })
+    vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+      currentPath: 'README.md',
+      currentPathType: 'file',
+      fileStatus: 'changed',
+      workingTreeRevision: 'rev-2',
+    }))
+    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+
+    await waitFor(() => {
+      expect(api.getSyncStatus).toHaveBeenCalledWith('README.md', 'main')
+    })
   })
 
   it('validates missing identity email and ignores branch-switch cancel requests while pending', async () => {

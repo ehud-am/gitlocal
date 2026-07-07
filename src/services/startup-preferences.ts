@@ -2,6 +2,9 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileS
 import { dirname, join, resolve } from 'node:path'
 import { homedir, platform } from 'node:os'
 import type {
+  DefaultReaderPreference,
+  DefaultReaderPreferenceStatus,
+  DefaultReaderPreferenceUpdateRequest,
   StartupFolderPreference,
   StartupFolderResolution,
   StartupFolderUpdateSource,
@@ -9,6 +12,23 @@ import type {
 
 function defaultPreferencePath(): string {
   return process.env.GITLOCAL_STARTUP_PREFERENCE_PATH || join(homedir(), '.gitlocal', 'startup-folder.json')
+}
+
+function defaultReaderPreferencePath(): string {
+  return process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH || join(homedir(), '.gitlocal', 'default-reader.json')
+}
+
+const DEFAULT_READER_PREFERENCE: DefaultReaderPreference = {
+  status: 'not-asked',
+  askedAt: '',
+  answeredAt: '',
+  message: '',
+}
+
+function normalizeDefaultReaderStatus(status: unknown): DefaultReaderPreferenceStatus {
+  return status === 'accepted' || status === 'declined' || status === 'failed' || status === 'not-asked'
+    ? status
+    : 'not-asked'
 }
 
 function isReadableDirectory(path: string): boolean {
@@ -48,6 +68,40 @@ export function readStartupFolderPreference(path = defaultPreferencePath()): Sta
   } catch {
     return null
   }
+}
+
+export function readDefaultReaderPreference(path = defaultReaderPreferencePath()): DefaultReaderPreference {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Partial<DefaultReaderPreference>
+    return {
+      status: normalizeDefaultReaderStatus(parsed.status),
+      askedAt: typeof parsed.askedAt === 'string' ? parsed.askedAt : '',
+      answeredAt: typeof parsed.answeredAt === 'string' ? parsed.answeredAt : '',
+      message: typeof parsed.message === 'string' ? parsed.message : '',
+    }
+  } catch {
+    return { ...DEFAULT_READER_PREFERENCE }
+  }
+}
+
+export function writeDefaultReaderPreference(
+  update: DefaultReaderPreferenceUpdateRequest,
+  path = defaultReaderPreferencePath(),
+): DefaultReaderPreference {
+  const current = readDefaultReaderPreference(path)
+  const now = new Date().toISOString()
+  const status = normalizeDefaultReaderStatus(update.status)
+  const askedAt = update.askedAt ?? current.askedAt
+  const preference: DefaultReaderPreference = {
+    status,
+    askedAt: askedAt || (status === 'not-asked' ? '' : now),
+    answeredAt: update.answeredAt ?? (status === 'not-asked' ? '' : now),
+    message: update.message ?? current.message ?? '',
+  }
+
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, `${JSON.stringify(preference, null, 2)}\n`)
+  return preference
 }
 
 export function writeStartupFolderPreference(

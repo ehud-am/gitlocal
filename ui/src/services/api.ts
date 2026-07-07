@@ -6,6 +6,8 @@ import type {
   CommitChangesRequest,
   CommitChangesResponse,
   Commit,
+  DefaultReaderPreferenceResponse,
+  DefaultReaderPreferenceUpdateRequest,
   FileContent,
   FolderCreateRequest,
   FolderDeleteRequest,
@@ -35,6 +37,7 @@ import type {
   StartupFolderResponse,
   StartupFolderUpdateRequest,
   StartupFolderUpdateResponse,
+  StartupOpenTargetResponse,
   TreeNode,
 } from '../types'
 
@@ -109,6 +112,17 @@ export const api = {
 
   updateStartupFolder: (payload: StartupFolderUpdateRequest): Promise<StartupFolderUpdateResponse> =>
     mutate('/api/startup-folder', 'PUT', payload),
+
+  getStartupOpenTarget: (): Promise<StartupOpenTargetResponse> =>
+    request<StartupOpenTargetResponse>('/api/startup-open-target'),
+
+  getDefaultReaderPreference: (): Promise<DefaultReaderPreferenceResponse> =>
+    request<DefaultReaderPreferenceResponse>('/api/default-reader-preference'),
+
+  updateDefaultReaderPreference: (
+    payload: DefaultReaderPreferenceUpdateRequest,
+  ): Promise<DefaultReaderPreferenceResponse> =>
+    mutate('/api/default-reader-preference', 'PUT', payload),
 
   getGitContext: (): Promise<GitContext | null> => request<GitContext | null>('/api/git/context'),
 
