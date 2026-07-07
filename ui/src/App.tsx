@@ -18,10 +18,12 @@ import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import {
+  readDefaultReaderPromptPreference,
   readRecentItems,
   readViewerState,
   rememberRecentChangedItems,
   rememberRecentItem,
+  writeDefaultReaderPromptPreference,
   writeViewerState,
 } from './services/viewerState'
 import type {
@@ -29,12 +31,15 @@ import type {
   BranchSwitchResponse,
   ChangedFileItem,
   ChangedFilesResponse,
+  DefaultReaderPreference,
   FileSyncState,
   FolderOperationResult,
   GeneratedLocalVisibility,
   GitUserIdentity,
+  LocalActionResponse,
   NavigationHintsResponse,
   NativeAppCommandEvent,
+  NativeAppOutboundCommand,
   RepoInfo,
   RepoSummaryResponse,
   RepoSyncState,
@@ -44,6 +49,7 @@ import type {
   SearchResult,
   SearchTrackedMode,
   SshKeyCandidate,
+  StartupOpenTarget,
   ViewerPathType,
 } from './types'
 import {
@@ -109,15 +115,27 @@ function ErrorScreen({ title, description }: { title: string; description: strin
   )
 }
 
+function postNativeAppCommand(command: NativeAppOutboundCommand): boolean {
+  const messageHandlers = (window as typeof window & {
+    webkit?: { messageHandlers?: { gitlocalNative?: { postMessage: (message: { command: NativeAppOutboundCommand }) => void } } }
+  }).webkit?.messageHandlers
+  const handler = messageHandlers?.gitlocalNative
+  if (!handler) return false
+  handler.postMessage({ command })
+  return true
+}
+
 export default function App() {
   const initialViewerState = readViewerState()
+  const savedInitialViewerStateRef = useRef(initialViewerState)
+  const savedInitialViewerStateAppliedRef = useRef(false)
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme())
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
-  const [selectedPath, setSelectedPath] = useState(initialViewerState.path)
-  const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>(initialViewerState.pathType)
+  const [selectedPath, setSelectedPath] = useState('')
+  const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>('none')
   const [selectedPathLocalOnly, setSelectedPathLocalOnly] = useState(false)
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
-  const [showRaw, setShowRaw] = useState(initialViewerState.raw)
+  const [showRaw, setShowRaw] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
   const [generatedLocalVisibility, setGeneratedLocalVisibility] = useState<GeneratedLocalVisibility>(initialViewerState.generatedLocalVisibility)
   const [searchPresentation, setSearchPresentation] = useState<SearchPresentation>(initialViewerState.searchPresentation)
@@ -154,14 +172,23 @@ export default function App() {
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
   const [nativeFindToken, setNativeFindToken] = useState(0)
   const [nativeSelectAllToken, setNativeSelectAllToken] = useState(0)
+  const [nativeDefaultReaderAvailable, setNativeDefaultReaderAvailable] = useState(false)
+  const [defaultReaderPreference, setDefaultReaderPreference] = useState<DefaultReaderPreference>(() => readDefaultReaderPromptPreference())
+  const [defaultReaderSetupPending, setDefaultReaderSetupPending] = useState(false)
   const [refreshingCurrentView, setRefreshingCurrentView] = useState(false)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
   const nativeRefreshPendingRef = useRef(false)
+  const startupOpenTargetAppliedRef = useRef('')
 
   const { data: baseInfo, isLoading } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
+  })
+
+  const { data: startupOpenTargetResponse, isFetched: startupOpenTargetFetched } = useQuery({
+    queryKey: ['startup-open-target'],
+    queryFn: api.getStartupOpenTarget,
   })
 
   const { data: gitContext } = useQuery({
@@ -280,6 +307,7 @@ export default function App() {
   }, [currentBranch, info, viewerRepoPath])
 
   useEffect(() => {
+    if (!startupOpenTargetFetched) return
     writeViewerState({
       repoPath: viewerRepoPath,
       branch: currentBranch,
@@ -297,7 +325,7 @@ export default function App() {
       searchTrackedMode,
       searchLimit,
     })
-  }, [currentBranch, generatedLocalVisibility, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath])
+  }, [currentBranch, generatedLocalVisibility, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
@@ -380,9 +408,97 @@ export default function App() {
     }
   }, [hasUnsavedChanges, queryClient])
 
+  const persistDefaultReaderPreference = useCallback((status: DefaultReaderPreference['status'], message = '') => {
+    const preference = writeDefaultReaderPromptPreference(status, message)
+    setDefaultReaderPreference(preference)
+    api.updateDefaultReaderPreference({
+      status,
+      askedAt: preference.askedAt,
+      answeredAt: preference.answeredAt,
+      message,
+    }).catch(() => {})
+    return preference
+  }, [])
+
+  const invalidateWorkspaceQueries = useCallback(async (): Promise<void> => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['info'] }),
+      queryClient.invalidateQueries({ queryKey: ['git-context'] }),
+      queryClient.invalidateQueries({ queryKey: ['branches'] }),
+      queryClient.invalidateQueries({ queryKey: ['tree'] }),
+      queryClient.invalidateQueries({ queryKey: ['file'] }),
+      queryClient.invalidateQueries({ queryKey: ['readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
+      queryClient.invalidateQueries({ queryKey: ['sync'] }),
+      queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
+      queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
+    ])
+  }, [queryClient])
+
+  const applyAcceptedOpenTarget = useCallback((target: Pick<StartupOpenTarget, 'rootPath' | 'selectedPath' | 'selectedPathType' | 'message'>): void => {
+    setViewerRepoPath(target.rootPath)
+    setSelectedPath(target.selectedPath)
+    setSelectedPathType(target.selectedPathType)
+    setSelectedPathLocalOnly(false)
+    setShowRaw(false)
+    setSidebarCollapsed(false)
+    setStatusMessage(target.message || `Opened ${target.selectedPath}.`)
+    setTreeRefreshToken((value) => value + 1)
+    lastRevisionRef.current = ''
+    if (target.selectedPath) {
+      setRecentItems(rememberRecentItem({
+        path: target.selectedPath,
+        type: target.selectedPathType === 'dir' ? 'folder' : 'file',
+        label: target.selectedPath.split('/').pop() || target.selectedPath,
+        available: true,
+      }))
+    }
+  }, [])
+
+  const applyOpenFailure = useCallback((message: string, clearSelection: boolean): void => {
+    if (clearSelection) {
+      setSelectedPath('')
+      setSelectedPathType('none')
+      setSelectedPathLocalOnly(false)
+      setShowRaw(false)
+    }
+    setStatusMessage(message)
+  }, [])
+
+  const applyLocalOpenResponse = useCallback(async (response: LocalActionResponse): Promise<void> => {
+    if (!response.ok || !response.rootPath) {
+      applyOpenFailure(response.message || response.error || 'GitLocal could not open that file.', false)
+      return
+    }
+
+    applyAcceptedOpenTarget({
+      rootPath: response.rootPath,
+      selectedPath: response.selectedPath ?? '',
+      selectedPathType: response.selectedPathType ?? 'none',
+      message: response.message || (response.selectedPath ? `Opened ${response.selectedPath}.` : `Opened ${response.rootPath}.`),
+    })
+    await invalidateWorkspaceQueries()
+  }, [applyAcceptedOpenTarget, applyOpenFailure, invalidateWorkspaceQueries])
+
+  const openNativeFile = useCallback(async (path: string): Promise<void> => {
+    if (!path.trim()) {
+      applyOpenFailure('GitLocal could not open the requested file because macOS did not provide a path.', false)
+      return
+    }
+    if (!confirmDiscardChanges()) return
+
+    try {
+      const response = await api.openRepository(path)
+      await applyLocalOpenResponse(response)
+    } catch (error) {
+      applyOpenFailure(getErrorMessage(error, 'GitLocal could not open the requested file.'), false)
+    }
+  }, [applyLocalOpenResponse, applyOpenFailure])
+
   useEffect(() => {
     const handleNativeCommand = (event: Event) => {
-      const command = (event as NativeAppCommandEvent).detail?.command
+      const detail = (event as NativeAppCommandEvent).detail
+      const command = detail?.command
       if (command === 'find') {
         event.preventDefault()
         setNativeFindToken((value) => value + 1)
@@ -398,12 +514,102 @@ export default function App() {
       if (command === 'select-all-panel') {
         event.preventDefault()
         setNativeSelectAllToken((value) => value + 1)
+        return
+      }
+
+      if (command === 'default-reader-available') {
+        event.preventDefault()
+        setNativeDefaultReaderAvailable(true)
+        return
+      }
+
+      if (command === 'default-reader-setup-succeeded') {
+        event.preventDefault()
+        setDefaultReaderSetupPending(false)
+        persistDefaultReaderPreference('accepted', detail?.message ?? 'GitLocal is now the default Markdown reader.')
+        setStatusMessage(detail?.message ?? 'GitLocal is now the default Markdown reader.')
+        return
+      }
+
+      if (command === 'default-reader-setup-failed') {
+        event.preventDefault()
+        setDefaultReaderSetupPending(false)
+        persistDefaultReaderPreference('failed', detail?.message ?? 'GitLocal could not update the default Markdown reader.')
+        setStatusMessage(detail?.message ?? 'GitLocal could not update the default Markdown reader.')
+        return
+      }
+
+      if (command === 'open-file') {
+        event.preventDefault()
+        void openNativeFile(detail?.path ?? '')
       }
     }
 
     window.addEventListener('gitlocal:native-command', handleNativeCommand)
     return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
-  }, [refreshCurrentView])
+  }, [openNativeFile, persistDefaultReaderPreference, refreshCurrentView])
+
+  useEffect(() => {
+    if (!nativeDefaultReaderAvailable) return
+    api.getDefaultReaderPreference()
+      .then((response) => {
+        if (response.preference.status !== 'not-asked') {
+          setDefaultReaderPreference(response.preference)
+        }
+      })
+      .catch(() => {})
+  }, [nativeDefaultReaderAvailable])
+
+  useEffect(() => {
+    const target = startupOpenTargetResponse?.target
+    if (!startupOpenTargetFetched) return
+    if (!target) {
+      if (savedInitialViewerStateAppliedRef.current) return
+      savedInitialViewerStateAppliedRef.current = true
+      const saved = savedInitialViewerStateRef.current
+      if (info && !info.pickerMode && saved.repoPath && info.path && saved.repoPath !== info.path) {
+        setSelectedPath('')
+        setSelectedPathType('none')
+        setShowRaw(false)
+        return
+      }
+      setSelectedPath(saved.path)
+      setSelectedPathType(saved.pathType)
+      setShowRaw(saved.raw)
+      return
+    }
+    const targetKey = `${target.receivedAt}:${target.inputPath}:${target.status}`
+    if (startupOpenTargetAppliedRef.current === targetKey) return
+    startupOpenTargetAppliedRef.current = targetKey
+
+    if (target.status === 'accepted' && target.rootPath) {
+      applyAcceptedOpenTarget(target)
+      void invalidateWorkspaceQueries()
+      return
+    }
+
+    applyOpenFailure(target.message || 'GitLocal could not open the requested startup file.', true)
+  }, [applyAcceptedOpenTarget, applyOpenFailure, info, invalidateWorkspaceQueries, startupOpenTargetFetched, startupOpenTargetResponse])
+
+  const showDefaultReaderPrompt =
+    nativeDefaultReaderAvailable
+    && !defaultReaderSetupPending
+    && (defaultReaderPreference.status === 'not-asked' || defaultReaderPreference.status === 'failed')
+
+  function declineDefaultReaderSetup(): void {
+    persistDefaultReaderPreference('declined', 'GitLocal will not become the default Markdown reader unless you choose it later.')
+    setStatusMessage('GitLocal will not become the default Markdown reader unless you choose it later.')
+  }
+
+  function requestDefaultReaderSetup(): void {
+    setDefaultReaderSetupPending(true)
+    const posted = postNativeAppCommand('set-default-markdown-reader')
+    if (!posted) {
+      setDefaultReaderSetupPending(false)
+      persistDefaultReaderPreference('failed', 'Default Markdown reader setup is only available in the macOS app.')
+      setStatusMessage('Default Markdown reader setup is only available in the macOS app.')
+    }
+  }
 
   function confirmDiscardChanges(): boolean {
     if (!hasUnsavedChanges) return true
@@ -842,9 +1048,11 @@ export default function App() {
     )
   }
 
-  const visibleSelectedPath = hasRepoMismatch ? '' : selectedPath
-  const visibleSelectedPathType: ViewerPathType = hasRepoMismatch ? 'none' : selectedPathType
-  const visibleSelectedPathLocalOnly = hasRepoMismatch ? false : selectedPathLocalOnly
+  const startupOpenTargetPending = !startupOpenTargetFetched
+  const startupOpenTargetBlocksSavedSelection = Boolean(startupOpenTargetResponse?.target && startupOpenTargetResponse.target.status !== 'accepted')
+  const visibleSelectedPath = hasRepoMismatch || startupOpenTargetPending || startupOpenTargetBlocksSavedSelection ? '' : selectedPath
+  const visibleSelectedPathType: ViewerPathType = hasRepoMismatch || startupOpenTargetPending || startupOpenTargetBlocksSavedSelection ? 'none' : selectedPathType
+  const visibleSelectedPathLocalOnly = hasRepoMismatch || startupOpenTargetPending || startupOpenTargetBlocksSavedSelection ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
   const darkMode = theme === 'dark'
@@ -967,6 +1175,24 @@ export default function App() {
           )}
 
           <main className="content-area flex min-w-0 flex-1 flex-col">
+            {showDefaultReaderPrompt ? (
+              <div className="border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--foreground)]" role="region" aria-label="Default Markdown reader setup">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Open Markdown files with GitLocal?</p>
+                    <p className="text-[var(--muted-foreground)]">Double-clicked .md files can open their folder in GitLocal and show the file in preview.</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button type="button" variant="secondary" onClick={declineDefaultReaderSetup}>
+                      Not now
+                    </Button>
+                    <Button type="button" onClick={requestDefaultReaderSetup}>
+                      Set as default
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {statusMessage ? (
               <div className="status-banner border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_45%,var(--background))] px-4 py-2 text-sm text-[var(--foreground)]" role="status">
                 {statusMessage}
@@ -1048,41 +1274,50 @@ export default function App() {
               />
 
               <div className="min-h-0 flex-1 overflow-hidden">
-                <ContentPanel
-                  canMutateFiles={canMutateFiles}
-                  refreshToken={treeRefreshToken}
-                  selectedPath={visibleSelectedPath}
-                  selectedPathType={visibleSelectedPathType}
-                  selectedPathLocalOnly={visibleSelectedPathLocalOnly}
-                  selectedPathSyncState={selectedPathSyncState}
-                  nativeFindToken={nativeFindToken}
-                  nativeSelectAllToken={nativeSelectAllToken}
-                  branch={currentBranch}
-                  isGitRepo={info?.isGitRepo}
-                  repoSummary={repoSummary}
-                  navigationHints={navigationHints}
-                  recentItems={recentItems}
-                  generatedLocalVisibility={generatedLocalVisibility}
-                  onNavigate={handleSelectFile}
-                  onOpenPath={(path, type, localOnly) => {
-                    if (type === 'dir') {
-                      handleSelectFolder(path, localOnly)
-                      return
-                    }
-                    handleSelectFile(path, localOnly)
-                  }}
-                  onDirtyChange={setHasUnsavedChanges}
-                  onMutationComplete={(event) => { void handleMutationComplete(event) }}
-                  onCreateFolderComplete={(event) => { void handleMutationComplete(event) }}
-                  onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
-                  emptyStateTitle={emptyStateTitle}
-                  emptyStateDetail={emptyStateDetail}
-                  emptyStateActions={emptyStateActions}
-                  onBrowseParent={handleBrowseParentRequest}
-                  raw={visibleShowRaw}
-                  onRawChange={setShowRaw}
-                  onStatusMessage={setStatusMessage}
-                />
+                {startupOpenTargetBlocksSavedSelection ? (
+                  <div className="content-panel" role="alert">
+                    <div className="content-empty">
+                      <h2 className="content-empty-title">Could not open the requested file</h2>
+                      <p className="content-empty-detail">{startupOpenTargetResponse?.target?.message ?? statusMessage}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ContentPanel
+                    canMutateFiles={canMutateFiles}
+                    refreshToken={treeRefreshToken}
+                    selectedPath={visibleSelectedPath}
+                    selectedPathType={visibleSelectedPathType}
+                    selectedPathLocalOnly={visibleSelectedPathLocalOnly}
+                    selectedPathSyncState={selectedPathSyncState}
+                    nativeFindToken={nativeFindToken}
+                    nativeSelectAllToken={nativeSelectAllToken}
+                    branch={currentBranch}
+                    isGitRepo={info?.isGitRepo}
+                    repoSummary={repoSummary}
+                    navigationHints={navigationHints}
+                    recentItems={recentItems}
+                    generatedLocalVisibility={generatedLocalVisibility}
+                    onNavigate={handleSelectFile}
+                    onOpenPath={(path, type, localOnly) => {
+                      if (type === 'dir') {
+                        handleSelectFolder(path, localOnly)
+                        return
+                      }
+                      handleSelectFile(path, localOnly)
+                    }}
+                    onDirtyChange={setHasUnsavedChanges}
+                    onMutationComplete={(event) => { void handleMutationComplete(event) }}
+                    onCreateFolderComplete={(event) => { void handleMutationComplete(event) }}
+                    onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
+                    emptyStateTitle={emptyStateTitle}
+                    emptyStateDetail={emptyStateDetail}
+                    emptyStateActions={emptyStateActions}
+                    onBrowseParent={handleBrowseParentRequest}
+                    raw={visibleShowRaw}
+                    onRawChange={setShowRaw}
+                    onStatusMessage={setStatusMessage}
+                  />
+                )}
               </div>
             </div>
           </main>

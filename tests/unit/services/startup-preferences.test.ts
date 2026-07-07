@@ -4,9 +4,11 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   getLinuxDocumentsPath,
+  readDefaultReaderPreference,
   readStartupFolderPreference,
   rememberStartupFolder,
   resolveStartupFolder,
+  writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../../../src/services/startup-preferences.js'
 
@@ -147,6 +149,79 @@ describe('startup preferences', () => {
       } else {
         process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = previousPreferencePath
       }
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns a not-asked default-reader preference when none is stored', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-default-reader-empty-'))
+    try {
+      expect(readDefaultReaderPreference(join(dir, 'missing.json'))).toEqual({
+        status: 'not-asked',
+        askedAt: '',
+        answeredAt: '',
+        message: '',
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('writes and reads default-reader prompt decisions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-default-reader-write-'))
+    const prefPath = join(dir, 'default-reader.json')
+
+    try {
+      const preference = writeDefaultReaderPreference({
+        status: 'declined',
+        askedAt: '2026-07-05T12:00:00.000Z',
+        answeredAt: '2026-07-05T12:01:00.000Z',
+        message: 'Not now.',
+      }, prefPath)
+
+      expect(preference).toEqual({
+        status: 'declined',
+        askedAt: '2026-07-05T12:00:00.000Z',
+        answeredAt: '2026-07-05T12:01:00.000Z',
+        message: 'Not now.',
+      })
+      expect(readDefaultReaderPreference(prefPath)).toEqual(preference)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('normalizes invalid default-reader state and fills missing timestamps', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-default-reader-normalize-'))
+    const prefPath = join(dir, 'default-reader.json')
+
+    try {
+      writeFileSync(prefPath, JSON.stringify({
+        status: 'surprise',
+        askedAt: 42,
+        answeredAt: null,
+        message: false,
+      }))
+
+      expect(readDefaultReaderPreference(prefPath)).toEqual({
+        status: 'not-asked',
+        askedAt: '',
+        answeredAt: '',
+        message: '',
+      })
+
+      const accepted = writeDefaultReaderPreference({ status: 'accepted' }, prefPath)
+      expect(accepted.status).toBe('accepted')
+      expect(accepted.askedAt).toMatch(/\d{4}-\d{2}-\d{2}T/)
+      expect(accepted.answeredAt).toMatch(/\d{4}-\d{2}-\d{2}T/)
+
+      const reset = writeDefaultReaderPreference({ status: 'not-asked', message: 'Reset.' }, prefPath)
+      expect(reset).toMatchObject({
+        status: 'not-asked',
+        answeredAt: '',
+        message: 'Reset.',
+      })
+    } finally {
       rmSync(dir, { recursive: true, force: true })
     }
   })

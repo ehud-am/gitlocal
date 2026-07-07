@@ -76,6 +76,8 @@ Then open `GitLocal.app` from your Applications folder.
 
 The macOS app starts the same local GitLocal service in the background for the app session, shows the viewer in an embedded WebKit window, and stops the service when the app quits. You do not need to keep a terminal open.
 
+On first launch, the app asks before setting GitLocal as the default Markdown reader. If you accept, double-clicking `.md` and `.markdown` files in Finder opens GitLocal, activates the file's local folder or repository, and selects the Markdown file in the preview. If you decline, GitLocal leaves your current Markdown default unchanged. You can also choose **GitLocal > Set as Default Markdown Reader** later from the macOS app menu.
+
 **Unsigned beta notice:** the current Mac app is not signed or notarized with an Apple Developer ID. macOS will show security warnings the first time you open it. After installing, approve the app with:
 
 ```bash

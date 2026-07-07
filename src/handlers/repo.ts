@@ -24,16 +24,19 @@ import {
   syncCurrentBranchWithRemote,
   validateRepo,
 } from '../git/repo.js'
-import { setPickerPath, setRepoPath } from '../server.js'
+import { getStartupOpenTarget, setPickerPath, setRepoPath } from '../server.js'
 import {
+  readDefaultReaderPreference,
   rememberStartupFolder,
   resolveStartupFolder,
+  writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
 import type {
   BranchSwitchRequest,
   ChangedFilesResponse,
   CommitChangesRequest,
+  DefaultReaderPreferenceUpdateRequest,
   GitIdentityUpdateRequest,
   LocalActionResponse,
   NavigationHintsResponse,
@@ -89,6 +92,46 @@ export async function startupFolderUpdateHandler(c: Context<{ Variables: Variabl
       ok: false,
       path: payload.path ?? '',
       message: error instanceof Error ? error.message : 'Could not update startup folder preference.',
+    }, 400)
+  }
+}
+
+export async function startupOpenTargetHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  return c.json({ target: getStartupOpenTarget() })
+}
+
+export async function defaultReaderPreferenceHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  return c.json({
+    ok: true,
+    preference: readDefaultReaderPreference(),
+    message: 'Default Markdown reader preference loaded.',
+  })
+}
+
+export async function defaultReaderPreferenceUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  let payload: DefaultReaderPreferenceUpdateRequest
+  try {
+    payload = await c.req.json<DefaultReaderPreferenceUpdateRequest>()
+  } catch {
+    return c.json({
+      ok: false,
+      preference: readDefaultReaderPreference(),
+      message: 'Invalid JSON body.',
+    }, 400)
+  }
+
+  try {
+    const preference = writeDefaultReaderPreference(payload)
+    return c.json({
+      ok: true,
+      preference,
+      message: 'Default Markdown reader preference updated.',
+    })
+  } catch (error) {
+    return c.json({
+      ok: false,
+      preference: readDefaultReaderPreference(),
+      message: error instanceof Error ? error.message : 'Could not update default Markdown reader preference.',
     }, 400)
   }
 }

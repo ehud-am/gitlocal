@@ -183,6 +183,143 @@ describe('infoHandler', () => {
 })
 
 describe('repository viewer usability handlers', () => {
+  it('returns startup-open target state and default-reader preferences', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-default-reader-handler-'))
+    const previousPreferencePath = process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH
+    process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH = join(dir, 'default-reader.json')
+
+    try {
+      const app = createApp('')
+
+      const startupTargetRes = await app.fetch(new Request('http://localhost/api/startup-open-target'))
+      expect(startupTargetRes.status).toBe(200)
+      expect(await startupTargetRes.json()).toEqual({ target: null })
+
+      const initialPreferenceRes = await app.fetch(new Request('http://localhost/api/default-reader-preference'))
+      expect(initialPreferenceRes.status).toBe(200)
+      expect(await initialPreferenceRes.json()).toMatchObject({
+        ok: true,
+        preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
+      })
+
+      const updateRes = await app.fetch(new Request('http://localhost/api/default-reader-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'declined',
+          askedAt: '2026-07-05T12:00:00.000Z',
+          answeredAt: '2026-07-05T12:01:00.000Z',
+          message: 'Not now.',
+        }),
+      }))
+      expect(updateRes.status).toBe(200)
+      expect(await updateRes.json()).toMatchObject({
+        ok: true,
+        preference: {
+          status: 'declined',
+          askedAt: '2026-07-05T12:00:00.000Z',
+          answeredAt: '2026-07-05T12:01:00.000Z',
+          message: 'Not now.',
+        },
+      })
+
+      const invalidJsonRes = await app.fetch(new Request('http://localhost/api/default-reader-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      }))
+      expect(invalidJsonRes.status).toBe(400)
+      expect(await invalidJsonRes.json()).toMatchObject({
+        ok: false,
+        message: 'Invalid JSON body.',
+      })
+
+      process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH = dir
+      const writeFailureRes = await app.fetch(new Request('http://localhost/api/default-reader-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'accepted' }),
+      }))
+      expect(writeFailureRes.status).toBe(400)
+      expect(await writeFailureRes.json()).toMatchObject({
+        ok: false,
+      })
+    } finally {
+      if (previousPreferencePath === undefined) {
+        delete process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH
+      } else {
+        process.env.GITLOCAL_DEFAULT_READER_PREFERENCE_PATH = previousPreferencePath
+      }
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('creates startup-open targets for repository and non-repository Markdown files', async () => {
+    const repo = makeGitRepo()
+    const plain = mkdtempSync(join(tmpdir(), 'gitlocal-startup-open-plain-'))
+    const docs = join(repo.dir, 'docs with spaces')
+    mkdirSync(docs)
+    const repoFile = join(docs, 'guide.md')
+    const plainFile = join(plain, 'notes.md')
+    writeFileSync(repoFile, '# Guide')
+    writeFileSync(plainFile, '# Notes')
+
+    try {
+      const repoApp = createApp(repoFile, { initialOpenSource: 'explicit-launch' })
+      const repoTargetRes = await repoApp.fetch(new Request('http://localhost/api/startup-open-target'))
+      const repoTarget = await repoTargetRes.json() as { target: { status: string; rootPath: string; selectedPath: string; selectedPathType: string; gitState: string } }
+      expect(repoTarget.target).toMatchObject({
+        status: 'accepted',
+        selectedPath: 'docs with spaces/guide.md',
+        selectedPathType: 'file',
+        gitState: 'inside-repository',
+      })
+      expect(realpathSync(repoTarget.target.rootPath)).toBe(realpathSync(repo.dir))
+
+      const plainApp = createApp(plainFile, { initialOpenSource: 'explicit-launch' })
+      const plainTargetRes = await plainApp.fetch(new Request('http://localhost/api/startup-open-target'))
+      const plainTarget = await plainTargetRes.json() as { target: { status: string; rootPath: string; selectedPath: string; gitState: string } }
+      expect(plainTarget.target).toMatchObject({
+        status: 'accepted',
+        selectedPath: 'notes.md',
+        gitState: 'outside-repository',
+      })
+      expect(realpathSync(plainTarget.target.rootPath)).toBe(realpathSync(plain))
+    } finally {
+      repo.cleanup()
+      rmSync(plain, { recursive: true, force: true })
+    }
+  })
+
+  it('returns distinct startup-open failure targets for missing and unsupported files', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-open-fail-'))
+    const unsupported = join(dir, 'notes.txt')
+    const missing = join(dir, 'missing.md')
+    writeFileSync(unsupported, 'plain text')
+
+    try {
+      const unsupportedApp = createApp(unsupported, { initialOpenSource: 'explicit-launch' })
+      const unsupportedRes = await unsupportedApp.fetch(new Request('http://localhost/api/startup-open-target'))
+      const unsupportedBody = await unsupportedRes.json() as { target: { status: string; message: string; selectedPathType: string } }
+      expect(unsupportedBody.target).toMatchObject({
+        status: 'blocked',
+        selectedPathType: 'none',
+      })
+      expect(unsupportedBody.target.message).toMatch(/unsupported file type/i)
+
+      const missingApp = createApp(missing, { initialOpenSource: 'explicit-launch' })
+      const missingRes = await missingApp.fetch(new Request('http://localhost/api/startup-open-target'))
+      const missingBody = await missingRes.json() as { target: { status: string; message: string; selectedPathType: string } }
+      expect(missingBody.target).toMatchObject({
+        status: 'failed',
+        selectedPathType: 'none',
+      })
+      expect(missingBody.target.message).toMatch(/path does not exist/i)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('returns repository summary with plain-language status and key docs', async () => {
     const { dir, cleanup } = makeGitRepo()
     try {

@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   clearRecentItems,
   clearViewerPath,
+  readDefaultReaderPromptPreference,
   readRecentItems,
   rememberRecentChangedItems,
   readViewerState,
   rememberRecentItem,
   resetViewerState,
+  writeDefaultReaderPromptPreference,
   writeViewerState,
 } from './viewerState'
 
@@ -197,5 +199,26 @@ describe('viewerState', () => {
     expect(items[0]).toMatchObject({ path: 'README.md', lastChangedAt: '2026-06-11T12:01:00.000Z' })
     expect(items[1]).toMatchObject({ path: 'docs/guide.md', lastChangedAt: '2026-06-11T12:00:00.000Z' })
     expect(readRecentItems()).toHaveLength(2)
+  })
+
+  it('persists the default Markdown reader prompt decision', () => {
+    const preference = writeDefaultReaderPromptPreference('declined', 'Not now.')
+
+    expect(preference.status).toBe('declined')
+    expect(preference.askedAt).toBeTruthy()
+    expect(preference.answeredAt).toBeTruthy()
+    expect(preference.message).toBe('Not now.')
+    expect(readDefaultReaderPromptPreference()).toEqual(preference)
+  })
+
+  it('falls back to not-asked for invalid default-reader prompt storage', () => {
+    window.localStorage.setItem('gitlocal:default-markdown-reader-prompt', '{"status":"unknown"}')
+
+    expect(readDefaultReaderPromptPreference()).toEqual({
+      status: 'not-asked',
+      askedAt: '',
+      answeredAt: '',
+      message: '',
+    })
   })
 })

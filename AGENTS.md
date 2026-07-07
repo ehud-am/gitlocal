@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-21
+Auto-generated from all feature plans. Last updated: 2026-07-05
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -46,6 +46,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-21
 - No new storage; existing viewer URL/local state continues to preserve sidebar collapsed preference (026-cleanup-collapsed-sidebar)
 - TypeScript 5.x on Node.js 22+ for server/CLI; React 18 TypeScript UI + Existing React 18, Vite, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, React Testing Library; no new runtime dependency planned (027-markdown-yaml-visualization)
 - No new storage; front matter presentation is derived from the currently loaded Markdown file content (027-markdown-yaml-visualization)
+- TypeScript 5.x on Node.js 22+ for server/CLI and React UI; Swift 5.x for the scoped macOS wrapper + Existing Hono local server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; macOS AppKit/WebKit and Uniform Type Identifiers for wrapper registration (028-mac-md-open-preview)
+- No database; runtime state remains derived from local filesystem/git metadata, browser local viewer state, in-memory server/UI state, startup/default-reader preference files, and native app session open requests (028-mac-md-open-preview)
 
 ## Project Structure
 
@@ -81,6 +83,7 @@ npm run verify # Run tests, builds, and dependency audits
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 028-mac-md-open-preview: Added TypeScript 5.x on Node.js 22+ for server/CLI and React UI; Swift 5.x for the scoped macOS wrapper + Existing Hono local server, @hono/node-server, React 18, Vite 7, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Radix UI primitives already present; macOS AppKit/WebKit and Uniform Type Identifiers for wrapper registration
 - 027-markdown-yaml-visualization: Added TypeScript 5.x on Node.js 22+ for server/CLI; React 18 TypeScript UI + Existing React 18, Vite, @tanstack/react-query, react-markdown, remark-gfm, rehype-highlight, highlight.js, Vitest, React Testing Library; no new runtime dependency planned
 - 026-cleanup-collapsed-sidebar: Added TypeScript 5.x on Node.js 22+; React 18 TypeScript UI + Existing React 18, Vite 7, @tanstack/react-query, Vitest, React Testing Library, jest-axe setup already present
 
@@ -90,5 +93,5 @@ TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/027-markdown-yaml-visualization/plan.md`
+`specs/028-mac-md-open-preview/plan.md`
 <!-- SPECKIT END -->

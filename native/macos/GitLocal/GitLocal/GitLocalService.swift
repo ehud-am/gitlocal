@@ -30,7 +30,7 @@ final class GitLocalService {
     private var completion: ((Result<URL, Error>) -> Void)?
     private var completed = false
 
-    func start(completion: @escaping (Result<URL, Error>) -> Void) {
+    func start(openPath: String? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
         self.completion = completion
 
         let paths = BundlePaths()
@@ -45,7 +45,7 @@ final class GitLocalService {
 
         let process = Process()
         process.executableURL = paths.nodeRuntime
-        process.arguments = [paths.cliScript.path, "--app-mode"]
+        process.arguments = [paths.cliScript.path, "--app-mode"] + (openPath.map { [$0] } ?? [])
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
         let pipe = Pipe()

@@ -52,11 +52,6 @@ async function openFileActionsMenu() {
 }
 
 async function openFolderActionsMenu() {
-  const treeTab = await screen.findByRole('tab', { name: /tree view/i }).catch(() => null)
-  if (treeTab?.getAttribute('aria-selected') === 'false') {
-    await userEvent.setup().click(treeTab)
-    await waitFor(() => expect(treeTab).toHaveAttribute('aria-selected', 'true'))
-  }
   const trigger = await screen.findByRole('button', { name: /folder actions/i })
   await userEvent.setup().click(trigger)
   await waitFor(() => {
@@ -156,7 +151,7 @@ describe('ContentPanel', () => {
     expect(onOpenPath).toHaveBeenCalledWith('README.md', 'file', false)
   })
 
-  it('defaults folder tabs to README before Tree view when a git README exists', async () => {
+  it('renders a git README directly without folder tabs', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
       { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
@@ -193,20 +188,16 @@ describe('ContentPanel', () => {
       />,
     )
 
-    const tabs = await screen.findByRole('tablist', { name: /folder views/i })
-    expect(within(tabs).queryByRole('tab', { name: 'Dashboard' })).not.toBeInTheDocument()
-    expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['README', 'Tree view'])
-    expect(within(tabs).getByRole('tab', { name: 'README' })).toHaveAttribute('aria-selected', 'true')
-    expect(within(tabs).getByRole('tab', { name: 'Tree view' })).toHaveAttribute('aria-selected', 'false')
-    expect(await screen.findByRole('heading', { name: 'Root readme' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: /folder views/i })).not.toBeInTheDocument()
+    const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
+    const readmeRegion = await screen.findByRole('region', { name: /folder readme/i })
+    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
+    expect(directoryTable.compareDocumentPosition(readmeRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Root readme' }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /repository dashboard/i })).not.toBeInTheDocument()
-
-    fireEvent.click(within(tabs).getByRole('tab', { name: 'Tree view' }))
-    expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Root readme' })).not.toBeInTheDocument()
   })
 
-  it('defaults non-git folder tabs to README before Tree view when a README entry exists', async () => {
+  it('renders a non-git README directly without folder tabs', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
       { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false },
@@ -226,17 +217,18 @@ describe('ContentPanel', () => {
       />,
     )
 
-    const tabs = await screen.findByRole('tablist', { name: /folder views/i })
-    expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['README', 'Tree view'])
-    expect(within(tabs).getByRole('tab', { name: 'README' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tablist', { name: /folder views/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
     expect(await screen.findByRole('heading', { name: 'Plain folder readme' })).toBeInTheDocument()
   })
 
-  it('filters root directory rows by generated/local visibility in Tree view', async () => {
+  it('filters root directory rows by generated/local visibility when no README is selected', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
-      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'guide.md', path: 'guide.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
       { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
     ])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
 
     renderWithClient(
       <ContentPanel
@@ -251,9 +243,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'Tree view' }))
     const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
-    expect(within(directoryTable).getAllByText('README.md')).not.toHaveLength(0)
+    expect(within(directoryTable).getAllByText('guide.md')).not.toHaveLength(0)
     expect(screen.queryByText('dist')).not.toBeInTheDocument()
   })
 
@@ -724,6 +715,31 @@ describe('ContentPanel', () => {
     expect(onOpenPath).toHaveBeenNthCalledWith(2, 'docs/.env', 'file', true)
   })
 
+  it('shows dotfiles by default and hides them from directory listings when requested', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
+      { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox', { name: /hide \.\* files/i }))
+    expect(screen.queryByRole('button', { name: /open file \.env/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/i)).toBeInTheDocument()
+  })
+
   it('shows local-only cues in ignored directory rows and active folder context', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: '.cache', path: 'docs/.cache', type: 'dir', localOnly: true },
@@ -949,6 +965,10 @@ describe('ContentPanel', () => {
       />,
     )
 
+    const directoryTable = await screen.findByRole('table', { name: /contents of docs/i })
+    const readmeRegion = await screen.findByRole('region', { name: /folder readme/i })
+    expect(directoryTable.compareDocumentPosition(readmeRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
     expect(await screen.findByRole('heading', { name: 'Folder readme' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'docs/README.md' })).toBeInTheDocument()
   })

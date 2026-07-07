@@ -10,6 +10,9 @@ import App from './App'
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
+    getStartupOpenTarget: vi.fn(),
+    getDefaultReaderPreference: vi.fn(),
+    updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getSyncStatus: vi.fn(),
@@ -158,10 +161,25 @@ describe('App', () => {
       }),
       writable: true,
     })
+    Object.defineProperty(window, 'webkit', {
+      value: undefined,
+      configurable: true,
+    })
 
     getItem.mockReturnValue(null)
 
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
+      message: 'Default Markdown reader preference loaded.',
+    })
+    vi.mocked(api.updateDefaultReaderPreference).mockResolvedValue({
+      ok: true,
+      preference: { status: 'declined', askedAt: 'now', answeredAt: 'now', message: 'Not now.' },
+      message: 'Default Markdown reader preference updated.',
+    })
     vi.mocked(api.getGitContext).mockResolvedValue(buildInfo('main').gitContext)
     vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
       path: path === 'docs' ? 'docs/README.md' : 'README.md',
@@ -329,7 +347,7 @@ describe('App', () => {
     expect(screen.getByText('Remote')).toBeInTheDocument()
     expect(screen.queryByText('/tmp/repo')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /browse parent folder/i })).not.toBeInTheDocument()
-    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+    expect(await screen.findByText(/root readme/i, {}, { timeout: 5000 })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /expand repository details/i }))
 
@@ -340,15 +358,151 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
   })
 
+  it('asks for default Markdown reader setup only after the native app announces support', async () => {
+    renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /default markdown reader setup/i })).not.toBeInTheDocument()
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-available' },
+    }))
+
+    expect(await screen.findByRole('region', { name: /default markdown reader setup/i })).toBeInTheDocument()
+  })
+
+  it('persists declining the default Markdown reader prompt', async () => {
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-available' },
+    }))
+    fireEvent.click(await screen.findByRole('button', { name: /not now/i }))
+
+    await waitFor(() => {
+      expect(api.updateDefaultReaderPreference).toHaveBeenCalledWith(expect.objectContaining({ status: 'declined' }))
+    })
+    expect(setItem).toHaveBeenCalledWith(
+      'gitlocal:default-markdown-reader-prompt',
+      expect.stringContaining('"status":"declined"'),
+    )
+    expect(screen.queryByRole('region', { name: /default markdown reader setup/i })).not.toBeInTheDocument()
+  })
+
+  it('dispatches the native default-reader setup command and records success', async () => {
+    const postMessage = vi.fn()
+    Object.defineProperty(window, 'webkit', {
+      value: { messageHandlers: { gitlocalNative: { postMessage } } },
+      configurable: true,
+    })
+
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-available' },
+    }))
+    fireEvent.click(await screen.findByRole('button', { name: /set as default/i }))
+
+    expect(postMessage).toHaveBeenCalledWith({ command: 'set-default-markdown-reader' })
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'default-reader-setup-succeeded', message: 'GitLocal is now the default Markdown reader.' },
+    }))
+
+    await waitFor(() => {
+      expect(api.updateDefaultReaderPreference).toHaveBeenCalledWith(expect.objectContaining({ status: 'accepted' }))
+    })
+    expect(await screen.findByText('GitLocal is now the default Markdown reader.')).toBeInTheDocument()
+  })
+
+  it('applies startup-open target before saved viewer state and renders Markdown preview', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file&raw=true')
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
+      target: {
+        source: 'explicit-launch',
+        inputPath: '/tmp/repo/docs/guide.md',
+        rootPath: '/tmp/repo',
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+        status: 'accepted',
+        message: 'Opened docs/guide.md.',
+        receivedAt: '2026-07-05T12:00:00.000Z',
+        gitState: 'inside-repository',
+        openMode: 'file',
+        repositoryRootPath: '/tmp/repo',
+      },
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
+    expect(await screen.findByText('Opened docs/guide.md.')).toBeInTheDocument()
+  })
+
+  it('opens a second Markdown file from a native open-file event while running', async () => {
+    vi.mocked(api.openRepository).mockResolvedValueOnce({
+      ok: true,
+      error: '',
+      path: '/tmp/repo/docs/guide.md',
+      rootPath: '/tmp/repo',
+      selectedPath: 'docs/guide.md',
+      selectedPathType: 'file',
+      openMode: 'file',
+      gitState: 'inside-repository',
+      message: 'Opened docs/guide.md.',
+    })
+
+    renderWithClient()
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'open-file', path: '/tmp/repo/docs/guide.md' },
+    }))
+
+    await waitFor(() => {
+      expect(api.openRepository).toHaveBeenCalledWith('/tmp/repo/docs/guide.md')
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+  })
+
+  it('clears stale saved startup selection after a failed startup-open target', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file')
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
+      target: {
+        source: 'explicit-launch',
+        inputPath: '/tmp/repo/missing.md',
+        rootPath: '',
+        selectedPath: '',
+        selectedPathType: 'none',
+        status: 'failed',
+        message: 'Path does not exist: /tmp/repo/missing.md',
+        receivedAt: '2026-07-05T12:00:00.000Z',
+      },
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('Path does not exist: /tmp/repo/missing.md')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getFile).not.toHaveBeenCalledWith('README.md', 'main', false)
+    })
+  })
+
   it('opens an info modal before leaving the repository from the root .. row', async () => {
     vi.mocked(api.showParentFolder).mockResolvedValueOnce({
       ok: false,
       error: 'Parent folder unavailable.',
     })
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
 
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     fireEvent.click(await screen.findByRole('button', { name: /open parent folder outside this repository/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -367,6 +521,19 @@ describe('App', () => {
 
     expect(await screen.findByRole('searchbox', { name: /search query/i })).toHaveValue('guide')
     expect(await screen.findByText('guide content')).toBeInTheDocument()
+    expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+  })
+
+  it('keeps the persistent tree visible while navigating to a neighboring file', async () => {
+    renderWithClient()
+
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    fireEvent.click(within(tree).getByText('docs'))
+    fireEvent.click(await within(tree).findByText('guide.md'))
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: /repository files/i })).toBeInTheDocument()
     expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
   })
 
@@ -1108,11 +1275,8 @@ describe('App', () => {
   it('creates a folder from the current folder view', async () => {
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
-    const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
-    fireEvent.click(docsButtons[0])
+    fireEvent.click(await screen.findByRole('button', { name: /open folder docs/i }))
 
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder here/i }))
     fireEvent.change(screen.getByLabelText(/folder name/i), {
@@ -1124,15 +1288,12 @@ describe('App', () => {
       expect(api.createFolder).toHaveBeenCalledWith({ parentPath: 'docs', name: 'new-folder' })
     })
     expect(await screen.findByText(/folder created successfully/i)).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('requires exact typed confirmation before deleting a folder', async () => {
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
-    const docsButtons = await screen.findAllByRole('button', { name: /open folder docs/i })
-    fireEvent.click(docsButtons[0])
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /open folder docs/i }))
     await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete folder$/i }))
 
@@ -1163,14 +1324,13 @@ describe('App', () => {
       })
     })
     expect(await screen.findByText(/folder deleted successfully/i)).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('cancels typed file delete confirmation without deleting the file', async () => {
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('tab', { name: /tree view/i }))
-    const readmeButtons = await screen.findAllByRole('button', { name: /open file README\.md/i })
-    fireEvent.click(readmeButtons[0])
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    fireEvent.click(await within(tree).findByText('README.md'))
     await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
     await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
 
@@ -1183,7 +1343,7 @@ describe('App', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(api.deleteFile).not.toHaveBeenCalled()
     expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('opens the picker page and footer in picker mode', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce({

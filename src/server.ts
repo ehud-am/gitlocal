@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import {
   infoHandler,
   branchesHandler,
@@ -18,6 +18,9 @@ import {
   repositoryChangesHandler,
   repositoryNavigationHintsHandler,
   repositorySummaryHandler,
+  defaultReaderPreferenceHandler,
+  defaultReaderPreferenceUpdateHandler,
+  startupOpenTargetHandler,
   startupFolderHandler,
   startupFolderUpdateHandler,
 } from './handlers/repo.js'
@@ -40,13 +43,15 @@ import {
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import { classifyLocalPath } from './git/repo.js'
+import type { StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
-type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean }
+type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean; initialOpenSource?: StartupOpenSource }
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
 let currentPickerPath = ''
+let currentStartupOpenTarget: StartupOpenTarget | null = null
 
 export function setRepoPath(path: string): void {
   currentRepoPath = path
@@ -64,7 +69,92 @@ export function getPickerPath(): string {
   return currentPickerPath
 }
 
+export function setStartupOpenTarget(target: StartupOpenTarget | null): void {
+  currentStartupOpenTarget = target
+}
+
+export function getStartupOpenTarget(): StartupOpenTarget | null {
+  return currentStartupOpenTarget
+}
+
+function createStartupOpenTargetFailure(
+  inputPath: string,
+  source: StartupOpenSource,
+  message: string,
+  status: StartupOpenTarget['status'] = 'failed',
+): StartupOpenTarget {
+  return {
+    source,
+    inputPath: inputPath ? resolve(inputPath) : '',
+    rootPath: '',
+    selectedPath: '',
+    selectedPathType: 'none',
+    status,
+    message,
+    receivedAt: new Date().toISOString(),
+  }
+}
+
+function isSupportedMarkdownPath(path: string): boolean {
+  return /\.(md|markdown)$/i.test(path)
+}
+
+export function resolveOpenTarget(inputPath: string, source: StartupOpenSource): StartupOpenTarget {
+  const classification = classifyLocalPath(inputPath)
+  if (!inputPath) {
+    return createStartupOpenTargetFailure(inputPath, source, 'path is required', 'blocked')
+  }
+
+  if (!classification.exists || classification.openMode === 'blocked') {
+    return createStartupOpenTargetFailure(
+      inputPath,
+      source,
+      classification.message ?? `Path does not exist: ${inputPath}`,
+      classification.pathType === 'missing' ? 'failed' : 'blocked',
+    )
+  }
+
+  if (classification.pathType !== 'file') {
+    return createStartupOpenTargetFailure(
+      inputPath,
+      source,
+      `Only Markdown files can be opened directly: ${classification.canonicalPath}`,
+      'blocked',
+    )
+  }
+
+  if (!isSupportedMarkdownPath(classification.canonicalPath)) {
+    return createStartupOpenTargetFailure(
+      inputPath,
+      source,
+      `Unsupported file type: ${classification.canonicalPath}. GitLocal can open Markdown files.`,
+      'blocked',
+    )
+  }
+
+  const rootPath = classification.repositoryRootPath ?? dirname(classification.canonicalPath)
+  const selectedPath = classification.repositoryRootPath
+    ? relative(rootPath, classification.canonicalPath).split('\\').join('/')
+    : basename(classification.canonicalPath)
+  const selectedPathType: ViewerPathType = 'file'
+
+  return {
+    source,
+    inputPath: classification.canonicalPath,
+    rootPath,
+    selectedPath,
+    selectedPathType,
+    status: 'accepted',
+    message: `Opened ${selectedPath}.`,
+    receivedAt: new Date().toISOString(),
+    gitState: classification.gitState,
+    openMode: classification.openMode,
+    ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
+  }
+}
+
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
+  currentStartupOpenTarget = null
   if (!initialPath) {
     const cwd = process.cwd()
     const cwdClassification = classifyLocalPath(cwd)
@@ -81,6 +171,21 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
 
   const resolvedPath = resolve(initialPath)
   const classification = classifyLocalPath(resolvedPath)
+  if (classification.pathType === 'file' || options.initialOpenSource) {
+    const target = resolveOpenTarget(resolvedPath, options.initialOpenSource ?? 'explicit-launch')
+    currentStartupOpenTarget = target
+    if (target.status === 'accepted' && target.rootPath) {
+      currentRepoPath = target.rootPath
+      currentPickerPath = ''
+      return
+    }
+    if (options.initialOpenSource) {
+      currentRepoPath = ''
+      currentPickerPath = process.cwd()
+      return
+    }
+  }
+
   if (classification.gitState === 'repository-root') {
     currentRepoPath = classification.repositoryRootPath!
     currentPickerPath = ''
@@ -107,6 +212,9 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/info', infoHandler)
   app.get('/api/startup-folder', startupFolderHandler)
   app.put('/api/startup-folder', startupFolderUpdateHandler)
+  app.get('/api/startup-open-target', startupOpenTargetHandler)
+  app.get('/api/default-reader-preference', defaultReaderPreferenceHandler)
+  app.put('/api/default-reader-preference', defaultReaderPreferenceUpdateHandler)
   app.get('/api/branches', branchesHandler)
   app.post('/api/branches/switch', branchSwitchHandler)
   app.post('/api/git/commit', commitChangesHandler)
