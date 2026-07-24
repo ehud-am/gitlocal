@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { platform, tmpdir } from 'node:os'
 import {
   getLinuxDocumentsPath,
   readDefaultReaderPreference,
@@ -50,6 +50,48 @@ describe('startup preferences', () => {
     }
   })
 
+  it('distinguishes why a remembered folder is unavailable when falling back to the platform default (deleted vs. permission-denied vs. disconnected)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-last-used-gone-'))
+    const documents = join(home, 'Documents')
+    mkdirSync(documents)
+    const prefPath = join(home, 'pref.json')
+
+    // Case 1: remembered folder was deleted entirely.
+    const deletedRemembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-deleted-'))
+    writeStartupFolderPreference(deletedRemembered, 'repo-open', prefPath)
+    rmSync(deletedRemembered, { recursive: true, force: true })
+
+    try {
+      const resolution = resolveStartupFolder({ preferencePath: prefPath, homePath: home })
+      expect(resolution.source).toBe('platform-default')
+      expect(resolution.fallbackReason).toBe('Last used folder no longer exists.')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a permission-denied reason distinctly when the remembered folder still exists but cannot be read', () => {
+    if (process.platform === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-last-used-denied-'))
+    const documents = join(home, 'Documents')
+    mkdirSync(documents)
+    const prefPath = join(home, 'pref.json')
+    const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-denied-'))
+    writeStartupFolderPreference(remembered, 'repo-open', prefPath)
+    chmodSync(remembered, 0o000)
+
+    try {
+      const resolution = resolveStartupFolder({ preferencePath: prefPath, homePath: home })
+      expect(resolution.source).toBe('platform-default')
+      expect(resolution.fallbackReason).toBe('Last used folder is no longer accessible (permission denied).')
+    } finally {
+      chmodSync(remembered, 0o755)
+      rmSync(home, { recursive: true, force: true })
+      rmSync(remembered, { recursive: true, force: true })
+    }
+  })
+
   it('reports an unavailable explicit path without falling back to remembered state', () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-explicit-missing-home-'))
     const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-explicit-missing-remembered-'))
@@ -66,6 +108,26 @@ describe('startup preferences', () => {
     } finally {
       rmSync(home, { recursive: true, force: true })
       rmSync(remembered, { recursive: true, force: true })
+    }
+  })
+
+  it('treats an existing-but-unlistable directory as unreadable rather than trusting stat alone', () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-unreadable-home-'))
+    const unreadable = mkdtempSync(join(tmpdir(), 'gitlocal-startup-unreadable-'))
+    chmodSync(unreadable, 0o000)
+
+    try {
+      const resolution = resolveStartupFolder({ explicitPath: unreadable, preferencePath: join(home, 'missing-pref.json'), homePath: home })
+      // Passes existsSync + statSync().isDirectory() but fails an actual read attempt —
+      // FR-006 requires this to be rejected as unreadable, not silently accepted.
+      expect(resolution.readable).toBe(false)
+      expect(resolution.fallbackReason).toBe('Explicit folder is unavailable.')
+    } finally {
+      chmodSync(unreadable, 0o755)
+      rmSync(home, { recursive: true, force: true })
+      rmSync(unreadable, { recursive: true, force: true })
     }
   })
 

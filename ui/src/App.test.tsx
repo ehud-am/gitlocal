@@ -11,6 +11,7 @@ vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
     getStartupOpenTarget: vi.fn(),
+    getStartupFolder: vi.fn(),
     getDefaultReaderPreference: vi.fn(),
     updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
@@ -170,6 +171,15 @@ describe('App', () => {
 
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
     vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getStartupFolder).mockResolvedValue({
+      path: '/tmp/repo',
+      source: 'last-used',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/tmp/Documents',
+      lastUsedPath: '/tmp/repo',
+      fallbackReason: '',
+    })
     vi.mocked(api.getDefaultReaderPreference).mockResolvedValue({
       ok: true,
       preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },
@@ -1362,5 +1372,80 @@ describe('App', () => {
 
     expect(await screen.findByText(/choose what gitlocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
+  })
+
+  it('shows a failure screen with a retry action instead of the app shell when the bootstrap info fetch fails', async () => {
+    vi.mocked(api.getInfo).mockReset()
+    vi.mocked(api.getInfo).mockRejectedValueOnce({ error: 'Permission was denied while accessing this path.', code: 'PERMISSION_DENIED' })
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo('main'))
+
+    renderWithClient()
+
+    expect(await screen.findByText(/couldn't load this workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/permission was denied while accessing this path/i)).toBeInTheDocument()
+    expect(screen.queryByText(/root readme/i)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+  })
+
+  it('falls back to a generic description when the bootstrap info fetch fails with no usable error message', async () => {
+    vi.mocked(api.getInfo).mockReset()
+    vi.mocked(api.getInfo).mockRejectedValue('boom')
+
+    renderWithClient()
+
+    expect(await screen.findByText(/couldn't load this workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/something went wrong while checking the current launch context/i)).toBeInTheDocument()
+  })
+
+  it('does not surface a startup-folder fallback banner while the app is in picker mode', async () => {
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: '',
+      path: '/tmp',
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: true,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
+      gitContext: null,
+    })
+    vi.mocked(api.getStartupFolder).mockResolvedValue({
+      path: '/tmp/Documents',
+      source: 'platform-default',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/tmp/Documents',
+      lastUsedPath: '/tmp/gone',
+      fallbackReason: 'Last used folder no longer exists.',
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText(/choose what gitlocal should open/i)).toBeInTheDocument()
+    // PickerPage.tsx legitimately shows this via its own startupMessage mechanism (US2) — what
+    // this guards against is App.tsx's separate status-banner effect *also* redundantly setting
+    // it, since App.tsx's main shell (where that banner lives) never renders in picker mode.
+    expect(document.querySelector('.status-banner')).not.toBeInTheDocument()
+  })
+
+  it('shows why the startup folder fell back to a default when the remembered folder is unavailable (US2)', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/tmp/Documents',
+      source: 'platform-default',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/tmp/Documents',
+      lastUsedPath: '/tmp/gone',
+      fallbackReason: 'Last used folder no longer exists.',
+    })
+
+    renderWithClient()
+
+    // Regression guard: /api/startup-folder's fallbackReason must reach the main app view
+    // (not just the picker), since a successful fallback resolution never enters picker mode.
+    expect(await screen.findByText(/last used folder no longer exists/i)).toBeInTheDocument()
   })
 })

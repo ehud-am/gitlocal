@@ -7,6 +7,7 @@ import PickerPage from './PickerPage'
 vi.mock('../../services/api', () => ({
   api: {
     getStartupFolder: vi.fn(),
+    getStartupOpenTarget: vi.fn(),
     getFolderBrowse: vi.fn(),
     openRepository: vi.fn(),
     createChildFolder: vi.fn(),
@@ -47,6 +48,7 @@ beforeEach(() => {
     lastUsedPath: '/Users/example',
     fallbackReason: '',
   })
+  vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
   vi.mocked(api.getFolderBrowse).mockResolvedValue({
     currentPath: '/Users/example',
     parentPath: '/Users',
@@ -75,6 +77,34 @@ describe('PickerPage', () => {
     expect((await axe(container)).violations).toHaveLength(0)
   })
 
+  it('surfaces a failed startup-open-target message (invalid explicit path) instead of silently browsing an unrelated folder (US3)', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
+      target: {
+        source: 'explicit-launch',
+        inputPath: '/tmp/gitlocal-definitely-missing',
+        rootPath: '',
+        selectedPath: '',
+        selectedPathType: 'none',
+        status: 'failed',
+        message: 'Path does not exist: /tmp/gitlocal-definitely-missing',
+        receivedAt: '2026-07-24T00:00:00.000Z',
+      },
+    })
+
+    render(<PickerPage />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Path does not exist: /tmp/gitlocal-definitely-missing')
+  })
+
+  it('does not show an open-target message when the startup target was accepted or none was requested', async () => {
+    render(<PickerPage />)
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getStartupOpenTarget)).toHaveBeenCalled()
+    })
+    expect(screen.queryByText(/does not exist/i)).not.toBeInTheDocument()
+  })
+
   it('loads folders on mount', async () => {
     render(<PickerPage />)
 
@@ -100,6 +130,54 @@ describe('PickerPage', () => {
     render(<PickerPage />)
 
     expect(await screen.findByText(/started from your documents folder/i)).toBeInTheDocument()
+  })
+
+  it('surfaces why the remembered folder was skipped when falling back to the platform default folder', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/Users/example/Documents',
+      source: 'platform-default',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/Users/example/Documents',
+      lastUsedPath: '/Users/example/gone',
+      fallbackReason: 'Last used folder no longer exists.',
+    })
+
+    render(<PickerPage />)
+
+    // Regression guard: this combination (platform-default source with a non-empty
+    // fallbackReason) previously fell through to the generic "started from your Documents
+    // folder" message, silently discarding the more specific reason the app already knew.
+    expect(await screen.findByText(/last used folder no longer exists/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^gitlocal started from your documents folder\.?$/i)).not.toBeInTheDocument()
+  })
+
+  it('recovers a previously-unavailable remembered folder by reopening the same path once it is reachable again (FR-008)', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/Users/example/Documents',
+      source: 'platform-default',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/Users/example/Documents',
+      lastUsedPath: '/Volumes/external-drive/project',
+      fallbackReason: 'Last used folder is currently unreachable — it may be on a disconnected drive.',
+    })
+    vi.mocked(api.openRepository).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    expect(await screen.findByText(/currently unreachable/i)).toBeInTheDocument()
+
+    // The drive reconnects; the user reopens the same remembered path from the still-open
+    // picker — no full app relaunch required, matching FR-008's recovery requirement.
+    const input = await screen.findByRole('textbox', { name: /folder path/i })
+    fireEvent.change(input, { target: { value: '/Volumes/external-drive/project' } })
+    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.openRepository)).toHaveBeenCalledWith('/Volumes/external-drive/project')
+    })
+    expect(window.location.reload).toHaveBeenCalled()
   })
 
   it('shows the home fallback startup message and tolerates startup lookup failures', async () => {

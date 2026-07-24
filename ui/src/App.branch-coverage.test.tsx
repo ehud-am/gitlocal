@@ -1043,18 +1043,14 @@ describe('App branch coverage', () => {
     })
   })
 
-  it('renders safely when repository info is unavailable and allows toggling dark mode', async () => {
+  it('shows the failure screen instead of the app shell when repository info is unavailable', async () => {
     vi.mocked(api.getInfo).mockResolvedValueOnce(undefined as never)
 
     renderApp()
 
-    expect(await screen.findByText('GitLocal')).toBeInTheDocument()
+    expect(await screen.findByText(/couldn't load this workspace/i)).toBeInTheDocument()
     expect(screen.queryByText('repo')).not.toBeInTheDocument()
-    expect(screen.getByText('footer:')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('switch', { name: /toggle dark theme/i }))
-    expect(screen.getByText('Dark theme')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: /toggle dark theme/i }))
-    expect(screen.getByText('Light theme')).toBeInTheDocument()
+    expect(screen.queryByText('footer:')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 })
