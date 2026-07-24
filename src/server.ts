@@ -43,15 +43,21 @@ import {
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import { classifyLocalPath } from './git/repo.js'
-import type { StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
+import { resolveStartupFolder } from './services/startup-preferences.js'
+import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
-type CreateAppOptions = { detectCurrentRepoOnEmptyPath?: boolean; initialOpenSource?: StartupOpenSource }
+type CreateAppOptions = {
+  detectCurrentRepoOnEmptyPath?: boolean
+  initialOpenSource?: StartupOpenSource
+  startupFolderResolution?: StartupFolderResolution
+}
 
 // Mutable server state — single-threaded Node.js, no mutex needed
 let currentRepoPath = ''
 let currentPickerPath = ''
 let currentStartupOpenTarget: StartupOpenTarget | null = null
+let currentStartupFolderResolution: StartupFolderResolution | null = null
 
 export function setRepoPath(path: string): void {
   currentRepoPath = path
@@ -75,6 +81,37 @@ export function setStartupOpenTarget(target: StartupOpenTarget | null): void {
 
 export function getStartupOpenTarget(): StartupOpenTarget | null {
   return currentStartupOpenTarget
+}
+
+// The CLI/native launcher resolves the startup folder once, synchronously, before this
+// server starts — and then immediately persists the resolved folder as the new "last used"
+// preference, which would otherwise erase the very fallbackReason (e.g. "your last folder
+// is gone") this endpoint exists to report. Returning the captured snapshot preserves that
+// one-time information for the lifetime of this server process; only fall back to computing
+// fresh when no snapshot was captured (e.g. direct handler/unit tests).
+export function getStartupFolderResolution(): StartupFolderResolution {
+  return currentStartupFolderResolution ?? resolveStartupFolder()
+}
+
+const FS_ERROR_CODE_MAP: Record<string, string> = {
+  ENOENT: 'NOT_FOUND',
+  EACCES: 'PERMISSION_DENIED',
+  EPERM: 'PERMISSION_DENIED',
+  ENOTDIR: 'UNAVAILABLE',
+  EBUSY: 'UNAVAILABLE',
+  ESTALE: 'UNAVAILABLE',
+}
+
+const FS_ERROR_MESSAGE_MAP: Record<string, string> = {
+  NOT_FOUND: 'The requested path could not be found.',
+  PERMISSION_DENIED: 'Permission was denied while accessing this path.',
+  UNAVAILABLE: 'This path is currently unavailable.',
+}
+
+export function classifyServerError(err: unknown): { error: string; code: string } {
+  const nodeCode = (err as NodeJS.ErrnoException | undefined)?.code
+  const code = (nodeCode && FS_ERROR_CODE_MAP[nodeCode]) || 'UNKNOWN'
+  return { error: FS_ERROR_MESSAGE_MAP[code] ?? 'An unexpected error occurred.', code }
 }
 
 function createStartupOpenTargetFailure(
@@ -155,6 +192,7 @@ export function resolveOpenTarget(inputPath: string, source: StartupOpenSource):
 
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   currentStartupOpenTarget = null
+  currentStartupFolderResolution = options.startupFolderResolution ?? null
   if (!initialPath) {
     const cwd = process.cwd()
     const cwdClassification = classifyLocalPath(cwd)
@@ -200,6 +238,11 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   initializePaths(initialRepoPath, options)
 
   const app = new Hono<{ Variables: AppVariables }>()
+
+  app.onError((err, c) => {
+    const body = classifyServerError(err)
+    return c.json(body, 500)
+  })
 
   // Inject repoPath and pickerPath into context for all handlers
   app.use('*', async (c, next) => {

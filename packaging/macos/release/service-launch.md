@@ -9,7 +9,7 @@ The native app starts GitLocal with:
 Expected stdout includes:
 
 ```text
-gitlocal listening on http://localhost:<port>
+gitlocal listening on http://127.0.0.1:<port>
 ```
 
 The native wrapper reads stdout, extracts the loopback URL, verifies that the URL uses a local host, and then loads that URL in WebKit.

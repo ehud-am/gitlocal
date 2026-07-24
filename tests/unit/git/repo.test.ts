@@ -318,10 +318,11 @@ describe('viewer usability repo helpers', () => {
     const { dir, cleanup } = makeGitRepo()
     try {
       writeFileSync(join(dir, 'README.md'), '# changed')
-      const summary = buildRepositoryStatusSummary(dir, 'main')
+      const branch = getCurrentBranch(dir)
+      const summary = buildRepositoryStatusSummary(dir, branch)
 
       expect(summary.repoName).toBeTruthy()
-      expect(summary.branchLabel).toBe('main')
+      expect(summary.branchLabel).toBe(branch)
       expect(summary.remoteLabel).toBe('Local only')
       expect(summary.syncDescription).toContain('no upstream remote configured')
       expect(summary.syncDescription).toContain('1 local change')
@@ -335,10 +336,11 @@ describe('viewer usability repo helpers', () => {
     const { dir, cleanup } = makeGitRepo()
     const remote = makeBareRepo()
     try {
+      const branch = getCurrentBranch(dir)
       spawnSync('git', ['remote', 'add', 'origin', remote.dir], { cwd: dir, env: isolatedGitEnv() })
       spawnSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: dir, env: isolatedGitEnv() })
 
-      const summary = buildRepositoryStatusSummary(dir, 'main')
+      const summary = buildRepositoryStatusSummary(dir, branch)
 
       expect(summary.remoteLabel).toBe('origin')
       expect(summary.syncState).toBe('up-to-date')
@@ -356,21 +358,22 @@ describe('viewer usability repo helpers', () => {
     const remote = makeBareRepo()
     const collaboratorDir = mkdtempSync(join(tmpdir(), 'gitlocal-collab-'))
     try {
+      const branch = getCurrentBranch(dir)
       git(dir, 'remote', 'add', 'origin', remote.dir)
       git(dir, 'push', '-u', 'origin', 'HEAD')
 
       writeFileSync(join(dir, 'ahead.md'), 'ahead')
       git(dir, 'add', 'ahead.md')
       git(dir, 'commit', '-m', 'ahead change')
-      expect(buildRepositoryStatusSummary(dir, 'main')).toMatchObject({
+      expect(buildRepositoryStatusSummary(dir, branch)).toMatchObject({
         syncState: 'ahead',
         statusTone: 'info',
       })
-      expect(buildRepositoryStatusSummary(dir, 'main').syncDescription).toContain('ahead')
+      expect(buildRepositoryStatusSummary(dir, branch).syncDescription).toContain('ahead')
 
       git(dir, 'push')
       rmSync(collaboratorDir, { recursive: true, force: true })
-      git(tmpdir(), 'clone', remote.dir, collaboratorDir)
+      git(tmpdir(), 'clone', '--branch', branch, remote.dir, collaboratorDir)
       git(collaboratorDir, 'config', 'user.email', 'test@test.com')
       git(collaboratorDir, 'config', 'user.name', 'Test User')
       writeFileSync(join(collaboratorDir, 'behind.md'), 'behind')
@@ -379,7 +382,7 @@ describe('viewer usability repo helpers', () => {
       git(collaboratorDir, 'push')
       git(dir, 'fetch', 'origin')
 
-      const behindSummary = buildRepositoryStatusSummary(dir, 'main')
+      const behindSummary = buildRepositoryStatusSummary(dir, branch)
       expect(behindSummary.syncState).toBe('behind')
       expect(behindSummary.statusTone).toBe('warning')
       expect(behindSummary.syncDescription).toContain('behind')
@@ -388,7 +391,7 @@ describe('viewer usability repo helpers', () => {
       git(dir, 'add', 'diverged.md')
       git(dir, 'commit', '-m', 'diverged change')
 
-      const divergedSummary = buildRepositoryStatusSummary(dir, 'main')
+      const divergedSummary = buildRepositoryStatusSummary(dir, branch)
       expect(divergedSummary.syncState).toBe('diverged')
       expect(divergedSummary.statusTone).toBe('warning')
       expect(divergedSummary.syncDescription).toContain('both have commits')
@@ -573,6 +576,33 @@ describe('classifyLocalPath', () => {
       spawnSync('git', ['worktree', 'remove', '--force', worktreeDir], { cwd: dir })
       rmSync(worktreeDir, { recursive: true, force: true })
       cleanup()
+    }
+  })
+
+  it('propagates a realpath resolution failure instead of silently substituting a fallback path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-realpath-race-'))
+    try {
+      vi.resetModules()
+      const realpathSyncMock = vi.fn(() => {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+      })
+      vi.doMock('node:fs', async () => {
+        const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+        return {
+          ...actual,
+          realpathSync: realpathSyncMock,
+        }
+      })
+
+      // Regression guard: must throw (so the global onError handler can classify it),
+      // never reclassify the failure into a normal-looking result (e.g. 'missing' or a substituted path).
+      const { classifyLocalPath: classifyLocalPathWithMockedRealpath } = await import('../../../src/git/repo.js?realpath-race')
+      expect(() => classifyLocalPathWithMockedRealpath(dir)).toThrow(
+        expect.objectContaining({ code: 'ENOENT' }),
+      )
+      expect(realpathSyncMock).toHaveBeenCalled()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
@@ -993,6 +1023,23 @@ describe('working tree helpers', () => {
     }
   })
 
+  it('propagates a directory read failure instead of silently returning an empty listing', () => {
+    if (process.platform === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const unreadableDir = mkdtempSync(join(tmpdir(), 'gitlocal-unreadable-listing-'))
+    chmodSync(unreadableDir, 0o000)
+    try {
+      // Regression guard: must throw (so the global onError handler can classify it),
+      // never swallow the failure into an empty array indistinguishable from a genuinely empty folder.
+      expect(() => listWorkingTreeDirectoryEntries(unreadableDir, '')).toThrow(
+        expect.objectContaining({ code: 'EACCES' }),
+      )
+    } finally {
+      chmodSync(unreadableDir, 0o755)
+      rmSync(unreadableDir, { recursive: true, force: true })
+    }
+  })
+
   it('classifies file sync states from working tree and upstream differences', () => {
     const { dir, cleanup } = makeGitRepo()
     const remote = makeBareRepo('gitlocal-sync-remote-')
@@ -1008,7 +1055,7 @@ describe('working tree helpers', () => {
       git(dir, 'add', 'notes.txt')
       git(dir, 'commit', '-m', 'local ahead change')
 
-      spawnSync('git', ['clone', remote.dir, cloneDir], { encoding: 'utf-8' })
+      spawnSync('git', ['clone', '--branch', currentBranch, remote.dir, cloneDir], { encoding: 'utf-8' })
       spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: cloneDir })
       spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: cloneDir })
       writeFileSync(join(cloneDir, 'docs', 'guide.md'), 'remote committed')
@@ -1171,6 +1218,7 @@ describe('working tree helpers', () => {
       process.env.GIT_CONFIG_NOSYSTEM = '1'
       process.env.GIT_CONFIG_GLOBAL = '/dev/null'
       process.env.XDG_CONFIG_HOME = homeDir
+      spawnSync('git', ['config', 'user.useConfigOnly', 'true'], { cwd: dir })
       const result = commitWorkingTreeChanges(dir, 'Will fail')
       expect(result).toEqual(expect.objectContaining({
         ok: false,
@@ -1210,7 +1258,7 @@ describe('working tree helpers', () => {
         status: 'pushed',
       }))
 
-      spawnSync('git', ['clone', remote.dir, second], { encoding: 'utf-8' })
+      spawnSync('git', ['clone', '--branch', branch, remote.dir, second], { encoding: 'utf-8' })
       spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: second })
       spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: second })
       writeFileSync(join(second, 'README.md'), '# pulled')
@@ -1345,7 +1393,7 @@ describe('working tree helpers', () => {
       git(first.dir, 'add', 'notes.txt')
       git(first.dir, 'commit', '-m', 'local diverged commit')
 
-      spawnSync('git', ['clone', remote.dir, second], { encoding: 'utf-8' })
+      spawnSync('git', ['clone', '--branch', branch, remote.dir, second], { encoding: 'utf-8' })
       spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: second })
       spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: second })
       writeFileSync(join(second, 'README.md'), '# remote diverged')

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { platform, tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
 import { createApp } from '../../../src/server.js'
@@ -122,6 +122,27 @@ describe('infoHandler', () => {
       expect(body.gitContext).toBeNull()
       expect(body.rootEntryCount).toBe(1)
     } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
+  })
+
+  it('returns a structured error instead of a fake zero rootEntryCount when a plain folder root cannot be read', async () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const folder = mkdtempSync(join(tmpdir(), 'gitlocal-info-unreadable-'))
+    chmodSync(folder, 0o000)
+    try {
+      const app = createApp(folder)
+      const client = testClient(app)
+      const res = await client.api.info.$get()
+
+      // Regression guard for FR-004: a real read failure must surface as a request failure,
+      // never as a successful response reporting rootEntryCount: 0 indistinguishable from empty.
+      expect(res.status).toBe(500)
+      const body = await res.json() as { error: string; code: string }
+      expect(body.code).toBe('PERMISSION_DENIED')
+    } finally {
+      chmodSync(folder, 0o755)
       rmSync(folder, { recursive: true, force: true })
     }
   })

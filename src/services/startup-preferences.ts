@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { homedir, platform } from 'node:os'
 import type {
@@ -33,9 +33,23 @@ function normalizeDefaultReaderStatus(status: unknown): DefaultReaderPreferenceS
 
 function isReadableDirectory(path: string): boolean {
   try {
-    return existsSync(path) && statSync(path).isDirectory()
+    if (!existsSync(path) || !statSync(path).isDirectory()) return false
+    readdirSync(path)
+    return true
   } catch {
     return false
+  }
+}
+
+function describeUnreadableFolder(path: string): string {
+  if (!existsSync(path)) return 'Last used folder no longer exists.'
+  try {
+    readdirSync(path)
+    return 'Last used folder is unavailable.'
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code
+    if (code === 'EACCES' || code === 'EPERM') return 'Last used folder is no longer accessible (permission denied).'
+    return 'Last used folder is currently unreachable — it may be on a disconnected drive.'
   }
 }
 
@@ -168,7 +182,7 @@ export function resolveStartupFolder(options: {
       readable: true,
       platformDefaultPath,
       lastUsedPath: preference?.path ?? '',
-      fallbackReason: preference?.path ? 'Last used folder is unavailable.' : '',
+      fallbackReason: preference?.path ? describeUnreadableFolder(preference.path) : '',
     }
   }
 

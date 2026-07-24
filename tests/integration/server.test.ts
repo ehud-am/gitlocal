@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { chdir } from 'node:process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
+import { platform } from 'node:os'
 import {
+  classifyServerError,
   createApp,
   getPickerPath,
   getRepoPath,
@@ -805,6 +807,55 @@ describe('Server integration', () => {
 
     const missingRes = await app.fetch(new Request('http://localhost/api/file?path=docs%2Fnotes.md'))
     expect(missingRes.status).toBe(404)
+  })
+
+  it('classifies unhandled filesystem errors into a structured envelope (NOT_FOUND, PERMISSION_DENIED, UNAVAILABLE, UNKNOWN)', () => {
+    const enoent = Object.assign(new Error('boom'), { code: 'ENOENT' })
+    expect(classifyServerError(enoent)).toEqual({
+      error: 'The requested path could not be found.',
+      code: 'NOT_FOUND',
+    })
+
+    const eacces = Object.assign(new Error('boom'), { code: 'EACCES' })
+    expect(classifyServerError(eacces)).toEqual({
+      error: 'Permission was denied while accessing this path.',
+      code: 'PERMISSION_DENIED',
+    })
+
+    const eperm = Object.assign(new Error('boom'), { code: 'EPERM' })
+    expect(classifyServerError(eperm)).toEqual({
+      error: 'Permission was denied while accessing this path.',
+      code: 'PERMISSION_DENIED',
+    })
+
+    const ebusy = Object.assign(new Error('boom'), { code: 'EBUSY' })
+    expect(classifyServerError(ebusy)).toEqual({
+      error: 'This path is currently unavailable.',
+      code: 'UNAVAILABLE',
+    })
+
+    expect(classifyServerError(new Error('no code here'))).toEqual({
+      error: 'An unexpected error occurred.',
+      code: 'UNKNOWN',
+    })
+  })
+
+  it('GET /api/tree returns the structured PERMISSION_DENIED envelope when the folder cannot be read', async () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const unreadableDir = mkdtempSync(join(tmpdir(), 'gitlocal-unreadable-'))
+    chmodSync(unreadableDir, 0o000)
+    try {
+      const app = createApp(unreadableDir)
+      const res = await app.fetch(new Request('http://localhost/api/tree'))
+      expect(res.status).toBe(500)
+      const body = await res.json() as { error: string; code: string }
+      expect(body.code).toBe('PERMISSION_DENIED')
+      expect(body.error).toBe('Permission was denied while accessing this path.')
+    } finally {
+      chmodSync(unreadableDir, 0o755)
+      rmSync(unreadableDir, { recursive: true, force: true })
+    }
   })
 })
 

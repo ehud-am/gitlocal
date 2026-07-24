@@ -66,13 +66,14 @@ export default function PickerPage() {
   const [canCloneIntoChild, setCanCloneIntoChild] = useState(false)
   const [startupSource, setStartupSource] = useState<StartupFolderSource | ''>('')
   const [startupFallbackReason, setStartupFallbackReason] = useState('')
+  const [openTargetMessage, setOpenTargetMessage] = useState('')
 
   const currentLabel = useMemo(() => currentPath || 'Choose a folder to begin', [currentPath])
   const hasFolderActions = canCreateChild || canInitGit || canCloneIntoChild || canOpen
   const startupMessage = useMemo(() => {
     if (!startupSource) return ''
     if (startupSource === 'last-used') return 'GitLocal reopened your last used folder.'
-    if (startupSource === 'platform-default') return 'GitLocal started from your Documents folder.'
+    if (startupSource === 'platform-default') return startupFallbackReason || 'GitLocal started from your Documents folder.'
     if (startupSource === 'home-fallback') return startupFallbackReason || 'GitLocal started from your home folder.'
     return ''
   }, [startupFallbackReason, startupSource])
@@ -85,9 +86,14 @@ export default function PickerPage() {
         const startup = await api.getStartupFolder().catch(() => null)
         setStartupSource(startup?.source ?? '')
         setStartupFallbackReason(startup?.fallbackReason ?? '')
+
+        const openTarget = await api.getStartupOpenTarget().catch(() => null)
+        const target = openTarget?.target
+        setOpenTargetMessage(target && target.status !== 'accepted' ? target.message : '')
       } else {
         setStartupSource('')
         setStartupFallbackReason('')
+        setOpenTargetMessage('')
       }
       const result = await api.getFolderBrowse(nextPath)
       setCurrentPath(result.currentPath)
@@ -341,6 +347,9 @@ export default function PickerPage() {
             <p>
               Browse your machine, select a folder, and open it in GitLocal. Git repositories include branch, remote, and identity details.
             </p>
+            {openTargetMessage ? (
+              <p role="alert" className="picker-error">{openTargetMessage}</p>
+            ) : null}
             {startupMessage ? <p className="picker-helper">{startupMessage}</p> : null}
           </section>
 

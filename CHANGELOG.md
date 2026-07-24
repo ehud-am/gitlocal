@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fixed GitLocal silently showing empty-looking content on startup instead of a clear error, across several distinct causes: an unreadable default or remembered folder, an invalid explicit launch path, and a query-retry pause that could get stuck indefinitely (especially in the macOS app's embedded browser).
+- Added a global server error handler so unexpected read failures surface as specific, plain-language messages (e.g. permission denied, not found) instead of a generic error or a blank screen.
+- Added a clear failure screen with a retry action when the app cannot load repository information on startup, distinct from the existing "empty folder" landing state.
+- Added a message explaining why GitLocal fell back to a different folder when a previously remembered folder is no longer available (deleted, permission denied, or on a disconnected drive), both in the folder picker and the main app view.
+- Added a clear message identifying an invalid startup path (e.g. a missing CLI argument or a moved "Open With" target) instead of silently browsing an unrelated folder.
+- Fixed a bug where a failed automatic browser launch (npm/terminal distribution) could crash the entire GitLocal server; it now prints a manual-open instruction instead.
+
 ## 0.9.12 - 2026-07-07
 
 - Added optional macOS Markdown default-reader setup, including first-run consent and a later `GitLocal > Set as Default Markdown Reader` menu action.
