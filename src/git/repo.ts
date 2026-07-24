@@ -285,6 +285,9 @@ function normalizePlatformPath(path: string): string {
   return resolve(path)
 }
 
+// Deliberately unguarded: a realpathSync failure here must propagate to the global onError
+// handler (src/server.ts) so classifyLocalPath's many callers (getInfo, treeHandler, etc.) see
+// a real failure rather than a classification that silently substitutes a fallback path.
 function canonicalizeExistingPath(path: string): string {
   return normalizePlatformPath(realpathSync(path))
 }
@@ -390,12 +393,20 @@ export function hasCommits(repoPath: string): boolean {
   return result.status === 0
 }
 
+// Deliberately does not catch readdirSync failures here (see listWorkingTreeDirectoryEntries):
+// this feeds RepoInfo.rootEntryCount for the non-git path, and swallowing a real read failure
+// to an empty/zero result would make it indistinguishable from a genuinely empty folder — the
+// exact "empty content on startup" bug. Let it propagate to the global onError handler instead.
 export function getBrowseableRootEntryCount(repoPath: string): number {
   return listWorkingTreeDirectoryEntries(repoPath)
     .filter((entry) => !entry.name.startsWith('.'))
     .length
 }
 
+// Unlike getBrowseableRootEntryCount above, returning 0 on failure here is intentionally safe:
+// this is only reached after other git operations (spawnGit, hasCommits) already implicitly
+// proved the path is accessible, making a readdirSync failure here a genuinely rare, near-
+// untestable edge case — not a template to copy for the non-git/general path.
 function getFastBrowseableRootEntryCount(repoPath: string): number {
   try {
     return readdirSync(repoPath, { withFileTypes: true })
@@ -1745,6 +1756,11 @@ export function cloneRepositoryInto(parentPath: string, name: string, repository
   return targetPath
 }
 
+// The readdirSync call below is deliberately unguarded — do not wrap it in a try/catch that
+// returns [] on failure. This feeds both /api/tree directly and getBrowseableRootEntryCount's
+// RepoInfo.rootEntryCount; swallowing a real read failure to an empty array would make it
+// indistinguishable from a genuinely empty folder (the exact bug this function must not
+// reintroduce). Let it propagate to the global onError handler (src/server.ts) instead.
 export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: string = ''): TreeNode[] {
   const normalized = normalizeRepoRelativePath(subpath)
   const dirPath = normalized ? resolveSafeRepoPath(repoPath, normalized) : repoPath

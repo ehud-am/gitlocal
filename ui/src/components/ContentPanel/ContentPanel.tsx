@@ -962,6 +962,14 @@ export default function ContentPanel({
       )
     }
 
+    if (isDirectoryError) {
+      return (
+        <div {...panelProps()}>
+          <p ref={setSelectionRoot} style={{ color: '#cf222e' }}>Failed to load this folder&apos;s contents.</p>
+        </div>
+      )
+    }
+
     return renderDirectoryList('', visibleDirectoryEntries)
   }
 
@@ -970,6 +978,13 @@ export default function ContentPanel({
       return (
         <div {...panelProps()}>
           <p ref={setSelectionRoot} style={{ color: '#cf222e' }}>This local-only folder is no longer available.</p>
+        </div>
+      )
+    }
+    if (isDirectoryError) {
+      return (
+        <div {...panelProps()}>
+          <p ref={setSelectionRoot} style={{ color: '#cf222e' }}>Failed to load this folder&apos;s contents.</p>
         </div>
       )
     }

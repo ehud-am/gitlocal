@@ -104,12 +104,25 @@ interface BranchSwitchDialogState {
   response: BranchSwitchResponse
 }
 
-function ErrorScreen({ title, description }: { title: string; description: string }) {
+function ErrorScreen({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description: string
+  action?: { label: string; onClick: () => void }
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-6 py-12">
       <div className="w-full max-w-lg rounded-md border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
         <h2 className="text-xl font-semibold text-[var(--foreground)]">{title}</h2>
         <p className="mt-2 text-sm text-[var(--muted-foreground)]">{description}</p>
+        {action ? (
+          <Button type="button" variant="secondary" className="mt-4" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        ) : null}
       </div>
     </div>
   )
@@ -180,8 +193,9 @@ export default function App() {
   const lastRevisionRef = useRef('')
   const nativeRefreshPendingRef = useRef(false)
   const startupOpenTargetAppliedRef = useRef('')
+  const startupFolderFallbackAppliedRef = useRef(false)
 
-  const { data: baseInfo, isLoading } = useQuery({
+  const { data: baseInfo, isLoading, isError: isInfoError, error: infoError } = useQuery({
     queryKey: ['info'],
     queryFn: api.getInfo,
   })
@@ -189,6 +203,11 @@ export default function App() {
   const { data: startupOpenTargetResponse, isFetched: startupOpenTargetFetched } = useQuery({
     queryKey: ['startup-open-target'],
     queryFn: api.getStartupOpenTarget,
+  })
+
+  const { data: startupFolderResponse } = useQuery({
+    queryKey: ['startup-folder'],
+    queryFn: api.getStartupFolder,
   })
 
   const { data: gitContext } = useQuery({
@@ -590,6 +609,15 @@ export default function App() {
 
     applyOpenFailure(target.message || 'GitLocal could not open the requested startup file.', true)
   }, [applyAcceptedOpenTarget, applyOpenFailure, info, invalidateWorkspaceQueries, startupOpenTargetFetched, startupOpenTargetResponse])
+
+  useEffect(() => {
+    if (startupFolderFallbackAppliedRef.current) return
+    if (!info || info.pickerMode) return
+    const fallbackReason = startupFolderResponse?.fallbackReason
+    if (!fallbackReason) return
+    startupFolderFallbackAppliedRef.current = true
+    setStatusMessage(fallbackReason)
+  }, [info, startupFolderResponse])
 
   const showDefaultReaderPrompt =
     nativeDefaultReaderAvailable
@@ -1037,6 +1065,21 @@ export default function App() {
 
   if (isLoading) {
     return <ErrorScreen title="Loading repository..." description="GitLocal is checking the current launch context." />
+  }
+
+  if (isInfoError) {
+    return (
+      <ErrorScreen
+        title="GitLocal couldn't load this workspace"
+        description={getErrorMessage(infoError, 'Something went wrong while checking the current launch context.')}
+        action={{
+          label: 'Try again',
+          onClick: () => {
+            queryClient.invalidateQueries({ queryKey: ['info'] }).catch(() => {})
+          },
+        }}
+      />
+    )
   }
 
   if (info?.pickerMode) {

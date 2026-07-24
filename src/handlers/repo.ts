@@ -24,11 +24,10 @@ import {
   syncCurrentBranchWithRemote,
   validateRepo,
 } from '../git/repo.js'
-import { getStartupOpenTarget, setPickerPath, setRepoPath } from '../server.js'
+import { getStartupFolderResolution, getStartupOpenTarget, setPickerPath, setRepoPath } from '../server.js'
 import {
   readDefaultReaderPreference,
   rememberStartupFolder,
-  resolveStartupFolder,
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
@@ -69,7 +68,7 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
 }
 
 export async function startupFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  return c.json(resolveStartupFolder())
+  return c.json(getStartupFolderResolution())
 }
 
 export async function startupFolderUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

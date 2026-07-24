@@ -191,4 +191,29 @@ describe('api client viewer usability endpoints', () => {
       }),
     })
   })
+
+  it('surfaces the structured error/code fields from a failed request instead of a generic message', async () => {
+    fetchMock.mockResolvedValueOnce(mockJsonResponse({
+      error: 'Permission was denied while accessing this path.',
+      code: 'PERMISSION_DENIED',
+    }, false))
+
+    await expect(api.getInfo()).rejects.toEqual({
+      error: 'Permission was denied while accessing this path.',
+      code: 'PERMISSION_DENIED',
+    })
+  })
+
+  it('falls back to a generic UNKNOWN error when a failed response has no parseable JSON body', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Internal Server Error',
+      json: async () => { throw new Error('not JSON') },
+    } as unknown as Response)
+
+    await expect(api.getInfo()).rejects.toEqual({
+      error: 'Internal Server Error',
+      code: 'UNKNOWN',
+    })
+  })
 })

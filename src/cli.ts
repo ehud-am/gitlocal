@@ -14,12 +14,24 @@ function checkNodeVersion(): void {
   }
 }
 
+function reportBrowserOpenFailure(url: string): void {
+  // Non-fatal, but the user needs an explicit next step — the "gitlocal listening on ..."
+  // line above is easy to miss, and without this nothing else on screen tells them what to do.
+  console.log(`GitLocal could not open a browser automatically. Open ${url} in your browser to continue.`)
+}
+
 async function openBrowser(url: string): Promise<void> {
   try {
     const { default: open } = await import('open')
-    await open(url)
+    const subprocess = await open(url)
+    // `open()`'s default (non-`wait`) mode resolves with a bare ChildProcess and attaches no
+    // error listener of its own — an async spawn failure (e.g. no browser opener installed)
+    // would otherwise be an unhandled 'error' event that crashes this entire server process,
+    // not just a failed browser-open. This listener is what actually makes the try/catch above
+    // meaningful for that failure mode, which is asynchronous and happens after `open()` returns.
+    subprocess.once('error', () => reportBrowserOpenFailure(url))
   } catch {
-    // Non-fatal — user can open browser manually
+    reportBrowserOpenFailure(url)
   }
 }
 
@@ -53,6 +65,11 @@ async function main(): Promise<void> {
   const app = createApp(launchPath, {
     detectCurrentRepoOnEmptyPath: true,
     initialOpenSource: explicitFileLaunch ? 'explicit-launch' : undefined,
+    // Captured now, before rememberStartupFolder (below) overwrites the "last used" preference
+    // this resolution was computed from — otherwise /api/startup-folder would recompute fresh
+    // from the already-mutated file and the fallbackReason (e.g. "your last folder is gone")
+    // would be lost before the UI ever gets a chance to fetch and show it.
+    startupFolderResolution: startupFolder ?? undefined,
   })
   const startupTarget = getStartupOpenTarget()
   if (startupTarget?.status === 'accepted' && getRepoPath()) {

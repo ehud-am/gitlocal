@@ -415,6 +415,20 @@ describe('App logic', () => {
     })
   })
 
+  it('shows the plain-folder (non-git) empty landing state', async () => {
+    readViewerState.mockReturnValue(buildViewerState())
+    vi.mocked(api.getInfo).mockResolvedValueOnce(buildInfo({
+      isGitRepo: false,
+      currentBranch: '',
+      rootEntryCount: 0,
+    }))
+
+    renderApp()
+
+    await screen.findByTestId('content-props')
+    expect(screen.getByTestId('content-props')).toHaveTextContent('This folder is ready for a first file')
+  })
+
   it('clears an unavailable branch and handles repositories with no commits', async () => {
     readViewerState.mockReturnValue(buildViewerState({ branch: 'missing' }))
     vi.mocked(api.getBranches).mockResolvedValueOnce([

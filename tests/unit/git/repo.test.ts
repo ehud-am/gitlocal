@@ -575,6 +575,33 @@ describe('classifyLocalPath', () => {
       cleanup()
     }
   })
+
+  it('propagates a realpath resolution failure instead of silently substituting a fallback path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-realpath-race-'))
+    try {
+      vi.resetModules()
+      const realpathSyncMock = vi.fn(() => {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+      })
+      vi.doMock('node:fs', async () => {
+        const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+        return {
+          ...actual,
+          realpathSync: realpathSyncMock,
+        }
+      })
+
+      // Regression guard: must throw (so the global onError handler can classify it),
+      // never reclassify the failure into a normal-looking result (e.g. 'missing' or a substituted path).
+      const { classifyLocalPath: classifyLocalPathWithMockedRealpath } = await import('../../../src/git/repo.js?realpath-race')
+      expect(() => classifyLocalPathWithMockedRealpath(dir)).toThrow(
+        expect.objectContaining({ code: 'ENOENT' }),
+      )
+      expect(realpathSyncMock).toHaveBeenCalled()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('getInfo', () => {
@@ -990,6 +1017,23 @@ describe('working tree helpers', () => {
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
     } finally {
       cleanup()
+    }
+  })
+
+  it('propagates a directory read failure instead of silently returning an empty listing', () => {
+    if (process.platform === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const unreadableDir = mkdtempSync(join(tmpdir(), 'gitlocal-unreadable-listing-'))
+    chmodSync(unreadableDir, 0o000)
+    try {
+      // Regression guard: must throw (so the global onError handler can classify it),
+      // never swallow the failure into an empty array indistinguishable from a genuinely empty folder.
+      expect(() => listWorkingTreeDirectoryEntries(unreadableDir, '')).toThrow(
+        expect.objectContaining({ code: 'EACCES' }),
+      )
+    } finally {
+      chmodSync(unreadableDir, 0o755)
+      rmSync(unreadableDir, { recursive: true, force: true })
     }
   })
 

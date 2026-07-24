@@ -99,6 +99,26 @@ describe('ContentPanel', () => {
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
+  it('shows a failure message instead of an empty-folder message when the root listing fails to load', async () => {
+    vi.mocked(api.getTree).mockRejectedValue(new Error('boom'))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onBrowseParent={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/failed to load this folder's contents/i)).toBeInTheDocument()
+    expect(screen.queryByText(/does not have any visible files yet/i)).not.toBeInTheDocument()
+  })
+
   it('renders root dashboard sections with key, recent, changed, and raw browsing shortcuts', async () => {
     const onOpenPath = vi.fn()
     vi.mocked(api.getTree).mockResolvedValue([
@@ -1047,6 +1067,25 @@ describe('ContentPanel', () => {
     )
 
     expect(await screen.findByText(/local-only folder is no longer available/i)).toBeInTheDocument()
+  })
+
+  it('shows a failure message for a regular (non-local-only) folder whose listing fails to load', async () => {
+    vi.mocked(api.getTree).mockRejectedValue(new Error('boom'))
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        isGitRepo
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText(/failed to load this folder's contents/i)).toBeInTheDocument()
   })
 
   it('shows markdown renderer for markdown files', async () => {
