@@ -53,7 +53,7 @@
     "prepublishOnly": "npm run verify"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.13",
+    "@hono/node-server": "^2.0.11",
     "hono": "^4.12.23",
     "open": "^10.1.0"
   },
