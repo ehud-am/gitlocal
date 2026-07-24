@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.13 - 2026-07-24
 
 - Fixed GitLocal silently showing empty-looking content on startup instead of a clear error, across several distinct causes: an unreadable default or remembered folder, an invalid explicit launch path, and a query-retry pause that could get stuck indefinitely (especially in the macOS app's embedded browser).
 - Added a global server error handler so unexpected read failures surface as specific, plain-language messages (e.g. permission denied, not found) instead of a generic error or a blank screen.
