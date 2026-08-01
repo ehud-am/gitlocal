@@ -26,15 +26,6 @@ vi.mock('./services/theme', () => ({
   getInitialTheme: () => getInitialTheme(),
 }))
 
-vi.mock('./components/Breadcrumb/Breadcrumb', () => ({
-  default: ({ onNavigate }: { onNavigate: (path: string) => void }) => (
-    <div>
-      <button type="button" onClick={() => onNavigate('')}>breadcrumb-root</button>
-      <button type="button" onClick={() => onNavigate('docs')}>breadcrumb-docs</button>
-    </div>
-  ),
-}))
-
 vi.mock('./components/FileTree/FileTree', () => ({
   default: ({ onSelect }: { onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void }) => (
     <div>
@@ -591,9 +582,6 @@ describe('App branch coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'select-file-result' }))
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":"notes.txt"')
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"file"')
-
-    fireEvent.click(screen.getByRole('button', { name: 'breadcrumb-root' }))
-    expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPathType":"none"')
   })
 
   it('covers boundary dialog callbacks plus identity pending guards without header commit actions', async () => {

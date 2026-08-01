@@ -151,10 +151,10 @@ export default function RepoContextHeader({
   const repoSyncBadge = describeRepoSyncState(repoSync)
   const summaryLocalChangeCount = repoSummary?.statusSummary.localChangeCount
   const changeSummary = summaryLocalChangeCount ?? (trackedChangeCount + untrackedChangeCount)
+  const showSyncBadge = Boolean(repoSyncBadge) && !(repoSync?.mode === 'up-to-date' && changeSummary > 0)
   const isGitRepo = Boolean(info?.isGitRepo)
   const repoName = info?.name || (isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
-  const statusSummary = repoSummary?.statusSummary
   const homeEnabled = Boolean(repoLocation?.repositoryRootPath) && !repoLocation?.isRepositoryRoot
   const readmeEnabled = Boolean(repoLocation?.homeReadmePath)
 
@@ -172,7 +172,7 @@ export default function RepoContextHeader({
               </h1>
               {isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}
               {remote ? <MetaTag label="Remote" icon="remote" tone="neutral" compact /> : null}
-              {repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
+              {showSyncBadge && repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
               {changeSummary > 0 ? (
                 <MetaTag
                   label={`${changeSummary} local ${changeSummary === 1 ? 'change' : 'changes'}`}
@@ -223,8 +223,8 @@ export default function RepoContextHeader({
                   className="xl:hidden"
                   onClick={onNavigateHome}
                   disabled={!homeEnabled}
-                  aria-label="Home"
-                  title="Home"
+                  aria-label="Root"
+                  title="Root"
                 >
                   <HomeIcon />
                 </Button>
@@ -235,11 +235,11 @@ export default function RepoContextHeader({
                   className="hidden xl:inline-flex"
                   onClick={onNavigateHome}
                   disabled={!homeEnabled}
-                  aria-label="Home"
-                  title="Home"
+                  aria-label="Root"
+                  title="Root"
                 >
                   <HomeIcon />
-                  Home
+                  Root
                 </Button>
               </>
             ) : null}
@@ -308,31 +308,6 @@ export default function RepoContextHeader({
               </Button>
             ) : null}
           </div>
-        ) : null}
-
-        {isGitRepo && statusSummary ? (
-          <section className={`repo-status-summary repo-status-summary-${statusSummary.tone}`} aria-label="repository status summary">
-            <p>{statusSummary.text}</p>
-            <dl>
-              <div>
-                <dt>Branch</dt>
-                <dd>{repoSummary.branch || branch || 'current branch'}</dd>
-              </div>
-              <div>
-                <dt>Remote</dt>
-                <dd>{statusSummary.remoteLabel || 'Not configured'}</dd>
-              </div>
-              <div>
-                <dt>Local changes</dt>
-                <dd>{statusSummary.localChangeCount}</dd>
-              </div>
-            </dl>
-            {onOpenChangedFiles && statusSummary.localChangeCount > 0 ? (
-              <Button type="button" variant="secondary" size="sm" onClick={onOpenChangedFiles}>
-                Review changed files
-              </Button>
-            ) : null}
-          </section>
         ) : null}
 
         {changedFiles && changedFiles.items.length > 0 ? (

@@ -22,10 +22,6 @@ vi.mock('./services/theme', () => ({
   getInitialTheme: () => 'light',
 }))
 
-vi.mock('./components/Breadcrumb/Breadcrumb', () => ({
-  default: ({ path }: { path: string }) => <div data-testid="breadcrumb">{path}</div>,
-}))
-
 vi.mock('./components/FileTree/FileTree', () => ({
   default: ({ refreshToken }: { refreshToken: number }) => (
     <div data-testid="tree-refresh-token">{refreshToken}</div>

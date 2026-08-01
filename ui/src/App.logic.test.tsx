@@ -26,14 +26,6 @@ vi.mock('./services/theme', () => ({
   getInitialTheme: () => getInitialTheme(),
 }))
 
-vi.mock('./components/Breadcrumb/Breadcrumb', () => ({
-  default: ({ path, onNavigate }: { path: string; onNavigate: (path: string) => void }) => (
-    <button type="button" onClick={() => onNavigate('docs')} data-testid="breadcrumb">
-      breadcrumb:{path}
-    </button>
-  ),
-}))
-
 vi.mock('./components/FileTree/FileTree', () => ({
   default: ({ onSelect }: { onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void }) => (
     <div>

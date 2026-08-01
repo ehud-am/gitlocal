@@ -540,37 +540,6 @@ pre {
   text-decoration: underline;
 }
 
-.breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  padding: 0.75rem 1rem;
-  color: var(--muted-foreground);
-}
-
-.breadcrumb-sep {
-  color: var(--muted-foreground);
-}
-
-.breadcrumb-link {
-  cursor: pointer;
-  color: var(--primary);
-}
-
-.breadcrumb-link:hover,
-.breadcrumb-link:focus-visible {
-  text-decoration: underline;
-}
-
-.breadcrumb-current {
-  color: var(--foreground);
-  font-weight: 600;
-}
-
 .file-tree-shell {
   display: flex;
   height: 100%;
@@ -1258,7 +1227,6 @@ pre {
   gap: 0.5rem;
 }
 
-.content-readme-jump,
 .dotfile-toggle {
   display: inline-flex;
   min-height: 2rem;
@@ -1271,18 +1239,6 @@ pre {
   color: var(--foreground);
   font-size: 0.8125rem;
   line-height: 1;
-}
-
-.content-readme-jump {
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.content-readme-jump:hover,
-.content-readme-jump:focus-visible {
-  background: var(--muted);
-  text-decoration: none;
 }
 
 .dotfile-toggle input {
@@ -1321,68 +1277,6 @@ pre {
 .background-change-notice p {
   margin: 0;
   font-size: 0.9rem;
-}
-
-.repo-status-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--background);
-  padding: 0.75rem;
-}
-
-.repo-status-summary-warning {
-  border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
-  background: color-mix(in srgb, var(--warning-soft) 48%, var(--background));
-}
-
-.repo-status-summary-danger {
-  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
-  background: color-mix(in srgb, var(--danger) 8%, var(--background));
-}
-
-.repo-status-summary-info {
-  border-color: color-mix(in srgb, var(--accent-foreground) 36%, var(--border));
-  background: color-mix(in srgb, var(--accent) 45%, var(--background));
-}
-
-.repo-status-summary p {
-  flex: 1 1 20rem;
-  margin: 0;
-  color: var(--foreground);
-  font-size: 0.92rem;
-}
-
-.repo-status-summary dl {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0;
-}
-
-.repo-status-summary dl div {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  padding: 0.25rem 0.5rem;
-  font-size: 0.76rem;
-}
-
-.repo-status-summary dt {
-  color: var(--muted-foreground);
-  font-weight: 600;
-}
-
-.repo-status-summary dd {
-  margin: 0;
-  color: var(--foreground);
 }
 
 .changed-files-panel {

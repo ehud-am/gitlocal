@@ -261,9 +261,7 @@ describe('RepoContextHeader', () => {
     expect(onCloseChangedFiles).toHaveBeenCalledTimes(1)
   })
 
-  it('renders a plain-language repository status summary with supporting facts', () => {
-    const onOpenChangedFiles = vi.fn()
-
+  it('surfaces the repo summary local change count as a tag instead of a status summary box', () => {
     render(
       <RepoContextHeader
         info={{
@@ -305,18 +303,12 @@ describe('RepoContextHeader', () => {
           visibility: { generatedLocalMode: 'hide', hiddenCount: 3 },
         }}
         onBranchChange={vi.fn()}
-        onOpenChangedFiles={onOpenChangedFiles}
       />,
     )
 
-    const summary = screen.getByRole('region', { name: /repository status summary/i })
-    expect(summary).toHaveTextContent('main is 1 commit behind origin/main')
-    expect(summary).toHaveTextContent('Branchmain')
-    expect(summary).toHaveTextContent('Remoteorigin')
-    expect(summary).toHaveTextContent('Local changes2')
-    expect(screen.queryByRole('button', { name: /^changed files$/i })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /review changed files/i }))
-    expect(onOpenChangedFiles).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('region', { name: /repository status summary/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/main is 1 commit behind origin\/main/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/2 local changes/i)).toBeInTheDocument()
   })
 
   it('renders a closeable empty changed-files state after review', () => {
@@ -436,11 +428,48 @@ describe('RepoContextHeader', () => {
 
     expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveTextContent('remote-only')
     expect(screen.getByText(/3 local changes/i)).toBeInTheDocument()
+    expect(screen.queryByText(/up to date/i)).not.toBeInTheDocument()
     expect(screen.getByText(/git user is not configured/i)).toBeInTheDocument()
     expect(screen.queryByText(/tracking the upstream branch\./i)).not.toBeInTheDocument()
     expect(screen.getByText('No remote configured')).toBeInTheDocument()
     expect(screen.queryByText('Remote path')).not.toBeInTheDocument()
     expect(screen.queryByText('Repository actions')).not.toBeInTheDocument()
+  })
+
+  it('shows the Up to date tag when there are no local changes to report', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        repoSync={{
+          mode: 'up-to-date',
+          aheadCount: 0,
+          behindCount: 0,
+          hasUpstream: true,
+          upstreamRef: 'origin/main',
+          remoteName: 'origin',
+        }}
+        trackedChangeCount={0}
+        untrackedChangeCount={0}
+        onBranchChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/up to date/i)).toBeInTheDocument()
+    expect(screen.queryByText(/local change/i)).not.toBeInTheDocument()
   })
 
   it('renders an enabled Parent Folder button and invokes onNavigateParent when clicked', () => {
@@ -561,7 +590,7 @@ describe('RepoContextHeader', () => {
       />,
     )
 
-    const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+    const homeButtons = screen.getAllByRole('button', { name: 'Root' })
     expect(homeButtons).toHaveLength(2)
     homeButtons.forEach((button) => expect(button).toBeEnabled())
     fireEvent.click(homeButtons[0])
@@ -604,7 +633,7 @@ describe('RepoContextHeader', () => {
       />,
     )
 
-    screen.getAllByRole('button', { name: 'Home' }).forEach((button) => expect(button).toBeDisabled())
+    screen.getAllByRole('button', { name: 'Root' }).forEach((button) => expect(button).toBeDisabled())
     screen.getAllByRole('button', { name: 'Readme' }).forEach((button) => expect(button).toBeDisabled())
   })
 
@@ -632,7 +661,7 @@ describe('RepoContextHeader', () => {
       />,
     )
 
-    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Root' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Readme' })).not.toBeInTheDocument()
   })
 })

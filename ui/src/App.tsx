@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
-import Breadcrumb from './components/Breadcrumb/Breadcrumb'
 import ContentPanel from './components/ContentPanel/ContentPanel'
 import FileTree from './components/FileTree/FileTree'
 import PickerPage from './components/Picker/PickerPage'
@@ -1349,11 +1348,6 @@ export default function App() {
                   />
                 </div>
               ) : null}
-
-              <Breadcrumb
-                path={visibleSelectedPath}
-                onNavigate={(path) => handleSelectFolder(path)}
-              />
 
               <div className="min-h-0 flex-1 overflow-hidden">
                 {startupOpenTargetBlocksSavedSelection ? (

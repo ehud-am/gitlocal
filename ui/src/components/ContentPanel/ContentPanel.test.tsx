@@ -214,7 +214,6 @@ describe('ContentPanel', () => {
     expect(screen.queryByRole('tablist', { name: /folder views/i })).not.toBeInTheDocument()
     const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
     const readmeRegion = await screen.findByRole('region', { name: /folder readme/i })
-    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
     expect(directoryTable.compareDocumentPosition(readmeRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(await screen.findByRole('heading', { name: 'Root readme' }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /repository dashboard/i })).not.toBeInTheDocument()
@@ -242,7 +241,6 @@ describe('ContentPanel', () => {
 
     expect(screen.queryByRole('tablist', { name: /folder views/i })).not.toBeInTheDocument()
     expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
     expect(await screen.findByRole('heading', { name: 'Plain folder readme' })).toBeInTheDocument()
   })
 
@@ -991,7 +989,6 @@ describe('ContentPanel', () => {
     const directoryTable = await screen.findByRole('table', { name: /contents of docs/i })
     const readmeRegion = await screen.findByRole('region', { name: /folder readme/i })
     expect(directoryTable.compareDocumentPosition(readmeRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('link', { name: /readme/i })).toHaveAttribute('href', '#folder-readme')
     expect(await screen.findByRole('heading', { name: 'Folder readme' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'docs/README.md' })).toBeInTheDocument()
   })
