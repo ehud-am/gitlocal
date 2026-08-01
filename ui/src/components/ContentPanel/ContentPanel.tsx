@@ -678,11 +678,6 @@ export default function ContentPanel({
                 </div>
               </div>
               <div className="content-directory-controls">
-                {directoryReadmePath ? (
-                  <a className="content-readme-jump" href="#folder-readme">
-                    README
-                  </a>
-                ) : null}
                 <label className="dotfile-toggle">
                   <input
                     type="checkbox"

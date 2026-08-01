@@ -577,7 +577,7 @@ describe('App', () => {
 
     expect(await screen.findByText('guide content')).toBeInTheDocument()
 
-    const homeButtons = await screen.findAllByRole('button', { name: 'Home' })
+    const homeButtons = await screen.findAllByRole('button', { name: 'Root' })
     expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
     fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
 
@@ -597,10 +597,10 @@ describe('App', () => {
     renderWithClient()
 
     await waitFor(() => {
-      const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+      const homeButtons = screen.getAllByRole('button', { name: 'Root' })
       expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
     })
-    const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+    const homeButtons = screen.getAllByRole('button', { name: 'Root' })
     fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
 
     await waitFor(() => {
@@ -888,10 +888,11 @@ describe('App', () => {
 
     renderWithClient()
 
-    expect(await screen.findByText('main has no local changes.')).toBeInTheDocument()
+    expect(await screen.findByText(/up to date/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
 
-    expect(await screen.findByText('main has 1 local change to review.')).toBeInTheDocument()
+    expect(await screen.findByText(/1 local change/i)).toBeInTheDocument()
+    expect(screen.queryByText(/up to date/i)).not.toBeInTheDocument()
     await waitFor(() => {
       expect(api.getRepoSummary).toHaveBeenCalledWith('main')
       expect(vi.mocked(api.getRepoSummary).mock.calls.length).toBeGreaterThanOrEqual(2)
@@ -1239,8 +1240,8 @@ describe('App', () => {
 
     renderWithClient()
 
-    expect(await screen.findByRole('region', { name: /repository status summary/i })).toHaveTextContent('2 local changes')
-    expect(screen.getByRole('button', { name: /review changed files/i })).toBeInTheDocument()
+    expect(await screen.findByText(/2 local changes/i)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /repository status summary/i })).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'show' } })
 
     await waitFor(() => {

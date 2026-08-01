@@ -32,9 +32,8 @@ describe('global responsive layout styles', () => {
     expect(css).toContain('white-space: pre-wrap')
   })
 
-  it('defines compact folder page controls for README jump links and dotfile filtering', () => {
+  it('defines compact folder page controls for dotfile filtering', () => {
     expect(css).toContain('.content-directory-controls')
-    expect(css).toContain('.content-readme-jump')
     expect(css).toContain('.dotfile-toggle')
     expect(css).toContain('min-height: 2rem')
     expect(css).toContain('.content-no-readme-panel')
