@@ -564,7 +564,7 @@ describe('App', () => {
     expect(api.showParentFolder).not.toHaveBeenCalled()
   })
 
-  it('navigates to the repository root when the Home button is clicked from a nested sub-repository location', async () => {
+  it('navigates to the repository root when the Root button is clicked from a nested sub-repository location', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
     vi.mocked(api.getRepoLocation).mockResolvedValue({
       repositoryRootPath: '/tmp/repo/docs',
@@ -577,9 +577,9 @@ describe('App', () => {
 
     expect(await screen.findByText('guide content')).toBeInTheDocument()
 
-    const homeButtons = await screen.findAllByRole('button', { name: 'Root' })
-    expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
-    fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
+    const rootButtons = await screen.findAllByRole('button', { name: 'Root' })
+    expect(rootButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+    fireEvent.click(rootButtons.find((button) => !button.hasAttribute('disabled'))!)
 
     await waitFor(() => {
       expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
@@ -597,11 +597,11 @@ describe('App', () => {
     renderWithClient()
 
     await waitFor(() => {
-      const homeButtons = screen.getAllByRole('button', { name: 'Root' })
-      expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+      const rootButtons = screen.getAllByRole('button', { name: 'Root' })
+      expect(rootButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
     })
-    const homeButtons = screen.getAllByRole('button', { name: 'Root' })
-    fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
+    const rootButtons = screen.getAllByRole('button', { name: 'Root' })
+    fireEvent.click(rootButtons.find((button) => !button.hasAttribute('disabled'))!)
 
     await waitFor(() => {
       expect(api.getTree).toHaveBeenCalledWith('', 'main')
