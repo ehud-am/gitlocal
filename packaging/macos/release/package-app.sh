@@ -31,7 +31,13 @@ cp -R "${ROOT_DIR}/ui/dist" "${GITLOCAL_RESOURCES}/ui/dist"
 cp "${ROOT_DIR}/package.json" "${GITLOCAL_RESOURCES}/package.json"
 
 NODE_PATH="$(command -v node)"
+NODE_LIB_PATH="$(dirname "${NODE_PATH}")/../lib/libnode.$(node -p 'process.versions.modules').dylib"
+if [[ ! -f "${NODE_LIB_PATH}" ]]; then
+  echo "Unable to locate the Node shared library at ${NODE_LIB_PATH}" >&2
+  exit 1
+fi
 cp "${NODE_PATH}" "${RUNTIME_RESOURCES}/node"
+cp "${NODE_LIB_PATH}" "${RUNTIME_RESOURCES}/$(basename "${NODE_LIB_PATH}")"
 chmod +x "${RUNTIME_RESOURCES}/node"
 
 mkdir -p "${SWIFT_MODULE_CACHE}"
