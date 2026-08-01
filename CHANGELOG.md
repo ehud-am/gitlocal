@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.9.14 - 2026-08-01
 
 - Replaced the synthetic ".." row in folder listings with a dedicated "Parent Folder" toolbar button, available in folder listing, file view, and file edit modes, and visibly disabled (not hidden) at the true filesystem root.
-- Added a "Home" toolbar button (visible inside git repositories) that jumps directly to the nearest enclosing repository's home folder in one click, correctly targeting a nested sub-repository's own root when applicable.
-- Added a "Readme" toolbar button (visible inside git repositories) that always opens the repository's home README, disabled when the home folder has no README.
+- Added a "Root" toolbar button (visible inside git repositories) that jumps directly to the nearest enclosing repository's root folder in one click, correctly targeting a nested sub-repository's own root when applicable.
+- Added a "Readme" toolbar button (visible inside git repositories) that always opens the repository's root README, disabled when the root folder has no README.
+- Removed the standalone breadcrumb and repository-status-summary boxes; the local-changes count now appears as a compact tag alongside the other repository tags, mutually exclusive with the "Up to date" tag.
+- Removed a duplicate "Readme" jump-link that appeared next to the dotfile-visibility toggle.
+- Fixed insufficient text contrast on the light-blue "local changes" tag in dark mode (was 3.21:1, now 4.62:1, meeting WCAG AA).
 
 ## 0.9.13 - 2026-07-24
 

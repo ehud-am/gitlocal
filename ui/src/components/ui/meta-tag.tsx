@@ -75,7 +75,7 @@ function iconFor(name: MetaTagIcon): ReactNode {
 
 const toneClassNames: Record<MetaTagTone, string> = {
   neutral: 'bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] text-[var(--muted-foreground)] ring-1 ring-inset ring-[var(--border)]',
-  info: 'bg-[color-mix(in_srgb,var(--primary)_12%,transparent)] text-[color-mix(in_srgb,var(--primary)_88%,black)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--primary)_26%,transparent)]',
+  info: 'bg-[color-mix(in_srgb,var(--primary)_12%,transparent)] text-[color-mix(in_srgb,var(--primary)_88%,var(--foreground))] ring-1 ring-inset ring-[color-mix(in_srgb,var(--primary)_26%,transparent)]',
   success: 'bg-[color-mix(in_srgb,#1a7f37_12%,transparent)] text-[#176c31] ring-1 ring-inset ring-[color-mix(in_srgb,#1a7f37_24%,transparent)]',
   warning: 'bg-[color-mix(in_srgb,#9a6700_14%,transparent)] text-[#8a5d00] ring-1 ring-inset ring-[color-mix(in_srgb,#9a6700_24%,transparent)]',
   danger: 'bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--danger)_24%,transparent)]',
