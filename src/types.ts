@@ -345,6 +345,17 @@ export interface LocalActionResponse {
   message?: string
 }
 
+export interface RepoLocationResponse {
+  /** Absolute filesystem path of the nearest enclosing git repository's root for `path`, or '' if `path` is not inside any git repository. */
+  repositoryRootPath: string
+  /** True when `path` (resolved to an absolute path) IS repositoryRootPath — i.e. the user is already at the repo home folder. */
+  isRepositoryRoot: boolean
+  /** Repo-relative path (relative to repositoryRootPath, NOT the globally opened repoPath) of the README directly in repositoryRootPath, or '' if none exists. */
+  homeReadmePath: string
+  /** True when going up one level from the CURRENT absolute location (opened repoPath + path) would go above the true filesystem root. */
+  atFilesystemRoot: boolean
+}
+
 export interface FolderBrowseEntry {
   name: string
   path: string

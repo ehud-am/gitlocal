@@ -80,7 +80,11 @@ describe('ContentPanel', () => {
     vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
   })
 
-  it('shows the root directory table with a parent-scope row when no file is selected', async () => {
+  it('shows the root directory table without a synthetic parent-scope row when no file is selected', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
     const { container } = renderWithClient(
       <ContentPanel
         canMutateFiles={false}
@@ -90,12 +94,12 @@ describe('ContentPanel', () => {
         branch="main"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
-        onBrowseParent={vi.fn()}
       />,
     )
     expect(await screen.findByRole('table', { name: /current folder contents/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open parent folder outside this repository/i })).toBeInTheDocument()
-    expect(screen.getByText(/does not have any visible files yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open parent folder outside this repository/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open parent folder \.\./i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file readme\.md/i })).toBeInTheDocument()
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
@@ -111,7 +115,6 @@ describe('ContentPanel', () => {
         branch="main"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
-        onBrowseParent={vi.fn()}
       />,
     )
 
@@ -1883,9 +1886,7 @@ describe('ContentPanel', () => {
     expect(await screen.findByText('No README found in this repository.')).toBeInTheDocument()
   })
 
-  it('renders a structured landing state with title, detail, and the root parent row', async () => {
-    const onBrowseParent = vi.fn()
-
+  it('renders a structured landing state with title and detail, and no synthetic parent row', async () => {
     renderWithClient(
       <ContentPanel
         canMutateFiles
@@ -1901,7 +1902,6 @@ describe('ContentPanel', () => {
         emptyStateActions={[
           { label: 'Create first file', action: 'create-file' },
         ]}
-        onBrowseParent={onBrowseParent}
       />,
     )
 
@@ -1910,8 +1910,7 @@ describe('ContentPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /create first file/i }))
     expect(screen.getByLabelText(/new file path/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /back to viewer/i }))
-    fireEvent.click(screen.getByRole('button', { name: /open parent folder outside this repository/i }))
-    expect(onBrowseParent).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /open parent folder outside this repository/i })).not.toBeInTheDocument()
   })
 
   it('relative link in MarkdownRenderer calls onNavigate', async () => {

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Replaced the synthetic ".." row in folder listings with a dedicated "Parent Folder" toolbar button, available in folder listing, file view, and file edit modes, and visibly disabled (not hidden) at the true filesystem root.
+- Added a "Home" toolbar button (visible inside git repositories) that jumps directly to the nearest enclosing repository's home folder in one click, correctly targeting a nested sub-repository's own root when applicable.
+- Added a "Readme" toolbar button (visible inside git repositories) that always opens the repository's home README, disabled when the home folder has no README.
+
 ## 0.9.13 - 2026-07-24
 
 - Fixed GitLocal silently showing empty-looking content on startup instead of a clear error, across several distinct causes: an unreadable default or remembered folder, an invalid explicit launch path, and a query-retry pause that could get stuck indefinitely (especially in the macOS app's embedded browser).

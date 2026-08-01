@@ -425,6 +425,184 @@ describe('repository viewer usability handlers', () => {
   })
 })
 
+describe('repositoryParentFolderHandler', () => {
+  it('returns 400-style ok:false when no repository is currently open', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: false, error: 'No repository is currently open' })
+  })
+
+  it('opens the parent folder in picker mode for a non-root repository path', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    const nested = join(dir, 'docs')
+    mkdirSync(nested)
+    writeFileSync(join(nested, 'guide.md'), '# Guide')
+
+    try {
+      const app = createApp(nested)
+      const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true, error: '' })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('refuses to navigate above the true filesystem root', async () => {
+    const app = createApp('/')
+    const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: 'GitLocal is already at the root of the file system.',
+    })
+  })
+})
+
+describe('repositoryLocationHandler', () => {
+  it('returns the zero-value shape when no repository is currently open', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      repositoryRootPath: '',
+      isRepositoryRoot: false,
+      homeReadmePath: '',
+      atFilesystemRoot: false,
+    })
+  })
+
+  it('resolves the opened repository root itself as isRepositoryRoot with its home README', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string; atFilesystemRoot: boolean }
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(dir))
+      expect(body.isRepositoryRoot).toBe(true)
+      expect(body.homeReadmePath).toBe('README.md')
+      expect(body.atFilesystemRoot).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('resolves a subfolder of the opened repository as not-root, with the same home README', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    const nested = join(dir, 'docs')
+    mkdirSync(nested)
+    writeFileSync(join(nested, 'guide.md'), '# Guide')
+
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location?path=docs'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(dir))
+      expect(body.isRepositoryRoot).toBe(false)
+      expect(body.homeReadmePath).toBe('README.md')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('targets the nearest enclosing nested sub-repository, not the outer repository', async () => {
+    const outer = makeGitRepo()
+    const innerDir = join(outer.dir, 'vendor', 'inner-repo')
+    mkdirSync(innerDir, { recursive: true })
+    spawnSync('git', ['init'], { cwd: innerDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: innerDir })
+    spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: innerDir })
+    writeFileSync(join(innerDir, 'README.md'), '# Inner')
+    spawnSync('git', ['add', '.'], { cwd: innerDir })
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: innerDir })
+
+    try {
+      const app = createApp(outer.dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location?path=vendor/inner-repo'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(innerDir))
+      expect(body.isRepositoryRoot).toBe(true)
+      expect(body.homeReadmePath).toBe('README.md')
+    } finally {
+      outer.cleanup()
+    }
+  })
+
+  it('returns the zero-value shape for a path that is not inside any git repository', async () => {
+    const outer = makeGitRepo()
+    const plainFolder = join(outer.dir, 'vendor', 'plain-folder')
+    mkdirSync(plainFolder, { recursive: true })
+
+    try {
+      const app = createApp(outer.dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location?path=vendor/plain-folder'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string; atFilesystemRoot: boolean }
+      expect(body.repositoryRootPath).not.toBe('')
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(outer.dir))
+    } finally {
+      outer.cleanup()
+    }
+  })
+
+  it('returns an empty homeReadmePath when the resolved repository root has no README', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-location-no-readme-'))
+    spawnSync('git', ['init'], { cwd: dir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir })
+    spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: dir })
+    writeFileSync(join(dir, 'notes.txt'), 'no readme here')
+    spawnSync('git', ['add', '.'], { cwd: dir })
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
+
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
+      expect(body.isRepositoryRoot).toBe(true)
+      expect(body.homeReadmePath).toBe('')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('is reachable and returns 200 for both a git-repo path and a non-git path', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    const plain = mkdtempSync(join(tmpdir(), 'gitlocal-location-plain-'))
+
+    try {
+      const repoApp = createApp(dir)
+      const repoRes = await repoApp.fetch(new Request('http://localhost/api/repo/location'))
+      expect(repoRes.status).toBe(200)
+
+      const plainApp = createApp(plain)
+      const plainRes = await plainApp.fetch(new Request('http://localhost/api/repo/location'))
+      expect(plainRes.status).toBe(200)
+      expect(await plainRes.json()).toEqual({
+        repositoryRootPath: '',
+        isRepositoryRoot: false,
+        homeReadmePath: '',
+        atFilesystemRoot: false,
+      })
+    } finally {
+      cleanup()
+      rmSync(plain, { recursive: true, force: true })
+    }
+  })
+
+  it('reports atFilesystemRoot when the opened root is the true filesystem root, even for a non-git folder', async () => {
+    const app = createApp('/')
+    const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { atFilesystemRoot: boolean }
+    expect(body.atFilesystemRoot).toBe(true)
+  })
+})
+
 describe('startup folder handlers', () => {
   it('returns the resolved startup folder', async () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-home-'))

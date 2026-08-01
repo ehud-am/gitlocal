@@ -578,6 +578,87 @@ describe('Server integration', () => {
     expect(infoBody.path).toBe(realpathSync(dirname(dir)))
   })
 
+  it('POST /api/repo/parent-folder refuses to navigate above the true filesystem root', async () => {
+    const app = createApp('/')
+    const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', {
+      method: 'POST',
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean; error: string }
+    expect(body.ok).toBe(false)
+    expect(body.error).toBe('GitLocal is already at the root of the file system.')
+  })
+
+  it('GET /api/repo/location returns the zero-value shape when no repository is open', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string; atFilesystemRoot: boolean }
+    expect(body).toEqual({ repositoryRootPath: '', isRepositoryRoot: false, homeReadmePath: '', atFilesystemRoot: false })
+  })
+
+  it('GET /api/repo/location resolves the opened repository root and its home README', async () => {
+    const app = createApp(dir)
+    const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string; atFilesystemRoot: boolean }
+    expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(dir))
+    expect(body.isRepositoryRoot).toBe(true)
+    expect(body.homeReadmePath).toMatch(/readme/i)
+    expect(body.atFilesystemRoot).toBe(false)
+  })
+
+  it('GET /api/repo/location resolves a nested sub-repository root, not the outer opened repository', async () => {
+    const outer = makeGitRepo()
+    const innerDir = join(outer.dir, 'vendor', 'inner-repo')
+
+    try {
+      mkdirSync(innerDir, { recursive: true })
+      spawnSync('git', ['init'], { cwd: innerDir })
+      spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: innerDir })
+      spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: innerDir })
+      writeFileSync(join(innerDir, 'README.md'), '# Inner Repo')
+      mkdirSync(join(innerDir, 'src'))
+      writeFileSync(join(innerDir, 'src', 'file.txt'), 'b')
+      spawnSync('git', ['add', '.'], { cwd: innerDir })
+      spawnSync('git', ['commit', '-m', 'init'], { cwd: innerDir })
+
+      const app = createApp(outer.dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location?path=vendor/inner-repo/src'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(innerDir))
+      expect(body.isRepositoryRoot).toBe(false)
+      expect(body.homeReadmePath).toBe('README.md')
+
+      const vendorRes = await app.fetch(new Request('http://localhost/api/repo/location?path=vendor'))
+      const vendorBody = await vendorRes.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
+      expect(realpathSync(vendorBody.repositoryRootPath)).toBe(realpathSync(outer.dir))
+      expect(vendorBody.isRepositoryRoot).toBe(false)
+    } finally {
+      outer.cleanup()
+    }
+  })
+
+  it('GET /api/repo/location reports no home README when the repository root has none', async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'gitlocal-location-no-readme-'))
+    spawnSync('git', ['init'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: emptyDir })
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: emptyDir })
+    writeFileSync(join(emptyDir, 'main.ts'), '')
+    spawnSync('git', ['add', '.'], { cwd: emptyDir })
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: emptyDir })
+
+    try {
+      const app = createApp(emptyDir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/location'))
+      const body = await res.json() as { repositoryRootPath: string; homeReadmePath: string }
+      expect(body.homeReadmePath).toBe('')
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
   it('POST /api/repo/open updates repo path', async () => {
     const app = createApp('')
     const res = await app.fetch(new Request('http://localhost/api/repo/open', {

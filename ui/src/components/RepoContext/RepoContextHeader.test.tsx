@@ -442,4 +442,197 @@ describe('RepoContextHeader', () => {
     expect(screen.queryByText('Remote path')).not.toBeInTheDocument()
     expect(screen.queryByText('Repository actions')).not.toBeInTheDocument()
   })
+
+  it('renders an enabled Parent Folder button and invokes onNavigateParent when clicked', () => {
+    const onNavigateParent = vi.fn()
+
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.4.9',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+        onNavigateParent={onNavigateParent}
+        parentFolderEnabled
+      />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Parent Folder' })
+    expect(buttons).toHaveLength(2)
+    buttons.forEach((button) => expect(button).toBeEnabled())
+    fireEvent.click(buttons[0])
+    expect(onNavigateParent).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the Parent Folder button when parentFolderEnabled is false', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.4.9',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+        onNavigateParent={vi.fn()}
+        parentFolderEnabled={false}
+      />,
+    )
+
+    screen.getAllByRole('button', { name: 'Parent Folder' }).forEach((button) => expect(button).toBeDisabled())
+  })
+
+  it('does not render the Parent Folder button when onNavigateParent is not provided', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/gitlocal',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.4.9',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Parent Folder' })).not.toBeInTheDocument()
+  })
+
+  it('renders Home and Readme buttons for a git repo, enabled per repoLocation, and invokes their handlers', () => {
+    const onNavigateHome = vi.fn()
+    const onNavigateReadme = vi.fn()
+
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/repo/vendor/inner-repo',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.4.9',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+        onNavigateHome={onNavigateHome}
+        onNavigateReadme={onNavigateReadme}
+        repoLocation={{
+          repositoryRootPath: '/tmp/repo/vendor/inner-repo',
+          isRepositoryRoot: false,
+          homeReadmePath: 'README.md',
+          atFilesystemRoot: false,
+        }}
+      />,
+    )
+
+    const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+    expect(homeButtons).toHaveLength(2)
+    homeButtons.forEach((button) => expect(button).toBeEnabled())
+    fireEvent.click(homeButtons[0])
+    expect(onNavigateHome).toHaveBeenCalledTimes(1)
+
+    const readmeButtons = screen.getAllByRole('button', { name: 'Readme' })
+    expect(readmeButtons).toHaveLength(2)
+    readmeButtons.forEach((button) => expect(button).toBeEnabled())
+    fireEvent.click(readmeButtons[0])
+    expect(onNavigateReadme).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables Home when already at the repository root and disables Readme when there is no home README', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'gitlocal',
+          path: '/tmp/repo',
+          currentBranch: 'main',
+          isGitRepo: true,
+          pickerMode: false,
+          version: '0.4.9',
+          hasCommits: true,
+          rootEntryCount: 2,
+          gitContext: null,
+        }}
+        branch="main"
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+        onNavigateHome={vi.fn()}
+        onNavigateReadme={vi.fn()}
+        repoLocation={{
+          repositoryRootPath: '/tmp/repo',
+          isRepositoryRoot: true,
+          homeReadmePath: '',
+          atFilesystemRoot: false,
+        }}
+      />,
+    )
+
+    screen.getAllByRole('button', { name: 'Home' }).forEach((button) => expect(button).toBeDisabled())
+    screen.getAllByRole('button', { name: 'Readme' }).forEach((button) => expect(button).toBeDisabled())
+  })
+
+  it('does not render Home or Readme buttons for a plain non-git folder even when handlers are provided', () => {
+    render(
+      <RepoContextHeader
+        info={{
+          name: 'notes',
+          path: '/tmp/notes',
+          currentBranch: '',
+          isGitRepo: false,
+          pickerMode: false,
+          version: '0.5.2',
+          hasCommits: false,
+          rootEntryCount: 1,
+          gitContext: null,
+        }}
+        branch=""
+        branches={[]}
+        selectedPath=""
+        selectedPathType="none"
+        onBranchChange={vi.fn()}
+        onNavigateHome={vi.fn()}
+        onNavigateReadme={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Readme' })).not.toBeInTheDocument()
+  })
 })
