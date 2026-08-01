@@ -16,6 +16,7 @@ vi.mock('./services/api', () => ({
     updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
     getReadme: vi.fn(),
+    getRepoLocation: vi.fn(),
     getSyncStatus: vi.fn(),
     showParentFolder: vi.fn(),
     getTree: vi.fn(),
@@ -194,6 +195,12 @@ describe('App', () => {
     vi.mocked(api.getReadme).mockImplementation(async (path?: string) => ({
       path: path === 'docs' ? 'docs/README.md' : 'README.md',
     }))
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo',
+      isRepositoryRoot: true,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    })
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
     vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
       if (path === 'docs') {
@@ -504,7 +511,7 @@ describe('App', () => {
     })
   })
 
-  it('opens an info modal before leaving the repository from the root .. row', async () => {
+  it('opens an info modal before leaving the repository from the Parent Folder toolbar button', async () => {
     vi.mocked(api.showParentFolder).mockResolvedValueOnce({
       ok: false,
       error: 'Parent folder unavailable.',
@@ -513,7 +520,8 @@ describe('App', () => {
 
     renderWithClient()
 
-    fireEvent.click(await screen.findByRole('button', { name: /open parent folder outside this repository/i }))
+    const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+    fireEvent.click(parentFolderButtons[0])
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: /leave this repository/i })).toBeInTheDocument()
@@ -521,6 +529,139 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(api.showParentFolder).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('disables the Parent Folder button when the current location is the filesystem root', async () => {
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo',
+      isRepositoryRoot: true,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: true,
+    })
+
+    renderWithClient()
+
+    const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+    await waitFor(() => {
+      parentFolderButtons.forEach((button) => expect(button).toBeDisabled())
+    })
+  })
+
+  it('navigates to the containing folder when the Parent Folder button is clicked from a selected file', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+
+    const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+    fireEvent.click(parentFolderButtons[0])
+
+    await waitFor(() => {
+      expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
+    })
+    expect(api.showParentFolder).not.toHaveBeenCalled()
+  })
+
+  it('navigates to the repository root when the Home button is clicked from a nested sub-repository location', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo/docs',
+      isRepositoryRoot: false,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+
+    const homeButtons = await screen.findAllByRole('button', { name: 'Home' })
+    expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+    fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
+
+    await waitFor(() => {
+      expect(api.getTree).toHaveBeenCalledWith('docs', 'main')
+    })
+  })
+
+  it('treats a repository root outside the viewer path as having no relative location', async () => {
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/other-repo',
+      isRepositoryRoot: false,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+      expect(homeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+    })
+    const homeButtons = screen.getAllByRole('button', { name: 'Home' })
+    fireEvent.click(homeButtons.find((button) => !button.hasAttribute('disabled'))!)
+
+    await waitFor(() => {
+      expect(api.getTree).toHaveBeenCalledWith('', 'main')
+    })
+  })
+
+  it('opens the home README when the Readme button is clicked', async () => {
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo',
+      isRepositoryRoot: true,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    })
+    vi.mocked(api.getFile).mockImplementation(async (path?: string) => ({
+      path: path ?? 'README.md',
+      type: 'text',
+      content: 'home readme content',
+      language: 'markdown',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-readme',
+    }))
+
+    renderWithClient()
+
+    await waitFor(() => {
+      const readmeButtons = screen.getAllByRole('button', { name: 'Readme' })
+      expect(readmeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+    })
+    const readmeButtons = screen.getAllByRole('button', { name: 'Readme' })
+    fireEvent.click(readmeButtons.find((button) => !button.hasAttribute('disabled'))!)
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
+    })
+    expect(await screen.findByText('home readme content')).toBeInTheDocument()
+  })
+
+  it('opens the nested sub-repository README, prefixed with its relative folder, when the Readme button is clicked', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo/docs',
+      isRepositoryRoot: false,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+
+    await waitFor(() => {
+      const readmeButtons = screen.getAllByRole('button', { name: 'Readme' })
+      expect(readmeButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true)
+    })
+    const readmeButtons = screen.getAllByRole('button', { name: 'Readme' })
+    fireEvent.click(readmeButtons.find((button) => !button.hasAttribute('disabled'))!)
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/README.md', 'main', false)
     })
   })
 

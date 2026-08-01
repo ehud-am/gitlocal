@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { BackgroundChangeNotice, Branch, ChangedFilesResponse, ChangedFileItem, RepoInfo, RepoSummaryResponse, RepoSyncState, ViewerPathType } from '../../types'
+import type { BackgroundChangeNotice, Branch, ChangedFilesResponse, ChangedFileItem, RepoInfo, RepoLocationResponse, RepoSummaryResponse, RepoSyncState, ViewerPathType } from '../../types'
 import { describeRepoSyncState } from '../../lib/sync'
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
@@ -26,6 +26,11 @@ interface Props {
   branchDisabled?: boolean
   syncActionLabel?: string
   branchSwitchDialog?: ReactNode
+  onNavigateParent?: () => void
+  parentFolderEnabled?: boolean
+  onNavigateHome?: () => void
+  repoLocation?: RepoLocationResponse
+  onNavigateReadme?: () => void
 }
 
 function buildDisplayPath(info?: RepoInfo, selectedPath?: string): string {
@@ -71,6 +76,46 @@ function EditIcon() {
   )
 }
 
+function ParentFolderIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M8 2 2 7v7h4V9.5h4V14h4V7L8 2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ReadmeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M3 2.5h6.5L13 6v7.5H3V2.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M5.5 8h5M5.5 10.5h5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export default function RepoContextHeader({
   info,
   branch,
@@ -91,6 +136,11 @@ export default function RepoContextHeader({
   onOpenChangedFile,
   branchDisabled = false,
   branchSwitchDialog,
+  onNavigateParent,
+  parentFolderEnabled = false,
+  onNavigateHome,
+  repoLocation,
+  onNavigateReadme,
 }: Props) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const displayPath = buildDisplayPath(info, selectedPath)
@@ -105,6 +155,8 @@ export default function RepoContextHeader({
   const repoName = info?.name || (isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
   const statusSummary = repoSummary?.statusSummary
+  const homeEnabled = Boolean(repoLocation?.repositoryRootPath) && !repoLocation?.isRepositoryRoot
+  const readmeEnabled = Boolean(repoLocation?.homeReadmePath)
 
   return (
     <section className="repo-context-header overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] shadow-sm">
@@ -133,6 +185,93 @@ export default function RepoContextHeader({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {onNavigateParent ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="xl:hidden"
+                  onClick={onNavigateParent}
+                  disabled={!parentFolderEnabled}
+                  aria-label="Parent Folder"
+                  title="Parent Folder"
+                >
+                  <ParentFolderIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="hidden xl:inline-flex"
+                  onClick={onNavigateParent}
+                  disabled={!parentFolderEnabled}
+                  aria-label="Parent Folder"
+                  title="Parent Folder"
+                >
+                  <ParentFolderIcon />
+                  Parent Folder
+                </Button>
+              </>
+            ) : null}
+            {isGitRepo && onNavigateHome ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="xl:hidden"
+                  onClick={onNavigateHome}
+                  disabled={!homeEnabled}
+                  aria-label="Home"
+                  title="Home"
+                >
+                  <HomeIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="hidden xl:inline-flex"
+                  onClick={onNavigateHome}
+                  disabled={!homeEnabled}
+                  aria-label="Home"
+                  title="Home"
+                >
+                  <HomeIcon />
+                  Home
+                </Button>
+              </>
+            ) : null}
+            {isGitRepo && onNavigateReadme ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="xl:hidden"
+                  onClick={onNavigateReadme}
+                  disabled={!readmeEnabled}
+                  aria-label="Readme"
+                  title="Readme"
+                >
+                  <ReadmeIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="hidden xl:inline-flex"
+                  onClick={onNavigateReadme}
+                  disabled={!readmeEnabled}
+                  aria-label="Readme"
+                  title="Readme"
+                >
+                  <ReadmeIcon />
+                  Readme
+                </Button>
+              </>
+            ) : null}
             {isGitRepo ? (
               <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">

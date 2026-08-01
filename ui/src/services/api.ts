@@ -25,6 +25,7 @@ import type {
   FolderInitRepositoryRequest,
   LocalActionResponse,
   RepoInfo,
+  RepoLocationResponse,
   RepoSummaryResponse,
   RemoteSyncResponse,
   SearchContentKind,
@@ -205,6 +206,14 @@ export const api = {
     if (branch) params.set('branch', branch)
     const qs = params.toString()
     return request(`/api/readme${qs ? '?' + qs : ''}`)
+  },
+
+  getRepoLocation: (path?: string, branch?: string): Promise<RepoLocationResponse> => {
+    const params = new URLSearchParams()
+    if (path) params.set('path', path)
+    if (branch) params.set('branch', branch)
+    const qs = params.toString()
+    return request(`/api/repo/location${qs ? '?' + qs : ''}`)
   },
 
   switchBranch: (payload: BranchSwitchRequest): Promise<BranchSwitchResponse> =>

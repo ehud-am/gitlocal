@@ -41,6 +41,7 @@ import type {
   NativeAppCommandEvent,
   NativeAppOutboundCommand,
   RepoInfo,
+  RepoLocationResponse,
   RepoSummaryResponse,
   RepoSyncState,
   SearchContentKind,
@@ -250,6 +251,12 @@ export default function App() {
     queryKey: ['navigation-hints', currentBranch, generatedLocalVisibility],
     queryFn: () => api.getNavigationHints(currentBranch, true, generatedLocalVisibility !== 'hide'),
     enabled: !!info?.isGitRepo && !hasRepoMismatch,
+  })
+
+  const { data: repoLocation } = useQuery<RepoLocationResponse>({
+    queryKey: ['repo-location', selectedPath, currentBranch],
+    queryFn: () => api.getRepoLocation(selectedPath, currentBranch),
+    enabled: !!info && !hasRepoMismatch,
   })
 
   useEffect(() => {
@@ -748,6 +755,33 @@ export default function App() {
   function handleBrowseParentRequest(): void {
     if (!confirmDiscardChanges()) return
     setShowRepoBoundaryDialog(true)
+  }
+
+  function handleNavigateParent(): void {
+    if (visibleSelectedPathType !== 'none' && visibleSelectedPath) {
+      handleSelectFolder(parentPathOf(visibleSelectedPath))
+      return
+    }
+    handleBrowseParentRequest()
+  }
+
+  function relativeToViewerRoot(absolutePath: string): string {
+    if (!viewerRepoPath || !absolutePath) return ''
+    if (absolutePath === viewerRepoPath) return ''
+    const prefix = viewerRepoPath.endsWith('/') ? viewerRepoPath : `${viewerRepoPath}/`
+    return absolutePath.startsWith(prefix) ? absolutePath.slice(prefix.length) : ''
+  }
+
+  function handleNavigateHome(): void {
+    if (!repoLocation?.repositoryRootPath) return
+    handleSelectFolder(relativeToViewerRoot(repoLocation.repositoryRootPath))
+  }
+
+  function handleNavigateReadme(): void {
+    if (!repoLocation?.repositoryRootPath || !repoLocation.homeReadmePath) return
+    const rootRelative = relativeToViewerRoot(repoLocation.repositoryRootPath)
+    const readmePath = rootRelative ? `${rootRelative}/${repoLocation.homeReadmePath}` : repoLocation.homeReadmePath
+    handleSelectFile(readmePath)
   }
 
   function handleDismissSearch() {
@@ -1265,6 +1299,11 @@ export default function App() {
                 onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}
+                onNavigateParent={handleNavigateParent}
+                parentFolderEnabled={!repoLocation?.atFilesystemRoot}
+                onNavigateHome={info?.isGitRepo ? handleNavigateHome : undefined}
+                repoLocation={repoLocation}
+                onNavigateReadme={info?.isGitRepo ? handleNavigateReadme : undefined}
                 branchSwitchDialog={
                   <BranchSwitchDialog
                     open={Boolean(branchSwitchState)}
@@ -1355,7 +1394,6 @@ export default function App() {
                     emptyStateTitle={emptyStateTitle}
                     emptyStateDetail={emptyStateDetail}
                     emptyStateActions={emptyStateActions}
-                    onBrowseParent={handleBrowseParentRequest}
                     raw={visibleShowRaw}
                     onRawChange={setShowRaw}
                     onStatusMessage={setStatusMessage}

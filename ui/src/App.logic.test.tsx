@@ -52,7 +52,6 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
     selectedPathSyncState?: string
     raw?: boolean
     emptyStateTitle?: string
-    onBrowseParent?: () => void
     onDirtyChange?: (value: boolean) => void
     onMutationComplete?: (event: { nextPath: string; nextPathType: 'file' | 'dir' | 'none'; result: { message: string } }) => void
     onStatusMessage?: (message: string) => void
@@ -70,7 +69,6 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
           emptyStateTitle: props.emptyStateTitle ?? '',
         })}
       </div>
-      <button type="button" onClick={() => props.onBrowseParent?.()}>request-browse-parent</button>
       <button type="button" onClick={() => props.onDirtyChange?.(true)}>mark-dirty</button>
       <button type="button" onClick={() => props.onDirtyChange?.(false)}>clear-dirty</button>
       <button
@@ -97,6 +95,7 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
     onOpenSearch?: () => void
+    onNavigateParent?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
     <div>
@@ -110,6 +109,7 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
+      <button type="button" onClick={() => props.onNavigateParent?.()}>request-browse-parent</button>
       {props.branchSwitchDialog}
     </div>
   ),

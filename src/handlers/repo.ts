@@ -18,6 +18,7 @@ import {
   getInfo,
   findReadme,
   findKeyDocuments,
+  resolveRepoPath,
   summarizeChangedFiles,
   setRepoGitIdentity,
   switchBranch,
@@ -39,6 +40,7 @@ import type {
   GitIdentityUpdateRequest,
   LocalActionResponse,
   NavigationHintsResponse,
+  RepoLocationResponse,
   RepoSummaryResponse,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
@@ -219,10 +221,47 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
   }
 
   const parentPath = dirname(repoPath)
+  if (parentPath === repoPath) {
+    return c.json({ ok: false, error: 'GitLocal is already at the root of the file system.' })
+  }
   setRepoPath('')
   setPickerPath(parentPath)
   rememberStartupFolder(parentPath, 'picker-open')
   return c.json({ ok: true, error: '' })
+}
+
+export async function repositoryLocationHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  const emptyResponse: RepoLocationResponse = {
+    repositoryRootPath: '',
+    isRepositoryRoot: false,
+    homeReadmePath: '',
+    atFilesystemRoot: false,
+  }
+  if (!repoPath) {
+    return c.json(emptyResponse)
+  }
+
+  const requestedPath = c.req.query('path') ?? ''
+  const currentPath = resolveRepoPath(repoPath, requestedPath)
+  const atFilesystemRoot = dirname(currentPath) === currentPath
+  const classification = classifyLocalPath(currentPath)
+  const repositoryRootPath = classification.repositoryRootPath ?? ''
+  if (!repositoryRootPath) {
+    return c.json({ ...emptyResponse, atFilesystemRoot })
+  }
+
+  const requestedBranch = c.req.query('branch') ?? ''
+  const readmeBranch = requestedBranch || getCurrentBranch(repositoryRootPath) || 'HEAD'
+  const homeReadmePath = findReadme(repositoryRootPath, readmeBranch, '')
+
+  const response: RepoLocationResponse = {
+    repositoryRootPath,
+    isRepositoryRoot: classification.gitState === 'repository-root',
+    homeReadmePath,
+    atFilesystemRoot,
+  }
+  return c.json(response)
 }
 
 export async function branchesHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

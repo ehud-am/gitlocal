@@ -328,6 +328,17 @@ export interface LocalActionResponse {
   message?: string
 }
 
+export interface RepoLocationResponse {
+  /** Absolute filesystem path of the nearest enclosing git repository's root for the current path, or '' if not inside any git repository. */
+  repositoryRootPath: string
+  /** True when the current location IS repositoryRootPath — i.e. the user is already at the repo home folder. */
+  isRepositoryRoot: boolean
+  /** Repo-relative path (relative to repositoryRootPath) of the README directly in repositoryRootPath, or '' if none exists. */
+  homeReadmePath: string
+  /** True when going up one level from the current location would go above the true filesystem root. */
+  atFilesystemRoot: boolean
+}
+
 export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
 export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
 export type StartupOpenSource = 'explicit-launch' | 'native-file-open' | 'picker-open' | 'repo-open'

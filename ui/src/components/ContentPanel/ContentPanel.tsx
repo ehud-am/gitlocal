@@ -74,7 +74,6 @@ interface Props {
   emptyStateTitle?: string
   emptyStateDetail?: string
   emptyStateActions?: Array<{ label: string; action: EmptyStateAction }>
-  onBrowseParent?: () => void
   raw?: boolean
   onRawChange?: (value: boolean) => void
   onStatusMessage?: (message: string) => void
@@ -86,8 +85,6 @@ interface DirectoryRow {
   type: 'file' | 'dir'
   localOnly: boolean
   syncState?: FileSyncState
-  isParent: boolean
-  exitsRepo: boolean
   displayPath: string
 }
 
@@ -224,7 +221,6 @@ export default function ContentPanel({
   emptyStateTitle,
   emptyStateDetail,
   emptyStateActions,
-  onBrowseParent,
   raw = false,
   onRawChange,
   onStatusMessage,
@@ -638,46 +634,15 @@ export default function ContentPanel({
     const emptyMessage = isRootView
       ? (emptyStateDetail ?? placeholder ?? 'This repository does not have any visible files yet.')
       : `This folder does not have any visible files or folders yet.`
-    const parentRow: DirectoryRow | null = path
-      ? {
-          name: '..',
-          path: parentPathOf(path),
-          type: 'dir',
-          localOnly: false,
-          isParent: true,
-          exitsRepo: false,
-          displayPath: parentPathOf(path) || 'repository root',
-        }
-      : onBrowseParent
-        ? {
-            name: '..',
-            path: '',
-            type: 'dir',
-            localOnly: false,
-            isParent: true,
-            exitsRepo: true,
-            displayPath: 'Leave the current repository scope',
-          }
-        : null
     const visibleEntries = filterVisibleEntries(entries)
     const hiddenDotfileCount = showDotfiles
       ? 0
       : entries.filter((entry) => entry.name.startsWith('.') && !visibleEntries.some((visibleEntry) => visibleEntry.path === entry.path)).length
-    const rows: DirectoryRow[] = [
-      ...(parentRow ? [parentRow] : []),
-      ...visibleEntries.map((entry) => ({
-        ...entry,
-        isParent: false,
-        exitsRepo: false,
-        displayPath: entry.path,
-      })),
-    ]
+    const rows: DirectoryRow[] = visibleEntries.map((entry) => ({
+      ...entry,
+      displayPath: entry.path,
+    }))
     function openDirectoryRow(entry: DirectoryRow): void {
-      if (entry.exitsRepo) {
-        onBrowseParent?.()
-        return
-      }
-
       onOpenPath(entry.path, entry.type, Boolean(entry.localOnly))
     }
 
@@ -777,10 +742,10 @@ export default function ContentPanel({
                     </thead>
                     <tbody>
                       {rows.map((entry) => {
-                        const syncBadge = !entry.isParent ? describeFileSyncState(entry.syncState) : null
+                        const syncBadge = describeFileSyncState(entry.syncState)
                         return (
                           <tr
-                            key={entry.isParent ? `parent:${entry.displayPath}` : entry.path}
+                            key={entry.path}
                             className="content-directory-row"
                             onDoubleClick={() => openDirectoryRow(entry)}
                           >
@@ -790,26 +755,20 @@ export default function ContentPanel({
                                 type="button"
                                 className="content-directory-link"
                                 onClick={() => openDirectoryRow(entry)}
-                                aria-label={
-                                  entry.exitsRepo
-                                    ? 'Open parent folder outside this repository'
-                                    : entry.isParent
-                                      ? 'Open parent folder ..'
-                                      : `Open ${entry.type === 'dir' ? 'folder' : 'file'} ${entry.name}`
-                                }
+                                aria-label={`Open ${entry.type === 'dir' ? 'folder' : 'file'} ${entry.name}`}
                               >
                                 <span className={`content-directory-badge content-directory-badge-${entry.type}`}>
-                                  {entry.isParent ? (entry.exitsRepo ? 'Browse' : 'Parent') : entry.type === 'dir' ? 'Folder' : 'File'}
+                                  {entry.type === 'dir' ? 'Folder' : 'File'}
                                 </span>
                                 <span className="content-directory-name">{entry.name}</span>
                               </button>
-                              {isGitRepo && !entry.isParent && entry.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
+                              {isGitRepo && entry.localOnly ? <MetaTag label="local" icon="local-only" tone="neutral" compact /> : null}
                               {syncBadge ? <MetaTag label={syncBadge.label} icon={syncBadge.icon} tone={syncBadge.tone} compact /> : null}
                             </div>
                           </td>
                           <td className="content-directory-cell">
                             <span className="content-directory-kind">
-                              {entry.isParent ? (entry.exitsRepo ? 'Outside repo' : 'Parent') : entry.type === 'dir' ? 'Directory' : 'File'}
+                              {entry.type === 'dir' ? 'Directory' : 'File'}
                             </span>
                           </td>
                           <td className="content-directory-cell content-directory-cell-path">

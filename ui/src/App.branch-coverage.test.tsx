@@ -55,7 +55,6 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
     selectedPathSyncState?: string
     raw?: boolean
     emptyStateTitle?: string
-    onBrowseParent?: () => void
     onDirtyChange?: (value: boolean) => void
     onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
     onDeleteFolder?: (path: string) => void
@@ -72,7 +71,6 @@ vi.mock('./components/ContentPanel/ContentPanel', () => ({
           emptyStateTitle: props.emptyStateTitle ?? '',
         })}
       </div>
-      <button type="button" onClick={() => props.onBrowseParent?.()}>request-browse-parent</button>
       <button type="button" onClick={() => props.onDirtyChange?.(true)}>mark-dirty</button>
       <button type="button" onClick={() => props.onDirtyChange?.(false)}>clear-dirty</button>
       <button type="button" onClick={() => props.onOpenPath('', 'file', true)}>open-empty-file</button>
@@ -93,6 +91,7 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     onOpenChangedFiles?: () => void
     onOpenChangedFile?: (item: ChangedFileItem) => void
     changedFiles?: { items: ChangedFileItem[] } | null
+    onNavigateParent?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
     <div>
@@ -102,6 +101,7 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
       <button type="button" onClick={() => props.onOpenChangedFiles?.()}>open-changed-files</button>
+      <button type="button" onClick={() => props.onNavigateParent?.()}>request-browse-parent</button>
       {props.changedFiles?.items.map((item) => (
         <button key={item.path} type="button" onClick={() => props.onOpenChangedFile?.(item)}>
           changed:{item.path}
@@ -176,6 +176,7 @@ vi.mock('./components/AppDialogs', () => ({
       <div data-testid="repo-boundary-dialog">
         <span>{props.pending ? 'pending' : 'idle'}</span>
         <button type="button" onClick={() => props.onOpenChange(false)}>close-boundary</button>
+        <button type="button" onClick={() => props.onOpenChange(true)}>reopen-boundary</button>
         <button type="button" onClick={props.onConfirm}>confirm-boundary</button>
       </div>
     ) : null
@@ -225,6 +226,7 @@ vi.mock('./components/AppDialogs', () => ({
           onChange={(event) => props.onConfirmationNameChange(event.target.value)}
         />
         <button type="button" onClick={() => props.onOpenChange(false)}>close-folder-delete</button>
+        <button type="button" onClick={() => props.onOpenChange(true)}>reopen-folder-delete</button>
         <button type="button" onClick={props.onCancel}>cancel-folder-delete</button>
         <button type="button" onClick={props.onDelete}>confirm-folder-delete</button>
         <span>{props.pending ? 'pending' : 'idle'}</span>
@@ -629,6 +631,45 @@ describe('App branch coverage', () => {
     })
 
     expect(api.commitChanges).not.toHaveBeenCalled()
+  })
+
+  it('ignores a redundant open signal from the repo boundary dialog while it is already open', async () => {
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'request-browse-parent' }))
+    expect(await screen.findByTestId('repo-boundary-dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'reopen-boundary' }))
+    expect(screen.getByTestId('repo-boundary-dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-boundary' }))
+    expect(screen.queryByTestId('repo-boundary-dialog')).not.toBeInTheDocument()
+  })
+
+  it('ignores a redundant open signal from the folder delete dialog while it is already open', async () => {
+    vi.mocked(api.getFolderDeletePreview).mockResolvedValueOnce({
+      ok: true,
+      operation: 'preview-delete-folder',
+      path: 'docs',
+      parentPath: '',
+      name: 'docs',
+      fileCount: 1,
+      folderCount: 0,
+      impactToken: 'impact-docs',
+      status: 'previewed',
+      message: 'This will permanently delete docs and all of its contents, including 1 file.',
+    })
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'request-delete-folder' }))
+    expect(await screen.findByTestId('folder-delete-dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'reopen-folder-delete' }))
+    expect(screen.getByTestId('folder-delete-dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-folder-delete' }))
+    expect(screen.queryByTestId('folder-delete-dialog')).not.toBeInTheDocument()
   })
 
   it('covers changed-files load failures and folder changed-file navigation', async () => {

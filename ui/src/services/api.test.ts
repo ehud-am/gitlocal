@@ -53,6 +53,34 @@ describe('api client viewer usability endpoints', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/repo/changes?branch=main&includeGeneratedLocal=true')
   })
 
+  it('requests repo location for the selected path and branch', async () => {
+    fetchMock.mockResolvedValueOnce(mockJsonResponse({
+      repositoryRootPath: '/repo/vendor/inner-repo',
+      isRepositoryRoot: false,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: false,
+    }))
+
+    const result = await api.getRepoLocation('vendor/inner-repo/src', 'main')
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/repo/location?path=vendor%2Finner-repo%2Fsrc&branch=main')
+    expect(result.repositoryRootPath).toBe('/repo/vendor/inner-repo')
+    expect(result.homeReadmePath).toBe('README.md')
+  })
+
+  it('requests repo location with no query params when path and branch are omitted', async () => {
+    fetchMock.mockResolvedValueOnce(mockJsonResponse({
+      repositoryRootPath: '',
+      isRepositoryRoot: false,
+      homeReadmePath: '',
+      atFilesystemRoot: false,
+    }))
+
+    await api.getRepoLocation()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/repo/location')
+  })
+
   it('requests navigation hints with explicit recent and generated/local flags', async () => {
     fetchMock.mockResolvedValueOnce(mockJsonResponse({
       keyDocuments: [],

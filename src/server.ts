@@ -16,6 +16,7 @@ import {
   repositoryOpenHandler,
   repositoryParentFolderHandler,
   repositoryChangesHandler,
+  repositoryLocationHandler,
   repositoryNavigationHintsHandler,
   repositorySummaryHandler,
   defaultReaderPreferenceHandler,
@@ -284,6 +285,7 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/repo/parent-folder', repositoryParentFolderHandler)
   app.get('/api/repo/summary', repositorySummaryHandler)
   app.get('/api/repo/changes', repositoryChangesHandler)
+  app.get('/api/repo/location', repositoryLocationHandler)
   app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
