@@ -870,6 +870,12 @@ describe('detectFileType', () => {
     expect(detectFileType('photo.jpg').type).toBe('image')
   })
 
+  it('detects json', () => {
+    const result = detectFileType('package.json')
+    expect(result.type).toBe('json')
+    expect(result.language).toBe('json')
+  })
+
   it('detects text with language hint', () => {
     const ts = detectFileType('index.ts')
     expect(ts.type).toBe('text')

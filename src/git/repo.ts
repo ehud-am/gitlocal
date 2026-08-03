@@ -1793,7 +1793,7 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     })
 }
 
-export function detectFileType(filename: string): { type: 'markdown' | 'text' | 'image' | 'binary'; language: string } {
+export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary'; language: string } {
   /* v8 ignore next */
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff'])
@@ -1802,13 +1802,16 @@ export function detectFileType(filename: string): { type: 'markdown' | 'text' | 
   const markdownExts = new Set(['md', 'markdown', 'mdx', 'mdown'])
   if (markdownExts.has(ext)) return { type: 'markdown', language: '' }
 
+  // json gets its own FileContentType (unlike langMap entries below, which only affect highlighting)
+  if (ext === 'json') return { type: 'json', language: 'json' }
+
   const langMap: Record<string, string> = {
     ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
     mjs: 'javascript', cjs: 'javascript', py: 'python', go: 'go',
     rs: 'rust', java: 'java', kt: 'kotlin', swift: 'swift',
     c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
     rb: 'ruby', php: 'php', sh: 'bash', bash: 'bash', zsh: 'bash',
-    yaml: 'yaml', yml: 'yaml', json: 'json', toml: 'toml',
+    yaml: 'yaml', yml: 'yaml', toml: 'toml',
     xml: 'xml', html: 'html', htm: 'html', css: 'css', scss: 'scss',
     sql: 'sql', graphql: 'graphql', proto: 'protobuf', tf: 'hcl',
     r: 'r', lua: 'lua', ex: 'elixir', exs: 'elixir',

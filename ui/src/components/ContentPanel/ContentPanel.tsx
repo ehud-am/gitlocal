@@ -21,8 +21,10 @@ import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 import CopyButton from './CopyButton'
+import { parseJsonTree } from './json-tree'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
+const JSONViewer = lazy(() => import('./JSONViewer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
@@ -304,6 +306,13 @@ export default function ContentPanel({
     return false
   }, [data?.content, draftContent, draftFolderName, draftPath, mode])
 
+  const jsonParseResult = useMemo(
+    () => (data?.type === 'json' ? parseJsonTree(data.content) : null),
+    [data?.type, data?.content],
+  )
+  const jsonIsValid = jsonParseResult?.ok ?? false
+  const effectiveShowRaw = data?.type === 'json' && !jsonIsValid ? true : showRaw
+
   const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image')
   const canDeleteCurrentFolder = canMutateFiles && selectedPathType === 'dir' && Boolean(selectedPath)
   const trimmedFileFindQuery = fileFindQuery.trim()
@@ -384,6 +393,13 @@ export default function ContentPanel({
 
   async function handleSaveEdit(): Promise<void> {
     if (!data?.revisionToken) return
+    if (data.type === 'json') {
+      try {
+        JSON.parse(draftContent)
+      } catch {
+        if (!window.confirm('This content is not valid JSON. Save anyway?')) return
+      }
+    }
     setBusy(true)
     setFormError('')
     try {
@@ -514,7 +530,7 @@ export default function ContentPanel({
     setMode('confirm-delete')
   }
 
-  const canToggleRaw = data?.type === 'markdown' || data?.type === 'text'
+  const canToggleRaw = data?.type === 'markdown' || data?.type === 'text' || (data?.type === 'json' && jsonIsValid)
   const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
   const visibleDirectoryEntries = directoryEntries ?? []
   const showDirectorySkeleton = isDirectoryLoading || (isDirectoryFetching && visibleDirectoryEntries.length === 0)
@@ -1270,10 +1286,19 @@ export default function ContentPanel({
               />
             </Suspense>
           </div>
-        ) : (
+        ) : data.type === 'json' && !effectiveShowRaw && jsonParseResult?.ok ? (
           <div ref={setSelectionRoot}>
             <Suspense fallback={loadingFallback}>
-              <CodeViewer content={data.content} language={showRaw ? '' : data.language} />
+              <JSONViewer root={jsonParseResult.root} />
+            </Suspense>
+          </div>
+        ) : (
+          <div ref={setSelectionRoot}>
+            {data.type === 'json' && jsonParseResult && !jsonParseResult.ok ? (
+              <p className="json-parse-notice">{jsonParseResult.message} Showing raw content.</p>
+            ) : null}
+            <Suspense fallback={loadingFallback}>
+              <CodeViewer content={data.content} language={effectiveShowRaw ? '' : data.language} />
             </Suspense>
           </div>
         )}

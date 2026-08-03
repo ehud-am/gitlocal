@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.15 - 2026-08-03
+
+- Added a structured, collapsible tree view for `.json` files (keys, values, arrays, nesting), matching the existing Markdown pretty-view pattern.
+- Added a raw/pretty toggle for valid JSON files, reusing the existing view-mode control; malformed or empty JSON always falls back to raw view with an inline notice instead of a broken pane.
+- Added a non-blocking warning when saving an edit that is not valid JSON, without blocking the save.
+
 ## 0.9.14 - 2026-08-01
 
 - Replaced the synthetic ".." row in folder listings with a dedicated "Parent Folder" toolbar button, available in folder listing, file view, and file edit modes, and visibly disabled (not hidden) at the true filesystem root.

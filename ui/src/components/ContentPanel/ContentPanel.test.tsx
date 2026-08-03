@@ -1973,4 +1973,258 @@ describe('ContentPanel', () => {
       expect(screen.getByText(/hidden reference/i)).toBeInTheDocument()
     })
   })
+
+  it('shows the JSON tree view by default for valid JSON files', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+
+    const { container } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+    expect(screen.getByText('name')).toBeInTheDocument()
+    expect(screen.getByText('gitlocal')).toBeInTheDocument()
+    expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument()
+    await expect(axe(container)).resolves.toMatchObject({ violations: [] })
+  })
+
+  it('toggles a valid JSON file between the tree view and raw source', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /view raw/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
+    })
+    expect(screen.queryByLabelText('JSON document structure')).not.toBeInTheDocument()
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /view rendered/i }))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+  })
+
+  it('falls back to raw view with an inline notice for malformed JSON, without offering a toggle', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'broken.json', type: 'json', language: 'json', content: '{"a": 1,}' }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="broken.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
+    })
+    expect(screen.getByText(/could not be parsed as valid json/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /file actions/i })).not.toBeInTheDocument()
+  })
+
+  it('falls back to raw view with an inline notice for an empty JSON file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'empty.json', type: 'json', language: 'json', content: '' }),
+    )
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="empty.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('code-viewer')).toBeInTheDocument()
+    })
+    expect(screen.getByText(/this file is empty/i)).toBeInTheDocument()
+  })
+
+  it('saves a valid JSON edit without a warning and returns to the tree view', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+    vi.mocked(api.updateFile).mockResolvedValue({
+      ok: true,
+      operation: 'update',
+      path: 'package.json',
+      status: 'updated',
+      message: 'File updated successfully.',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), {
+      target: { value: JSON.stringify({ name: 'gitlocal', version: '1.0.0' }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(api.updateFile).toHaveBeenCalled()
+    })
+    expect(window.confirm).not.toHaveBeenCalled()
+  })
+
+  it('warns before saving an edit that is not valid JSON, without blocking the save', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+    vi.mocked(api.updateFile).mockResolvedValue({
+      ok: true,
+      operation: 'update',
+      path: 'package.json',
+      status: 'updated',
+      message: 'File updated successfully.',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: '{"name": "gitlocal"' } })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith('This content is not valid JSON. Save anyway?')
+    })
+    expect(api.updateFile).toHaveBeenCalled()
+  })
+
+  it('does not save an invalid JSON edit when the user declines the warning', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+    vi.mocked(window.confirm).mockReturnValue(false)
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: '{"name": "gitlocal"' } })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith('This content is not valid JSON. Save anyway?')
+    })
+    expect(api.updateFile).not.toHaveBeenCalled()
+  })
+
+  it('still warns before discarding dirty edits to a JSON file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(
+      makeTextFile({ path: 'package.json', type: 'json', language: 'json', content: JSON.stringify({ name: 'gitlocal' }) }),
+    )
+    vi.mocked(window.confirm).mockReturnValue(false)
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="package.json"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty' } })
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved file changes?')
+    expect(screen.getByLabelText(/edit file content/i)).toBeInTheDocument()
+  })
 })
