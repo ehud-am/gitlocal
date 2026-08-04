@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.16 - 2026-08-04
+
+- Fixed the macOS app packaging script, which had been failing on every release since 0.9.13 for unrelated CI/release-automation reasons and, as of this release, because newer Node.js 24.x macOS builds no longer ship a separate `libnode` shared library. The packaged app only ever executed the standalone `node` binary as a subprocess, so the shared library was never actually required; the dead dependency has been removed.
+
 ## 0.9.15 - 2026-08-03
 
 - Added a structured, collapsible tree view for `.json` files (keys, values, arrays, nesting), matching the existing Markdown pretty-view pattern.
