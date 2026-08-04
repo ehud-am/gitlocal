@@ -116,16 +116,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "Release ${GITHUB_REF_NAME} already exists. Immutable releases must be created with assets in one step." >&2
-            exit 1
-          fi
+          ARTIFACT="${{ steps.cask.outputs.artifact }}"
 
-          gh release create "${GITHUB_REF_NAME}" \
-            "${{ steps.cask.outputs.artifact }}" \
-            "${{ steps.cask.outputs.artifact }}.sha256" \
-            --title "GitLocal ${GITHUB_REF_NAME}" \
-            --generate-notes
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; ensuring the macOS artifact is attached (idempotent rerun)."
+            gh release upload "${GITHUB_REF_NAME}" "${ARTIFACT}" "${ARTIFACT}.sha256" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${ARTIFACT}" \
+              "${ARTIFACT}.sha256" \
+              --title "GitLocal ${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi
 
       - name: Check out Homebrew tap
         uses: actions/checkout@v5
