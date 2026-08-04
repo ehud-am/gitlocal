@@ -381,6 +381,79 @@ pre {
   white-space: pre-wrap;
 }
 
+.json-viewer {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.json-tree-root,
+.json-tree-children {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.json-tree-children {
+  margin-top: 2px;
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+}
+
+.json-tree-entry {
+  min-width: 0;
+}
+
+.json-tree-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.json-tree-toggle {
+  flex-shrink: 0;
+  width: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.json-tree-toggle-spacer {
+  flex-shrink: 0;
+  width: 16px;
+}
+
+.json-tree-key,
+.json-tree-index {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.json-tree-value {
+  min-width: 0;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.json-tree-type-badge {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.json-parse-notice {
+  margin: 0 0 12px;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
 .code-frame {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
