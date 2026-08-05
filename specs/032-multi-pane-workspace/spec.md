@@ -2,7 +2,7 @@
 
 **Feature Branch**: `032-multi-pane-workspace`
 **Created**: 2026-08-05
-**Status**: Draft
+**Status**: Clarified
 **Input**: User description: "1. Create an option to open 1 or more tabs. each can view a different file. 2. have an easy way to arrange these file in 2 columns, 4 tiles, and 6 tiles. 3. Ability to open one or more terminal windows. 4. Ability to open one or more file windows."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -43,38 +43,21 @@ A user with several tabs open wants to see more than one at a time — for examp
 
 ---
 
-### User Story 3 - Open one or more terminal panes (Priority: P3)
+### User Story 3 - See terminal and code together in a live layout (Priority: P3)
 
-A user needs to run a command against the repo (e.g. `git status`, a test command) without leaving the app. They open a terminal pane, which behaves like any other pane — it can be viewed alone, opened alongside file panes as a tab, or included in a tiled layout — and they can open additional terminal panes (e.g. one per task) as needed.
+A user is running an AI coding agent (or any long-lived command) in a terminal pane and wants to watch its output while simultaneously reviewing the code it's changing — for example, one tile runs the agent, an adjacent tile shows the file it's currently editing. They open one or more terminal panes and place them into a tiled layout alongside content panes, all visible and live at once.
 
-**Why this priority**: Adds a distinct, higher-complexity pane type (a live shell) on top of the tab/tile mechanics established by Stories 1-2. It is independently valuable but depends on the pane/tab/tile framework already existing.
+**Why this priority**: This is the concrete driving use case behind terminal support (per product direction: watching an agent run while reviewing its output). It's a distinct, higher-complexity pane type (a live shell) layered on top of the tab/tile mechanics from Stories 1-2, and is explicitly scoped as an experimental capability — GitLocal is not becoming a general IDE, but this workflow is valuable enough to build and evaluate.
 
-**Independent Test**: Open a terminal pane, run a simple command, confirm output renders; open a second terminal pane and confirm both run independent sessions; close one and confirm the other's session and output are unaffected.
+**Independent Test**: Open a terminal pane and a content pane together in the 2-column layout, run a long-lived command (e.g. an agent or watch process) in the terminal pane, and confirm its output keeps streaming live while the content pane remains independently viewable/scrollable; open a second terminal pane and confirm both run independent sessions.
 
 **Acceptance Scenarios**:
 
 1. **Given** the workspace is open, **When** the user opens a new terminal pane, **Then** a live shell session starts, scoped to the current repository's working directory.
-2. **Given** a terminal pane is open, **When** the user runs a command, **Then** the command's output streams into that pane.
+2. **Given** a terminal pane is open, **When** the user runs a command, **Then** the command's output streams into that pane live, including long-running/continuous output.
 3. **Given** two or more terminal panes are open, **When** the user runs commands in each, **Then** each terminal's session, input, and output are fully independent of the others.
 4. **Given** a terminal pane is open, **When** the user closes its tab/tile, **Then** the underlying shell session is terminated and any running process in it is stopped.
-5. **Given** one or more terminal panes are open, **When** the user arranges panes into a 2-column, 4-tile, or 6-tile layout, **Then** terminal panes can occupy tiles alongside file panes in the same layout.
-
----
-
-### User Story 4 - Open one or more dedicated file browser panes (Priority: P4)
-
-A user working across a tiled layout wants a pane dedicated to navigating the repo's folder tree — distinct from the content panes showing individual file contents — so they can browse and open files into other panes without losing their current tiled arrangement. They open one or more file browser panes, which can also be tiled alongside content and terminal panes.
-
-**Why this priority**: Rounds out the pane system with a navigation-focused pane type. It is the least essential of the four capabilities on its own (the existing sidebar already provides folder navigation) but becomes valuable once tiling exists, since it lets navigation live inside the tiled layout itself rather than only in the fixed sidebar.
-
-**Independent Test**: Open a file browser pane, navigate the folder tree within it, open a file from it into another pane, and confirm the file browser pane's own navigation state persists independently of the content pane it opened.
-
-**Acceptance Scenarios**:
-
-1. **Given** the workspace is open, **When** the user opens a new file browser pane, **Then** a pane showing the repository's folder tree appears, independent of the existing fixed sidebar.
-2. **Given** a file browser pane is open, **When** the user selects a file within it, **Then** that file opens in a content pane (a new tab, or a target tile if one is designated) without closing the file browser pane.
-3. **Given** two or more file browser panes are open, **When** the user navigates in one, **Then** the other's navigation state (current folder, scroll position) is unaffected.
-4. **Given** one or more file browser panes are open, **When** the user arranges panes into a 2-column, 4-tile, or 6-tile layout, **Then** file browser panes can occupy tiles alongside content and terminal panes in the same layout.
+5. **Given** one or more terminal panes and one or more content panes are open, **When** the user selects a 2-column, 4-tile, or 6-tile layout, **Then** terminal and content panes can occupy tiles side by side in the same layout, each remaining live and independently usable.
 
 ---
 
@@ -86,7 +69,7 @@ A user working across a tiled layout wants a pane dedicated to navigating the re
 - What happens on narrow/small viewport sizes where a 4-tile or 6-tile layout cannot reasonably render side by side? The system must degrade to a usable arrangement (e.g. stacked, or restrict which layouts are offered) rather than rendering illegibly small tiles.
 - What happens when the same file is opened into more than one pane at once (e.g. two file panes both showing `README.md`)? Both panes should reflect the same underlying file and stay in sync with on-disk changes/edits, consistent with existing single-pane file behavior.
 - What happens when a terminal pane's shell process exits or crashes on its own (not via user-initiated close)? The pane must show a clear "session ended" state rather than a frozen or blank pane.
-- What happens to open panes, layout selection, and terminal sessions when the user reloads the page or the app restarts? See Assumptions — this needs explicit product direction on what, if anything, persists.
+- What happens to open panes, layout selection, and terminal sessions when the user reloads the page or the app restarts? Per FR-014, nothing persists — the workspace resets to the default single-file view and all terminal sessions end.
 
 ## Requirements *(mandatory)*
 
@@ -101,42 +84,35 @@ A user working across a tiled layout wants a pane dedicated to navigating the re
 - **FR-007**: System MUST allow the user to open one or more terminal panes, each running an independent live shell session scoped to the current repository's working directory.
 - **FR-008**: System MUST stream a terminal pane's command output live and accept user input directed at that specific session.
 - **FR-009**: System MUST terminate a terminal pane's underlying shell session (and any process it is running) when that pane is closed.
-- **FR-010**: Terminal panes MUST be eligible to appear as tabs or occupy tiles in any of the layouts defined in FR-004, alongside file content panes.
-- **FR-011**: System MUST allow the user to open one or more dedicated file browser panes showing the repository folder tree, independent of the existing fixed sidebar.
-- **FR-012**: Selecting a file within a file browser pane MUST open that file into a content pane without closing the file browser pane itself.
-- **FR-013**: File browser panes MUST be eligible to appear as tabs or occupy tiles in any of the layouts defined in FR-004, alongside content and terminal panes.
-- **FR-014**: System MUST handle a tiled layout with fewer open panes than the layout's tile capacity by showing an empty/"open a file" placeholder in unused tiles, not an error.
-- **FR-015**: System MUST handle more open panes than a selected layout's tile capacity by keeping the excess panes accessible (e.g. via tabs/overflow) rather than closing them.
-- **FR-016**: System MUST continue to support all existing single-file, single-view behavior unchanged for users who never open a second tab or pane.
-
-*Marking unclear requirements:*
-
-- **FR-017**: System MUST distinguish "tabs" (User Story 1) from "file windows" (User Story 4) in the interaction model exposed to the user [NEEDS CLARIFICATION: the source request lists "open 1+ tabs, each viewing a different file" and, separately, "ability to open one or more file windows" as two distinct capabilities. This spec currently interprets the former as content tabs/panes showing file contents, and the latter as a distinct dedicated file-browser/navigation pane type. Confirm this is the intended distinction, versus "file windows" simply meaning the same content panes once they are tiled.]
-- **FR-018**: Persistence of open panes/layout/terminal sessions across page reloads or app restarts is [NEEDS CLARIFICATION: not specified by the source request — should open tabs and the selected layout survive a reload? Should terminal sessions be restored, or always start fresh?]
+- **FR-010**: Terminal panes MUST be eligible to appear as tabs or occupy tiles in any of the layouts defined in FR-004, mixed freely alongside content panes (e.g. one tile running a terminal, an adjacent tile showing code).
+- **FR-011**: System MUST handle a tiled layout with fewer open panes than the layout's tile capacity by showing an empty/"open a file" placeholder in unused tiles, not an error.
+- **FR-012**: System MUST handle more open panes than a selected layout's tile capacity by keeping the excess panes accessible (e.g. via tabs/overflow) rather than closing them.
+- **FR-013**: System MUST continue to support all existing single-file, single-view behavior unchanged for users who never open a second tab or pane.
+- **FR-014**: Open panes and the selected layout MUST NOT persist across a page reload or app restart; each session starts fresh with the existing default single-file view, consistent with the app's current lack of cross-session UI state persistence.
 
 ### Key Entities
 
-- **Pane**: A single viewable unit within the workspace. Has a type (Content Pane, Terminal Pane, or File Browser Pane) and can be displayed either as one tab among several (tabbed view) or as one tile within a tiled layout.
-- **Content Pane**: A pane bound to one file, showing that file's content using the existing per-file-type viewer (matches today's single-file view).
+- **Pane**: A single viewable unit within the workspace. Has a type (Content Pane or Terminal Pane) and can be displayed either as one tab among several (tabbed view, one visible at a time) or as one tile within a tiled layout (multiple visible simultaneously).
+- **Content Pane**: A pane bound to one file, showing that file's content using the existing per-file-type viewer (matches today's single-file view). This is what the source request calls a "file window" once placed into a tiled layout.
 - **Terminal Pane**: A pane bound to one live shell session scoped to the repository's working directory.
-- **File Browser Pane**: A pane showing the repository's folder tree for navigation, independent of the fixed sidebar; selecting a file within it opens a Content Pane.
-- **Workspace Layout**: The current arrangement mode for all open panes — tabbed (one active pane at a time) or one of the tiled presets (2-column, 4-tile, 6-tile).
+- **Workspace Layout**: The current arrangement mode for all open panes — Tabbed Mode (one active pane visible at a time, switched via tabs) or one of the tiled/windowed presets (2-column, 4-tile, 6-tile), where multiple panes of any mix of types are visible simultaneously.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A user can have at least 6 panes open at once (any mix of content, terminal, and file browser panes) without errors or degraded responsiveness.
+- **SC-001**: A user can have at least 6 panes open at once (any mix of content and terminal panes) without errors or degraded responsiveness.
 - **SC-002**: A user can switch between tabbed view and any tiled layout in one action, with all open panes preserved every time.
 - **SC-003**: A user can go from "single file open" to "comparing two files side by side" in two actions or fewer (open second file as tab, select 2-column layout).
 - **SC-004**: Each open terminal pane behaves as a fully independent session — commands, output, and process lifecycle in one terminal pane never affect another.
-- **SC-005**: 100% of existing single-file viewing/editing behavior is unaffected for users who do not use tabs, tiling, terminal panes, or file browser panes (zero regressions in existing test suite).
+- **SC-005**: A user can watch a long-running terminal session (e.g. an AI coding agent) and a content pane showing the file it's editing simultaneously, both live, in a single tiled layout — the concrete "agent workflow" scenario motivating this feature.
+- **SC-006**: 100% of existing single-file viewing/editing behavior is unaffected for users who do not use tabs, tiling, or terminal panes (zero regressions in existing test suite).
 
 ## Assumptions
 
-- "Tabs" (User Story 1) and "file windows" (User Story 4) are treated as two distinct concepts per the FR-017 clarification note above; this spec proceeds on that interpretation but flags it for confirmation before planning.
+- Two distinct viewing modes are in scope: **Tabbed Mode** (switch between open panes, one visible at a time) and **Layout Mode** (2-column/4-tile/6-tile presets, multiple panes visible simultaneously). The source request's "tabs" and "file windows" map to these two modes for the same underlying Content Panes, not to two different pane types — confirmed with product direction.
 - The 2-column, 4-tile, and 6-tile layouts are fixed presets (not a freeform/resizable grid); exact tile grid shape for 6-tile (e.g. 3x2 vs 2x3) is a design/plan-level decision, not specified here.
-- Terminal panes provide direct shell access to the local machine running GitLocal. This is a materially different capability than GitLocal's current local-first, non-IDE positioning (see the project constitution's Target Audience & UX Philosophy, which optimizes for browsing/reading over terminal/IDE workflows) and is called out here as a deliberate scope expansion requiring explicit product sign-off, not an oversight.
-- Terminal and file browser panes are local-only, matching the existing constitution's local-first principle — no new remote/network services are introduced by this feature.
-- Persistence behavior (FR-018) defaults to "no persistence across reload" (fresh workspace each session) unless product direction specifies otherwise, consistent with the app's current lack of cross-session UI state persistence.
+- Terminal panes provide direct shell access to the local machine running GitLocal. This is explicitly accepted as an experimental step toward IDE-adjacent territory (confirmed with product direction), not an oversight against the project constitution's browsing/reading-first UX philosophy — scope and risk should be re-evaluated after initial delivery.
+- Terminal panes are local-only, matching the existing constitution's local-first principle — no new remote/network services are introduced by this feature.
+- Open panes, layout selection, and terminal sessions do not persist across reload or restart (see FR-014) — a deliberate simplification for the initial version, not a gap requiring further clarification.
 - This feature targets the same browser-based and macOS native app distributions GitLocal already ships; no new distribution channel is introduced.
