@@ -13,7 +13,9 @@ const baseContentPanelProps: PaneTileProps['contentPanelProps'] = {
 
 vi.mock('../ContentPanel/ContentPanel', () => ({
   default: (props: Record<string, unknown>) => (
-    <div data-testid="content-panel" data-selected-path={String(props.selectedPath)} data-selected-path-type={String(props.selectedPathType)} />
+    <div data-testid="content-panel" data-selected-path={String(props.selectedPath)} data-selected-path-type={String(props.selectedPathType)}>
+      {props.selectedPath === 'deleted.md' ? <p>This local-only file is no longer available.</p> : null}
+    </div>
   ),
 }))
 
@@ -55,6 +57,12 @@ describe('PaneTile', () => {
     expect(panel).toHaveAttribute('data-selected-path-type', 'file')
     expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'workspace-tabpanel-pane-1')
     expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'workspace-tab-pane-1')
+  })
+
+  it('surfaces a "no longer available" state for a pane whose file was deleted/moved (US1 edge case)', () => {
+    const deletedPane: Pane = { id: 'pane-4', kind: 'content', contentPath: 'deleted.md', title: 'deleted.md' }
+    render(<PaneTile pane={deletedPane} contentPanelProps={baseContentPanelProps} />)
+    expect(screen.getByText('This local-only file is no longer available.')).toBeInTheDocument()
   })
 
   it('falls back to an empty selected path when a content pane has no contentPath', () => {
