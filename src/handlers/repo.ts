@@ -32,6 +32,7 @@ import {
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
+import { readRepoLayout, writeRepoLayout } from '../services/repo-layout.js'
 import type {
   BranchSwitchRequest,
   ChangedFilesResponse,
@@ -40,6 +41,8 @@ import type {
   GitIdentityUpdateRequest,
   LocalActionResponse,
   NavigationHintsResponse,
+  RepoLayout,
+  RepoLayoutUpdateRequest,
   RepoLocationResponse,
   RepoSummaryResponse,
   RepositoryOpenRequest,
@@ -99,6 +102,49 @@ export async function startupFolderUpdateHandler(c: Context<{ Variables: Variabl
 
 export async function startupOpenTargetHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   return c.json({ target: getStartupOpenTarget() })
+}
+
+export async function repoLayoutHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+  if (!repoPath) {
+    return c.json({ layout: { branch: null, path: null, pathType: 'none', raw: false } })
+  }
+  return c.json({ layout: readRepoLayout(repoPath) })
+}
+
+export async function repoLayoutUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  const repoPath = c.get('repoPath')
+
+  let payload: RepoLayoutUpdateRequest
+  try {
+    payload = await c.req.json<RepoLayoutUpdateRequest>()
+  } catch {
+    return c.json({ layout: { branch: null, path: null, pathType: 'none', raw: false } }, 400)
+  }
+
+  const layoutInput = payload.layout
+  if (
+    !layoutInput
+    || (layoutInput.branch !== null && typeof layoutInput.branch !== 'string')
+    || (layoutInput.path !== null && typeof layoutInput.path !== 'string')
+    || (layoutInput.pathType !== 'file' && layoutInput.pathType !== 'dir' && layoutInput.pathType !== 'none')
+    || typeof layoutInput.raw !== 'boolean'
+  ) {
+    return c.json({ layout: { branch: null, path: null, pathType: 'none', raw: false } }, 400)
+  }
+
+  if (!repoPath) {
+    return c.json({ layout: layoutInput })
+  }
+
+  const layout: RepoLayout = {
+    branch: layoutInput.branch,
+    path: layoutInput.path,
+    pathType: layoutInput.pathType,
+    raw: layoutInput.raw,
+  }
+  writeRepoLayout(repoPath, layout)
+  return c.json({ layout })
 }
 
 export async function defaultReaderPreferenceHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

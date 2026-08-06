@@ -687,6 +687,162 @@ describe('startup folder handlers', () => {
   })
 })
 
+describe('repo layout handlers', () => {
+  it('returns default layout when no repository is open', async () => {
+    const app = createApp('')
+    const res = await app.fetch(new Request('http://localhost/api/repo/layout'))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { layout: { branch: string | null; path: string | null; pathType: string; raw: boolean } }
+    expect(body.layout).toEqual({ branch: null, path: null, pathType: 'none', raw: false })
+  })
+
+  it('returns default layout when no .gitlocal/.layout has been saved yet', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { layout: { branch: string | null; path: string | null; pathType: string; raw: boolean } }
+      expect(body.layout).toEqual({ branch: null, path: null, pathType: 'none', raw: false })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns a previously saved layout', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      mkdirSync(join(dir, '.gitlocal'))
+      writeFileSync(join(dir, '.gitlocal', '.layout'), JSON.stringify({
+        branch: 'main',
+        path: 'README.md',
+        pathType: 'file',
+        raw: true,
+      }))
+
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { layout: { branch: string | null; path: string | null; pathType: string; raw: boolean } }
+      expect(body.layout).toEqual({ branch: 'main', path: 'README.md', pathType: 'file', raw: true })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('never returns an error status for a malformed .gitlocal/.layout file', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      mkdirSync(join(dir, '.gitlocal'))
+      writeFileSync(join(dir, '.gitlocal', '.layout'), '{not-json')
+
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout'))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { layout: { branch: string | null; path: string | null; pathType: string; raw: boolean } }
+      expect(body.layout).toEqual({ branch: null, path: null, pathType: 'none', raw: false })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('writes a valid layout and echoes it back', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const layout = { branch: 'main', path: 'docs/guide.md', pathType: 'file', raw: true }
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ layout }),
+      }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { layout: typeof layout }
+      expect(body.layout).toEqual(layout)
+      expect(existsSync(join(dir, '.gitlocal', '.layout'))).toBe(true)
+      expect(JSON.parse(readFileSync(join(dir, '.gitlocal', '.layout'), 'utf-8'))).toEqual(layout)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('writes a layout with null branch/path for a non-git folder', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-layout-handler-nongit-'))
+    try {
+      const app = createApp(dir)
+      const layout = { branch: null, path: 'notes.md', pathType: 'file', raw: false }
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ layout }),
+      }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { layout: typeof layout }
+      expect(body.layout).toEqual(layout)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects invalid JSON bodies', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad-json',
+      }))
+      expect(res.status).toBe(400)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects a layout object with a missing/mistyped required field', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ layout: { branch: 'main', path: 'README.md', pathType: 'bogus', raw: false } }),
+      }))
+      expect(res.status).toBe(400)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects a request body missing the layout object entirely', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const app = createApp(dir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }))
+      expect(res.status).toBe(400)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('accepts a PUT with no repository open without erroring', async () => {
+    const app = createApp('')
+    const layout = { branch: null, path: null, pathType: 'none', raw: false }
+    const res = await app.fetch(new Request('http://localhost/api/repo/layout', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ layout }),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { layout: typeof layout }
+    expect(body.layout).toEqual(layout)
+  })
+})
+
 describe('gitIdentityUpdateHandler', () => {
   it('returns blocked when no repository is open', async () => {
     const app = createApp('')
