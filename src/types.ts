@@ -157,6 +157,21 @@ export interface DefaultReaderPreferenceResponse {
   message: string
 }
 
+export interface RepoLayout {
+  branch: string | null
+  path: string | null
+  pathType: ViewerPathType
+  raw: boolean
+}
+
+export interface RepoLayoutResponse {
+  layout: RepoLayout
+}
+
+export interface RepoLayoutUpdateRequest {
+  layout: RepoLayout
+}
+
 export interface ViewerState {
   branch: string
   path: string
