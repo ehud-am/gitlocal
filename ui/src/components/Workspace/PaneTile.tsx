@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import type { Pane } from '../../types'
+import type { FileSyncState, Pane } from '../../types'
 import ContentPanel from '../ContentPanel/ContentPanel'
 import TerminalPane from './TerminalPane'
 
@@ -17,6 +17,15 @@ export interface PaneTileProps {
   onTerminalSessionId?: (paneId: string, sessionId: string) => void
   /** Optional handler invoked when the user acts on the empty-tile placeholder (e.g. "open a file"). */
   onOpenFileRequested?: () => void
+  /**
+   * The classic single-selection "primary" file path (see App.tsx's pane-mirroring effect), plus
+   * its local-only/sync-state flags. Git sync-state badges are only meaningful relative to this
+   * one file, so they're applied only to the pane whose `contentPath` matches — never blanket
+   * across every open tab.
+   */
+  primaryPanePath?: string
+  primaryPathLocalOnly?: boolean
+  primaryPathSyncState?: FileSyncState | 'none'
 }
 
 /**
@@ -25,7 +34,15 @@ export interface PaneTileProps {
  * pane id so each open pane keeps its own independent component state (data-model.md).
  * Renders an empty "open a file" placeholder when no pane is assigned to this tile (FR-011).
  */
-export default function PaneTile({ pane, contentPanelProps, onTerminalSessionId, onOpenFileRequested }: PaneTileProps) {
+export default function PaneTile({
+  pane,
+  contentPanelProps,
+  onTerminalSessionId,
+  onOpenFileRequested,
+  primaryPanePath,
+  primaryPathLocalOnly,
+  primaryPathSyncState,
+}: PaneTileProps) {
   if (!pane) {
     return (
       <div className="workspace-tile workspace-tile-empty" role="tabpanel" aria-label="Empty tile">
@@ -62,6 +79,8 @@ export default function PaneTile({ pane, contentPanelProps, onTerminalSessionId,
           {...contentPanelProps}
           selectedPath={pane.contentPath ?? ''}
           selectedPathType="file"
+          selectedPathLocalOnly={pane.contentPath && pane.contentPath === primaryPanePath ? primaryPathLocalOnly : false}
+          selectedPathSyncState={pane.contentPath && pane.contentPath === primaryPanePath ? primaryPathSyncState : 'none'}
         />
       )}
     </div>

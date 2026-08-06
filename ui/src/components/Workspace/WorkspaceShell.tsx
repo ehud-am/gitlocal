@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import type { UsePaneWorkspaceResult } from '../../hooks/usePaneWorkspace'
-import type { WorkspaceLayoutMode } from '../../types'
+import type { FileSyncState, WorkspaceLayoutMode } from '../../types'
 import { WORKSPACE_LAYOUT_TILE_CAPACITY } from '../../types'
 import ContentPanel from '../ContentPanel/ContentPanel'
 import TabStrip from './TabStrip'
@@ -19,6 +19,10 @@ export interface WorkspaceShellProps {
   disabledLayouts?: WorkspaceLayoutMode[]
   /** Invoked when the user acts on an empty tile's "open a file" placeholder. */
   onOpenFileRequested?: () => void
+  /** The classic single-selection "primary" file path and its sync-state, applied only to the matching pane. */
+  primaryPanePath?: string
+  primaryPathLocalOnly?: boolean
+  primaryPathSyncState?: FileSyncState | 'none'
 }
 
 /**
@@ -27,7 +31,15 @@ export interface WorkspaceShellProps {
  * overflow list for panes beyond the active layout's tile capacity. Delegates pane rendering
  * to `PaneTile`, which mounts one `ContentPanel`/`TerminalPane` per open pane.
  */
-export default function WorkspaceShell({ workspace, contentPanelProps, disabledLayouts, onOpenFileRequested }: WorkspaceShellProps) {
+export default function WorkspaceShell({
+  workspace,
+  contentPanelProps,
+  disabledLayouts,
+  onOpenFileRequested,
+  primaryPanePath,
+  primaryPathLocalOnly,
+  primaryPathSyncState,
+}: WorkspaceShellProps) {
   const { panes, activePaneId, layoutMode, tilePaneIds, overflowPaneIds, selectPane, closePane, setLayoutMode } = workspace
 
   if (panes.length === 0) {
@@ -60,6 +72,9 @@ export default function WorkspaceShell({ workspace, contentPanelProps, disabledL
                 contentPanelProps={contentPanelProps}
                 onTerminalSessionId={workspace.setTerminalSessionId}
                 onOpenFileRequested={onOpenFileRequested}
+                primaryPanePath={primaryPanePath}
+                primaryPathLocalOnly={primaryPathLocalOnly}
+                primaryPathSyncState={primaryPathSyncState}
               />
             ))}
           </div>
@@ -77,6 +92,9 @@ export default function WorkspaceShell({ workspace, contentPanelProps, disabledL
             contentPanelProps={contentPanelProps}
             onTerminalSessionId={workspace.setTerminalSessionId}
             onOpenFileRequested={onOpenFileRequested}
+            primaryPanePath={primaryPanePath}
+            primaryPathLocalOnly={primaryPathLocalOnly}
+            primaryPathSyncState={primaryPathSyncState}
           />
         </div>
       )}
