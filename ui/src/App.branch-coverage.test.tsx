@@ -230,6 +230,8 @@ vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
     getStartupOpenTarget: vi.fn(),
+    getRepoLayout: vi.fn(),
+    updateRepoLayout: vi.fn(),
     getDefaultReaderPreference: vi.fn(),
     updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
@@ -377,6 +379,12 @@ describe('App branch coverage', () => {
     readViewerState.mockReturnValue(buildViewerState())
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo())
     vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
+    vi.mocked(api.updateRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
     vi.mocked(api.getDefaultReaderPreference).mockResolvedValue({
       ok: true,
       preference: { status: 'not-asked', askedAt: '', answeredAt: '', message: '' },

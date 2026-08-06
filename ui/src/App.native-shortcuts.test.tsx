@@ -70,6 +70,8 @@ vi.mock('./services/api', () => ({
     getGitContext: vi.fn(),
     getSyncStatus: vi.fn(),
     getBranches: vi.fn(),
+    getRepoLayout: vi.fn(),
+    updateRepoLayout: vi.fn(),
   },
 }))
 
@@ -153,6 +155,12 @@ describe('native app shortcut bridge', () => {
       { name: 'main', isCurrent: true, scope: 'local', hasLocalCheckout: true },
     ])
     vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus())
+    vi.mocked(api.getRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
+    vi.mocked(api.updateRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
   })
 
   it('forwards native Find commands to the content panel without opening repository search', async () => {

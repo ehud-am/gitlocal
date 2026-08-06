@@ -25,6 +25,8 @@ import type {
   FolderInitRepositoryRequest,
   LocalActionResponse,
   RepoInfo,
+  RepoLayoutResponse,
+  RepoLayoutUpdateRequest,
   RepoLocationResponse,
   RepoSummaryResponse,
   RemoteSyncResponse,
@@ -116,6 +118,11 @@ export const api = {
 
   getStartupOpenTarget: (): Promise<StartupOpenTargetResponse> =>
     request<StartupOpenTargetResponse>('/api/startup-open-target'),
+
+  getRepoLayout: (): Promise<RepoLayoutResponse> => request<RepoLayoutResponse>('/api/repo/layout'),
+
+  updateRepoLayout: (payload: RepoLayoutUpdateRequest): Promise<RepoLayoutResponse> =>
+    mutate('/api/repo/layout', 'PUT', payload),
 
   getDefaultReaderPreference: (): Promise<DefaultReaderPreferenceResponse> =>
     request<DefaultReaderPreferenceResponse>('/api/default-reader-preference'),

@@ -12,6 +12,8 @@ vi.mock('./services/api', () => ({
     getInfo: vi.fn(),
     getStartupOpenTarget: vi.fn(),
     getStartupFolder: vi.fn(),
+    getRepoLayout: vi.fn(),
+    updateRepoLayout: vi.fn(),
     getDefaultReaderPreference: vi.fn(),
     updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
@@ -172,6 +174,12 @@ describe('App', () => {
 
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
     vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
+    vi.mocked(api.updateRepoLayout).mockResolvedValue({
+      layout: { branch: null, path: null, pathType: 'none', raw: false },
+    })
     vi.mocked(api.getStartupFolder).mockResolvedValue({
       path: '/tmp/repo',
       source: 'last-used',
@@ -459,6 +467,129 @@ describe('App', () => {
       expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
     })
     expect(await screen.findByText('Opened docs/guide.md.')).toBeInTheDocument()
+  })
+
+  it('restores the saved repo layout (branch, path, raw mode) when there is no startup-open target', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: 'release', path: 'docs/guide.md', pathType: 'file', raw: true },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'release', true)
+    })
+    // Raw mode renders the file through the syntax-highlighted code viewer, which
+    // splits text into multiple <span> nodes (e.g. `hljs-attribute`), so match on
+    // the code viewer's aggregate text content rather than an exact text node.
+    await waitFor(() => {
+      expect(document.querySelector('.code-viewer')?.textContent).toBe('guide content')
+    })
+  })
+
+  it('lets an explicit startup-open target win over a saved repo layout', async () => {
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: 'release', path: 'docs/README.md', pathType: 'file', raw: true },
+    })
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
+      target: {
+        source: 'explicit-launch',
+        inputPath: '/tmp/repo/docs/guide.md',
+        rootPath: '/tmp/repo',
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+        status: 'accepted',
+        message: 'Opened docs/guide.md.',
+        receivedAt: '2026-07-05T12:00:00.000Z',
+        gitState: 'inside-repository',
+        openMode: 'file',
+        repositoryRootPath: '/tmp/repo',
+      },
+    })
+
+    renderWithClient()
+
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
+    expect(await screen.findByText('Opened docs/guide.md.')).toBeInTheDocument()
+  })
+
+  it('falls back to a valid branch when the saved repo layout branch no longer exists', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: 'deleted-branch', path: 'README.md', pathType: 'file', raw: false },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByText('GitLocal reset the saved branch because it is not available in this repository.')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
+    })
+  })
+
+  it('restores a saved repo layout path without a saved branch, keeping the current branch', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: null, path: 'docs/guide.md', pathType: 'file', raw: false },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
+  })
+
+  it('restores a saved repo layout branch without a saved path', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: 'main', path: null, pathType: 'none', raw: false },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('main')
+    })
+  })
+
+  it('restores a saved path/raw mode with a null branch for a plain non-git folder', async () => {
+    vi.mocked(api.getInfo).mockResolvedValue({
+      name: 'folder',
+      path: '/tmp/repo',
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: false,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 1,
+      gitContext: null,
+    })
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
+      layout: { branch: null, path: 'docs/guide.md', pathType: 'file', raw: true },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', '', true)
+    })
+  })
+
+  it('does not block restoring the initial view state when fetching the saved repo layout fails', async () => {
+    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
+    vi.mocked(api.getRepoLayout).mockRejectedValueOnce(new Error('boom'))
+
+    renderWithClient()
+
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
   })
 
   it('opens a second Markdown file from a native open-file event while running', async () => {

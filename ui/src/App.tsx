@@ -142,6 +142,7 @@ export default function App() {
   const initialViewerState = readViewerState()
   const savedInitialViewerStateRef = useRef(initialViewerState)
   const savedInitialViewerStateAppliedRef = useRef(false)
+  const savedRepoLayoutAppliedRef = useRef(false)
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme())
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
   const [selectedPath, setSelectedPath] = useState('')
@@ -208,6 +209,11 @@ export default function App() {
   const { data: startupFolderResponse } = useQuery({
     queryKey: ['startup-folder'],
     queryFn: api.getStartupFolder,
+  })
+
+  const { data: repoLayoutResponse, isFetched: repoLayoutFetched } = useQuery({
+    queryKey: ['repo-layout'],
+    queryFn: api.getRepoLayout,
   })
 
   const { data: gitContext } = useQuery({
@@ -351,6 +357,27 @@ export default function App() {
       searchLimit,
     })
   }, [currentBranch, generatedLocalVisibility, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
+
+  useEffect(() => {
+    // Only persist once the initial view state has actually been resolved (startup
+    // open-target checked, and — when applicable — the saved layout tier applied).
+    // Otherwise this would race the restoration effect above and overwrite the
+    // saved .gitlocal/.layout with transient defaults before it's ever read back.
+    if (!startupOpenTargetFetched) return
+    if (!startupOpenTargetResponse?.target && !savedRepoLayoutAppliedRef.current) return
+    if (!info || info.pickerMode) return
+
+    api
+      .updateRepoLayout({
+        layout: {
+          branch: currentBranch || null,
+          path: selectedPath || null,
+          pathType: selectedPathType,
+          raw: showRaw,
+        },
+      })
+      .catch(() => {})
+  }, [currentBranch, info, selectedPath, selectedPathType, showRaw, startupOpenTargetFetched, startupOpenTargetResponse])
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
@@ -590,7 +617,21 @@ export default function App() {
     if (!startupOpenTargetFetched) return
     if (!target) {
       if (savedInitialViewerStateAppliedRef.current) return
+      if (!repoLayoutFetched) return
       savedInitialViewerStateAppliedRef.current = true
+      savedRepoLayoutAppliedRef.current = true
+
+      const savedLayout = repoLayoutResponse?.layout
+      if (savedLayout && (savedLayout.path || savedLayout.branch)) {
+        setSelectedPath(savedLayout.path ?? '')
+        setSelectedPathType(savedLayout.pathType)
+        setShowRaw(savedLayout.raw)
+        if (savedLayout.branch) {
+          setCurrentBranch(savedLayout.branch)
+        }
+        return
+      }
+
       const saved = savedInitialViewerStateRef.current
       if (info && !info.pickerMode && saved.repoPath && info.path && saved.repoPath !== info.path) {
         setSelectedPath('')
@@ -614,7 +655,7 @@ export default function App() {
     }
 
     applyOpenFailure(target.message || 'GitLocal could not open the requested startup file.', true)
-  }, [applyAcceptedOpenTarget, applyOpenFailure, info, invalidateWorkspaceQueries, startupOpenTargetFetched, startupOpenTargetResponse])
+  }, [applyAcceptedOpenTarget, applyOpenFailure, info, invalidateWorkspaceQueries, repoLayoutFetched, repoLayoutResponse, startupOpenTargetFetched, startupOpenTargetResponse])
 
   useEffect(() => {
     if (startupFolderFallbackAppliedRef.current) return
