@@ -24,8 +24,6 @@ import {
   startupOpenTargetHandler,
   startupFolderHandler,
   startupFolderUpdateHandler,
-  repoLayoutHandler,
-  repoLayoutUpdateHandler,
 } from './handlers/repo.js'
 import {
   treeHandler,
@@ -289,8 +287,6 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/repo/changes', repositoryChangesHandler)
   app.get('/api/repo/location', repositoryLocationHandler)
   app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
-  app.get('/api/repo/layout', repoLayoutHandler)
-  app.put('/api/repo/layout', repoLayoutUpdateHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
 

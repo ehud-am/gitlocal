@@ -404,21 +404,6 @@ export interface DefaultReaderPreferenceResponse {
   message: string
 }
 
-export interface RepoLayout {
-  branch: string | null
-  path: string | null
-  pathType: ViewerPathType
-  raw: boolean
-}
-
-export interface RepoLayoutResponse {
-  layout: RepoLayout
-}
-
-export interface RepoLayoutUpdateRequest {
-  layout: RepoLayout
-}
-
 export interface FolderCreateChildRequest {
   parentPath: string
   name: string
@@ -587,35 +572,6 @@ export interface SearchResponse {
   partial?: boolean
   nextCursor?: string
   results: SearchResult[]
-}
-
-export type PaneKind = 'content' | 'terminal'
-export type WorkspaceLayoutMode = 'tabbed' | '2-column' | '4-tile' | '6-tile'
-export type TerminalConnectionState = 'connecting' | 'connected' | 'ended' | 'error'
-
-export interface Pane {
-  id: string
-  kind: PaneKind
-  /** Repository-relative file path. Present only when kind === 'content'. */
-  contentPath?: string
-  /** Server-side terminal session id. Present only when kind === 'terminal', once connected. */
-  terminalSessionId?: string
-  /** Display label for the tab/tile — file basename for Content Panes, "Terminal N" for Terminal Panes. */
-  title: string
-}
-
-export interface WorkspaceState {
-  panes: Pane[]
-  activePaneId: string | null
-  layoutMode: WorkspaceLayoutMode
-  tilePaneIds: string[]
-}
-
-export const WORKSPACE_LAYOUT_TILE_CAPACITY: Record<WorkspaceLayoutMode, number> = {
-  tabbed: 1,
-  '2-column': 2,
-  '4-tile': 4,
-  '6-tile': 6,
 }
 
 export interface SyncStatus {

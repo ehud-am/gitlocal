@@ -12,8 +12,6 @@ interface Props {
   isGitRepo?: boolean
   generatedLocalVisibility?: GeneratedLocalVisibility
   onSelect: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
-  /** Cmd/Ctrl-click on a file opens it as a new workspace tab instead of replacing the current selection (T012). */
-  onOpenInNewTab?: (path: string, localOnly: boolean) => void
 }
 
 interface NodeState {
@@ -53,7 +51,6 @@ export default function FileTree({
   isGitRepo = false,
   generatedLocalVisibility = 'show',
   onSelect,
-  onOpenInNewTab,
 }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
   const [showDotfiles, setShowDotfiles] = useState(true)
@@ -201,12 +198,10 @@ export default function FileTree({
               isSelected={selectedPath === node.path}
               depth={depth}
               showLocalOnly={isGitRepo}
-              onClick={(event) => {
+              onClick={() => {
                 if (node.type === 'dir') {
                   onSelect(node.path, 'dir', Boolean(node.localOnly))
                   toggleDir(node)
-                } else if (onOpenInNewTab && (event.metaKey || event.ctrlKey)) {
-                  onOpenInNewTab(node.path, Boolean(node.localOnly))
                 } else {
                   onSelect(node.path, 'file', Boolean(node.localOnly))
                 }

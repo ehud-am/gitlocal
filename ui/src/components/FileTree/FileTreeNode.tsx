@@ -1,4 +1,3 @@
-import type React from 'react'
 import type { TreeNode } from '../../types'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
@@ -9,7 +8,7 @@ interface Props {
   isSelected: boolean
   depth: number
   showLocalOnly: boolean
-  onClick: (event: React.MouseEvent) => void
+  onClick: () => void
 }
 
 const FolderIcon = ({ open }: { open: boolean }) => (
@@ -49,7 +48,7 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, show
     <div
       className={`file-tree-node${isSelected ? ' selected' : ''}`}
       style={{ paddingLeft: `${8 + depth * 16}px` }}
-      onClick={(event) => onClick(event)}
+      onClick={onClick}
       role="treeitem"
       aria-expanded={node.type === 'dir' ? isExpanded : undefined}
       aria-selected={isSelected}

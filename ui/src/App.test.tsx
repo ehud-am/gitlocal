@@ -12,8 +12,6 @@ vi.mock('./services/api', () => ({
     getInfo: vi.fn(),
     getStartupOpenTarget: vi.fn(),
     getStartupFolder: vi.fn(),
-    getRepoLayout: vi.fn(),
-    updateRepoLayout: vi.fn(),
     getDefaultReaderPreference: vi.fn(),
     updateDefaultReaderPreference: vi.fn(),
     getGitContext: vi.fn(),
@@ -174,12 +172,6 @@ describe('App', () => {
 
     vi.mocked(api.getInfo).mockResolvedValue(buildInfo('main'))
     vi.mocked(api.getStartupOpenTarget).mockResolvedValue({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValue({
-      layout: { branch: null, path: null, pathType: 'none', raw: false },
-    })
-    vi.mocked(api.updateRepoLayout).mockResolvedValue({
-      layout: { branch: null, path: null, pathType: 'none', raw: false },
-    })
     vi.mocked(api.getStartupFolder).mockResolvedValue({
       path: '/tmp/repo',
       source: 'last-used',
@@ -467,129 +459,6 @@ describe('App', () => {
       expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
     })
     expect(await screen.findByText('Opened docs/guide.md.')).toBeInTheDocument()
-  })
-
-  it('restores the saved repo layout (branch, path, raw mode) when there is no startup-open target', async () => {
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: 'release', path: 'docs/guide.md', pathType: 'file', raw: true },
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'release', true)
-    })
-    // Raw mode renders the file through the syntax-highlighted code viewer, which
-    // splits text into multiple <span> nodes (e.g. `hljs-attribute`), so match on
-    // the code viewer's aggregate text content rather than an exact text node.
-    await waitFor(() => {
-      expect(document.querySelector('.code-viewer')?.textContent).toBe('guide content')
-    })
-  })
-
-  it('lets an explicit startup-open target win over a saved repo layout', async () => {
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: 'release', path: 'docs/README.md', pathType: 'file', raw: true },
-    })
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({
-      target: {
-        source: 'explicit-launch',
-        inputPath: '/tmp/repo/docs/guide.md',
-        rootPath: '/tmp/repo',
-        selectedPath: 'docs/guide.md',
-        selectedPathType: 'file',
-        status: 'accepted',
-        message: 'Opened docs/guide.md.',
-        receivedAt: '2026-07-05T12:00:00.000Z',
-        gitState: 'inside-repository',
-        openMode: 'file',
-        repositoryRootPath: '/tmp/repo',
-      },
-    })
-
-    renderWithClient()
-
-    expect(await screen.findByText('guide content')).toBeInTheDocument()
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
-    })
-    expect(await screen.findByText('Opened docs/guide.md.')).toBeInTheDocument()
-  })
-
-  it('falls back to a valid branch when the saved repo layout branch no longer exists', async () => {
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: 'deleted-branch', path: 'README.md', pathType: 'file', raw: false },
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(screen.getByText('GitLocal reset the saved branch because it is not available in this repository.')).toBeInTheDocument()
-    })
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false)
-    })
-  })
-
-  it('restores a saved repo layout path without a saved branch, keeping the current branch', async () => {
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: null, path: 'docs/guide.md', pathType: 'file', raw: false },
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
-    })
-  })
-
-  it('restores a saved repo layout branch without a saved path', async () => {
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: 'main', path: null, pathType: 'none', raw: false },
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /branch selector/i })).toHaveValue('main')
-    })
-  })
-
-  it('restores a saved path/raw mode with a null branch for a plain non-git folder', async () => {
-    vi.mocked(api.getInfo).mockResolvedValue({
-      name: 'folder',
-      path: '/tmp/repo',
-      currentBranch: '',
-      isGitRepo: false,
-      pickerMode: false,
-      version: APP_VERSION.version,
-      hasCommits: false,
-      rootEntryCount: 1,
-      gitContext: null,
-    })
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockResolvedValueOnce({
-      layout: { branch: null, path: 'docs/guide.md', pathType: 'file', raw: true },
-    })
-
-    renderWithClient()
-
-    await waitFor(() => {
-      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', '', true)
-    })
-  })
-
-  it('does not block restoring the initial view state when fetching the saved repo layout fails', async () => {
-    vi.mocked(api.getStartupOpenTarget).mockResolvedValueOnce({ target: null })
-    vi.mocked(api.getRepoLayout).mockRejectedValueOnce(new Error('boom'))
-
-    renderWithClient()
-
-    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
   })
 
   it('opens a second Markdown file from a native open-file event while running', async () => {
@@ -1454,14 +1323,13 @@ describe('App', () => {
         }
       }
 
-      const pathType = path === 'docs' ? 'dir' : path ? 'file' : 'none'
       return buildSyncStatus({
         branch: branch ?? currentBranch,
         workingTreeRevision: `${branch ?? currentBranch}-rev`,
         currentPath: path ?? '',
         resolvedPath: path ?? '',
-        currentPathType: pathType,
-        resolvedPathType: pathType,
+        currentPathType: path ? 'file' : 'none',
+        resolvedPathType: path ? 'file' : 'none',
         pathSyncState: path ? 'clean' : 'none',
         repoSync: {
           mode: 'up-to-date',
@@ -1627,81 +1495,6 @@ describe('App', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(api.deleteFile).not.toHaveBeenCalled()
     expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
-  }, 15000)
-
-  it('opens a second workspace tab when a file is Cmd/Ctrl-clicked in the tree', async () => {
-    renderWithClient()
-
-    const tree = await screen.findByRole('tree', { name: /repository files/i })
-    // Expand docs first (before selecting README.md) so the folder click below doesn't navigate
-    // away from README.md and tear down the primary pane.
-    fireEvent.click(await within(tree).findByText('docs'))
-    const guideNode = await within(tree).findByText('guide.md')
-
-    fireEvent.click(await within(tree).findByText('README.md'))
-    expect(await screen.findByRole('tablist', { name: /open panes/i })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab')).toHaveLength(1)
-
-    fireEvent.click(guideNode, { ctrlKey: true })
-
-    await waitFor(() => {
-      expect(screen.getAllByRole('tab')).toHaveLength(2)
-    })
-    const tabs = screen.getAllByRole('tab')
-    expect(tabs.map((tab) => tab.textContent)).toEqual(expect.arrayContaining([
-      expect.stringContaining('README.md'),
-      expect.stringContaining('guide.md'),
-    ]))
-    // Cmd/Ctrl-click opens a new tab (now active/visible) without closing the README.md tab.
-    expect(await screen.findByText('guide content')).toBeInTheDocument()
-    expect(screen.getAllByRole('tab')).toHaveLength(2)
-  })
-
-  it('shows the empty-tile placeholder and reopens the sidebar after closing the primary pane tab directly', async () => {
-    renderWithClient()
-
-    const tree = await screen.findByRole('tree', { name: /repository files/i })
-    fireEvent.click(await within(tree).findByText('README.md'))
-    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
-
-    const closeButton = await screen.findByRole('button', { name: /close readme\.md/i })
-    fireEvent.click(closeButton)
-
-    const openFileButton = await screen.findByRole('button', { name: /^open a file$/i })
-    fireEvent.click(openFileButton)
-
-    // Collapsing/expanding the nav rail is the observable effect of onOpenFileRequested.
-    expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
-  })
-
-  it('deletes the currently open primary-pane file from within the workspace tile', async () => {
-    vi.mocked(api.deleteFile).mockResolvedValue({
-      ok: true,
-      operation: 'delete',
-      status: 'deleted',
-      message: 'README.md deleted.',
-      path: 'README.md',
-    })
-
-    renderWithClient()
-
-    const tree = await screen.findByRole('tree', { name: /repository files/i })
-    fireEvent.click(await within(tree).findByText('README.md'))
-    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
-
-    await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
-    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
-
-    const dialog = await screen.findByRole('alertdialog')
-    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
-      target: { value: 'README.md' },
-    })
-    fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
-
-    await waitFor(() => {
-      expect(api.deleteFile).toHaveBeenCalledWith({ path: 'README.md', revisionToken: 'readme-rev' })
-    })
-    expect(await screen.findByText('README.md deleted.')).toBeInTheDocument()
   }, 15000)
 
   it('opens the picker page and footer in picker mode', async () => {
