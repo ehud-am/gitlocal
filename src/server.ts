@@ -43,6 +43,12 @@ import {
 } from './handlers/folder.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
+import {
+  closeTerminalSessionHandler,
+  createTerminalSessionHandler,
+  listTerminalSessionsHandler,
+  terminalCapabilitiesHandler,
+} from './handlers/terminal.js'
 import { classifyLocalPath } from './git/repo.js'
 import { resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
@@ -289,6 +295,10 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
+  app.post('/api/terminal/sessions', createTerminalSessionHandler)
+  app.get('/api/terminal/sessions', listTerminalSessionsHandler)
+  app.delete('/api/terminal/sessions/:id', closeTerminalSessionHandler)
+  app.get('/api/terminal/capabilities', terminalCapabilitiesHandler)
 
   // Static file serving with SPA fallback
   const uiDir = join(import.meta.dirname, '../ui/dist')

@@ -593,3 +593,61 @@ export interface SyncStatus {
   activePathNotice?: BackgroundChangeNotice
   changedFilesSummary?: ChangedFilesSummary
 }
+
+// Integrated terminal panel (feature 032). Server-side counterparts live in
+// `src/terminal/types.ts`; kept in sync by hand since the server bundle and UI bundle are
+// built separately and don't share a types module.
+
+export type TerminalKind = 'regular' | 'claude' | 'codex'
+
+export type TerminalSessionStatus = 'starting' | 'running' | 'exited' | 'unavailable'
+
+export interface TerminalExitInfo {
+  code: number | null
+  signal: string | null
+}
+
+export interface TerminalSession {
+  id: string
+  kind: TerminalKind
+  cwd: string
+  status: TerminalSessionStatus
+  createdAt: string
+  exitInfo: TerminalExitInfo | null
+}
+
+export type TerminalContextType = 'file' | 'dir' | 'none'
+
+export interface CreateTerminalSessionRequest {
+  kind: TerminalKind
+  contextPath?: string
+  contextType?: TerminalContextType
+}
+
+export type TerminalUnavailableErrorCode = 'cli_not_found' | 'pty_unavailable'
+
+export interface TerminalUnavailableResponse {
+  error: TerminalUnavailableErrorCode
+  message: string
+}
+
+export interface TerminalCapabilities {
+  available: boolean
+  claudeCliFound: boolean
+  codexCliFound: boolean
+}
+
+// Client-side UI state, per data-model.md — not mirrored server-side.
+export interface TerminalTabRef {
+  id: string
+  kind: TerminalKind
+  label: string
+  cwd: string
+  status: TerminalSessionStatus
+}
+
+export interface TerminalPanelState {
+  visible: boolean
+  tabs: TerminalTabRef[]
+  activeTabId: string | null
+}

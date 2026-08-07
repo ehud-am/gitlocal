@@ -7,6 +7,7 @@ import PickerPage from './components/Picker/PickerPage'
 import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
+import { TerminalPanel } from './components/TerminalPanel/TerminalPanel'
 import AppFooter from './components/AppFooter'
 import {
   FolderDeleteDialog,
@@ -1397,6 +1398,8 @@ export default function App() {
             </div>
           </main>
         </div>
+
+        <TerminalPanel />
 
         <AppFooter version={info?.version ?? ''} />
       </div>

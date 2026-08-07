@@ -14,8 +14,10 @@ export default defineConfig({
       // Excluded from the 90% gate (same rationale as Go's main/openBrowser):
       //   - main.tsx       : entry point, not unit-testable
       //   - App.tsx        : integration-level component, tested via e2e
-      //   - api.ts         : HTTP client, mocked in all component tests
+      //   - api.ts / terminalApi.ts: HTTP/WS clients, mocked in all component tests
       //   - MarkdownRenderer / CodeViewer: mocked in ContentPanel tests
+      //   - TerminalPanel / TerminalView / useTerminalPanel: dedicated tests land with US1
+      //     (specs/032-integrated-terminal-panel/tasks.md T019/T020) — added to this list then
       include: [
         'src/App.tsx',
         'src/components/FileTree/**/*.tsx',
