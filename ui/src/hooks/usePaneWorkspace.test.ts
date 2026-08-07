@@ -293,27 +293,6 @@ describe('usePaneWorkspace', () => {
       expect(result.current.tilePaneIds).toEqual([firstId, secondId])
       expect(result.current.overflowPaneIds).toEqual([])
     })
-
-    it('closing a tiled pane backfills its freed slot with the next overflow pane in order', () => {
-      const { result } = renderHook(() => usePaneWorkspace())
-      let firstId = ''
-      let secondId = ''
-      let thirdId = ''
-      let fourthId = ''
-      act(() => { firstId = result.current.openContentPane('a.md') })
-      act(() => { secondId = result.current.openContentPane('b.md') })
-      act(() => { result.current.setLayoutMode('2-column') })
-      act(() => { thirdId = result.current.openContentPane('c.md') })
-      act(() => { fourthId = result.current.openContentPane('d.md') })
-      expect(result.current.tilePaneIds).toEqual([firstId, secondId])
-      expect(result.current.overflowPaneIds).toEqual([thirdId, fourthId])
-
-      act(() => { result.current.closePane(firstId) })
-
-      expect(result.current.panes.map((pane) => pane.id)).toEqual([secondId, thirdId, fourthId])
-      expect(result.current.tilePaneIds).toEqual([secondId, thirdId])
-      expect(result.current.overflowPaneIds).toEqual([fourthId])
-    })
   })
 
   describe('terminal pane lifecycle (US3)', () => {

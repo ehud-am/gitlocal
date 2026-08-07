@@ -25,9 +25,6 @@ export default defineConfig({
           ) {
             return 'markdown'
           }
-          if (id.includes('/node_modules/@xterm/')) {
-            return 'xterm'
-          }
         },
       },
     },

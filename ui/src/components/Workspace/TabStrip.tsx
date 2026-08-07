@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react'
 import type { Pane } from '../../types'
 
 interface TabStripProps {
@@ -13,32 +13,6 @@ interface TabStripProps {
  * many tabs open (20+, per Edge Cases) via horizontal scrolling rather than wrapping/clipping.
  */
 export default function TabStrip({ panes, activePaneId, onSelect, onClose }: TabStripProps) {
-  const previousPaneIdsRef = useRef<Set<string>>(new Set(panes.map((pane) => pane.id)))
-  const closedActivePaneRef = useRef(false)
-
-  useEffect(() => {
-    const currentPaneIds = new Set(panes.map((pane) => pane.id))
-    const previousPaneIds = previousPaneIdsRef.current
-    const paneWasRemoved = [...previousPaneIds].some((id) => !currentPaneIds.has(id))
-    previousPaneIdsRef.current = currentPaneIds
-
-    if (closedActivePaneRef.current && paneWasRemoved) {
-      closedActivePaneRef.current = false
-      if (activePaneId) {
-        // Move focus to the newly-active tab so closing the focused tab never silently drops
-        // keyboard focus to <body> (a11y regression for keyboard-only users).
-        document.getElementById(`workspace-tab-${activePaneId}`)?.focus()
-      }
-    }
-  }, [panes, activePaneId])
-
-  function handleClose(paneId: string): void {
-    if (paneId === activePaneId) {
-      closedActivePaneRef.current = true
-    }
-    onClose(paneId)
-  }
-
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, paneId: string, index: number): void {
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -50,7 +24,7 @@ export default function TabStrip({ panes, activePaneId, onSelect, onClose }: Tab
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
-      handleClose(paneId)
+      onClose(paneId)
     }
   }
 
@@ -87,7 +61,7 @@ export default function TabStrip({ panes, activePaneId, onSelect, onClose }: Tab
               aria-label={`Close ${pane.title || 'Untitled'}`}
               onClick={(event) => {
                 event.stopPropagation()
-                handleClose(pane.id)
+                onClose(pane.id)
               }}
             >
               <span aria-hidden="true">&times;</span>

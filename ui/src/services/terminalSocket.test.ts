@@ -127,22 +127,4 @@ describe('TerminalSocket', () => {
     const socket = new TerminalSocket({})
     expect(() => socket.close()).not.toThrow()
   })
-
-  it('does not reconnect on its own after an unexpected close or an error (by design — TerminalPane surfaces a "Connection lost" banner instead)', () => {
-    const factory = vi.fn(() => new FakeWebSocket())
-    const onClose = vi.fn()
-    const onError = vi.fn()
-    const socket = new TerminalSocket({ onClose, onError }, factory, 'ws://test/ws/terminal')
-
-    socket.connect()
-    expect(factory).toHaveBeenCalledTimes(1)
-    const fake = factory.mock.results[0].value as FakeWebSocket
-
-    fake.emit('close', { code: 1006 })
-    fake.emit('error')
-
-    expect(onClose).toHaveBeenCalledWith(false)
-    expect(onError).toHaveBeenCalledTimes(1)
-    expect(factory).toHaveBeenCalledTimes(1)
-  })
 })

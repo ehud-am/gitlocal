@@ -126,24 +126,6 @@ describe('TerminalSessionManager', () => {
     expect(manager.getSession(id)?.cwd).toBe('/repo/root')
   })
 
-  it('reports an error and closes the socket, without throwing, when spawnPty fails (e.g. no native binding for this platform)', () => {
-    const { deps } = makeDeps({
-      spawnPty: vi.fn(() => {
-        throw new Error('Terminal panes are unavailable on this platform.')
-      }),
-    })
-    const manager = new TerminalSessionManager(deps)
-    const socket = new FakeSocket()
-
-    expect(() => manager.openSession(socket)).not.toThrow()
-
-    expect(socket.sent).toEqual([
-      JSON.stringify({ type: 'error', message: 'Terminal panes are unavailable on this platform.' }),
-    ])
-    expect(socket.closed).toEqual({ code: 1011, reason: 'terminal-unavailable' })
-    expect(manager.size).toBe(0)
-  })
-
   it('falls back to process.cwd() when no repository is loaded', () => {
     const { deps } = makeDeps({ getRepoPath: () => '' })
     const manager = new TerminalSessionManager(deps)

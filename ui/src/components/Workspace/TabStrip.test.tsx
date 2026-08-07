@@ -1,30 +1,8 @@
-import { useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import TabStrip from './TabStrip'
 import type { Pane } from '../../types'
-
-/** A thin stateful wrapper so closing a tab actually removes it and re-derives activePaneId,
- * mirroring how `usePaneWorkspace.closePane` drives `TabStrip` in the real app. */
-function StatefulTabStrip({ initialPanes, initialActivePaneId }: { initialPanes: Pane[]; initialActivePaneId: string | null }) {
-  const [panes, setPanes] = useState(initialPanes)
-  const [activePaneId, setActivePaneId] = useState(initialActivePaneId)
-
-  function handleClose(paneId: string): void {
-    const closedIndex = panes.findIndex((pane: Pane) => pane.id === paneId)
-    const nextPanes = panes.filter((pane: Pane) => pane.id !== paneId)
-    setPanes(nextPanes)
-    setActivePaneId((previous: string | null) => {
-      if (previous !== paneId) return previous
-      if (nextPanes.length === 0) return null
-      const nextIndex = Math.min(closedIndex, nextPanes.length - 1)
-      return nextPanes[nextIndex].id
-    })
-  }
-
-  return <TabStrip panes={panes} activePaneId={activePaneId} onSelect={setActivePaneId} onClose={handleClose} />
-}
 
 function makePane(overrides: Partial<Pane> & { id: string }): Pane {
   return {
@@ -143,40 +121,5 @@ describe('TabStrip', () => {
     render(<TabStrip panes={panes} activePaneId="a" onSelect={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByRole('tab', { name: 'a' })).toHaveAttribute('tabIndex', '0')
     expect(screen.getByRole('tab', { name: 'b' })).toHaveAttribute('tabIndex', '-1')
-  })
-
-  it('moves keyboard focus to the new active tab after closing the active tab (a11y)', async () => {
-    const user = userEvent.setup()
-    const panes = [makePane({ id: 'a' }), makePane({ id: 'b' }), makePane({ id: 'c' })]
-    render(<StatefulTabStrip initialPanes={panes} initialActivePaneId="b" />)
-
-    await user.click(screen.getByRole('button', { name: 'Close b' }))
-
-    expect(screen.queryByRole('tab', { name: 'b' })).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'c' })).toHaveFocus()
-  })
-
-  it('does not steal focus when closing a tab other than the active one (a11y)', async () => {
-    const user = userEvent.setup()
-    const panes = [makePane({ id: 'a' }), makePane({ id: 'b' }), makePane({ id: 'c' })]
-    render(<StatefulTabStrip initialPanes={panes} initialActivePaneId="a" />)
-
-    const closeB = screen.getByRole('button', { name: 'Close b' })
-    closeB.focus()
-    await user.click(closeB)
-
-    expect(screen.queryByRole('tab', { name: 'b' })).not.toBeInTheDocument()
-    // Closing a background tab must not redirect focus to the (unrelated) active tab.
-    expect(screen.getByRole('tab', { name: 'a' })).not.toHaveFocus()
-  })
-
-  it('does not throw when closing the last remaining tab leaves no active pane to focus', async () => {
-    const user = userEvent.setup()
-    const panes = [makePane({ id: 'a' })]
-    render(<StatefulTabStrip initialPanes={panes} initialActivePaneId="a" />)
-
-    await user.click(screen.getByRole('button', { name: 'Close a' }))
-
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 })
