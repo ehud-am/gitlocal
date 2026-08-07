@@ -114,13 +114,20 @@ export class TerminalSessionManager {
   openSession(socket: TerminalSocketLike): string {
     const id = generateSessionId()
     const cwd = this.deps.getRepoPath() || process.cwd()
-    const pty = this.deps.spawnPty(resolveDefaultShell(), [], {
-      name: 'xterm-color',
-      cols: 80,
-      rows: 24,
-      cwd,
-      env: process.env,
-    })
+    let pty: IPty
+    try {
+      pty = this.deps.spawnPty(resolveDefaultShell(), [], {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 24,
+        cwd,
+        env: process.env,
+      })
+    } catch (err) {
+      socket.send(JSON.stringify({ type: 'error', message: err instanceof Error ? err.message : String(err) }))
+      socket.close(1011, 'terminal-unavailable')
+      return id
+    }
 
     const session: TerminalSession = { id, pty, cwd, socket }
     this.sessions.set(id, session)
