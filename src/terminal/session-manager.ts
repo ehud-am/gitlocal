@@ -27,6 +27,7 @@ export type PtyFactory = (options: SpawnPtyOptions) => Promise<PtyLike>
 // cannot bundle it (it's marked --external in package.json), and a static import would force
 // every consumer of this module — including unit tests that inject a fake PtyFactory — to load
 // the native binary. The dynamic import here confines that requirement to real PTY spawns only.
+/* v8 ignore start -- native node-pty binary is not loadable in unit tests by design; only exercised via a real shell in integration tests */
 export const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
   const nodePty = await import('node-pty')
   return nodePty.spawn(shell, [], {
@@ -37,6 +38,7 @@ export const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
     env: process.env as Record<string, string>,
   })
 }
+/* v8 ignore stop */
 
 function defaultShellCommand(): string {
   return process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/sh'
