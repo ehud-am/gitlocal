@@ -7,7 +7,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/cli.ts', 'src/services/terminal-server.ts'],
+      exclude: ['src/cli.ts'],
       thresholds: {
         perFile: true,
         lines: 90,

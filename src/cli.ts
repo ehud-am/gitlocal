@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     }
   })
 
-  const terminalServer = attachTerminalServer(server, getRepoPath)
+  const terminalServer = await attachTerminalServer(server, getRepoPath)
 
   const shutdown = (): void => {
     console.log('\nShutting down...')

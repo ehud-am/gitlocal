@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.17 - 2026-08-06
+
+- Fixed GitLocal crashing on startup on every platform: the server bundle's ESM build wrapped `ws` and `node-pty` in a `require()` shim with no real `require` at runtime, so both packages (and the whole app) failed before the server ever bound a port. Both are now externalized from the bundle and shipped as real dependencies instead.
+- Fixed the macOS app package not including `ws`/`node-pty` at all, which would have broken the app even after the above fix; both are now copied into the packaged app's resources.
+- Fixed GitLocal crashing entirely if `node-pty`'s native binding fails to load for any reason (unsupported platform/arch, no prebuild, no build toolchain) — terminal panes now fail gracefully with a clear in-pane error instead of taking down the whole app.
+- Added CSS styling for the multi-pane workspace UI (tabs, tiled layouts, terminal panes, layout switcher) introduced in the previous release, which had shipped unstyled.
+- Fixed keyboard focus silently dropping to the page body when closing the active workspace tab; focus now moves to the newly-active tab.
+- Reduced the UI's main JS bundle size by splitting `xterm.js` into its own chunk, fixing a chunk-size warning regression.
+
 ## 0.9.16 - 2026-08-04
 
 - Fixed the macOS app packaging script, which had been failing on every release since 0.9.13 for unrelated CI/release-automation reasons and, as of this release, because newer Node.js 24.x macOS builds no longer ship a separate `libnode` shared library. The packaged app only ever executed the standalone `node` binary as a subprocess, so the shared library was never actually required; the dead dependency has been removed.

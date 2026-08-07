@@ -25,10 +25,16 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO
 
 rm -rf "${GITLOCAL_RESOURCES}" "${RUNTIME_RESOURCES}"
-mkdir -p "${GITLOCAL_RESOURCES}/ui" "${RUNTIME_RESOURCES}"
+mkdir -p "${GITLOCAL_RESOURCES}/ui" "${GITLOCAL_RESOURCES}/node_modules" "${RUNTIME_RESOURCES}"
 cp -R "${ROOT_DIR}/dist" "${GITLOCAL_RESOURCES}/dist"
 cp -R "${ROOT_DIR}/ui/dist" "${GITLOCAL_RESOURCES}/ui/dist"
 cp "${ROOT_DIR}/package.json" "${GITLOCAL_RESOURCES}/package.json"
+
+# dist/cli.js requires "ws" and "node-pty" at runtime instead of bundling them
+# (native addons and dynamic requires of Node builtins can't survive esbuild's
+# ESM bundle output), so both must ship alongside the bundle.
+cp -R "${ROOT_DIR}/node_modules/ws" "${GITLOCAL_RESOURCES}/node_modules/ws"
+cp -R "${ROOT_DIR}/node_modules/node-pty" "${GITLOCAL_RESOURCES}/node_modules/node-pty"
 
 NODE_PATH="$(command -v node)"
 cp "${NODE_PATH}" "${RUNTIME_RESOURCES}/node"

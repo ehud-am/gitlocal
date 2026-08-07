@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.9.16",
+  "version": "0.9.17",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -37,7 +37,7 @@
   ],
   "scripts": {
     "build:ui": "npm --prefix ui run build",
-    "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
+    "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --external:ws --external:node-pty --outfile=dist/index.js && esbuild src/cli.ts --bundle --platform=node --format=esm --external:ws --external:node-pty --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
     "build": "npm run build:ui && npm run build:server && chmod +x dist/cli.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:server": "node --watch --experimental-strip-types src/cli.ts .",
