@@ -12,6 +12,8 @@ test -f "${APP_PATH}/Contents/Resources/gitlocal/package.json"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/dist/cli.js"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/dist/index.js"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/ui/dist/index.html"
+test -d "${APP_PATH}/Contents/Resources/gitlocal/node_modules/ws"
+test -d "${APP_PATH}/Contents/Resources/gitlocal/node_modules/node-pty"
 
 APP_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP_PATH}/Contents/Info.plist")"
 PACKAGE_VERSION="$(node -p "require(process.cwd() + '/package.json').version")"
