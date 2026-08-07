@@ -28,9 +28,6 @@ export default defineConfig({
         'src/components/ui/dialog.tsx',
         'src/components/ui/meta-tag.tsx',
         'src/lib/sync.ts',
-        'src/hooks/usePaneWorkspace.ts',
-        'src/components/Workspace/**/*.tsx',
-        'src/services/terminalSocket.ts',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts'],
       thresholds: {

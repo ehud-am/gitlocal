@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
-import FileTree from './components/FileTree/FileTree'
 import ContentPanel from './components/ContentPanel/ContentPanel'
-import WorkspaceShell from './components/Workspace/WorkspaceShell'
-import { usePaneWorkspace } from './hooks/usePaneWorkspace'
+import FileTree from './components/FileTree/FileTree'
 import PickerPage from './components/Picker/PickerPage'
 import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
@@ -196,8 +194,6 @@ export default function App() {
   const nativeRefreshPendingRef = useRef(false)
   const startupOpenTargetAppliedRef = useRef('')
   const startupFolderFallbackAppliedRef = useRef(false)
-  const workspace = usePaneWorkspace()
-  const primaryPaneIdRef = useRef<string | null>(null)
 
   const { data: baseInfo, isLoading, isError: isInfoError, error: infoError } = useQuery({
     queryKey: ['info'],
@@ -628,53 +624,6 @@ export default function App() {
     startupFolderFallbackAppliedRef.current = true
     setStatusMessage(fallbackReason)
   }, [info, startupFolderResponse])
-
-  // Mirrors the classic single-file selection into the workspace's "primary" pane, so the tab
-  // strip and tiled layouts (US1/US2) layer additively on top of the pre-existing selectedPath
-  // flow without altering any of its side effects (sync status, branch switching, startup
-  // targets). Only Content Panes are mirrored — Terminal Panes are opened explicitly by the
-  // user and are never a "primary" pane. Re-syncs only when `selectedPath` itself changes (an
-  // explicit navigation via handleSelectFile/handleSelectFolder/etc.), so switching tabs by hand
-  // does not get fought by this effect on the next render. See specs/032-multi-pane-workspace/plan.md.
-  useEffect(() => {
-    const startupOpenTargetPendingNow = !startupOpenTargetFetched
-    const startupOpenTargetBlocksSavedSelectionNow = Boolean(
-      startupOpenTargetResponse?.target && startupOpenTargetResponse.target.status !== 'accepted',
-    )
-    const nextVisiblePath = hasRepoMismatch || startupOpenTargetPendingNow || startupOpenTargetBlocksSavedSelectionNow ? '' : selectedPath
-    const nextVisiblePathType: ViewerPathType = hasRepoMismatch || startupOpenTargetPendingNow || startupOpenTargetBlocksSavedSelectionNow ? 'none' : selectedPathType
-
-    const primaryPaneId = primaryPaneIdRef.current
-    const primaryPane = primaryPaneId ? workspace.panes.find((pane) => pane.id === primaryPaneId) : undefined
-
-    if (nextVisiblePathType !== 'file' || !nextVisiblePath) {
-      // The classic selection navigated away from a file (to a directory, the root dashboard, or
-      // nothing) — the primary pane always exactly mirrors `selectedPath`, so it closes here too.
-      // Extra tabs the user opened explicitly (via Cmd/Ctrl-click) are never the primary pane and
-      // are untouched by this effect.
-      if (primaryPane) {
-        workspace.closePane(primaryPane.id)
-      }
-      primaryPaneIdRef.current = null
-      return
-    }
-
-    if (primaryPane && primaryPane.contentPath === nextVisiblePath) {
-      workspace.selectPane(primaryPane.id)
-      return
-    }
-
-    // `usePaneWorkspace` has no "update pane path" action, so re-pointing the primary pane at a
-    // newly navigated-to file means closing the old primary pane and opening a fresh one — other
-    // tabs the user opened explicitly are untouched.
-    if (primaryPane) {
-      workspace.closePane(primaryPane.id)
-    }
-    primaryPaneIdRef.current = workspace.openContentPane(nextVisiblePath)
-    // workspace's action identities are stable (useCallback with narrow deps); including the
-    // whole object would re-run this effect on every pane-list change, which is not the intent.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasRepoMismatch, selectedPath, startupOpenTargetFetched, startupOpenTargetResponse])
 
   const showDefaultReaderPrompt =
     nativeDefaultReaderAvailable
@@ -1296,9 +1245,6 @@ export default function App() {
 
                     handleSelectFile(path, localOnly)
                   }}
-                  onOpenInNewTab={(path) => {
-                    workspace.openContentPane(path)
-                  }}
                 />
               </div>
             </aside>
@@ -1411,12 +1357,7 @@ export default function App() {
                       <p className="content-empty-detail">{startupOpenTargetResponse?.target?.message ?? statusMessage}</p>
                     </div>
                   </div>
-                ) : visibleSelectedPathType !== 'file' ? (
-                  // Directory browsing and the root dashboard are not Content Panes (they're not
-                  // bound to one file — see data-model.md) and stay out of the tab/tile workspace
-                  // entirely, matching pre-existing single-view behavior exactly (T017). Any
-                  // explicitly-opened extra tabs remain in `workspace.panes` and reappear once the
-                  // user returns to viewing a file — they're just not reachable mid-directory-browse.
+                ) : (
                   <ContentPanel
                     canMutateFiles={canMutateFiles}
                     refreshToken={treeRefreshToken}
@@ -1450,44 +1391,6 @@ export default function App() {
                     raw={visibleShowRaw}
                     onRawChange={setShowRaw}
                     onStatusMessage={setStatusMessage}
-                  />
-                ) : (
-                  <WorkspaceShell
-                    workspace={workspace}
-                    onOpenFileRequested={() => setSidebarCollapsed(false)}
-                    primaryPanePath={visibleSelectedPath}
-                    primaryPathLocalOnly={visibleSelectedPathLocalOnly}
-                    primaryPathSyncState={selectedPathSyncState}
-                    contentPanelProps={{
-                      canMutateFiles,
-                      refreshToken: treeRefreshToken,
-                      nativeFindToken,
-                      nativeSelectAllToken,
-                      branch: currentBranch,
-                      isGitRepo: info?.isGitRepo,
-                      repoSummary,
-                      navigationHints,
-                      recentItems,
-                      generatedLocalVisibility,
-                      onNavigate: handleSelectFile,
-                      onOpenPath: (path, type, localOnly) => {
-                        if (type === 'dir') {
-                          handleSelectFolder(path, localOnly)
-                          return
-                        }
-                        handleSelectFile(path, localOnly)
-                      },
-                      onDirtyChange: setHasUnsavedChanges,
-                      onMutationComplete: (event) => { void handleMutationComplete(event) },
-                      onCreateFolderComplete: (event) => { void handleMutationComplete(event) },
-                      onDeleteFolder: (path) => { void openFolderDeleteDialog(path) },
-                      emptyStateTitle,
-                      emptyStateDetail,
-                      emptyStateActions,
-                      raw: visibleShowRaw,
-                      onRawChange: setShowRaw,
-                      onStatusMessage: setStatusMessage,
-                    }}
                   />
                 )}
               </div>
