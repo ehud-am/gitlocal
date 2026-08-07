@@ -16,8 +16,9 @@ export default defineConfig({
       //   - App.tsx        : integration-level component, tested via e2e
       //   - api.ts / terminalApi.ts: HTTP/WS clients, mocked in all component tests
       //   - MarkdownRenderer / CodeViewer: mocked in ContentPanel tests
-      //   - TerminalPanel / TerminalView / useTerminalPanel: dedicated tests land with US1
-      //     (specs/032-integrated-terminal-panel/tasks.md T019/T020) — added to this list then
+      //   - TerminalView: mounts real @xterm/xterm/WebSocket, not meaningfully assertable in
+      //     jsdom; exercised indirectly (mocked) by TerminalPanel.test.tsx and for real by the
+      //     server-side integration test (tests/integration/terminal.test.ts)
       include: [
         'src/App.tsx',
         'src/components/FileTree/**/*.tsx',
@@ -29,6 +30,8 @@ export default defineConfig({
         'src/components/ui/button.tsx',
         'src/components/ui/dialog.tsx',
         'src/components/ui/meta-tag.tsx',
+        'src/components/TerminalPanel/TerminalPanel.tsx',
+        'src/hooks/useTerminalPanel.ts',
         'src/lib/sync.ts',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts'],

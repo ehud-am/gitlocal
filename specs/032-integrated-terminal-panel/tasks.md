@@ -49,17 +49,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Unit tests for `session-manager.ts` lifecycle (`starting`→`running`→`exited`) using an injected fake PTY, in `tests/unit/terminal/session-manager.test.ts`
-- [ ] T014 [P] [US1] Contract tests for `POST/GET/DELETE /api/terminal/sessions` in `tests/unit/handlers/terminal.test.ts`
-- [ ] T015 [P] [US1] Integration test spawning a real shell (e.g. `sh -c 'echo hi'`), writing input, reading output, and closing, in `tests/integration/terminal.test.ts`
+- [x] T013 [P] [US1] Unit tests for `session-manager.ts` lifecycle (`starting`→`running`→`exited`) using an injected fake PTY, in `tests/unit/terminal/session-manager.test.ts`
+- [x] T014 [P] [US1] Contract tests for `POST/GET/DELETE /api/terminal/sessions` in `tests/unit/handlers/terminal.test.ts`
+- [x] T015 [P] [US1] Integration test spawning a real shell (e.g. `sh -c 'echo hi'`), writing input, reading output, and closing, in `tests/integration/terminal.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement `ui/src/components/TerminalPanel/TerminalView.tsx`: mount `@xterm/xterm` + `addon-fit`, connect to a session's WebSocket, wire input/output/resize (depends on T010, T012)
-- [ ] T017 [US1] Wire an "open terminal" action in `TerminalPanel.tsx` to create a Regular-kind session via `useTerminalPanel`/`terminalApi` and render its `TerminalView` (depends on T016)
-- [ ] T018 [US1] Default a new session's working directory to the repository root (simple default for this story; smart cwd-follow arrives in US5), resolved server-side in `src/handlers/terminal.ts`/`session-manager.ts` via the existing `classifyLocalPath()` in `src/git/repo.ts`
-- [ ] T019 [US1] [P] UI test confirming a running session's output/state is unchanged when unrelated App-level state changes (e.g. `selectedPath`/`viewerRepoPath`) without `TerminalPanel` unmounting, in `ui/src/components/TerminalPanel/TerminalPanel.test.tsx`
-- [ ] T020 [US1] [P] Regression test asserting no terminal state is read from `localStorage`/URL params on mount, so a full reload always starts with zero sessions (FR-016)
+- [x] T016 [US1] Implement `ui/src/components/TerminalPanel/TerminalView.tsx`: mount `@xterm/xterm` + `addon-fit`, connect to a session's WebSocket, wire input/output/resize (depends on T010, T012)
+- [x] T017 [US1] Wire an "open terminal" action in `TerminalPanel.tsx` to create a Regular-kind session via `useTerminalPanel`/`terminalApi` and render its `TerminalView` (depends on T016)
+- [x] T018 [US1] Default a new session's working directory to the repository root (simple default for this story; smart cwd-follow arrives in US5), resolved server-side in `src/handlers/terminal.ts`/`session-manager.ts` via the existing `classifyLocalPath()` in `src/git/repo.ts`
+- [x] T019 [US1] [P] UI test confirming a running session's output/state is unchanged when unrelated App-level state changes (e.g. `selectedPath`/`viewerRepoPath`) without `TerminalPanel` unmounting, in `ui/src/components/TerminalPanel/TerminalPanel.test.tsx`
+- [x] T020 [US1] [P] Regression test asserting no terminal state is read from `localStorage`/URL params on mount, so a full reload always starts with zero sessions (FR-016)
 
 **Checkpoint**: MVP — a user can open one persistent terminal that survives in-app navigation.
 
