@@ -1454,13 +1454,14 @@ describe('App', () => {
         }
       }
 
+      const pathType = path === 'docs' ? 'dir' : path ? 'file' : 'none'
       return buildSyncStatus({
         branch: branch ?? currentBranch,
         workingTreeRevision: `${branch ?? currentBranch}-rev`,
         currentPath: path ?? '',
         resolvedPath: path ?? '',
-        currentPathType: path ? 'file' : 'none',
-        resolvedPathType: path ? 'file' : 'none',
+        currentPathType: pathType,
+        resolvedPathType: pathType,
         pathSyncState: path ? 'clean' : 'none',
         repoSync: {
           mode: 'up-to-date',
@@ -1626,6 +1627,81 @@ describe('App', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(api.deleteFile).not.toHaveBeenCalled()
     expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+  }, 15000)
+
+  it('opens a second workspace tab when a file is Cmd/Ctrl-clicked in the tree', async () => {
+    renderWithClient()
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    // Expand docs first (before selecting README.md) so the folder click below doesn't navigate
+    // away from README.md and tear down the primary pane.
+    fireEvent.click(await within(tree).findByText('docs'))
+    const guideNode = await within(tree).findByText('guide.md')
+
+    fireEvent.click(await within(tree).findByText('README.md'))
+    expect(await screen.findByRole('tablist', { name: /open panes/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('tab')).toHaveLength(1)
+
+    fireEvent.click(guideNode, { ctrlKey: true })
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('tab')).toHaveLength(2)
+    })
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(expect.arrayContaining([
+      expect.stringContaining('README.md'),
+      expect.stringContaining('guide.md'),
+    ]))
+    // Cmd/Ctrl-click opens a new tab (now active/visible) without closing the README.md tab.
+    expect(await screen.findByText('guide content')).toBeInTheDocument()
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+  })
+
+  it('shows the empty-tile placeholder and reopens the sidebar after closing the primary pane tab directly', async () => {
+    renderWithClient()
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    fireEvent.click(await within(tree).findByText('README.md'))
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+
+    const closeButton = await screen.findByRole('button', { name: /close readme\.md/i })
+    fireEvent.click(closeButton)
+
+    const openFileButton = await screen.findByRole('button', { name: /^open a file$/i })
+    fireEvent.click(openFileButton)
+
+    // Collapsing/expanding the nav rail is the observable effect of onOpenFileRequested.
+    expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
+  })
+
+  it('deletes the currently open primary-pane file from within the workspace tile', async () => {
+    vi.mocked(api.deleteFile).mockResolvedValue({
+      ok: true,
+      operation: 'delete',
+      status: 'deleted',
+      message: 'README.md deleted.',
+      path: 'README.md',
+    })
+
+    renderWithClient()
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    fireEvent.click(await within(tree).findByText('README.md'))
+    expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete file$/i }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.change(within(dialog).getByLabelText(/file deletion confirmation name/i), {
+      target: { value: 'README.md' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^delete file$/i }))
+
+    await waitFor(() => {
+      expect(api.deleteFile).toHaveBeenCalledWith({ path: 'README.md', revisionToken: 'readme-rev' })
+    })
+    expect(await screen.findByText('README.md deleted.')).toBeInTheDocument()
   }, 15000)
 
   it('opens the picker page and footer in picker mode', async () => {

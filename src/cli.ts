@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { classifyLocalPath, validateRepo } from './git/repo.js'
 import { createApp, getRepoPath, getStartupOpenTarget } from './server.js'
 import { rememberStartupFolder, resolveStartupFolder } from './services/startup-preferences.js'
+import { attachTerminalServer } from './services/terminal-server.js'
 
 function checkNodeVersion(): void {
   const [major] = process.versions.node.split('.').map(Number)
@@ -98,8 +99,11 @@ async function main(): Promise<void> {
     }
   })
 
+  const terminalServer = attachTerminalServer(server, getRepoPath)
+
   const shutdown = (): void => {
     console.log('\nShutting down...')
+    terminalServer.close()
     server.close()
     process.exit(0)
   }
