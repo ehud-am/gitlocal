@@ -155,4 +155,28 @@ describe('TabStrip', () => {
     expect(screen.queryByRole('tab', { name: 'b' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'c' })).toHaveFocus()
   })
+
+  it('does not steal focus when closing a tab other than the active one (a11y)', async () => {
+    const user = userEvent.setup()
+    const panes = [makePane({ id: 'a' }), makePane({ id: 'b' }), makePane({ id: 'c' })]
+    render(<StatefulTabStrip initialPanes={panes} initialActivePaneId="a" />)
+
+    const closeB = screen.getByRole('button', { name: 'Close b' })
+    closeB.focus()
+    await user.click(closeB)
+
+    expect(screen.queryByRole('tab', { name: 'b' })).not.toBeInTheDocument()
+    // Closing a background tab must not redirect focus to the (unrelated) active tab.
+    expect(screen.getByRole('tab', { name: 'a' })).not.toHaveFocus()
+  })
+
+  it('does not throw when closing the last remaining tab leaves no active pane to focus', async () => {
+    const user = userEvent.setup()
+    const panes = [makePane({ id: 'a' })]
+    render(<StatefulTabStrip initialPanes={panes} initialActivePaneId="a" />)
+
+    await user.click(screen.getByRole('button', { name: 'Close a' }))
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  })
 })

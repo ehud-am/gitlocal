@@ -25,6 +25,7 @@ export async function attachTerminalServer(
   } catch (err) {
     console.error(
       'Terminal panes are unavailable: node-pty failed to load its native binding for this platform.',
+      /* v8 ignore next -- module resolution/native-binding load failures always throw Error instances */
       err instanceof Error ? err.message : err,
     )
     spawnPty = () => {
