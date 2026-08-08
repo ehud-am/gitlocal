@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { TerminalPanel } from './TerminalPanel'
 import { TerminalTabStrip } from './TerminalTabStrip'
@@ -210,6 +211,28 @@ describe('TerminalTabStrip', () => {
       const newTabButton = screen.getByRole('button', { name: 'New terminal tab' })
       expect(newTabButton).toBeDisabled()
       expect(newTabButton).toHaveTextContent('…')
+    })
+
+    it('has no accessibility violations across regular/claude/codex tabs (FR-014, SC-006, T043)', async () => {
+      const kindTabs: TerminalTabRef[] = [
+        { id: 't1', kind: 'regular', label: 'Terminal 1', cwd: '/repo', status: 'running' },
+        { id: 't2', kind: 'claude', label: 'Claude', cwd: '/repo', status: 'running' },
+        { id: 't3', kind: 'codex', label: 'Codex', cwd: '/repo', status: 'running' },
+      ]
+      const { container } = render(
+        <TerminalTabStrip
+          tabs={kindTabs}
+          activeTabId="t1"
+          onSelectTab={vi.fn()}
+          onCloseTab={vi.fn()}
+          onNewTab={vi.fn()}
+          creatingNewTab={false}
+          pendingKind="regular"
+          onPendingKindChange={vi.fn()}
+        />,
+      )
+
+      expect((await axe(container)).violations).toHaveLength(0)
     })
   })
 })

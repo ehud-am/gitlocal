@@ -153,7 +153,7 @@
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Accessibility pass: keyboard operability + correct ARIA roles/names/states for every `TerminalPanel` control (show/hide, tab open/close/switch, kind picker); extend `jest-axe` assertions in `TerminalPanel.test.tsx` and `TerminalTabStrip.test.tsx` (FR-014, SC-006)
+- [x] T043 [P] Accessibility pass: keyboard operability + correct ARIA roles/names/states for every `TerminalPanel` control (show/hide, tab open/close/switch, kind picker); extend `jest-axe` assertions in `TerminalPanel.test.tsx` and `TerminalTabStrip.test.tsx` (FR-014, SC-006)
 - [ ] T044 [P] Visual polish pass: align `TerminalPanel` styling with the app's existing minimal, GitHub-inspired design language (Principle V, FR-017)
 - [ ] T045 Validate `node-pty` native binary packaging end-to-end for both distributions: `npm run build` output and the macOS Homebrew app bundling step (`packaging/macos/`) each include the correct per-platform binary; this directly resolves the risk flagged in `plan.md` Complexity Tracking
 - [ ] T046 Run `quickstart.md` manual validation for all 5 user stories

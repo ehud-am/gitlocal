@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { TerminalPanel } from './TerminalPanel'
 import type { TerminalSession } from '../../types'
@@ -356,5 +357,41 @@ describe('TerminalPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
 
     expect(screen.getByTestId('terminal-panel-empty')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations in the empty (collapsed) state (FR-014, SC-006, T043)', async () => {
+    const { container } = render(<TerminalPanel />)
+    expect((await axe(container)).violations).toHaveLength(0)
+  })
+
+  it('has no accessibility violations once a tab is open (FR-014, SC-006, T043)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue({
+      id: 'session-1',
+      kind: 'regular',
+      cwd: '/repo',
+      status: 'running',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      exitInfo: null,
+    } satisfies TerminalSession)
+
+    const { container } = render(<TerminalPanel />)
+    await openTerminal(user)
+
+    expect((await axe(container)).violations).toHaveLength(0)
+  })
+
+  it('has no accessibility violations for a synthesized "unavailable" tab (FR-014, SC-006, T043)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockRejectedValue({
+      error: 'cli_not_found',
+      message: 'The Claude Code CLI ("claude") was not found on PATH.',
+    })
+
+    const { container } = render(<TerminalPanel />)
+    await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+
+    expect((await axe(container)).violations).toHaveLength(0)
   })
 })
