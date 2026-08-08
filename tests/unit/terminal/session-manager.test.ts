@@ -310,4 +310,43 @@ describe('session-manager', () => {
     expect(ids).toHaveLength(2)
     expect(new Set(ids).size).toBe(2)
   })
+
+  it('supports 6+ concurrent sessions with no cross-talk between their I/O streams (SC-003)', async () => {
+    const ptys = Array.from({ length: 6 }, () => createFakePty())
+    let nextPty = 0
+    const factory: PtyFactory = vi.fn(async () => ptys[nextPty++])
+    const manager = createSessionManager(factory, '/bin/sh')
+
+    const sessions = []
+    for (let i = 0; i < ptys.length; i++) {
+      const result = await manager.createSession({ kind: 'regular', cwd: `/tmp/${i}` })
+      expect(result.ok).toBe(true)
+      if (result.ok) sessions.push(result.session)
+    }
+    expect(new Set(sessions.map((s) => s.id)).size).toBe(6)
+
+    const received: string[][] = sessions.map(() => [])
+    const subscriptions = sessions.map((s, i) => manager.subscribe(s.id, (chunk) => received[i].push(chunk), vi.fn()))
+    expect(subscriptions.every((sub) => sub !== null)).toBe(true)
+
+    // Emit distinct output on each session's own pty and confirm it only ever reaches that
+    // session's subscriber — never a sibling session's.
+    ptys.forEach((pty, i) => pty.emitData(`output-from-session-${i}`))
+    received.forEach((chunks, i) => expect(chunks).toEqual([`output-from-session-${i}`]))
+
+    // Writing input to one session must not touch any other session's pty.
+    expect(manager.writeInput(sessions[2].id, 'echo hi\n')).toBe(true)
+    expect(ptys[2].writes).toEqual(['echo hi\n'])
+    ptys.forEach((pty, i) => {
+      if (i !== 2) expect(pty.writes).toEqual([])
+    })
+
+    // Closing one session must leave the others running and unaffected.
+    expect(manager.closeSession(sessions[4].id)).toBe(true)
+    expect(ptys[4].killed).toBe(true)
+    expect(manager.getSession(sessions[4].id)?.status).toBe('exited')
+    sessions.forEach((s, i) => {
+      if (i !== 4) expect(manager.getSession(s.id)?.status).toBe('running')
+    })
+  })
 })

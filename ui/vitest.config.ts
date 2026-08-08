@@ -31,6 +31,7 @@ export default defineConfig({
         'src/components/ui/dialog.tsx',
         'src/components/ui/meta-tag.tsx',
         'src/components/TerminalPanel/TerminalPanel.tsx',
+        'src/components/TerminalPanel/TerminalTabStrip.tsx',
         'src/hooks/useTerminalPanel.ts',
         'src/lib/sync.ts',
       ],

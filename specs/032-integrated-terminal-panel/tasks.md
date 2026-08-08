@@ -92,15 +92,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T028 [US3] [P] Unit test: `session-manager.ts` supports ≥6 concurrent sessions with no cross-talk between their I/O streams (SC-003), in `tests/unit/terminal/session-manager.test.ts`
-- [ ] T029 [US3] [P] UI test: open 3 tabs, produce distinct output in each, close the middle tab, confirm the other two are unaffected, in `ui/src/components/TerminalPanel/TerminalTabStrip.test.tsx`
+- [x] T028 [US3] [P] Unit test: `session-manager.ts` supports ≥6 concurrent sessions with no cross-talk between their I/O streams (SC-003), in `tests/unit/terminal/session-manager.test.ts`
+- [x] T029 [US3] [P] UI test: open 3 tabs, produce distinct output in each, close the middle tab, confirm the other two are unaffected, in `ui/src/components/TerminalPanel/TerminalTabStrip.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Implement `ui/src/components/TerminalPanel/TerminalTabStrip.tsx`: render open tabs, an open-new-tab control, per-tab close, active-tab switching (depends on T011)
-- [ ] T025 [US3] Wire `TerminalTabStrip` into `TerminalPanel.tsx`; keep every open tab's `TerminalView` mounted (CSS-hidden when inactive) so switching tabs never loses scrollback (same pattern as T021)
-- [ ] T026 [US3] Implement per-tab close: call `DELETE /api/terminal/sessions/:id` via `terminalApi`, unmount that tab's `TerminalView`, leave other tabs untouched (FR-004, FR-005)
-- [ ] T027 [US3] Empty-state UI when the last tab is closed — a clear "open a terminal" prompt, not an error (Edge Cases)
+- [x] T024 [US3] Implement `ui/src/components/TerminalPanel/TerminalTabStrip.tsx`: render open tabs, an open-new-tab control, per-tab close, active-tab switching (depends on T011)
+- [x] T025 [US3] Wire `TerminalTabStrip` into `TerminalPanel.tsx`; keep every open tab's `TerminalView` mounted (CSS-hidden when inactive) so switching tabs never loses scrollback (same pattern as T021)
+- [x] T026 [US3] Implement per-tab close: call `DELETE /api/terminal/sessions/:id` via `terminalApi`, unmount that tab's `TerminalView`, leave other tabs untouched (FR-004, FR-005)
+- [x] T027 [US3] Empty-state UI when the last tab is closed — a clear "open a terminal" prompt, not an error (Edge Cases)
 
 **Checkpoint**: Multiple concurrent, independently closable terminal tabs work.
 
