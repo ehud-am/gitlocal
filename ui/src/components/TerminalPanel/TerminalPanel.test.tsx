@@ -159,6 +159,77 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
   })
 
+  it('hiding the panel closes no session and keeps output visible on show again (US2)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue({
+      id: 'session-1',
+      kind: 'regular',
+      cwd: '/repo',
+      status: 'running',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      exitInfo: null,
+    } satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    expect(terminalViewMountCount).toBe(1)
+
+    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+
+    // Hiding must never end the session: no server-side close call, and the
+    // TerminalView instance (and its WebSocket) stays mounted rather than being torn down.
+    expect(mockCloseSession).not.toHaveBeenCalled()
+    expect(terminalViewMountCount).toBe(1)
+    expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:running')
+
+    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+
+    // Same instance reappears with its state intact — output produced while hidden wasn't lost.
+    expect(mockCloseSession).not.toHaveBeenCalled()
+    expect(terminalViewMountCount).toBe(1)
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:running')
+  })
+
+  it('keeps panel visibility unchanged across unrelated App state changes until explicitly toggled (US2)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue({
+      id: 'session-1',
+      kind: 'regular',
+      cwd: '/repo',
+      status: 'running',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      exitInfo: null,
+    } satisfies TerminalSession)
+
+    render(<AppShell />)
+    await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+    await waitFor(() => expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
+
+    await user.click(screen.getByRole('button', { name: 'bump unrelated state' }))
+    await user.click(screen.getByRole('button', { name: 'bump unrelated state' }))
+    await waitFor(() => expect(screen.getByTestId('unrelated-count')).toHaveTextContent('2'))
+
+    // Still hidden — an unrelated re-render must not reset visibility.
+    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
+
+    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
+
+    await user.click(screen.getByRole('button', { name: 'bump unrelated state' }))
+    await waitFor(() => expect(screen.getByTestId('unrelated-count')).toHaveTextContent('3'))
+
+    // Still visible — same guarantee in the other direction.
+    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
+  })
+
   it('closes a tab, notifies the server, and collapses back to the empty state once no tabs remain', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue({

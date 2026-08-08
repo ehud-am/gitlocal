@@ -96,7 +96,11 @@ export function TerminalPanel() {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden" style={{ display: panel.state.visible ? 'block' : 'none' }}>
+      <div
+        className="flex-1 overflow-hidden"
+        style={{ display: panel.state.visible ? 'block' : 'none' }}
+        data-testid="terminal-panel-content"
+      >
         {panel.state.tabs.map((tab) => (
           <div key={tab.id} className="h-full" style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}>
             <TerminalView

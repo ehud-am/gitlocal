@@ -73,12 +73,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T022 [US2] [P] UI test: hiding the panel issues no WS-close or session-close call, and output produced while hidden is visible on show, in `ui/src/components/TerminalPanel/TerminalPanel.test.tsx`
-- [ ] T023 [US2] [P] UI test: panel visibility persists across unrelated App state changes until explicitly toggled
+- [x] T022 [US2] [P] UI test: hiding the panel issues no WS-close or session-close call, and output produced while hidden is visible on show, in `ui/src/components/TerminalPanel/TerminalPanel.test.tsx`
+- [x] T023 [US2] [P] UI test: panel visibility persists across unrelated App state changes until explicitly toggled
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Add a show/hide control to `TerminalPanel.tsx`, implemented as a CSS visibility toggle (not conditional unmount) so mounted `TerminalView` instances and their WebSocket connections are unaffected by hiding (FR-002, FR-003)
+- [x] T021 [US2] Add a show/hide control to `TerminalPanel.tsx`, implemented as a CSS visibility toggle (not conditional unmount) so mounted `TerminalView` instances and their WebSocket connections are unaffected by hiding (FR-002, FR-003)
 
 **Checkpoint**: Panel can be freely collapsed/expanded without disrupting sessions.
 
