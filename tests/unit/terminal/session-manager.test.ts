@@ -76,6 +76,41 @@ describe('session-manager', () => {
     expect(manager.listSessions()[0]?.status).toBe('running')
   })
 
+  // FR-008/FR-009 (T036): a claude/codex tab is a shell session where the server types the
+  // launch command for the user once the shell reports it's ready (its first output chunk).
+  it('auto-launches the claude CLI once, triggered by the first pty output chunk', async () => {
+    const pty = createFakePty()
+    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
+    const result = await manager.createSession({ kind: 'claude', cwd: '/tmp' })
+    expect(result.ok).toBe(true)
+
+    expect(pty.writes).toEqual([])
+    pty.emitData('$ ')
+    expect(pty.writes).toEqual(['claude\n'])
+
+    pty.emitData('more output\n')
+    expect(pty.writes).toEqual(['claude\n'])
+  })
+
+  it('auto-launches the codex CLI once, triggered by the first pty output chunk', async () => {
+    const pty = createFakePty()
+    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
+    await manager.createSession({ kind: 'codex', cwd: '/tmp' })
+
+    pty.emitData('$ ')
+    expect(pty.writes).toEqual(['codex\n'])
+  })
+
+  it('never auto-launches anything for a regular session', async () => {
+    const pty = createFakePty()
+    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
+    await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+
+    pty.emitData('$ ')
+    pty.emitData('more output\n')
+    expect(pty.writes).toEqual([])
+  })
+
   it('flows pty output to subscribers and buffers it for late subscribers', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')

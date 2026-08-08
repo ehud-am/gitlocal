@@ -4,10 +4,8 @@ import { join, delimiter } from 'node:path'
 import { tmpdir } from 'node:os'
 import { isPtySupported, isCliAvailable, detectCapabilities } from '../../../src/terminal/cli-detection.js'
 
-// Coverage-closing tests for already-implemented Foundational code: this file's dedicated test
-// task (T035) is scoped to a later phase (US4) not yet authorized, but the project's global
-// coverage gate applies to every src file regardless of phase, so these keep `npm test` green
-// in the meantime without implementing any later-phase feature.
+// T035 (US4): PATH-based CLI detection, used by src/handlers/terminal.ts's pre-flight check
+// (FR-010) and the /api/terminal/capabilities endpoint.
 
 describe('isPtySupported', () => {
   it('recognizes the platforms node-pty ships prebuilds for', () => {

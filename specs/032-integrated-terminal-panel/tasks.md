@@ -114,15 +114,15 @@
 
 ### Tests for User Story 4
 
-- [ ] T035 [US4] [P] Unit tests for `cli-detection.ts` (found/not-found PATH cases, platform capability probe), in `tests/unit/terminal/cli-detection.test.ts`
-- [ ] T036 [US4] [P] Unit test: `session-manager.ts` auto-types the correct launch command for `claude`/`codex` kinds against the fake PTY once the shell is ready, and sends nothing extra for `regular`, in `tests/unit/terminal/session-manager.test.ts`
+- [x] T035 [US4] [P] Unit tests for `cli-detection.ts` (found/not-found PATH cases, platform capability probe), in `tests/unit/terminal/cli-detection.test.ts`
+- [x] T036 [US4] [P] Unit test: `session-manager.ts` auto-types the correct launch command for `claude`/`codex` kinds against the fake PTY once the shell is ready, and sends nothing extra for `regular`, in `tests/unit/terminal/session-manager.test.ts`
 - [ ] T037 [US4] [P] UI test: opening a Claude/Codex tab shows the CLI starting; with capabilities mocked as "missing," the tab shows the not-available message instead, in `ui/src/components/TerminalPanel/TerminalTabStrip.test.tsx`
 
 ### Implementation for User Story 4
 
 - [ ] T030 [US4] Extend the "open new tab" flow with a kind picker (Regular/Claude/Codex) in `TerminalTabStrip.tsx`/`TerminalPanel.tsx`, sending `kind` in the create-session request (FR-007)
 - [ ] T031 [US4] Implement server-side auto-launch in `session-manager.ts`/`websocket.ts`: once the PTY reports its shell prompt is ready, write the `claude`/`codex` command + newline for non-regular kinds (FR-008, FR-009)
-- [ ] T032 [US4] Wire `cli-detection.ts`'s pre-flight check into `POST /api/terminal/sessions`: return `503 cli_not_found` before spawning if the requested kind's CLI isn't resolvable (FR-010)
+- [x] T032 [US4] Wire `cli-detection.ts`'s pre-flight check into `POST /api/terminal/sessions`: return `503 cli_not_found` before spawning if the requested kind's CLI isn't resolvable (FR-010)
 - [ ] T033 [US4] Render the "tool not available" message in `TerminalView.tsx`/`TerminalPanel.tsx` when a session's status is `unavailable`, instead of an empty terminal
 - [ ] T034 [US4] Add a kind icon/label to tab strip entries so Regular/Claude/Codex tabs are visually distinguishable (US4 acceptance scenario 5)
 
@@ -138,13 +138,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T041 [US5] [P] Unit tests: cwd resolution for file/dir/none `contextType` values and the deleted/moved-path fallback, in `tests/unit/handlers/terminal.test.ts`
+- [x] T041 [US5] [P] Unit tests: cwd resolution for file/dir/none `contextType` values and the deleted/moved-path fallback, in `tests/unit/handlers/terminal.test.ts`
 - [ ] T042 [US5] [P] UI test: opening a new tab from a nested folder/file view sends the expected `contextPath`/`contextType`, in `ui/src/services/terminalApi.test.ts`
 
 ### Implementation for User Story 5
 
 - [ ] T038 [US5] Extend `terminalApi.ts`'s create-session call to send `contextPath`/`contextType` derived from `App.tsx`'s current `viewerRepoPath`/`selectedPath`/`selectedPathType` (FR-011)
-- [ ] T039 [US5] Implement server-side resolution in `src/handlers/terminal.ts`: parent directory when `contextType` is `file`, the path itself when `dir`, repository root when `none` or resolution fails, via `classifyLocalPath()` (FR-011, Edge Cases)
+- [x] T039 [US5] Implement server-side resolution in `src/handlers/terminal.ts`: parent directory when `contextType` is `file`, the path itself when `dir`, repository root when `none` or resolution fails, via `classifyLocalPath()` (FR-011, Edge Cases)
 - [ ] T040 [US5] Confirm via test (no new production code expected) that an already-open tab's `cwd` is never recomputed after creation — `session-manager.ts` treats `cwd` as immutable post-creation (FR-012)
 
 **Checkpoint**: All 5 user stories independently functional; feature matches `spec.md` in full.

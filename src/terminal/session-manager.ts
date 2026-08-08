@@ -134,9 +134,17 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
     session.pty = pty
     session.status = 'running'
 
+    // FR-008/FR-009: a Claude/Codex tab is an ordinary shell session where the server types the
+    // launch command for the user, once — triggered by the first output chunk (the shell's
+    // initial prompt), exactly as research.md's "one code path, one entity" decision describes.
+    let autoLaunched = false
     pty.onData((chunk) => {
       appendBuffered(session, chunk)
       for (const listener of session.outputListeners) listener(chunk)
+      if (!autoLaunched && session.kind !== 'regular') {
+        autoLaunched = true
+        pty.write(`${session.kind}\n`)
+      }
     })
     pty.onExit((event) => {
       markExited(session, {
