@@ -1157,7 +1157,7 @@ export default function App() {
 
   return (
     <>
-      <div className="flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
+      <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
         <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
           <span className="brand-lockup">
             <img className="brand-mark" src="/gitlocal-logo.svg" alt="" aria-hidden="true" />
