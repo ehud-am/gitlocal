@@ -126,8 +126,9 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
     let pty: PtyLike
     try {
       pty = await ptyFactory({ shell: shellCommand, cwd: options.cwd, cols: DEFAULT_COLS, rows: DEFAULT_ROWS })
-    } catch {
+    } catch (error) {
       sessions.delete(session.id)
+      console.error('Failed to spawn terminal PTY:', error)
       return { ok: false, error: 'pty_unavailable', message: 'Failed to start a terminal session on this platform.' }
     }
 
