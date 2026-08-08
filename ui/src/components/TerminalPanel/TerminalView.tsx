@@ -49,6 +49,7 @@ export function TerminalView({ session, onExit }: TerminalViewProps) {
     })
 
     const resizeObserver = new ResizeObserver(() => {
+      if (container.clientWidth === 0 || container.clientHeight === 0) return
       fitAddon.fit()
       if (socket.readyState === WebSocket.OPEN) {
         terminalApi.sendResize(socket, terminal.cols, terminal.rows)
