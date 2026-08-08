@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-08-07
+Auto-generated from all feature plans. Last updated: 2026-08-08
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -9,7 +9,7 @@ Auto-generated from all feature plans. Last updated: 2026-08-07
 - **Build**: esbuild (server bundle), Vite 7 (UI bundle)
 - **Test**: Vitest + @vitest/coverage-v8 (≥90% per-file branch coverage enforced)
 - **State**: All state in-process or derived from filesystem/git at request time
-- **Terminal (in progress, 032)**: `node-pty` (server PTY sessions), `ws` (per-tab WebSocket I/O), `@xterm/xterm` + `@xterm/addon-fit` (UI rendering) — see `specs/032-integrated-terminal-panel/research.md`
+- **Terminal (032)**: `node-pty` (server PTY sessions), `ws` (per-tab WebSocket I/O), `@xterm/xterm` + `@xterm/addon-fit` (UI rendering) — see `specs/032-integrated-terminal-panel/research.md`
 
 ## Project Structure
 
@@ -44,7 +44,7 @@ Measured on the current branch, 90.7% of implementation lines are shared between
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
-- 032-integrated-terminal-panel: Planned a persistent bottom-docked terminal panel (Regular/Claude/Codex tab kinds, cross-page session persistence, cwd-follows-visible-content) — see `specs/032-integrated-terminal-panel/`. Not yet implemented.
+- 032-integrated-terminal-panel: Added a persistent bottom-docked terminal panel (Regular/Claude/Codex tab kinds, cross-page session persistence via `node-pty` + per-tab WebSocket I/O, cwd-follows-visible-content) — see `specs/032-integrated-terminal-panel/`.
 - 018-macos-homebrew-app: Added scoped macOS native app packaging around the shared GitLocal server/UI while preserving the npm package distribution.
 - 020-local-git-identity: Changed git identity settings to use repository-local git config directly, while preserving SSH key discovery and validation.
 

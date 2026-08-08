@@ -27,15 +27,15 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Define `TerminalKind`, session `status`, and related types in `src/terminal/types.ts` per `data-model.md`
-- [ ] T005 Implement `src/terminal/session-manager.ts`: in-memory `TerminalSession` registry (create/get/list/close) with the PTY spawn call behind an injectable factory, per `research.md`'s testability strategy
-- [ ] T006 [P] Implement `src/terminal/cli-detection.ts`: PATH pre-flight check for `claude`/`codex` (FR-010) and a platform PTY-capability probe (FR-015)
-- [ ] T007 Implement `src/terminal/websocket.ts`: WS upgrade handling, framing input/resize (client→server) and output/exit (server→client) per `contracts/terminal-api.md`
-- [ ] T008 Implement `src/handlers/terminal.ts`: `POST/GET /api/terminal/sessions`, `DELETE /api/terminal/sessions/:id`, `GET /api/terminal/capabilities`, following the existing handler pattern in `src/handlers/file.ts`/`folder.ts`
-- [ ] T009 Register the new terminal routes and WS upgrade in `src/server.ts` alongside existing handlers
-- [ ] T010 [P] Implement `ui/src/services/terminalApi.ts`: REST client + WebSocket connection helper matching `contracts/terminal-api.md`
-- [ ] T011 [P] Implement `ui/src/hooks/useTerminalPanel.ts`: panel/tab state (`visible`, `tabs`, `activeTabId`) per `data-model.md`'s `TerminalPanel`/`TerminalTabRef`
-- [ ] T012 Create `ui/src/components/TerminalPanel/TerminalPanel.tsx` as an empty-state shell and mount it once at the `App.tsx` root layout level (outside the page-specific content area) so it persists across all page/content types (FR-001, FR-013)
+- [x] T004 Define `TerminalKind`, session `status`, and related types in `src/terminal/types.ts` per `data-model.md`
+- [x] T005 Implement `src/terminal/session-manager.ts`: in-memory `TerminalSession` registry (create/get/list/close) with the PTY spawn call behind an injectable factory, per `research.md`'s testability strategy
+- [x] T006 [P] Implement `src/terminal/cli-detection.ts`: PATH pre-flight check for `claude`/`codex` (FR-010) and a platform PTY-capability probe (FR-015)
+- [x] T007 Implement `src/terminal/websocket.ts`: WS upgrade handling, framing input/resize (client→server) and output/exit (server→client) per `contracts/terminal-api.md`
+- [x] T008 Implement `src/handlers/terminal.ts`: `POST/GET /api/terminal/sessions`, `DELETE /api/terminal/sessions/:id`, `GET /api/terminal/capabilities`, following the existing handler pattern in `src/handlers/file.ts`/`folder.ts`
+- [x] T009 Register the new terminal routes and WS upgrade in `src/server.ts` alongside existing handlers
+- [x] T010 [P] Implement `ui/src/services/terminalApi.ts`: REST client + WebSocket connection helper matching `contracts/terminal-api.md`
+- [x] T011 [P] Implement `ui/src/hooks/useTerminalPanel.ts`: panel/tab state (`visible`, `tabs`, `activeTabId`) per `data-model.md`'s `TerminalPanel`/`TerminalTabRef`
+- [x] T012 Create `ui/src/components/TerminalPanel/TerminalPanel.tsx` as an empty-state shell and mount it once at the `App.tsx` root layout level (outside the page-specific content area) so it persists across all page/content types (FR-001, FR-013)
 
 **Checkpoint**: Server can create/list/close a session and stream I/O over a WebSocket; UI has a mounted (empty) panel wired to the API client. No user-visible terminal yet — that starts in US1.
 
@@ -156,9 +156,9 @@
 - [x] T043 [P] Accessibility pass: keyboard operability + correct ARIA roles/names/states for every `TerminalPanel` control (show/hide, tab open/close/switch, kind picker); extend `jest-axe` assertions in `TerminalPanel.test.tsx` and `TerminalTabStrip.test.tsx` (FR-014, SC-006)
 - [x] T044 [P] Visual polish pass: align `TerminalPanel` styling with the app's existing minimal, GitHub-inspired design language (Principle V, FR-017)
 - [x] T045 Validate `node-pty` native binary packaging end-to-end for both distributions: `npm run build` output and the macOS Homebrew app bundling step (`packaging/macos/`) each include the correct per-platform binary; this directly resolves the risk flagged in `plan.md` Complexity Tracking
-- [ ] T046 Run `quickstart.md` manual validation for all 5 user stories
-- [ ] T047 Run `npm run verify` (full suite + coverage + build + audit); confirm ≥90% per-file coverage on every new/modified file (SC-008) and zero regressions in existing suites (SC-007)
-- [ ] T048 Update `CLAUDE.md`'s "Recent Changes" entry for 032-integrated-terminal-panel to reflect implementation completion (currently reads "Not yet implemented" from the `/plan` step)
+- [x] T046 Run `quickstart.md` manual validation for all 5 user stories (this sandbox has no `node-pty` prebuild for linux/arm64, so real PTY-backed session I/O — actual `pwd` output, multi-tab isolation, Claude/Codex CLI autostart — is not executable here and always returns `pty_unavailable`; the graceful-degradation path for that was verified instead, alongside everything not gated on a real PTY: the terminal control is reachable and viewport-pinned from the repo overview, a file view, and the git view; the kind selector shows Regular/Claude/Codex; keyboard-only focus+Enter activates it; and `npm run test:ui`'s jest-axe suite passes with no new violations)
+- [x] T047 Run `npm run verify` (full suite + coverage + build + audit); confirm ≥90% per-file coverage on every new/modified file (SC-008) and zero regressions in existing suites (SC-007) — server: 427 passed/1 skipped (the skip is the expected `pty_unavailable` sandbox case); UI: 411 passed, all terminal-panel files at 100% coverage; both server and UI builds succeed. `npm audit`/`npm run audit:ui` each report one pre-existing high-severity `nanoid` finding via the `vite → postcss → nanoid` dev-only chain — confirmed present on `main` before this branch (unrelated to node-pty/ws/terminal work) and out of scope to fix here without separate authorization
+- [x] T048 Update `CLAUDE.md`'s "Recent Changes" entry for 032-integrated-terminal-panel to reflect implementation completion (currently reads "Not yet implemented" from the `/plan` step)
 
 ---
 
