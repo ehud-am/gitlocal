@@ -17,9 +17,9 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Add new dependencies: `node-pty`, `ws` to root `package.json`; `@xterm/xterm`, `@xterm/addon-fit` to `ui/package.json`
-- [ ] T002 [P] Mark `node-pty` `--external` in the `build:server` esbuild command in `package.json` (esbuild cannot bundle native `.node` addons); confirm `npm run build` still produces a runnable `dist/index.js`
-- [ ] T003 [P] Add `node-pty`'s platform binary to the npm package `files` list in `package.json` and note (as a comment or short doc) the equivalent copy step still needed in `packaging/macos/` for the Homebrew app bundle — full packaging-script automation happens in T045, this task only makes local dev builds runnable
+- [x] T001 Add new dependencies: `node-pty`, `ws` to root `package.json`; `@xterm/xterm`, `@xterm/addon-fit` to `ui/package.json`
+- [x] T002 [P] Mark `node-pty` `--external` in the `build:server` esbuild command in `package.json` (esbuild cannot bundle native `.node` addons); confirm `npm run build` still produces a runnable `dist/index.js`
+- [x] T003 [P] Add `node-pty`'s platform binary to the npm package `files` list in `package.json` and note (as a comment or short doc) the equivalent copy step still needed in `packaging/macos/` for the Homebrew app bundle — full packaging-script automation happens in T045, this task only makes local dev builds runnable
 
 ---
 
@@ -155,7 +155,7 @@
 
 - [x] T043 [P] Accessibility pass: keyboard operability + correct ARIA roles/names/states for every `TerminalPanel` control (show/hide, tab open/close/switch, kind picker); extend `jest-axe` assertions in `TerminalPanel.test.tsx` and `TerminalTabStrip.test.tsx` (FR-014, SC-006)
 - [x] T044 [P] Visual polish pass: align `TerminalPanel` styling with the app's existing minimal, GitHub-inspired design language (Principle V, FR-017)
-- [ ] T045 Validate `node-pty` native binary packaging end-to-end for both distributions: `npm run build` output and the macOS Homebrew app bundling step (`packaging/macos/`) each include the correct per-platform binary; this directly resolves the risk flagged in `plan.md` Complexity Tracking
+- [x] T045 Validate `node-pty` native binary packaging end-to-end for both distributions: `npm run build` output and the macOS Homebrew app bundling step (`packaging/macos/`) each include the correct per-platform binary; this directly resolves the risk flagged in `plan.md` Complexity Tracking
 - [ ] T046 Run `quickstart.md` manual validation for all 5 user stories
 - [ ] T047 Run `npm run verify` (full suite + coverage + build + audit); confirm ≥90% per-file coverage on every new/modified file (SC-008) and zero regressions in existing suites (SC-007)
 - [ ] T048 Update `CLAUDE.md`'s "Recent Changes" entry for 032-integrated-terminal-panel to reflect implementation completion (currently reads "Not yet implemented" from the `/plan` step)

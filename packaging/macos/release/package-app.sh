@@ -25,10 +25,15 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO
 
 rm -rf "${GITLOCAL_RESOURCES}" "${RUNTIME_RESOURCES}"
-mkdir -p "${GITLOCAL_RESOURCES}/ui" "${RUNTIME_RESOURCES}"
+mkdir -p "${GITLOCAL_RESOURCES}/ui" "${GITLOCAL_RESOURCES}/node_modules" "${RUNTIME_RESOURCES}"
 cp -R "${ROOT_DIR}/dist" "${GITLOCAL_RESOURCES}/dist"
 cp -R "${ROOT_DIR}/ui/dist" "${GITLOCAL_RESOURCES}/ui/dist"
 cp "${ROOT_DIR}/package.json" "${GITLOCAL_RESOURCES}/package.json"
+
+# node-pty ships a native addon and is intentionally --external to the esbuild bundle (see
+# src/terminal/session-manager.ts), so it's never inlined into dist/index.js. It must be copied
+# alongside dist/ here so Node's module resolution walk-up finds it at runtime inside the bundle.
+cp -R "${ROOT_DIR}/node_modules/node-pty" "${GITLOCAL_RESOURCES}/node_modules/node-pty"
 
 NODE_PATH="$(command -v node)"
 cp "${NODE_PATH}" "${RUNTIME_RESOURCES}/node"

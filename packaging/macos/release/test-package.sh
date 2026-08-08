@@ -12,6 +12,7 @@ test -f "${APP_PATH}/Contents/Resources/gitlocal/package.json"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/dist/cli.js"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/dist/index.js"
 test -f "${APP_PATH}/Contents/Resources/gitlocal/ui/dist/index.html"
+test -d "${APP_PATH}/Contents/Resources/gitlocal/node_modules/node-pty"
 
 APP_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP_PATH}/Contents/Info.plist")"
 PACKAGE_VERSION="$(node -p "require(process.cwd() + '/package.json').version")"
@@ -34,6 +35,16 @@ if [[ "${APP_ICON_NAME}" != "GitLocal" ]]; then
 fi
 
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}" >/dev/null
+
+# node-pty is --external to the esbuild bundle and only dynamically imported when a terminal
+# session is actually requested (see src/terminal/session-manager.ts), so a passing /api/info
+# smoke test below would not catch a missing/broken node_modules/node-pty inside the bundle.
+# Import it directly here, from the packaged dist/ directory, so module resolution walks up
+# through the same path the running server uses.
+(
+  cd "${APP_PATH}/Contents/Resources/gitlocal/dist"
+  "${APP_PATH}/Contents/Resources/runtime/node" -e "import('node-pty').then(() => process.exit(0)).catch((err) => { console.error(err); process.exit(1) })"
+) || { echo "Packaged node-pty failed to load" >&2; exit 1; }
 
 LOG_FILE="$(mktemp)"
 SERVICE_PID=""
