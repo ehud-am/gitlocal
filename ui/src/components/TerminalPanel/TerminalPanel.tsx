@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { terminalApi } from '../../services/terminalApi'
 import { useTerminalPanel } from '../../hooks/useTerminalPanel'
 import { TerminalView } from './TerminalView'
+import { TerminalTabStrip } from './TerminalTabStrip'
 import type { TerminalUnavailableResponse } from '../../types'
 
 // Mounted once at the App.tsx root layout level, outside the page-specific content area, so
@@ -75,27 +76,29 @@ export function TerminalPanel() {
       style={{ height: panel.state.visible ? '260px' : '32px' }}
       data-testid="terminal-panel"
     >
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-1">
-        <span className="text-sm font-medium text-[var(--foreground)]">{activeTab.label}</span>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={panel.toggleVisible}
-            aria-label={panel.state.visible ? 'Hide terminal' : 'Show terminal'}
-            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-          >
-            {panel.state.visible ? '▾' : '▸'}
-          </button>
-          <button
-            type="button"
-            onClick={() => closeTab(activeTab.id)}
-            aria-label="Close terminal"
-            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-          >
-            ✕
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-1">
+        <TerminalTabStrip
+          tabs={panel.state.tabs}
+          activeTabId={panel.state.activeTabId}
+          onSelectTab={panel.setActiveTab}
+          onCloseTab={closeTab}
+          onNewTab={() => void openTerminal()}
+          creatingNewTab={creating}
+        />
+        <button
+          type="button"
+          onClick={panel.toggleVisible}
+          aria-label={panel.state.visible ? 'Hide terminal' : 'Show terminal'}
+          className="shrink-0 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+        >
+          {panel.state.visible ? '▾' : '▸'}
+        </button>
       </div>
+      {error && (
+        <div className="border-b border-[var(--border)] px-3 py-1 text-sm text-[var(--danger)]" role="alert">
+          {error}
+        </div>
+      )}
       <div
         className="flex-1 overflow-hidden"
         style={{ display: panel.state.visible ? 'block' : 'none' }}

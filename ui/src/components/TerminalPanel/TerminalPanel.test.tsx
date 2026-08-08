@@ -244,7 +244,7 @@ describe('TerminalPanel', () => {
     render(<TerminalPanel />)
     await openTerminal(user)
 
-    await user.click(screen.getByRole('button', { name: 'Close terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
 
     expect(mockCloseSession).toHaveBeenCalledWith('session-1')
     expect(screen.getByTestId('terminal-panel-empty')).toBeInTheDocument()
@@ -284,7 +284,7 @@ describe('TerminalPanel', () => {
 
     render(<TerminalPanel />)
     await openTerminal(user)
-    await user.click(screen.getByRole('button', { name: 'Close terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
 
     expect(screen.getByTestId('terminal-panel-empty')).toBeInTheDocument()
   })
