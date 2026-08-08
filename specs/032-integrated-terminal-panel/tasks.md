@@ -139,13 +139,13 @@
 ### Tests for User Story 5
 
 - [x] T041 [US5] [P] Unit tests: cwd resolution for file/dir/none `contextType` values and the deleted/moved-path fallback, in `tests/unit/handlers/terminal.test.ts`
-- [ ] T042 [US5] [P] UI test: opening a new tab from a nested folder/file view sends the expected `contextPath`/`contextType`, in `ui/src/services/terminalApi.test.ts`
+- [x] T042 [US5] [P] UI test: opening a new tab from a nested folder/file view sends the expected `contextPath`/`contextType`, in `ui/src/services/terminalApi.test.ts`
 
 ### Implementation for User Story 5
 
 - [x] T038 [US5] Extend `terminalApi.ts`'s create-session call to send `contextPath`/`contextType` derived from `App.tsx`'s current `viewerRepoPath`/`selectedPath`/`selectedPathType` (FR-011)
 - [x] T039 [US5] Implement server-side resolution in `src/handlers/terminal.ts`: parent directory when `contextType` is `file`, the path itself when `dir`, repository root when `none` or resolution fails, via `classifyLocalPath()` (FR-011, Edge Cases)
-- [ ] T040 [US5] Confirm via test (no new production code expected) that an already-open tab's `cwd` is never recomputed after creation — `session-manager.ts` treats `cwd` as immutable post-creation (FR-012)
+- [x] T040 [US5] Confirm via test (no new production code expected) that an already-open tab's `cwd` is never recomputed after creation — `session-manager.ts` treats `cwd` as immutable post-creation (FR-012)
 
 **Checkpoint**: All 5 user stories independently functional; feature matches `spec.md` in full.
 

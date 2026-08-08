@@ -346,6 +346,19 @@ describe('session-manager', () => {
     expect(new Set(ids).size).toBe(2)
   })
 
+  it('never recomputes an already-open tab\'s cwd after creation, even as later sessions use a different cwd (FR-012, T040)', async () => {
+    const manager = createSessionManager(fakeFactory(createFakePty()), '/bin/sh')
+    const first = await manager.createSession({ kind: 'regular', cwd: '/repo/src' })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+
+    await manager.createSession({ kind: 'regular', cwd: '/repo/lib' })
+    await manager.createSession({ kind: 'claude', cwd: '/repo/docs' })
+
+    expect(manager.getSession(first.session.id)?.cwd).toBe('/repo/src')
+    expect(manager.listSessions().find((s) => s.id === first.session.id)?.cwd).toBe('/repo/src')
+  })
+
   it('supports 6+ concurrent sessions with no cross-talk between their I/O streams (SC-003)', async () => {
     const ptys = Array.from({ length: 6 }, () => createFakePty())
     let nextPty = 0
