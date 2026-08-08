@@ -3,31 +3,55 @@ import { terminalApi } from '../../services/terminalApi'
 import { useTerminalPanel } from '../../hooks/useTerminalPanel'
 import { TerminalView } from './TerminalView'
 import { TerminalTabStrip } from './TerminalTabStrip'
-import type { TerminalUnavailableResponse } from '../../types'
+import { TerminalKindSelect } from './TerminalKindSelect'
+import type { TerminalContextType, TerminalKind, TerminalUnavailableResponse } from '../../types'
+
+interface TerminalPanelProps {
+  contextPath?: string
+  contextType?: TerminalContextType
+}
 
 // Mounted once at the App.tsx root layout level, outside the page-specific content area, so
 // it persists across every page/content type (FR-001, FR-013) and its state survives unrelated
 // App-level re-renders (US1 T019). Owns its own state via useTerminalPanel() rather than lifted
 // App state, so switching selectedPath/viewerRepoPath etc. never remounts it.
-export function TerminalPanel() {
+export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps = {}) {
   const panel = useTerminalPanel()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [pendingKind, setPendingKind] = useState<TerminalKind>('regular')
 
-  const openTerminal = useCallback(async () => {
-    setCreating(true)
-    setError('')
-    try {
-      const session = await terminalApi.createSession({ kind: 'regular' })
-      panel.addTab(session)
-      panel.show()
-    } catch (err) {
-      const message = (err as Partial<TerminalUnavailableResponse>)?.message ?? 'Failed to start a terminal session.'
-      setError(message)
-    } finally {
-      setCreating(false)
-    }
-  }, [panel])
+  const openTerminal = useCallback(
+    async (kind: TerminalKind) => {
+      setCreating(true)
+      setError('')
+      try {
+        const session = await terminalApi.createSession({ kind, contextPath, contextType })
+        panel.addTab(session)
+        panel.show()
+      } catch (err) {
+        const response = err as Partial<TerminalUnavailableResponse>
+        if (response?.error === 'cli_not_found') {
+          // FR-010: the server never created a session for a missing CLI, so synthesize a
+          // local-only tab here purely to satisfy "the tab MUST display a message" — there's
+          // no real server-side session behind it.
+          panel.addTab({
+            id: crypto.randomUUID(),
+            kind,
+            cwd: '',
+            status: 'unavailable',
+            unavailableMessage: response.message ?? 'This CLI was not found.',
+          })
+          panel.show()
+        } else {
+          setError(response?.message ?? 'Failed to start a terminal session.')
+        }
+      } finally {
+        setCreating(false)
+      }
+    },
+    [panel, contextPath, contextType],
+  )
 
   const closeTab = useCallback(
     (id: string) => {
@@ -52,13 +76,14 @@ export function TerminalPanel() {
       >
         <button
           type="button"
-          onClick={() => void openTerminal()}
+          onClick={() => void openTerminal(pendingKind)}
           disabled={creating}
           className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           aria-label="Open terminal"
         >
           {creating ? 'Starting terminal…' : '▸ Terminal'}
         </button>
+        <TerminalKindSelect value={pendingKind} onChange={setPendingKind} disabled={creating} />
         {error && (
           <span className="text-[var(--danger)]" role="alert">
             {error}
@@ -68,7 +93,9 @@ export function TerminalPanel() {
     )
   }
 
-  const activeTab = panel.state.tabs.find((tab) => tab.id === panel.state.activeTabId) ?? panel.state.tabs[0]
+  // addTab/removeTab/setActiveTab in useTerminalPanel.ts always keep activeTabId pointed at an
+  // existing tab whenever tabs.length > 0 (guaranteed by the early return above), so this always finds a match.
+  const activeTab = panel.state.tabs.find((tab) => tab.id === panel.state.activeTabId)!
 
   return (
     <div
@@ -82,8 +109,10 @@ export function TerminalPanel() {
           activeTabId={panel.state.activeTabId}
           onSelectTab={panel.setActiveTab}
           onCloseTab={closeTab}
-          onNewTab={() => void openTerminal()}
+          onNewTab={() => void openTerminal(pendingKind)}
           creatingNewTab={creating}
+          pendingKind={pendingKind}
+          onPendingKindChange={setPendingKind}
         />
         <button
           type="button"
@@ -106,10 +135,16 @@ export function TerminalPanel() {
       >
         {panel.state.tabs.map((tab) => (
           <div key={tab.id} className="h-full" style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}>
-            <TerminalView
-              session={{ id: tab.id, kind: tab.kind, cwd: tab.cwd, status: tab.status, createdAt: '', exitInfo: null }}
-              onExit={() => handleExit(tab.id)}
-            />
+            {tab.status === 'unavailable' ? (
+              <div className="flex h-full items-center justify-center px-4 text-center text-sm text-[var(--muted-foreground)]">
+                {tab.unavailableMessage}
+              </div>
+            ) : (
+              <TerminalView
+                session={{ id: tab.id, kind: tab.kind, cwd: tab.cwd, status: tab.status, createdAt: '', exitInfo: null }}
+                onExit={() => handleExit(tab.id)}
+              />
+            )}
           </div>
         ))}
       </div>

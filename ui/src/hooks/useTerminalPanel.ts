@@ -12,6 +12,7 @@ export interface NewTerminalTab {
   kind: TerminalKind
   cwd: string
   status: TerminalSessionStatus
+  unavailableMessage?: string
 }
 
 export interface UseTerminalPanelResult {
@@ -44,6 +45,7 @@ export function useTerminalPanel(): UseTerminalPanelResult {
         cwd: session.cwd,
         status: session.status,
         label: labelFor(session.kind, regularOrdinal),
+        ...(session.unavailableMessage !== undefined ? { unavailableMessage: session.unavailableMessage } : {}),
       }
       return { ...prev, tabs: [...prev.tabs, tab], activeTabId: tab.id }
     })

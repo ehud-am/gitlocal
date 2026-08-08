@@ -127,6 +127,46 @@ describe('TerminalTabStrip', () => {
       { id: 't2', kind: 'regular', label: 'Terminal 2', cwd: '/repo', status: 'running' },
     ]
 
+    it('shows a distinct icon per tab kind (US4 acceptance scenario 5)', () => {
+      const kindTabs: TerminalTabRef[] = [
+        { id: 't1', kind: 'regular', label: 'Terminal 1', cwd: '/repo', status: 'running' },
+        { id: 't2', kind: 'claude', label: 'Claude', cwd: '/repo', status: 'running' },
+        { id: 't3', kind: 'codex', label: 'Codex', cwd: '/repo', status: 'running' },
+      ]
+      render(
+        <TerminalTabStrip
+          tabs={kindTabs}
+          activeTabId="t1"
+          onSelectTab={vi.fn()}
+          onCloseTab={vi.fn()}
+          onNewTab={vi.fn()}
+          creatingNewTab={false}
+        />,
+      )
+
+      expect(screen.getByRole('tab', { name: 'Terminal 1' })).toHaveTextContent('›_')
+      expect(screen.getByRole('tab', { name: 'Claude' })).toHaveTextContent('◆')
+      expect(screen.getByRole('tab', { name: 'Codex' })).toHaveTextContent('✳')
+    })
+
+    it('defaults pendingKind/onPendingKindChange to a no-op regular picker when the caller omits them', async () => {
+      const user = userEvent.setup()
+      render(
+        <TerminalTabStrip
+          tabs={tabs}
+          activeTabId="t1"
+          onSelectTab={vi.fn()}
+          onCloseTab={vi.fn()}
+          onNewTab={vi.fn()}
+          creatingNewTab={false}
+        />,
+      )
+
+      const select = screen.getByLabelText('New terminal kind') as HTMLSelectElement
+      expect(select.value).toBe('regular')
+      await user.selectOptions(select, 'claude')
+    })
+
     it('activates a tab via Enter or Space, and ignores other keys', async () => {
       const user = userEvent.setup()
       const onSelectTab = vi.fn()

@@ -1,4 +1,5 @@
-import type { TerminalTabRef } from '../../types'
+import type { TerminalKind, TerminalTabRef } from '../../types'
+import { TerminalKindSelect } from './TerminalKindSelect'
 
 interface TerminalTabStripProps {
   tabs: TerminalTabRef[]
@@ -7,6 +8,17 @@ interface TerminalTabStripProps {
   onCloseTab: (id: string) => void
   onNewTab: () => void
   creatingNewTab: boolean
+  pendingKind?: TerminalKind
+  onPendingKindChange?: (kind: TerminalKind) => void
+}
+
+// US4 acceptance scenario 5: a small glyph per kind so Regular/Claude/Codex tabs are
+// visually distinguishable at a glance, without duplicating what the tab's aria-label
+// (which already includes "Claude"/"Codex"/"Terminal N") tells screen readers.
+function kindIcon(kind: TerminalKind): string {
+  if (kind === 'claude') return '◆'
+  if (kind === 'codex') return '✳'
+  return '›_'
 }
 
 // Every open tab is kept mounted by the caller (TerminalPanel) regardless of which is active —
@@ -19,6 +31,8 @@ export function TerminalTabStrip({
   onCloseTab,
   onNewTab,
   creatingNewTab,
+  pendingKind = 'regular',
+  onPendingKindChange = () => {},
 }: TerminalTabStripProps) {
   return (
     <div className="flex min-w-0 items-center gap-1 overflow-x-auto" role="tablist" aria-label="Terminal tabs">
@@ -41,6 +55,7 @@ export function TerminalTabStrip({
                 : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
+            <span aria-hidden="true">{kindIcon(tab.kind)}</span>
             <span className="whitespace-nowrap">{tab.label}</span>
             <button
               type="button"
@@ -56,6 +71,7 @@ export function TerminalTabStrip({
           </div>
         )
       })}
+      <TerminalKindSelect value={pendingKind} onChange={onPendingKindChange} disabled={creatingNewTab} />
       <button
         type="button"
         onClick={onNewTab}

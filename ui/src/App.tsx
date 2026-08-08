@@ -1399,7 +1399,7 @@ export default function App() {
           </main>
         </div>
 
-        <TerminalPanel />
+        <TerminalPanel contextPath={visibleSelectedPath} contextType={visibleSelectedPathType} />
 
         <AppFooter version={info?.version ?? ''} />
       </div>

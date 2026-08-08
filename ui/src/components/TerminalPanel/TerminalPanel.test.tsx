@@ -128,6 +128,42 @@ describe('TerminalPanel', () => {
     expect(screen.queryByTestId('terminal-panel')).not.toBeInTheDocument()
   })
 
+  it('opens a Claude tab from the kind picker, sending kind and rendering the running session (FR-007, T037)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue({
+      id: 'claude-1',
+      kind: 'claude',
+      cwd: '/repo',
+      status: 'running',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      exitInfo: null,
+    } satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+    await user.selectOptions(screen.getByLabelText('New terminal kind'), 'claude')
+    await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Claude' })).toBeInTheDocument())
+    expect(mockCreateSession).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claude' }))
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('claude-1:running')
+  })
+
+  it('synthesizes a local "unavailable" tab with the server message when the CLI is missing (FR-010)', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockRejectedValue({
+      error: 'cli_not_found',
+      message: 'The Claude Code CLI ("claude") was not found on PATH.',
+    })
+
+    render(<TerminalPanel />)
+    await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+    expect(screen.getByText('The Claude Code CLI ("claude") was not found on PATH.')).toBeInTheDocument()
+    expect(screen.queryByTestId('fake-terminal-view')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('falls back to a generic error message when the failure has none', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockRejectedValue({})
@@ -136,6 +172,39 @@ describe('TerminalPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Open terminal' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to start a terminal session.')
+  })
+
+  it('falls back to a generic unavailable message when a cli_not_found response has none', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockRejectedValue({ error: 'cli_not_found' })
+
+    render(<TerminalPanel />)
+    await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+    expect(screen.getByText('This CLI was not found.')).toBeInTheDocument()
+  })
+
+  it('shows a failure to open a second tab as a banner alongside the still-open first tab', async () => {
+    const user = userEvent.setup()
+    mockCreateSession
+      .mockResolvedValueOnce({
+        id: 'session-1',
+        kind: 'regular',
+        cwd: '/repo',
+        status: 'running',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        exitInfo: null,
+      } satisfies TerminalSession)
+      .mockRejectedValueOnce({ error: 'pty_unavailable', message: 'No PTY available for a second session.' })
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+
+    await user.click(screen.getByRole('button', { name: 'New terminal tab' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No PTY available for a second session.')
+    expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument()
   })
 
   it('toggles the panel between expanded and collapsed', async () => {

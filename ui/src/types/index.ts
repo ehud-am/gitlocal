@@ -644,6 +644,9 @@ export interface TerminalTabRef {
   label: string
   cwd: string
   status: TerminalSessionStatus
+  // Set only for a locally-synthesized `unavailable` tab (FR-010): the server never created a
+  // session for it, so there's no real id/cwd to show alongside the "CLI not found" message.
+  unavailableMessage?: string
 }
 
 export interface TerminalPanelState {
