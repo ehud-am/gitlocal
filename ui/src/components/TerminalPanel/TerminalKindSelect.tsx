@@ -27,7 +27,7 @@ export function TerminalKindSelect({ value, onChange, disabled }: TerminalKindSe
       onChange={(event) => onChange(event.target.value as TerminalKind)}
       disabled={disabled}
       aria-label="New terminal kind"
-      className="shrink-0 rounded border border-[var(--border)] bg-[var(--background)] px-1 py-0.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+      className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--background)] px-1 py-0.5 text-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {KIND_OPTIONS.map((option) => (
         <option key={option.value} value={option.value}>

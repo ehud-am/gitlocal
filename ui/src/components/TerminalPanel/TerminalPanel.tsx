@@ -78,7 +78,7 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
           type="button"
           onClick={() => void openTerminal(pendingKind)}
           disabled={creating}
-          className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          className="rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
           aria-label="Open terminal"
         >
           {creating ? 'Starting terminal…' : '▸ Terminal'}
@@ -118,7 +118,7 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
           type="button"
           onClick={panel.toggleVisible}
           aria-label={panel.state.visible ? 'Hide terminal' : 'Show terminal'}
-          className="shrink-0 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          className="shrink-0 rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           {panel.state.visible ? '▾' : '▸'}
         </button>

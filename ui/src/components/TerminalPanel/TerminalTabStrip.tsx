@@ -49,10 +49,10 @@ export function TerminalTabStrip({
         return (
           <div
             key={tab.id}
-            className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-0.5 text-sm ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-sm transition-colors ${
               isActive
                 ? 'bg-[var(--muted)] text-[var(--foreground)]'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
             }`}
           >
             <span
@@ -65,7 +65,7 @@ export function TerminalTabStrip({
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') onSelectTab(tab.id)
               }}
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               <span aria-hidden="true">{kindIcon(tab.kind)}</span>
               <span className="whitespace-nowrap">{tab.label}</span>
@@ -74,7 +74,7 @@ export function TerminalTabStrip({
               type="button"
               onClick={() => onCloseTab(tab.id)}
               aria-label={`Close ${tab.label}`}
-              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              className="rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               ✕
             </button>
@@ -87,7 +87,7 @@ export function TerminalTabStrip({
         onClick={onNewTab}
         disabled={creatingNewTab}
         aria-label="New terminal tab"
-        className="shrink-0 px-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+        className="shrink-0 rounded-sm px-1.5 text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
       >
         {creatingNewTab ? '…' : '+'}
       </button>
