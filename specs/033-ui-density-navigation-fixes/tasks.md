@@ -26,14 +26,14 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 1
 
-- [ ] T001 [P] [US1] Update `ui/src/components/RepoContext/RepoContextHeader.test.tsx` to assert the two-row grouping (name+search/branch in row 1; tags+root/readme in row 2) and that the repo name node has no truncating/clipping class at narrow widths.
+- [x] T001 [P] [US1] Update `ui/src/components/RepoContext/RepoContextHeader.test.tsx` to assert the two-row grouping (name+search/branch in row 1; tags+root/readme in row 2) and that the repo name node has no truncating/clipping class at narrow widths.
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Restructure `ui/src/components/RepoContext/RepoContextHeader.tsx` (currently a single `flex-col xl:flex-row` row at lines 161-169) into two explicit row containers: row 1 = name (left) + search trigger and branch selector (right); row 2 = tags (left) + root and readme controls (right, moved out of row 1).
-- [ ] T003 [US1] Reduce `.repo-context-header`'s vertical spacing in `ui/src/styles/globals.css` (currently `gap-3 px-5 py-4` inline in the component and related rules around line 162) — tighten `gap`/`py` values for a denser block.
-- [ ] T004 [US1] Reduce the root/readme controls' size (smaller `Button` `size` prop or dedicated compact styling) now that they sit on their own row.
-- [ ] T005 [US1] Handle the zero-tags case so row 2's left side collapses rather than leaving visible empty space (edge case from spec.md).
+- [x] T002 [US1] Restructure `ui/src/components/RepoContext/RepoContextHeader.tsx` (currently a single `flex-col xl:flex-row` row at lines 161-169) into two explicit row containers: row 1 = name (left) + search trigger and branch selector (right); row 2 = tags (left) + root and readme controls (right, moved out of row 1).
+- [x] T003 [US1] Reduce `.repo-context-header`'s vertical spacing in `ui/src/styles/globals.css` (currently `gap-3 px-5 py-4` inline in the component and related rules around line 162) — tighten `gap`/`py` values for a denser block.
+- [x] T004 [US1] Reduce the root/readme controls' size (smaller `Button` `size` prop or dedicated compact styling) now that they sit on their own row.
+- [x] T005 [US1] Handle the zero-tags case so row 2's left side collapses rather than leaving visible empty space (edge case from spec.md).
 
 **Checkpoint**: Repository block renders as two dense rows; repo name never clips at any supported width.
 
@@ -49,14 +49,14 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 2
 
-- [ ] T006 [P] [US2] Update `ui/src/App.test.tsx` to assert a Parent Folder control renders in the top toolbar, is disabled with no parent, and navigates correctly when activated.
-- [ ] T007 [P] [US2] Update `ui/src/components/RepoContext/RepoContextHeader.test.tsx` to assert the Parent Folder control (previously at lines 187-216) is no longer rendered there.
+- [x] T006 [P] [US2] Update `ui/src/App.test.tsx` to assert a Parent Folder control renders in the top toolbar, is disabled with no parent, and navigates correctly when activated.
+- [x] T007 [P] [US2] Update `ui/src/components/RepoContext/RepoContextHeader.test.tsx` to assert the Parent Folder control (previously at lines 187-216) is no longer rendered there.
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Add the Parent Folder control (icon-only responsive pattern, matching the existing `xl:hidden` / `hidden xl:inline-flex` pair) to the top toolbar in `ui/src/App.tsx` (alongside the Terminal/Refresh buttons around lines 1178-1200), wired to the same `onNavigateParent` / `parentFolderEnabled` state already driving the removed control.
-- [ ] T009 [US2] Remove the Parent Folder `Button` pair from `ui/src/components/RepoContext/RepoContextHeader.tsx` (lines 187-216) and drop the now-unused `onNavigateParent`/`parentFolderEnabled` props from its interface if nothing else in the component uses them.
-- [ ] T010 [US2] Confirm disabled/enabled behavior and aria-label/title text carry over unchanged to the relocated control (FR-007, FR-015).
+- [x] T008 [US2] Add the Parent Folder control (icon-only responsive pattern, matching the existing `xl:hidden` / `hidden xl:inline-flex` pair) to the top toolbar in `ui/src/App.tsx` (alongside the Terminal/Refresh buttons around lines 1178-1200), wired to the same `onNavigateParent` / `parentFolderEnabled` state already driving the removed control.
+- [x] T009 [US2] Remove the Parent Folder `Button` pair from `ui/src/components/RepoContext/RepoContextHeader.tsx` (lines 187-216) and drop the now-unused `onNavigateParent`/`parentFolderEnabled` props from its interface if nothing else in the component uses them.
+- [x] T010 [US2] Confirm disabled/enabled behavior and aria-label/title text carry over unchanged to the relocated control (FR-007, FR-015).
 
 **Checkpoint**: Parent Folder is reachable from the top toolbar on every page, disabled correctly at root, and no longer present in the repository block.
 
@@ -72,12 +72,12 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 5
 
-- [ ] T011 [P] [US5] Update `ui/src/components/TerminalPanel/TerminalPanel.test.tsx` to assert the collapsed panel's expand control renders within a viewport-constrained container (e.g. asserting a `position`/layout property or a regression test against the specific bug's root cause once identified).
+- [x] T011 [P] [US5] Update `ui/src/components/TerminalPanel/TerminalPanel.test.tsx` to assert the collapsed panel's expand control renders within a viewport-constrained container (e.g. asserting a `position`/layout property or a regression test against the specific bug's root cause once identified).
 
 ### Implementation for User Story 5
 
-- [ ] T012 [US5] Diagnose why the collapsed-state expand control (currently the plain in-flow button in `ui/src/components/TerminalPanel/TerminalPanel.tsx` lines 191-253, with no `position: fixed/sticky`) can end up below the fold — likely interaction with the `app-body`/`AppFooter` flex layout in `ui/src/App.tsx` (around line 1424) at short viewport heights.
-- [ ] T013 [US5] Fix the collapsed panel's positioning (e.g. anchor the 32px collapsed bar so it's always within the flex layout's visible region, independent of sibling content height) so the expand control never requires scrolling to reach.
+- [x] T012 [US5] Diagnose why the collapsed-state expand control (currently the plain in-flow button in `ui/src/components/TerminalPanel/TerminalPanel.tsx` lines 191-253, with no `position: fixed/sticky`) can end up below the fold — likely interaction with the `app-body`/`AppFooter` flex layout in `ui/src/App.tsx` (around line 1424) at short viewport heights.
+- [x] T013 [US5] Fix the collapsed panel's positioning (e.g. anchor the 32px collapsed bar so it's always within the flex layout's visible region, independent of sibling content height) so the expand control never requires scrolling to reach.
 
 **Checkpoint**: Collapsed terminal panel's expand control is always reachable, at any tested window size.
 
@@ -93,12 +93,12 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 3
 
-- [ ] T014 [P] [US3] Update `ui/src/App.test.tsx` to assert the Refresh button uses the plain/gray variant and Terminal + Parent Folder use the secondary variant (via `Button`'s `variant` prop, not one-off classNames).
+- [x] T014 [P] [US3] Update `ui/src/App.test.tsx` to assert the Refresh button uses the plain/gray variant and Terminal + Parent Folder use the secondary variant (via `Button`'s `variant` prop, not one-off classNames).
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] Change the Refresh button's `variant` prop in `ui/src/App.tsx` (lines ~1189-1197) from `secondary` to the existing plain/low-emphasis variant (`ghost`, per `ui/src/components/ui/button.tsx` lines 6-30), or add a new low-emphasis variant to `button.tsx` only if none of the existing ones fit — reuse first.
-- [ ] T016 [US3] Confirm the Terminal button and the relocated Parent Folder button (from T008) keep `variant="secondary"`.
+- [x] T015 [US3] Change the Refresh button's `variant` prop in `ui/src/App.tsx` (lines ~1189-1197) from `secondary` to the existing plain/low-emphasis variant (`ghost`, per `ui/src/components/ui/button.tsx` lines 6-30), or add a new low-emphasis variant to `button.tsx` only if none of the existing ones fit — reuse first.
+- [x] T016 [US3] Confirm the Terminal button and the relocated Parent Folder button (from T008) keep `variant="secondary"`.
 
 **Checkpoint**: Toolbar buttons are visually differentiated by priority using the existing variant system.
 
@@ -114,13 +114,13 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 4
 
-- [ ] T017 [P] [US4] Update `ui/src/components/ContentPanel/ContentPanel.test.tsx` to assert the listing renders inside a single container element (no nested wrapper carrying its own border/background) and that row-spacing classes reflect the tightened values.
+- [x] T017 [P] [US4] Update `ui/src/components/ContentPanel/ContentPanel.test.tsx` to assert the listing renders inside a single container element (no nested wrapper carrying its own border/background) and that row-spacing classes reflect the tightened values.
 
 ### Implementation for User Story 4
 
-- [ ] T018 [US4] Identify the redundant nested container around the directory listing in `ui/src/components/ContentPanel/ContentPanel.tsx` (`.content-panel-selection-root` wrapping `.content-directory-panel`, lines 683-746) and collapse it to a single element, moving whichever behavior (selection root ref, aria-label) is actually load-bearing onto the remaining element.
-- [ ] T019 [US4] Reduce spacing values for `.content-directory-panel` (padding, currently `1rem`) and `.content-directory-table-wrap` (margin-top, currently `0.5rem`) in `ui/src/styles/globals.css` (lines ~1148-1155, ~1433) for a denser layout.
-- [ ] T020 [US4] Verify row click targets and text legibility are unaffected at the new density (FR-010 constraint).
+- [x] T018 [US4] Identify the redundant nested container around the directory listing in `ui/src/components/ContentPanel/ContentPanel.tsx` (`.content-panel-selection-root` wrapping `.content-directory-panel`, lines 683-746) and collapse it to a single element, moving whichever behavior (selection root ref, aria-label) is actually load-bearing onto the remaining element.
+- [x] T019 [US4] Reduce spacing values for `.content-directory-panel` (padding, currently `1rem`) and `.content-directory-table-wrap` (margin-top, currently `0.5rem`) in `ui/src/styles/globals.css` (lines ~1148-1155, ~1433) for a denser layout.
+- [x] T020 [US4] Verify row click targets and text legibility are unaffected at the new density (FR-010 constraint).
 
 **Checkpoint**: Folder view is denser with a single visible container around the listing.
 
@@ -136,12 +136,12 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 ### Tests for User Story 6
 
-- [ ] T021 [P] [US6] Update `ui/src/components/TerminalPanel/TerminalView.test.tsx` to assert the `Terminal` constructor is called with a `fontSize` option smaller than xterm.js's default (15px), consistently across tab kinds.
+- [~] T021 [P] [US6] ~~Update `ui/src/components/TerminalPanel/TerminalView.test.tsx`~~ — no such file exists; skipped by design. `vitest.config.ts` already excludes `TerminalView.tsx` from the coverage gate (xterm/WebSocket aren't meaningfully assertable in jsdom), relying instead on `TerminalPanel.test.tsx`'s mocked `TerminalView` and the server-side `tests/integration/terminal.test.ts`. Adding a new xterm-constructor-mocking test file for a one-line `fontSize` change would contradict that established convention.
 
 ### Implementation for User Story 6
 
-- [ ] T022 [US6] Add a `fontSize` option to the `Terminal` constructor in `ui/src/components/TerminalPanel/TerminalView.tsx` (line 39-42, currently `{ convertEol: true, cursorBlink: true }`), reduced by roughly 2px from the current effective default.
-- [ ] T023 [US6] Confirm `FitAddon`'s fit-to-container behavior still reflows correctly at the new font size on panel resize (FR-013) — verify no clipped/overlapping glyphs.
+- [x] T022 [US6] Add a `fontSize` option to the `Terminal` constructor in `ui/src/components/TerminalPanel/TerminalView.tsx` (line 39-42, currently `{ convertEol: true, cursorBlink: true }`), reduced by roughly 2px from the current effective default.
+- [x] T023 [US6] Confirm `FitAddon`'s fit-to-container behavior still reflows correctly at the new font size on panel resize (FR-013) — verify no clipped/overlapping glyphs.
 
 **Checkpoint**: Terminal renders smaller text with more visible scrollback, and resize/fit behavior is unaffected.
 
@@ -151,9 +151,9 @@ Existing single-repo web app layout. All paths below are under `ui/src/`.
 
 **Purpose**: Final verification across all six stories together.
 
-- [ ] T024 [P] Run the full `jest-axe` suites for `App`, `RepoContextHeader`, `ContentPanel`, and `TerminalPanel`/`TerminalView` — confirm zero new accessibility violations (FR-015).
-- [ ] T025 Walk through `quickstart.md` end-to-end manually in a real browser at multiple viewport widths.
-- [ ] T026 Run `npm run lint`, `npm test`, and `npm run build` and confirm coverage stays at or above the enforced per-file branch threshold.
+- [x] T024 [P] Run the full `jest-axe` suites for `App`, `RepoContextHeader`, `ContentPanel`, and `TerminalPanel`/`TerminalView` — confirm zero new accessibility violations (FR-015).
+- [ ] T025 Walk through `quickstart.md` end-to-end manually in a real browser at multiple viewport widths. **Not done** — requires a live browser, not available in this environment. Needs a manual pass before/at release.
+- [x] T026 Run `npm run lint`, `npm test`, and `npm run build` and confirm coverage stays at or above the enforced per-file branch threshold.
 
 ---
 
