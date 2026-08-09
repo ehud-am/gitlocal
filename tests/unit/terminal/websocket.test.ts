@@ -21,9 +21,13 @@ class FakeWebSocket extends EventEmitter {
 }
 
 const createdSockets: FakeWebSocket[] = []
+const serverConstructorOptions: unknown[] = []
 
 vi.mock('ws', () => {
   class FakeWebSocketServer {
+    constructor(options: unknown) {
+      serverConstructorOptions.push(options)
+    }
     handleUpgrade(_req: unknown, _socket: unknown, _head: unknown, callback: (ws: FakeWebSocket) => void) {
       const ws = new FakeWebSocket()
       createdSockets.push(ws)
@@ -61,10 +65,16 @@ function emitUpgrade(httpServer: EventEmitter, path: string) {
 describe('attachTerminalWebSocketServer', () => {
   beforeEach(() => {
     createdSockets.length = 0
+    serverConstructorOptions.length = 0
     mockSubscribe.mockReset()
     mockGetSession.mockReset()
     mockWriteInput.mockReset()
     mockResize.mockReset()
+  })
+
+  it('caps inbound frame size via maxPayload to bound a single client\'s memory/CPU impact', () => {
+    attachTerminalWebSocketServer(fakeHttpServer() as never)
+    expect(serverConstructorOptions).toEqual([{ noServer: true, maxPayload: 64 * 1024 }])
   })
 
   it('ignores upgrade requests whose path does not match the terminal io route', () => {

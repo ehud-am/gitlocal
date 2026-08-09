@@ -1,4 +1,4 @@
-import { createRef, useEffect, useState } from 'react'
+import { createRef, forwardRef, useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
@@ -32,24 +32,29 @@ vi.mock('../../services/terminalApi', () => ({
 // remount — only an effect re-running does (matching what the real TerminalView relies on to
 // avoid tearing down its xterm instance/WebSocket). Track mounts via useEffect, not render calls.
 let terminalViewMountCount = 0
+const terminalFocusCalls: string[] = []
 vi.mock('./TerminalView', () => ({
-  TerminalView: ({
-    session,
-    onExit,
-  }: {
-    session: TerminalSession
-    onExit: (code: number | null, signal: string | null) => void
-  }) => {
+  TerminalView: forwardRef(function FakeTerminalView(
+    {
+      session,
+      onExit,
+    }: {
+      session: TerminalSession
+      onExit: (code: number | null, signal: string | null) => void
+    },
+    ref: Ref<{ focus: () => void }>,
+  ) {
     useEffect(() => {
       terminalViewMountCount += 1
     }, [])
+    useImperativeHandle(ref, () => ({ focus: () => terminalFocusCalls.push(session.id) }), [session.id])
     return (
       <div data-testid="fake-terminal-view">
         {session.id}:{session.status}
         <button onClick={() => onExit(0, null)}>simulate exit</button>
       </div>
     )
-  },
+  }),
 }))
 
 import { terminalApi } from '../../services/terminalApi'
@@ -74,6 +79,7 @@ function AppShell() {
 describe('TerminalPanel', () => {
   beforeEach(() => {
     terminalViewMountCount = 0
+    terminalFocusCalls.length = 0
     mockCreateSession.mockReset()
     mockCloseSession.mockReset()
     mockCloseSession.mockResolvedValue(undefined)
@@ -246,6 +252,31 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show terminal' }))
     expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+  })
+
+  it('moves focus into the terminal when a session first opens, so a keyboard/screen-reader user is not stranded', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+
+    await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
+  })
+
+  it('moves focus into the active terminal again when the panel is re-shown after being hidden', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
+
+    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    terminalFocusCalls.length = 0
+    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+
+    await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
   })
 
   it('hiding the panel closes no session and keeps output visible on show again (US2)', async () => {

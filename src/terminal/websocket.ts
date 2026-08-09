@@ -4,6 +4,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import { sessionManager } from './session-manager.js'
 
 const TERMINAL_IO_PATH = /^\/api\/terminal\/sessions\/([^/]+)\/io$/
+const MAX_FRAME_BYTES = 64 * 1024
 
 interface InboundFrame {
   type: string
@@ -17,7 +18,7 @@ interface InboundFrame {
 // must be wired in by the caller (src/cli.ts) once it has the real server instance — createApp()
 // alone (used directly in tests via hono/testing) has no server to attach to.
 export function attachTerminalWebSocketServer(httpServer: HttpServer): WebSocketServer {
-  const wss = new WebSocketServer({ noServer: true })
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES })
 
   httpServer.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
     const pathname = new URL(request.url ?? '', 'http://localhost').pathname

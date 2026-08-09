@@ -227,6 +227,35 @@ describe('session-manager', () => {
     expect(manager.resize(result.session.id, 100, 40)).toBe(false)
   })
 
+  it('clamps out-of-range resize dimensions before forwarding to the pty', async () => {
+    const pty = createFakePty()
+    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
+    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(manager.resize(result.session.id, -5, 999_999)).toBe(true)
+    expect(manager.resize(result.session.id, 42.9, 30)).toBe(true)
+    expect(pty.resizes).toEqual([
+      { cols: 1, rows: 1000 },
+      { cols: 42, rows: 30 },
+    ])
+  })
+
+  it('rejects session creation once the concurrent session limit is reached', async () => {
+    const manager = createSessionManager(() => Promise.resolve(createFakePty()), '/bin/sh')
+
+    for (let i = 0; i < 20; i++) {
+      const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+      expect(result.ok).toBe(true)
+    }
+
+    const overflow = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    expect(overflow.ok).toBe(false)
+    if (overflow.ok) return
+    expect(overflow.error).toBe('session_limit_reached')
+  })
+
   it('subscribe returns null for an unknown session id', async () => {
     const manager = createSessionManager(fakeFactory(createFakePty()), '/bin/sh')
     expect(manager.subscribe('missing', vi.fn(), vi.fn())).toBeNull()

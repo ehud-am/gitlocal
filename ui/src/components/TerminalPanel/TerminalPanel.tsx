@@ -1,7 +1,7 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { terminalApi } from '../../services/terminalApi'
 import { useTerminalPanel } from '../../hooks/useTerminalPanel'
-import { TerminalView } from './TerminalView'
+import { TerminalView, type TerminalViewHandle } from './TerminalView'
 import { TerminalTabStrip } from './TerminalTabStrip'
 import { TerminalKindSelect } from './TerminalKindSelect'
 import type { TerminalContextType, TerminalKind, TerminalUnavailableResponse } from '../../types'
@@ -42,6 +42,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   const [error, setError] = useState('')
   const [pendingKind, setPendingKind] = useState<TerminalKind>('regular')
   const [height, setHeight] = useState(DEFAULT_PANEL_HEIGHT)
+  const viewHandlesRef = useRef(new Map<string, TerminalViewHandle>())
 
   const openTerminal = useCallback(
     async (kind: TerminalKind) => {
@@ -149,6 +150,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       setHeight((current) => clampPanelHeight(current - RESIZE_KEY_STEP))
     }
   }, [])
+
+  // A keyboard/screen-reader user who opens the panel (header button, Ctrl+`, or a new tab)
+  // otherwise has no indication it appeared and must Tab through the rest of the page to reach
+  // it. Move focus into the active tab's terminal whenever it becomes the visible one.
+  useEffect(() => {
+    if (!panel.state.visible || !panel.state.activeTabId) return
+    viewHandlesRef.current.get(panel.state.activeTabId)?.focus()
+  }, [panel.state.visible, panel.state.activeTabId])
 
   if (panel.state.tabs.length === 0) {
     return (
@@ -260,6 +269,10 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               </div>
             ) : (
               <TerminalView
+                ref={(handle) => {
+                  if (handle) viewHandlesRef.current.set(tab.id, handle)
+                  else viewHandlesRef.current.delete(tab.id)
+                }}
                 session={{ id: tab.id, kind: tab.kind, cwd: tab.cwd, status: tab.status, createdAt: '', exitInfo: null }}
                 onExit={() => handleExit(tab.id)}
                 onToggleShortcut={toggleOrOpenTerminal}

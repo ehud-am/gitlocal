@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -11,20 +11,33 @@ interface TerminalViewProps {
   onToggleShortcut?: () => void
 }
 
+export interface TerminalViewHandle {
+  focus: () => void
+}
+
 // Mounts one xterm.js instance bound to one session's WebSocket. Keyed by session.id in the
 // parent (TerminalPanel) so switching tabs never tears this down — only closing a tab does.
-export function TerminalView({ session, onExit, onToggleShortcut }: TerminalViewProps) {
+// Exposes focus() via ref so the panel can move keyboard focus into the terminal whenever it
+// becomes the visible/active tab, since opening the panel otherwise leaves focus wherever it was.
+export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
+  { session, onExit, onToggleShortcut }: TerminalViewProps,
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const terminalRef = useRef<Terminal | null>(null)
   const onExitRef = useRef(onExit)
   onExitRef.current = onExit
   const onToggleShortcutRef = useRef(onToggleShortcut)
   onToggleShortcutRef.current = onToggleShortcut
+
+  useImperativeHandle(ref, () => ({ focus: () => terminalRef.current?.focus() }), [])
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const terminal = new Terminal({ convertEol: true, cursorBlink: true })
+    terminalRef.current = terminal
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(container)
@@ -79,8 +92,9 @@ export function TerminalView({ session, onExit, onToggleShortcut }: TerminalView
       socket.removeEventListener('message', handleMessage)
       socket.close()
       terminal.dispose()
+      terminalRef.current = null
     }
   }, [session.id])
 
   return <div ref={containerRef} className="h-full w-full" data-testid="terminal-view" />
-}
+})

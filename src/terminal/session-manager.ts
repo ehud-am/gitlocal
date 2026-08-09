@@ -5,6 +5,9 @@ import type { TerminalExitInfo, TerminalKind, TerminalSession, TerminalSessionSt
 const MAX_BUFFERED_OUTPUT_CHARS = 200_000
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
+const MAX_CONCURRENT_SESSIONS = 20
+const MIN_DIMENSION = 1
+const MAX_DIMENSION = 1000
 
 export interface PtyLike {
   onData(callback: (data: string) => void): void
@@ -51,7 +54,7 @@ export interface CreateSessionOptions {
 
 export type CreateSessionResult =
   | { ok: true; session: TerminalSession }
-  | { ok: false; error: 'pty_unavailable'; message: string }
+  | { ok: false; error: 'pty_unavailable' | 'session_limit_reached'; message: string }
 
 interface ManagedSession {
   id: string
@@ -107,6 +110,14 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
   async function createSession(options: CreateSessionOptions): Promise<CreateSessionResult> {
     if (!isPtySupported()) {
       return { ok: false, error: 'pty_unavailable', message: 'Terminal sessions are not supported on this platform.' }
+    }
+
+    if (sessions.size >= MAX_CONCURRENT_SESSIONS) {
+      return {
+        ok: false,
+        error: 'session_limit_reached',
+        message: `Too many open terminal sessions (limit ${MAX_CONCURRENT_SESSIONS}). Close one and try again.`,
+      }
     }
 
     const session: ManagedSession = {
@@ -202,10 +213,14 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
     return true
   }
 
+  function clampDimension(value: number): number {
+    return Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, Math.trunc(value)))
+  }
+
   function resize(id: string, cols: number, rows: number): boolean {
     const session = sessions.get(id)
     if (!session || session.status !== 'running' || !session.pty) return false
-    session.pty.resize(cols, rows)
+    session.pty.resize(clampDimension(cols), clampDimension(rows))
     return true
   }
 
