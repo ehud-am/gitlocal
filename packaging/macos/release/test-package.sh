@@ -2,6 +2,7 @@
 set -euo pipefail
 
 APP_PATH="${1:-native/macos/build/Build/Products/Release/GitLocal.app}"
+APP_PATH="$(cd "$(dirname "${APP_PATH}")" && pwd)/$(basename "${APP_PATH}")"
 
 test -d "${APP_PATH}"
 test -x "${APP_PATH}/Contents/MacOS/GitLocal"
