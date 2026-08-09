@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.1 - 2026-08-09
+
+- Restructured the repository block into two lines (name, search, and branch selection on line 1; tags, root, and readme on line 2) so the repository name is no longer clipped on narrower windows, and reduced its internal spacing.
+- Moved the "Parent Folder" control out of the repository block and into the persistent top toolbar so it's always available in a consistent place, and reordered the toolbar to Parent Folder, Refresh, Terminal, then the theme switch, grouping controls from most page-specific to most global.
+- Restyled the top toolbar: Refresh and Parent Folder are now plain/low-emphasis controls, and Terminal uses a new soft-green "highlight" style so it reads as a higher-value action without looking like a primary/submit or danger control.
+- Tightened row spacing in the current folder view (both git repository and local folder browsing) for a denser, more scannable layout, and removed a redundant nested container in the git repository view.
+- Fixed the terminal panel's collapsed-state expand button falling outside the viewport, and reduced the terminal's default font size.
+- Fixed the terminal panel's collapse/expand chevron pointing the wrong direction; it now points toward where the panel will move.
+- Added an "X" close button to the file view so a file can be closed back to its containing folder without navigating manually; it respects the existing unsaved-edit discard confirmation.
+
 ## 0.10.0 - 2026-08-09
 
 - First official release of the integrated terminal panel across both distributions, including the macOS Homebrew app (0.9.17 published the feature to npm only; its Homebrew build failed at packaging validation and never shipped).
