@@ -1753,7 +1753,7 @@ pre {
 }
 
 .picker-browser-table-wrap {
-  margin-top: 1rem;
+  margin-top: 0.625rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1766,7 +1766,7 @@ pre {
 }
 
 .picker-browser-table th {
-  padding: 0.7rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   background: var(--surface-subtle);
   color: var(--muted-foreground);
   font-size: 0.75rem;
@@ -1803,7 +1803,7 @@ pre {
 }
 
 .picker-entry-cell {
-  padding: 0.8rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   vertical-align: middle;
 }
 
