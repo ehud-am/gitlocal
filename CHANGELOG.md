@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 - 2026-08-09
+
+- First official release of the integrated terminal panel across both distributions, including the macOS Homebrew app (0.9.17 published the feature to npm only; its Homebrew build failed at packaging validation and never shipped).
+- Fixed a path-resolution bug in the macOS packaging script's node-pty verification step (`packaging/macos/release/test-package.sh`) that used a relative path across a working-directory change, causing the Homebrew build to fail validation. No product code changes since 0.9.17.
+
 ## 0.9.17 - 2026-08-08
 
 - Added an integrated terminal panel, docked at the bottom of the window, with support for a regular shell as well as Claude Code and Codex CLI tab kinds; sessions persist across page navigation and follow the currently viewed folder's working directory.

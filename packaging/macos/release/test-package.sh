@@ -2,6 +2,11 @@
 set -euo pipefail
 
 APP_PATH="${1:-native/macos/build/Build/Products/Release/GitLocal.app}"
+if [[ ! -d "${APP_PATH}" ]]; then
+  echo "App bundle not found at ${APP_PATH}" >&2
+  exit 1
+fi
+APP_PATH="$(cd "${APP_PATH}" && pwd)"
 
 test -d "${APP_PATH}"
 test -x "${APP_PATH}/Contents/MacOS/GitLocal"
