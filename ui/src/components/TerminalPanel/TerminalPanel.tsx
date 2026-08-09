@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
 import { terminalApi } from '../../services/terminalApi'
 import { useTerminalPanel } from '../../hooks/useTerminalPanel'
 import { TerminalView } from './TerminalView'
@@ -11,15 +11,37 @@ interface TerminalPanelProps {
   contextType?: TerminalContextType
 }
 
+export interface TerminalPanelHandle {
+  toggleTerminal: () => void
+}
+
+const MIN_PANEL_HEIGHT = 120
+const DEFAULT_PANEL_HEIGHT = 260
+const MAX_PANEL_HEIGHT_RATIO = 0.85
+const RESIZE_KEY_STEP = 24
+
+function maxPanelHeight(): number {
+  return Math.max(MIN_PANEL_HEIGHT, Math.round(window.innerHeight * MAX_PANEL_HEIGHT_RATIO))
+}
+
+function clampPanelHeight(value: number): number {
+  return Math.min(maxPanelHeight(), Math.max(MIN_PANEL_HEIGHT, value))
+}
+
 // Mounted once at the App.tsx root layout level, outside the page-specific content area, so
 // it persists across every page/content type (FR-001, FR-013) and its state survives unrelated
 // App-level re-renders (US1 T019). Owns its own state via useTerminalPanel() rather than lifted
-// App state, so switching selectedPath/viewerRepoPath etc. never remounts it.
-export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps = {}) {
+// App state, so switching selectedPath/viewerRepoPath etc. never remounts it. Exposes
+// toggleTerminal() via ref so App.tsx's header button can drive it without lifting that state up.
+export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel(
+  { contextPath, contextType }: TerminalPanelProps = {},
+  ref,
+) {
   const panel = useTerminalPanel()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [pendingKind, setPendingKind] = useState<TerminalKind>('regular')
+  const [height, setHeight] = useState(DEFAULT_PANEL_HEIGHT)
 
   const openTerminal = useCallback(
     async (kind: TerminalKind) => {
@@ -68,6 +90,66 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
     [panel],
   )
 
+  // Shared by the header button (via ref), the global Ctrl+` shortcut, and the same shortcut
+  // fired from inside a focused terminal (via TerminalView's onToggleShortcut) — one first-open
+  // fallback so all three entry points behave identically when no tab exists yet.
+  const toggleOrOpenTerminal = useCallback(() => {
+    if (panel.state.tabs.length === 0) {
+      void openTerminal(pendingKind)
+      return
+    }
+    panel.toggleVisible()
+  }, [panel, openTerminal, pendingKind])
+
+  useImperativeHandle(ref, () => ({ toggleTerminal: toggleOrOpenTerminal }), [toggleOrOpenTerminal])
+
+  // Matches VS Code's default "Toggle Integrated Terminal" binding, which is Ctrl+` on every
+  // platform (not Cmd, even on macOS).
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '`' || !event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      toggleOrOpenTerminal()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleOrOpenTerminal])
+
+  // Reclamp on viewport shrink so the panel can never grow past the window after a resize.
+  useEffect(() => {
+    const handleWindowResize = () => setHeight((current) => clampPanelHeight(current))
+    window.addEventListener('resize', handleWindowResize)
+    return () => window.removeEventListener('resize', handleWindowResize)
+  }, [])
+
+  const handleResizeStart = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      const startY = event.clientY
+      const startHeight = height
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        setHeight(clampPanelHeight(startHeight + (startY - moveEvent.clientY)))
+      }
+      const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    },
+    [height],
+  )
+
+  const handleResizeKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setHeight((current) => clampPanelHeight(current + RESIZE_KEY_STEP))
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setHeight((current) => clampPanelHeight(current - RESIZE_KEY_STEP))
+    }
+  }, [])
+
   if (panel.state.tabs.length === 0) {
     return (
       <div
@@ -99,10 +181,25 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
 
   return (
     <div
-      className="flex flex-col border-t border-[var(--border)] bg-[var(--background)]"
-      style={{ height: panel.state.visible ? '260px' : '32px' }}
+      className="flex flex-col bg-[var(--background)]"
+      style={{ height: panel.state.visible ? `${height}px` : '32px' }}
       data-testid="terminal-panel"
     >
+      <div
+        role={panel.state.visible ? 'separator' : undefined}
+        aria-orientation={panel.state.visible ? 'horizontal' : undefined}
+        aria-label={panel.state.visible ? 'Resize terminal panel' : undefined}
+        aria-valuenow={panel.state.visible ? height : undefined}
+        aria-valuemin={panel.state.visible ? MIN_PANEL_HEIGHT : undefined}
+        aria-valuemax={panel.state.visible ? maxPanelHeight() : undefined}
+        tabIndex={panel.state.visible ? 0 : undefined}
+        onMouseDown={panel.state.visible ? handleResizeStart : undefined}
+        onKeyDown={panel.state.visible ? handleResizeKeyDown : undefined}
+        className={`h-1 shrink-0 border-t border-[var(--border)] outline-none focus-visible:bg-[var(--ring)] ${
+          panel.state.visible ? 'cursor-row-resize hover:bg-[var(--ring)]' : ''
+        }`}
+        data-testid="terminal-panel-resize-handle"
+      />
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-1">
         <TerminalTabStrip
           tabs={panel.state.tabs}
@@ -143,6 +240,7 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
               <TerminalView
                 session={{ id: tab.id, kind: tab.kind, cwd: tab.cwd, status: tab.status, createdAt: '', exitInfo: null }}
                 onExit={() => handleExit(tab.id)}
+                onToggleShortcut={toggleOrOpenTerminal}
               />
             )}
           </div>
@@ -150,4 +248,4 @@ export function TerminalPanel({ contextPath, contextType }: TerminalPanelProps =
       </div>
     </div>
   )
-}
+})

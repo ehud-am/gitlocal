@@ -1,10 +1,25 @@
-import { useEffect, useState } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { createRef, useEffect, useState } from 'react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { TerminalPanel } from './TerminalPanel'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { TerminalPanel, type TerminalPanelHandle } from './TerminalPanel'
 import type { TerminalSession } from '../../types'
+
+const ORIGINAL_INNER_HEIGHT = window.innerHeight
+
+function setInnerHeight(value: number) {
+  Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value })
+}
+
+const runningSession: TerminalSession = {
+  id: 'session-1',
+  kind: 'regular',
+  cwd: '/repo',
+  status: 'running',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  exitInfo: null,
+}
 
 vi.mock('../../services/terminalApi', () => ({
   terminalApi: {
@@ -62,6 +77,10 @@ describe('TerminalPanel', () => {
     mockCreateSession.mockReset()
     mockCloseSession.mockReset()
     mockCloseSession.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    setInnerHeight(ORIGINAL_INNER_HEIGHT)
   })
 
   async function openTerminal(user: ReturnType<typeof userEvent.setup>) {
@@ -379,6 +398,146 @@ describe('TerminalPanel', () => {
     await openTerminal(user)
 
     expect((await axe(container)).violations).toHaveLength(0)
+  })
+
+  it('exposes toggleTerminal via ref: opens the first tab when none exist, then toggles visibility once one does', async () => {
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+    const ref = createRef<TerminalPanelHandle>()
+
+    render(<TerminalPanel ref={ref} />)
+
+    act(() => ref.current?.toggleTerminal())
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+
+    act(() => ref.current?.toggleTerminal())
+    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
+
+    act(() => ref.current?.toggleTerminal())
+    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+  })
+
+  it('Ctrl+` opens the first tab when none exist, and toggles visibility once one does (matches VS Code default binding)', async () => {
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true })
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true })
+    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
+  })
+
+  it('ignores Ctrl+` variants that do not exactly match the shortcut', () => {
+    render(<TerminalPanel />)
+
+    fireEvent.keyDown(window, { key: 'a', ctrlKey: true })
+    fireEvent.keyDown(window, { key: '`' })
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true, altKey: true })
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true, metaKey: true })
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true, shiftKey: true })
+
+    expect(screen.getByTestId('terminal-panel-empty')).toBeInTheDocument()
+    expect(mockCreateSession).not.toHaveBeenCalled()
+  })
+
+  it('renders resizable-panel semantics on the handle while visible, and drops them while collapsed', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    const handle = screen.getByTestId('terminal-panel-resize-handle')
+
+    expect(handle).toHaveAttribute('role', 'separator')
+    expect(handle).toHaveAttribute('aria-orientation', 'horizontal')
+    expect(handle).toHaveAttribute('tabindex', '0')
+
+    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+
+    expect(handle).not.toHaveAttribute('role')
+    expect(handle).not.toHaveAttribute('aria-orientation')
+    expect(handle).not.toHaveAttribute('tabindex')
+  })
+
+  it('drag-grows the panel via the resize handle, clamps at the viewport-derived max, and ignores moves after mouseup', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+    setInnerHeight(1000)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    const handle = screen.getByTestId('terminal-panel-resize-handle')
+
+    fireEvent.mouseDown(handle, { clientY: 300 })
+    fireEvent.mouseMove(window, { clientY: 200 })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '360px' })
+
+    fireEvent.mouseMove(window, { clientY: -1000 })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '850px' })
+
+    fireEvent.mouseUp(window)
+    fireEvent.mouseMove(window, { clientY: 500 })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '850px' })
+  })
+
+  it('drag-shrinks the panel via the resize handle and clamps at the minimum height', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    const handle = screen.getByTestId('terminal-panel-resize-handle')
+
+    fireEvent.mouseDown(handle, { clientY: 0 })
+    fireEvent.mouseMove(window, { clientY: 1000 })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '120px' })
+
+    fireEvent.mouseUp(window)
+  })
+
+  it('resizes the panel with ArrowUp/ArrowDown on the handle, clamped to the same min/max bounds', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+    setInnerHeight(400)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    const handle = screen.getByTestId('terminal-panel-resize-handle')
+
+    fireEvent.keyDown(handle, { key: 'ArrowUp' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '284px' })
+
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '260px' })
+
+    for (let i = 0; i < 20; i += 1) fireEvent.keyDown(handle, { key: 'ArrowUp' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '340px' })
+
+    for (let i = 0; i < 20; i += 1) fireEvent.keyDown(handle, { key: 'ArrowDown' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '120px' })
+
+    fireEvent.keyDown(handle, { key: 'Enter' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '120px' })
+  })
+
+  it('reclamps the panel height on window resize so it never exceeds a shrunk viewport', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+
+    render(<TerminalPanel />)
+    await openTerminal(user)
+    const handle = screen.getByTestId('terminal-panel-resize-handle')
+
+    fireEvent.keyDown(handle, { key: 'ArrowUp' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '284px' })
+
+    setInnerHeight(100)
+    fireEvent(window, new Event('resize'))
+
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '120px' })
   })
 
   it('has no accessibility violations for a synthesized "unavailable" tab (FR-014, SC-006, T043)', async () => {

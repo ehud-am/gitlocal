@@ -8,14 +8,17 @@ import type { TerminalSession } from '../../types'
 interface TerminalViewProps {
   session: TerminalSession
   onExit: (code: number | null, signal: string | null) => void
+  onToggleShortcut?: () => void
 }
 
 // Mounts one xterm.js instance bound to one session's WebSocket. Keyed by session.id in the
 // parent (TerminalPanel) so switching tabs never tears this down — only closing a tab does.
-export function TerminalView({ session, onExit }: TerminalViewProps) {
+export function TerminalView({ session, onExit, onToggleShortcut }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const onExitRef = useRef(onExit)
   onExitRef.current = onExit
+  const onToggleShortcutRef = useRef(onToggleShortcut)
+  onToggleShortcutRef.current = onToggleShortcut
 
   useEffect(() => {
     const container = containerRef.current
@@ -26,6 +29,18 @@ export function TerminalView({ session, onExit }: TerminalViewProps) {
     terminal.loadAddon(fitAddon)
     terminal.open(container)
     fitAddon.fit()
+
+    // Without this, Ctrl+` while the terminal has focus is swallowed by xterm and sent to the
+    // shell as literal input instead of toggling the panel (matches VS Code's terminal, where
+    // the shortcut works the same whether or not the terminal is focused).
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== 'keydown' || event.key !== '`' || !event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+        return true
+      }
+      event.preventDefault()
+      onToggleShortcutRef.current?.()
+      return false
+    })
 
     const socket = terminalApi.connectSessionSocket(session.id)
 
