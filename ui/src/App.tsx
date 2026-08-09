@@ -7,6 +7,7 @@ import PickerPage from './components/Picker/PickerPage'
 import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
+import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPanel/TerminalPanel'
 import AppFooter from './components/AppFooter'
 import {
   FolderDeleteDialog,
@@ -81,6 +82,16 @@ function ThemeIcon({ darkMode }: { darkMode: boolean }) {
     <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
       <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
       <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M12.6 3.4l-.9.9M4.3 11.7l-.9.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function TerminalIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4 6l2.5 2.5L4 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   )
 }
@@ -194,6 +205,7 @@ export default function App() {
   const nativeRefreshPendingRef = useRef(false)
   const startupOpenTargetAppliedRef = useRef('')
   const startupFolderFallbackAppliedRef = useRef(false)
+  const terminalPanelRef = useRef<TerminalPanelHandle>(null)
 
   const { data: baseInfo, isLoading, isError: isInfoError, error: infoError } = useQuery({
     queryKey: ['info'],
@@ -1156,7 +1168,7 @@ export default function App() {
 
   return (
     <>
-      <div className="flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
+      <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
         <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
           <span className="brand-lockup">
             <img className="brand-mark" src="/gitlocal-logo.svg" alt="" aria-hidden="true" />
@@ -1164,6 +1176,17 @@ export default function App() {
           </span>
           {info ? <span className="repo-name truncate text-sm text-[var(--muted-foreground)]">{info.name}</span> : null}
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => terminalPanelRef.current?.toggleTerminal()}
+              aria-label="Toggle terminal"
+              title="Toggle terminal (Ctrl+`)"
+            >
+              <TerminalIcon />
+              Terminal
+            </Button>
             <Button
               type="button"
               variant="secondary"
@@ -1397,6 +1420,8 @@ export default function App() {
             </div>
           </main>
         </div>
+
+        <TerminalPanel ref={terminalPanelRef} contextPath={visibleSelectedPath} contextType={visibleSelectedPathType} />
 
         <AppFooter version={info?.version ?? ''} />
       </div>

@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.9.16",
+  "version": "0.9.17",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -33,11 +33,13 @@
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "dist",
-    "ui/dist"
+    "ui/dist",
+    "scripts/verify-node-pty.mjs"
   ],
   "scripts": {
+    "postinstall": "node scripts/verify-node-pty.mjs",
     "build:ui": "npm --prefix ui run build",
-    "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
+    "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --external:node-pty --outfile=dist/index.js --banner:js='import{createRequire as __createRequire}from \"module\";const require=__createRequire(import.meta.url);' && esbuild src/cli.ts --bundle --platform=node --format=esm --external:node-pty --outfile=dist/cli.js --banner:js='#!/usr/bin/env node\nimport{createRequire as __createRequire}from \"module\";const require=__createRequire(import.meta.url);'",
     "build": "npm run build:ui && npm run build:server && chmod +x dist/cli.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:server": "node --watch --experimental-strip-types src/cli.ts .",
@@ -55,12 +57,15 @@
   "dependencies": {
     "@hono/node-server": "^2.0.11",
     "hono": "^4.12.23",
-    "open": "^10.1.0"
+    "node-pty": "^1.1.0",
+    "open": "^10.1.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@emnapi/core": "^1.9.1",
     "@emnapi/runtime": "^1.9.1",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.3",
     "esbuild": "^0.28.1",
     "typescript": "^5.8.3",

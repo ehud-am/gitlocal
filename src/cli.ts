@@ -1,7 +1,9 @@
 import { serve } from '@hono/node-server'
+import type { Server } from 'node:http'
 import { classifyLocalPath, validateRepo } from './git/repo.js'
 import { createApp, getRepoPath, getStartupOpenTarget } from './server.js'
 import { rememberStartupFolder, resolveStartupFolder } from './services/startup-preferences.js'
+import { attachTerminalWebSocketServer } from './terminal/websocket.js'
 
 function checkNodeVersion(): void {
   const [major] = process.versions.node.split('.').map(Number)
@@ -97,6 +99,10 @@ async function main(): Promise<void> {
       await openBrowser(url)
     }
   })
+
+  // @hono/node-server's serve() always returns a plain http.Server here (no HTTPS/HTTP2
+  // options are passed above), so this cast reflects the real runtime type.
+  attachTerminalWebSocketServer(server as Server)
 
   const shutdown = (): void => {
     console.log('\nShutting down...')

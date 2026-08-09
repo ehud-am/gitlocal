@@ -14,8 +14,11 @@ export default defineConfig({
       // Excluded from the 90% gate (same rationale as Go's main/openBrowser):
       //   - main.tsx       : entry point, not unit-testable
       //   - App.tsx        : integration-level component, tested via e2e
-      //   - api.ts         : HTTP client, mocked in all component tests
+      //   - api.ts / terminalApi.ts: HTTP/WS clients, mocked in all component tests
       //   - MarkdownRenderer / CodeViewer: mocked in ContentPanel tests
+      //   - TerminalView: mounts real @xterm/xterm/WebSocket, not meaningfully assertable in
+      //     jsdom; exercised indirectly (mocked) by TerminalPanel.test.tsx and for real by the
+      //     server-side integration test (tests/integration/terminal.test.ts)
       include: [
         'src/App.tsx',
         'src/components/FileTree/**/*.tsx',
@@ -27,6 +30,9 @@ export default defineConfig({
         'src/components/ui/button.tsx',
         'src/components/ui/dialog.tsx',
         'src/components/ui/meta-tag.tsx',
+        'src/components/TerminalPanel/TerminalPanel.tsx',
+        'src/components/TerminalPanel/TerminalTabStrip.tsx',
+        'src/hooks/useTerminalPanel.ts',
         'src/lib/sync.ts',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts'],

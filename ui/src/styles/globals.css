@@ -95,6 +95,15 @@ body,
 #root {
   min-height: 100%;
   height: 100%;
+  overflow: hidden;
+}
+
+/* `overflow: hidden` on html/body alone doesn't reliably block wheel/touch scroll of the
+   layout viewport in every browser; pinning body out of normal flow removes any ambiguity
+   about a document-level "root scroller" so the app shell below is the only scroll owner. */
+body {
+  position: fixed;
+  inset: 0;
 }
 
 html {
