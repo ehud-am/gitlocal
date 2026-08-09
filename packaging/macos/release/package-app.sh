@@ -39,6 +39,25 @@ NODE_PATH="$(command -v node)"
 cp "${NODE_PATH}" "${RUNTIME_RESOURCES}/node"
 chmod +x "${RUNTIME_RESOURCES}/node"
 
+# Official nodejs.org/actions-setup-node builds are statically linked, but some distributions
+# (e.g. Homebrew's node formula) link `node` dynamically against a shared libnode.*.dylib. Copy
+# that dylib alongside the binary if present, so the packaged app doesn't depend on the dylib
+# still being installed at its original build-machine path. Mirrors dyld's own @rpath search
+# order (same directory, then a sibling lib/ directory) so it resolves without further rpath work.
+NODE_DIR="$(dirname "${NODE_PATH}")"
+LIBNODE_NAME="$(otool -L "${NODE_PATH}" | awk '/libnode\.[0-9]+\.dylib/ { n = $1; sub(/^.*\//, "", n); print n; exit }')"
+if [[ -n "${LIBNODE_NAME}" ]]; then
+  for candidate in "${NODE_DIR}/${LIBNODE_NAME}" "${NODE_DIR}/../lib/${LIBNODE_NAME}"; do
+    if [[ -f "${candidate}" ]]; then
+      cp "${candidate}" "${RUNTIME_RESOURCES}/${LIBNODE_NAME}"
+      break
+    fi
+  done
+  if [[ ! -f "${RUNTIME_RESOURCES}/${LIBNODE_NAME}" ]]; then
+    echo "warning: ${NODE_PATH} depends on ${LIBNODE_NAME} but it could not be located to bundle" >&2
+  fi
+fi
+
 mkdir -p "${SWIFT_MODULE_CACHE}"
 swift -module-cache-path "${SWIFT_MODULE_CACHE}" "${ROOT_DIR}/packaging/macos/release/generate-app-icon.swift" "${ICON_PATH}"
 
