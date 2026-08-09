@@ -473,14 +473,14 @@ describe('TerminalPanel', () => {
 
     fireEvent.mouseDown(handle, { clientY: 300 })
     fireEvent.mouseMove(window, { clientY: 200 })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '360px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '420px' })
 
     fireEvent.mouseMove(window, { clientY: -1000 })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '850px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '900px' })
 
     fireEvent.mouseUp(window)
     fireEvent.mouseMove(window, { clientY: 500 })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '850px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '900px' })
   })
 
   it('drag-shrinks the panel via the resize handle and clamps at the minimum height', async () => {
@@ -508,13 +508,13 @@ describe('TerminalPanel', () => {
     const handle = screen.getByTestId('terminal-panel-resize-handle')
 
     fireEvent.keyDown(handle, { key: 'ArrowUp' })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '284px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '344px' })
 
     fireEvent.keyDown(handle, { key: 'ArrowDown' })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '260px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '320px' })
 
     for (let i = 0; i < 20; i += 1) fireEvent.keyDown(handle, { key: 'ArrowUp' })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '340px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '360px' })
 
     for (let i = 0; i < 20; i += 1) fireEvent.keyDown(handle, { key: 'ArrowDown' })
     expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '120px' })
@@ -532,7 +532,7 @@ describe('TerminalPanel', () => {
     const handle = screen.getByTestId('terminal-panel-resize-handle')
 
     fireEvent.keyDown(handle, { key: 'ArrowUp' })
-    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '284px' })
+    expect(screen.getByTestId('terminal-panel')).toHaveStyle({ height: '344px' })
 
     setInnerHeight(100)
     fireEvent(window, new Event('resize'))

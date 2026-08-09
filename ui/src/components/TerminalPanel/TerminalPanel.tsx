@@ -16,8 +16,8 @@ export interface TerminalPanelHandle {
 }
 
 const MIN_PANEL_HEIGHT = 120
-const DEFAULT_PANEL_HEIGHT = 260
-const MAX_PANEL_HEIGHT_RATIO = 0.85
+const DEFAULT_PANEL_HEIGHT = 320
+const MAX_PANEL_HEIGHT_RATIO = 0.9
 const RESIZE_KEY_STEP = 24
 
 function maxPanelHeight(): number {
@@ -195,11 +195,18 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         tabIndex={panel.state.visible ? 0 : undefined}
         onMouseDown={panel.state.visible ? handleResizeStart : undefined}
         onKeyDown={panel.state.visible ? handleResizeKeyDown : undefined}
-        className={`h-1 shrink-0 border-t border-[var(--border)] outline-none focus-visible:bg-[var(--ring)] ${
-          panel.state.visible ? 'cursor-row-resize hover:bg-[var(--ring)]' : ''
+        className={`group flex h-2 shrink-0 items-center justify-center border-t border-[var(--border)] outline-none focus-visible:bg-[var(--ring)] ${
+          panel.state.visible ? 'cursor-row-resize hover:bg-[var(--ring)]/40' : ''
         }`}
         data-testid="terminal-panel-resize-handle"
-      />
+      >
+        {panel.state.visible && (
+          <span
+            aria-hidden="true"
+            className="h-0.5 w-10 rounded-full bg-[var(--border)] transition-colors group-hover:bg-[var(--ring)] group-focus-visible:bg-[var(--ring)]"
+          />
+        )}
+      </div>
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-1">
         <TerminalTabStrip
           tabs={panel.state.tabs}
@@ -215,9 +222,24 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           type="button"
           onClick={panel.toggleVisible}
           aria-label={panel.state.visible ? 'Hide terminal' : 'Show terminal'}
-          className="shrink-0 rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          title={panel.state.visible ? 'Collapse terminal panel' : 'Expand terminal panel'}
+          className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-xs font-medium text-[var(--muted-foreground)] outline-none transition-colors hover:border-[var(--ring)] hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
-          {panel.state.visible ? '▾' : '▸'}
+          <svg
+            aria-hidden="true"
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`transition-transform ${panel.state.visible ? '' : 'rotate-180'}`}
+          >
+            <path d="M4 10l4-4 4 4" />
+          </svg>
+          <span>{panel.state.visible ? 'Collapse' : 'Expand'}</span>
         </button>
       </div>
       {error && (
