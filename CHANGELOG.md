@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.17 - 2026-08-08
+
+- Added an integrated terminal panel, docked at the bottom of the window, with support for a regular shell as well as Claude Code and Codex CLI tab kinds; sessions persist across page navigation and follow the currently viewed folder's working directory.
+- Added a "Terminal" header button and the `Ctrl+\`` shortcut (matching VS Code, also intercepted while focus is inside the terminal) to make opening the panel more discoverable.
+- Added drag-to-resize and keyboard resize (arrow keys on the resize handle) for the terminal panel's height, with a clearer collapse/expand toggle and a taller default height.
+- Fixed `node-pty`'s prebuilt native binding failing to load on some platforms/Node versions by automatically rebuilding it during install instead of leaving the terminal feature silently broken.
+- Updated `nanoid` to clear a high-severity advisory (GHSA-2v37-7h3g-55p8) in the `vitest`/`vite` devDependency chain.
+
 ## 0.9.16 - 2026-08-04
 
 - Fixed the macOS app packaging script, which had been failing on every release since 0.9.13 for unrelated CI/release-automation reasons and, as of this release, because newer Node.js 24.x macOS builds no longer ship a separate `libnode` shared library. The packaged app only ever executed the standalone `node` binary as a subprocess, so the shared library was never actually required; the dead dependency has been removed.
