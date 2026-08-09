@@ -33,9 +33,11 @@
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "dist",
-    "ui/dist"
+    "ui/dist",
+    "scripts/verify-node-pty.mjs"
   ],
   "scripts": {
+    "postinstall": "node scripts/verify-node-pty.mjs",
     "build:ui": "npm --prefix ui run build",
     "build:server": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --external:node-pty --outfile=dist/index.js --banner:js='import{createRequire as __createRequire}from \"module\";const require=__createRequire(import.meta.url);' && esbuild src/cli.ts --bundle --platform=node --format=esm --external:node-pty --outfile=dist/cli.js --banner:js='#!/usr/bin/env node\nimport{createRequire as __createRequire}from \"module\";const require=__createRequire(import.meta.url);'",
     "build": "npm run build:ui && npm run build:server && chmod +x dist/cli.js",
