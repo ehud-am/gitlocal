@@ -448,6 +448,22 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
   })
 
+  it('never forces the collapsed panel below its own content height, and never shrinks below the fold', async () => {
+    mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
+    const ref = createRef<TerminalPanelHandle>()
+
+    render(<TerminalPanel ref={ref} />)
+
+    act(() => ref.current?.toggleTerminal())
+    await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
+
+    act(() => ref.current?.toggleTerminal())
+    const panel = screen.getByTestId('terminal-panel')
+    expect(panel).toHaveStyle({ height: 'auto' })
+    expect(panel.className).toContain('shrink-0')
+    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeVisible()
+  })
+
   it('Ctrl+` opens the first tab when none exist, and toggles visibility once one does (matches VS Code default binding)', async () => {
     mockCreateSession.mockResolvedValue(runningSession satisfies TerminalSession)
 

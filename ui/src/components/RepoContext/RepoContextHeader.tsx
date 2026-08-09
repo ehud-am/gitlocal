@@ -26,8 +26,6 @@ interface Props {
   branchDisabled?: boolean
   syncActionLabel?: string
   branchSwitchDialog?: ReactNode
-  onNavigateParent?: () => void
-  parentFolderEnabled?: boolean
   onNavigateHome?: () => void
   repoLocation?: RepoLocationResponse
   onNavigateReadme?: () => void
@@ -70,17 +68,6 @@ function EditIcon() {
     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
       <path
         d="M11.8 1.8a1.6 1.6 0 0 1 2.3 2.3l-7.4 7.4-2.9.6.6-2.9 7.4-7.4Zm1.6 1.6a.6.6 0 0 0-.9-.9l-.8.8.9.9.8-.8ZM5 9.7l1.3 1.3 5.6-5.6-1.3-1.3L5 9.7Zm-.4 1 1 .9-1.3.3.3-1.2Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-function ParentFolderIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <path
-        d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z"
         fill="currentColor"
       />
     </svg>
@@ -136,8 +123,6 @@ export default function RepoContextHeader({
   onOpenChangedFile,
   branchDisabled = false,
   branchSwitchDialog,
-  onNavigateParent,
-  parentFolderEnabled = false,
   onNavigateHome,
   repoLocation,
   onNavigateReadme,
@@ -157,121 +142,23 @@ export default function RepoContextHeader({
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
   const homeEnabled = Boolean(repoLocation?.repositoryRootPath) && !repoLocation?.isRepositoryRoot
   const readmeEnabled = Boolean(repoLocation?.homeReadmePath)
+  const hasTags = isGitRepo || Boolean(remote) || (showSyncBadge && Boolean(repoSyncBadge)) || changeSummary > 0
+  const hasRootReadme = isGitRepo && (Boolean(onNavigateHome) || Boolean(onNavigateReadme))
 
   return (
     <section className="repo-context-header overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] shadow-sm">
-      <div className="flex flex-col gap-3 px-5 py-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-1.5 px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
               {isGitRepo ? 'Repository' : 'Folder'}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-[20px] leading-tight font-semibold text-[var(--foreground)]">
-                {repoName}
-              </h1>
-              {isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}
-              {remote ? <MetaTag label="Remote" icon="remote" tone="neutral" compact /> : null}
-              {showSyncBadge && repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
-              {changeSummary > 0 ? (
-                <MetaTag
-                  label={`${changeSummary} local ${changeSummary === 1 ? 'change' : 'changes'}`}
-                  icon="local-change"
-                  tone="info"
-                  compact
-                />
-              ) : null}
-            </div>
+            <h1 className="truncate text-[20px] leading-tight font-semibold text-[var(--foreground)]">
+              {repoName}
+            </h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {onNavigateParent ? (
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="xl:hidden"
-                  onClick={onNavigateParent}
-                  disabled={!parentFolderEnabled}
-                  aria-label="Parent Folder"
-                  title="Parent Folder"
-                >
-                  <ParentFolderIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="hidden xl:inline-flex"
-                  onClick={onNavigateParent}
-                  disabled={!parentFolderEnabled}
-                  aria-label="Parent Folder"
-                  title="Parent Folder"
-                >
-                  <ParentFolderIcon />
-                  Parent Folder
-                </Button>
-              </>
-            ) : null}
-            {isGitRepo && onNavigateHome ? (
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="xl:hidden"
-                  onClick={onNavigateHome}
-                  disabled={!homeEnabled}
-                  aria-label="Root"
-                  title="Root"
-                >
-                  <HomeIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="hidden xl:inline-flex"
-                  onClick={onNavigateHome}
-                  disabled={!homeEnabled}
-                  aria-label="Root"
-                  title="Root"
-                >
-                  <HomeIcon />
-                  Root
-                </Button>
-              </>
-            ) : null}
-            {isGitRepo && onNavigateReadme ? (
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="xl:hidden"
-                  onClick={onNavigateReadme}
-                  disabled={!readmeEnabled}
-                  aria-label="Readme"
-                  title="Readme"
-                >
-                  <ReadmeIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="hidden xl:inline-flex"
-                  onClick={onNavigateReadme}
-                  disabled={!readmeEnabled}
-                  aria-label="Readme"
-                  title="Readme"
-                >
-                  <ReadmeIcon />
-                  Readme
-                </Button>
-              </>
-            ) : null}
             {isGitRepo ? (
               <label className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]">
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
@@ -298,6 +185,85 @@ export default function RepoContextHeader({
             {onOpenSearch ? <SearchTrigger onOpen={onOpenSearch} /> : null}
           </div>
         </div>
+
+        {hasTags || hasRootReadme ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}
+              {remote ? <MetaTag label="Remote" icon="remote" tone="neutral" compact /> : null}
+              {showSyncBadge && repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
+              {changeSummary > 0 ? (
+                <MetaTag
+                  label={`${changeSummary} local ${changeSummary === 1 ? 'change' : 'changes'}`}
+                  icon="local-change"
+                  tone="info"
+                  compact
+                />
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {isGitRepo && onNavigateHome ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 xl:hidden"
+                    onClick={onNavigateHome}
+                    disabled={!homeEnabled}
+                    aria-label="Root"
+                    title="Root"
+                  >
+                    <HomeIcon />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="hidden h-7 gap-1 px-2 text-[11px] xl:inline-flex"
+                    onClick={onNavigateHome}
+                    disabled={!homeEnabled}
+                    aria-label="Root"
+                    title="Root"
+                  >
+                    <HomeIcon />
+                    Root
+                  </Button>
+                </>
+              ) : null}
+              {isGitRepo && onNavigateReadme ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 xl:hidden"
+                    onClick={onNavigateReadme}
+                    disabled={!readmeEnabled}
+                    aria-label="Readme"
+                    title="Readme"
+                  >
+                    <ReadmeIcon />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="hidden h-7 gap-1 px-2 text-[11px] xl:inline-flex"
+                    onClick={onNavigateReadme}
+                    disabled={!readmeEnabled}
+                    aria-label="Readme"
+                    title="Readme"
+                  >
+                    <ReadmeIcon />
+                    Readme
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {activePathNotice ? (
           <div className="background-change-notice" role="status">

@@ -190,8 +190,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   return (
     <div
-      className="flex flex-col bg-[var(--background)]"
-      style={{ height: panel.state.visible ? `${height}px` : '32px' }}
+      className="flex shrink-0 flex-col bg-[var(--background)]"
+      style={{ height: panel.state.visible ? `${height}px` : 'auto' }}
       data-testid="terminal-panel"
     >
       <div

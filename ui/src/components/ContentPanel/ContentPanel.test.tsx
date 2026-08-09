@@ -103,6 +103,40 @@ describe('ContentPanel', () => {
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })
 
+  it('renders the folder listing inside a single bordered container, not a nested card-within-a-card', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    const table = await screen.findByRole('table', { name: /current folder contents/i })
+    const directoryPanel = table.closest('.content-directory-panel') as HTMLElement
+    expect(directoryPanel).toBeInTheDocument()
+    expect(directoryPanel.className).not.toContain('content-panel ')
+    expect(directoryPanel.closest('.content-panel')).toBeInTheDocument()
+
+    // No other element between the outer card and the listing carries its own card-like class.
+    let node: HTMLElement | null = directoryPanel.parentElement
+    while (node && !node.classList.contains('content-panel')) {
+      expect(node.className).not.toMatch(/content-directory-panel|content-readme-panel|content-panel(?!-selection-root)/)
+      node = node.parentElement
+    }
+
+    const cell = table.querySelector('.content-directory-cell') as HTMLElement
+    expect(cell).toBeInTheDocument()
+  })
+
   it('shows a failure message instead of an empty-folder message when the root listing fails to load', async () => {
     vi.mocked(api.getTree).mockRejectedValue(new Error('boom'))
 

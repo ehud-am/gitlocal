@@ -87,7 +87,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
     onOpenSearch?: () => void
-    onNavigateParent?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
     <div>
@@ -101,7 +100,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
-      <button type="button" onClick={() => props.onNavigateParent?.()}>request-browse-parent</button>
       {props.branchSwitchDialog}
     </div>
   ),
@@ -489,7 +487,7 @@ describe('App logic', () => {
     fireEvent.click(screen.getByRole('button', { name: 'tree-file' }))
     expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":""')
 
-    fireEvent.click(screen.getByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Parent Folder' }))
     expect(screen.queryByRole('heading', { name: /leave this repository/i })).not.toBeInTheDocument()
   })
 
@@ -518,7 +516,7 @@ describe('App logic', () => {
 
     renderApp()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Parent Folder' }))
     fireEvent.click(screen.getByRole('button', { name: /open parent folder/i }))
     await waitFor(() => {
       expect(reload).toHaveBeenCalledTimes(1)
@@ -548,7 +546,7 @@ describe('App logic', () => {
   it('shows the repository-boundary dialog and surfaces parent-picker errors', async () => {
     renderApp()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Parent Folder' }))
     expect(await screen.findByRole('heading', { name: /leave this repository/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /open parent folder/i }))
 

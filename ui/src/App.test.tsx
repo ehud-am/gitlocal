@@ -908,6 +908,18 @@ describe('App', () => {
     expect(refresh.querySelector('svg')).toBeInTheDocument()
   })
 
+  it('renders the Refresh toolbar button as plain/low-emphasis and Terminal plus Parent Folder as secondary', async () => {
+    renderWithClient()
+
+    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
+    const terminal = await screen.findByRole('button', { name: /toggle terminal/i })
+    const [parentFolder] = await screen.findAllByRole('button', { name: 'Parent Folder' })
+
+    expect(refresh.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
+    expect(terminal.className).toContain('bg-[var(--muted)] text-[var(--foreground)]')
+    expect(parentFolder.className).toContain('bg-[var(--muted)] text-[var(--foreground)]')
+  })
+
   it('toggles the theme and persists the preference', async () => {
     renderWithClient()
 
