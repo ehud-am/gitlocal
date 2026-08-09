@@ -109,6 +109,14 @@ function KebabIcon() {
   )
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function parentPathOf(path: string): string {
   const boundary = path.lastIndexOf('/')
   return boundary >= 0 ? path.slice(0, boundary) : ''
@@ -1007,8 +1015,9 @@ export default function ContentPanel({
             {selectedPathSyncBadge ? <MetaTag label={selectedPathSyncBadge.label} icon={selectedPathSyncBadge.icon} tone={selectedPathSyncBadge.tone} compact /> : null}
           </div>
         </div>
-        {mode === 'view' ? (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {mode === 'view' ? (
+            <>
             {canSearchCurrentFile ? (
               <Button
                 type="button"
@@ -1105,8 +1114,21 @@ export default function ContentPanel({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
-          </div>
-        ) : null}
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="panel-icon-button content-close-trigger"
+            aria-label="Close file and return to folder"
+            title="Close file"
+            onClick={() => {
+              if (!confirmDiscardIfNeeded()) return
+              onOpenPath(parentPathOf(selectedPath), 'dir', false)
+            }}
+          >
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
       {mode === 'view' && fileFindOpen ? (

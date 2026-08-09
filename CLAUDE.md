@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-08-08
+Auto-generated from all feature plans. Last updated: 2026-08-09
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -44,9 +44,9 @@ Measured on the current branch, 90.7% of implementation lines are shared between
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 033-ui-density-navigation-fixes: UI-only density/navigation fixes — two-row repository block, Parent Folder control moved to the top toolbar, toolbar button restyling, denser folder-view spacing with a redundant nested container removed, terminal collapsed-state viewport fix, smaller terminal font — see `specs/033-ui-density-navigation-fixes/`.
 - 032-integrated-terminal-panel: Added a persistent bottom-docked terminal panel (Regular/Claude/Codex tab kinds, cross-page session persistence via `node-pty` + per-tab WebSocket I/O, cwd-follows-visible-content) — see `specs/032-integrated-terminal-panel/`.
 - 018-macos-homebrew-app: Added scoped macOS native app packaging around the shared GitLocal server/UI while preserving the npm package distribution.
-- 020-local-git-identity: Changed git identity settings to use repository-local git config directly, while preserving SSH key discovery and validation.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

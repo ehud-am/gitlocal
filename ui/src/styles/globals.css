@@ -603,6 +603,7 @@ pre {
 
 .app-footer {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
@@ -1145,18 +1146,17 @@ pre {
   color: var(--muted-foreground);
 }
 
-.content-directory-panel,
+.content-directory-panel {
+  padding: 0;
+}
+
 .content-readme-panel,
 .content-no-readme-panel {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--background);
   padding: 1rem;
-}
-
-.content-readme-panel,
-.content-no-readme-panel {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .content-no-readme-panel {
@@ -1431,7 +1431,7 @@ pre {
 }
 
 .content-directory-table-wrap {
-  margin-top: 1rem;
+  margin-top: 0.625rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1444,7 +1444,7 @@ pre {
 }
 
 .content-directory-table th {
-  padding: 0.7rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   background: var(--surface-subtle);
   color: var(--muted-foreground);
   font-size: 0.75rem;
@@ -1468,7 +1468,7 @@ pre {
 }
 
 .content-directory-cell {
-  padding: 0.8rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   vertical-align: middle;
 }
 
@@ -1753,7 +1753,7 @@ pre {
 }
 
 .picker-browser-table-wrap {
-  margin-top: 1rem;
+  margin-top: 0.625rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1766,7 +1766,7 @@ pre {
 }
 
 .picker-browser-table th {
-  padding: 0.7rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   background: var(--surface-subtle);
   color: var(--muted-foreground);
   font-size: 0.75rem;
@@ -1803,7 +1803,7 @@ pre {
 }
 
 .picker-entry-cell {
-  padding: 0.8rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   vertical-align: middle;
 }
 

@@ -82,7 +82,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
     onOpenChangedFiles?: () => void
     onOpenChangedFile?: (item: ChangedFileItem) => void
     changedFiles?: { items: ChangedFileItem[] } | null
-    onNavigateParent?: () => void
     branchSwitchDialog?: React.ReactNode
   }) => (
     <div>
@@ -92,7 +91,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
       <button type="button" onClick={() => props.onEditGitIdentity?.()}>open-identity</button>
       <button type="button" onClick={() => props.onOpenSearch?.()}>open-search</button>
       <button type="button" onClick={() => props.onOpenChangedFiles?.()}>open-changed-files</button>
-      <button type="button" onClick={() => props.onNavigateParent?.()}>request-browse-parent</button>
       {props.changedFiles?.items.map((item) => (
         <button key={item.path} type="button" onClick={() => props.onOpenChangedFile?.(item)}>
           changed:{item.path}
@@ -591,11 +589,11 @@ describe('App branch coverage', () => {
 
     renderApp()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Parent Folder' }))
     fireEvent.click(screen.getByRole('button', { name: 'close-boundary' }))
     expect(screen.queryByTestId('repo-boundary-dialog')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Parent Folder' }))
     fireEvent.click(screen.getByRole('button', { name: 'confirm-boundary' }))
     expect(await screen.findByText(/could not open the parent folder/i)).toBeInTheDocument()
 
@@ -624,7 +622,7 @@ describe('App branch coverage', () => {
   it('ignores a redundant open signal from the repo boundary dialog while it is already open', async () => {
     renderApp()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'request-browse-parent' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Parent Folder' }))
     expect(await screen.findByTestId('repo-boundary-dialog')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'reopen-boundary' }))

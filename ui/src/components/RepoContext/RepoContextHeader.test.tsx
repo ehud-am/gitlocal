@@ -373,6 +373,9 @@ describe('RepoContextHeader', () => {
     expect(screen.queryByText('Git')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /branch selector/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /open repository search/i })).not.toBeInTheDocument()
+    // With no tags and no root/readme controls (non-git folder), the second row collapses entirely.
+    expect(screen.queryByRole('button', { name: 'Root' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Readme' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /expand folder details/i }))
     expect(screen.getByText('Local folder')).toBeInTheDocument()
@@ -472,9 +475,7 @@ describe('RepoContextHeader', () => {
     expect(screen.queryByText(/local change/i)).not.toBeInTheDocument()
   })
 
-  it('renders an enabled Parent Folder button and invokes onNavigateParent when clicked', () => {
-    const onNavigateParent = vi.fn()
-
+  it('renders the repo name/search/branch row separately from the tags/root/readme row', () => {
     render(
       <RepoContextHeader
         info={{
@@ -486,53 +487,48 @@ describe('RepoContextHeader', () => {
           version: '0.4.9',
           hasCommits: true,
           rootEntryCount: 2,
-          gitContext: null,
+          gitContext: {
+            user: null,
+            remote: {
+              name: 'origin',
+              fetchUrl: 'git@github.com:ehud-am/gitlocal.git',
+              webUrl: '',
+              selectionReason: 'origin',
+            },
+          },
         }}
         branch="main"
-        branches={[]}
+        branches={[{ name: 'main', displayName: 'main', scope: 'local', hasLocalCheckout: true, isCurrent: true }]}
         selectedPath=""
         selectedPathType="none"
         onBranchChange={vi.fn()}
-        onNavigateParent={onNavigateParent}
-        parentFolderEnabled
-      />,
-    )
-
-    const buttons = screen.getAllByRole('button', { name: 'Parent Folder' })
-    expect(buttons).toHaveLength(2)
-    buttons.forEach((button) => expect(button).toBeEnabled())
-    fireEvent.click(buttons[0])
-    expect(onNavigateParent).toHaveBeenCalledTimes(1)
-  })
-
-  it('disables the Parent Folder button when parentFolderEnabled is false', () => {
-    render(
-      <RepoContextHeader
-        info={{
-          name: 'gitlocal',
-          path: '/tmp/gitlocal',
-          currentBranch: 'main',
-          isGitRepo: true,
-          pickerMode: false,
-          version: '0.4.9',
-          hasCommits: true,
-          rootEntryCount: 2,
-          gitContext: null,
+        onOpenSearch={vi.fn()}
+        onNavigateHome={vi.fn()}
+        onNavigateReadme={vi.fn()}
+        repoLocation={{
+          repositoryRootPath: '/tmp/gitlocal',
+          isRepositoryRoot: false,
+          homeReadmePath: 'README.md',
+          atFilesystemRoot: false,
         }}
-        branch="main"
-        branches={[]}
-        selectedPath=""
-        selectedPathType="none"
-        onBranchChange={vi.fn()}
-        onNavigateParent={vi.fn()}
-        parentFolderEnabled={false}
       />,
     )
 
-    screen.getAllByRole('button', { name: 'Parent Folder' }).forEach((button) => expect(button).toBeDisabled())
+    const heading = screen.getByRole('heading', { name: 'gitlocal' })
+    const nameRow = heading.closest('div')?.parentElement as HTMLElement
+    expect(nameRow.querySelector('select')).toBeInTheDocument()
+    expect(nameRow).toContainElement(screen.getByRole('button', { name: /open repository search/i }))
+    expect(nameRow).not.toHaveTextContent('Remote')
+    expect(nameRow).not.toHaveTextContent('Root')
+
+    const remoteTag = screen.getByText('Remote')
+    const tagsRow = remoteTag.closest('div')?.parentElement as HTMLElement
+    expect(tagsRow).not.toBe(nameRow)
+    expect(tagsRow).toContainElement(screen.getAllByRole('button', { name: 'Root' })[0])
+    expect(tagsRow).toContainElement(screen.getAllByRole('button', { name: 'Readme' })[0])
   })
 
-  it('does not render the Parent Folder button when onNavigateParent is not provided', () => {
+  it('does not render a Parent Folder button (control lives in the top toolbar)', () => {
     render(
       <RepoContextHeader
         info={{

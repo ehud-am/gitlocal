@@ -36,7 +36,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const container = containerRef.current
     if (!container) return
 
-    const terminal = new Terminal({ convertEol: true, cursorBlink: true })
+    const terminal = new Terminal({ convertEol: true, cursorBlink: true, fontSize: 13 })
     terminalRef.current = terminal
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)

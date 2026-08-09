@@ -96,6 +96,14 @@ function TerminalIcon() {
   )
 }
 
+function ParentFolderIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -1169,7 +1177,7 @@ export default function App() {
   return (
     <>
       <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-        <header className="app-header sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
+        <header className="app-header sticky top-0 z-20 flex h-12 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur">
           <span className="brand-lockup">
             <img className="brand-mark" src="/gitlocal-logo.svg" alt="" aria-hidden="true" />
             <span className="logo text-sm font-semibold text-[var(--foreground)]">GitLocal</span>
@@ -1178,18 +1186,19 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              onClick={() => terminalPanelRef.current?.toggleTerminal()}
-              aria-label="Toggle terminal"
-              title="Toggle terminal (Ctrl+`)"
+              disabled={Boolean(repoLocation?.atFilesystemRoot)}
+              onClick={handleNavigateParent}
+              aria-label="Parent Folder"
+              title="Go to parent folder"
             >
-              <TerminalIcon />
-              Terminal
+              <ParentFolderIcon />
+              Parent Folder
             </Button>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="sm"
               disabled={refreshingCurrentView}
               onClick={() => { void refreshCurrentView() }}
@@ -1197,6 +1206,17 @@ export default function App() {
             >
               <RefreshIcon spinning={refreshingCurrentView} />
               {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              type="button"
+              variant="highlight"
+              size="sm"
+              onClick={() => terminalPanelRef.current?.toggleTerminal()}
+              aria-label="Toggle terminal"
+              title="Toggle terminal (Ctrl+`)"
+            >
+              <TerminalIcon />
+              Terminal
             </Button>
             <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
               <ThemeIcon darkMode={darkMode} />
@@ -1321,8 +1341,6 @@ export default function App() {
                 onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
                 syncActionLabel={getRepoSyncActionLabel(repoSync)}
-                onNavigateParent={handleNavigateParent}
-                parentFolderEnabled={!repoLocation?.atFilesystemRoot}
                 onNavigateHome={info?.isGitRepo ? handleNavigateHome : undefined}
                 repoLocation={repoLocation}
                 onNavigateReadme={info?.isGitRepo ? handleNavigateReadme : undefined}

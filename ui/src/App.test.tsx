@@ -908,6 +908,29 @@ describe('App', () => {
     expect(refresh.querySelector('svg')).toBeInTheDocument()
   })
 
+  it('renders Refresh and Parent Folder as plain/low-emphasis and Terminal as a highlighted control', async () => {
+    renderWithClient()
+
+    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
+    const terminal = await screen.findByRole('button', { name: /toggle terminal/i })
+    const [parentFolder] = await screen.findAllByRole('button', { name: 'Parent Folder' })
+
+    expect(refresh.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
+    expect(parentFolder.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
+    expect(terminal.className).toContain('text-[var(--success)]')
+  })
+
+  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Refresh, Terminal', async () => {
+    renderWithClient()
+
+    const toolbarButtons = await screen.findAllByRole('button', {
+      name: /^parent folder$|refresh current page|toggle terminal/i,
+    })
+    expect(toolbarButtons[0]).toHaveAccessibleName('Parent Folder')
+    expect(toolbarButtons[1]).toHaveAccessibleName(/refresh current page/i)
+    expect(toolbarButtons[2]).toHaveAccessibleName(/toggle terminal/i)
+  })
+
   it('toggles the theme and persists the preference', async () => {
     renderWithClient()
 
