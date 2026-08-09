@@ -244,7 +244,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             strokeWidth="1.75"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={`transition-transform ${panel.state.visible ? '' : 'rotate-180'}`}
+            className={`transition-transform ${panel.state.visible ? 'rotate-180' : ''}`}
           >
             <path d="M4 10l4-4 4 4" />
           </svg>

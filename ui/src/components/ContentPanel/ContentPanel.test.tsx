@@ -2261,4 +2261,52 @@ describe('ContentPanel', () => {
     expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved file changes?')
     expect(screen.getByLabelText(/edit file content/i)).toBeInTheDocument()
   })
+
+  it('closes the file view and returns to its containing folder', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'docs/notes.md' }))
+    const onOpenPath = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs/notes.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /close file/i }))
+
+    expect(onOpenPath).toHaveBeenCalledWith('docs', 'dir', false)
+  })
+
+  it('warns before closing a file with unsaved edits', async () => {
+    vi.mocked(api.getFile).mockResolvedValue(makeTextFile({ path: 'docs/notes.md' }))
+    vi.mocked(window.confirm).mockReturnValue(false)
+    const onOpenPath = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="docs/notes.md"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={onOpenPath}
+      />,
+    )
+
+    await openFileActionsMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+    fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /close file/i }))
+
+    expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved file changes?')
+    expect(onOpenPath).not.toHaveBeenCalled()
+  })
 })

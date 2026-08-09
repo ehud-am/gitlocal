@@ -1186,7 +1186,18 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="highlight"
+              size="sm"
+              onClick={() => terminalPanelRef.current?.toggleTerminal()}
+              aria-label="Toggle terminal"
+              title="Toggle terminal (Ctrl+`)"
+            >
+              <TerminalIcon />
+              Terminal
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
               size="sm"
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
               onClick={handleNavigateParent}
@@ -1195,17 +1206,6 @@ export default function App() {
             >
               <ParentFolderIcon />
               Parent Folder
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => terminalPanelRef.current?.toggleTerminal()}
-              aria-label="Toggle terminal"
-              title="Toggle terminal (Ctrl+`)"
-            >
-              <TerminalIcon />
-              Terminal
             </Button>
             <Button
               type="button"

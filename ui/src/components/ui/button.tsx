@@ -14,6 +14,7 @@ const buttonVariants = cva(
         outline: 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)]',
         danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
         dangerOutline: 'border border-[color-mix(in_srgb,var(--danger)_65%,var(--border))] bg-[var(--card)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,var(--background))]',
+        highlight: 'border border-[color-mix(in_srgb,var(--success)_55%,var(--border))] bg-[color-mix(in_srgb,var(--success)_10%,var(--card))] text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_18%,var(--card))]',
       },
       size: {
         default: 'h-9 px-3.5',

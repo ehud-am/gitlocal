@@ -908,7 +908,7 @@ describe('App', () => {
     expect(refresh.querySelector('svg')).toBeInTheDocument()
   })
 
-  it('renders the Refresh toolbar button as plain/low-emphasis and Terminal plus Parent Folder as secondary', async () => {
+  it('renders Refresh and Parent Folder as plain/low-emphasis and Terminal as a highlighted control', async () => {
     renderWithClient()
 
     const refresh = await screen.findByRole('button', { name: /refresh current page/i })
@@ -916,8 +916,16 @@ describe('App', () => {
     const [parentFolder] = await screen.findAllByRole('button', { name: 'Parent Folder' })
 
     expect(refresh.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
-    expect(terminal.className).toContain('bg-[var(--muted)] text-[var(--foreground)]')
-    expect(parentFolder.className).toContain('bg-[var(--muted)] text-[var(--foreground)]')
+    expect(parentFolder.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
+    expect(terminal.className).toContain('text-[var(--success)]')
+  })
+
+  it('places the Terminal toolbar button before Parent Folder', async () => {
+    renderWithClient()
+
+    const toolbarButtons = await screen.findAllByRole('button', { name: /toggle terminal|^parent folder$/i })
+    expect(toolbarButtons[0]).toHaveAccessibleName(/toggle terminal/i)
+    expect(toolbarButtons[1]).toHaveAccessibleName('Parent Folder')
   })
 
   it('toggles the theme and persists the preference', async () => {
