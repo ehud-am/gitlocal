@@ -1186,17 +1186,6 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2">
             <Button
               type="button"
-              variant="highlight"
-              size="sm"
-              onClick={() => terminalPanelRef.current?.toggleTerminal()}
-              aria-label="Toggle terminal"
-              title="Toggle terminal (Ctrl+`)"
-            >
-              <TerminalIcon />
-              Terminal
-            </Button>
-            <Button
-              type="button"
               variant="ghost"
               size="sm"
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
@@ -1217,6 +1206,17 @@ export default function App() {
             >
               <RefreshIcon spinning={refreshingCurrentView} />
               {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              type="button"
+              variant="highlight"
+              size="sm"
+              onClick={() => terminalPanelRef.current?.toggleTerminal()}
+              aria-label="Toggle terminal"
+              title="Toggle terminal (Ctrl+`)"
+            >
+              <TerminalIcon />
+              Terminal
             </Button>
             <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
               <ThemeIcon darkMode={darkMode} />

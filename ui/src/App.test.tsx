@@ -920,12 +920,15 @@ describe('App', () => {
     expect(terminal.className).toContain('text-[var(--success)]')
   })
 
-  it('places the Terminal toolbar button before Parent Folder', async () => {
+  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Refresh, Terminal', async () => {
     renderWithClient()
 
-    const toolbarButtons = await screen.findAllByRole('button', { name: /toggle terminal|^parent folder$/i })
-    expect(toolbarButtons[0]).toHaveAccessibleName(/toggle terminal/i)
-    expect(toolbarButtons[1]).toHaveAccessibleName('Parent Folder')
+    const toolbarButtons = await screen.findAllByRole('button', {
+      name: /^parent folder$|refresh current page|toggle terminal/i,
+    })
+    expect(toolbarButtons[0]).toHaveAccessibleName('Parent Folder')
+    expect(toolbarButtons[1]).toHaveAccessibleName(/refresh current page/i)
+    expect(toolbarButtons[2]).toHaveAccessibleName(/toggle terminal/i)
   })
 
   it('toggles the theme and persists the preference', async () => {
