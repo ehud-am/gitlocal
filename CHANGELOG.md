@@ -5,6 +5,8 @@
 - Added an integrated terminal panel, docked at the bottom of the window, with support for a regular shell as well as Claude Code and Codex CLI tab kinds; sessions persist across page navigation and follow the currently viewed folder's working directory.
 - Added a "Terminal" header button and the `Ctrl+\`` shortcut (matching VS Code, also intercepted while focus is inside the terminal) to make opening the panel more discoverable.
 - Added drag-to-resize and keyboard resize (arrow keys on the resize handle) for the terminal panel's height, with a clearer collapse/expand toggle and a taller default height.
+- Moved keyboard focus into the terminal whenever the panel opens, so keyboard and screen-reader users land in it immediately instead of needing to tab through the rest of the page to find it.
+- Capped concurrent terminal sessions and inbound WebSocket frame size per process, and bounded resize requests to a sane range, so the terminal endpoints can't be used to exhaust local system resources.
 - Fixed `node-pty`'s prebuilt native binding failing to load on some platforms/Node versions by automatically rebuilding it during install instead of leaving the terminal feature silently broken.
 - Updated `nanoid` to clear a high-severity advisory (GHSA-2v37-7h3g-55p8) in the `vitest`/`vite` devDependency chain.
 
