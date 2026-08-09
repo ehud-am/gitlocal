@@ -70,7 +70,7 @@ ui/
 │   ├── App.tsx                         # Top toolbar: Refresh/Terminal styling, relocated Parent Folder control
 │   ├── App.test.tsx                    # Toolbar tests updated for relocated/restyled controls
 │   ├── components/
-│   │   ├── RepoContextHeader/
+│   │   ├── RepoContext/
 │   │   │   ├── RepoContextHeader.tsx   # Two-row repo block layout; Parent Folder control removed
 │   │   │   └── RepoContextHeader.test.tsx
 │   │   ├── ContentPanel/
