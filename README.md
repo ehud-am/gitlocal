@@ -15,6 +15,10 @@ When AI agents do most of the code generation, direct hand-editing of source fil
 
 Everything runs locally, there are no accounts or telemetry, and any clone, fetch, pull, or push action goes through your installed `git` only when you choose it.
 
+<p align="center">
+  <img src="docs/assets/gitlocal-demo.gif" alt="GitLocal demo: browsing a repo, reading the README, using the terminal, and viewing code" width="800">
+</p>
+
 ---
 
 ## Requirements
