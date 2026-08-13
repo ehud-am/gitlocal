@@ -39,19 +39,19 @@ A user opens a "Claude" terminal tab and gets `The Claude Code CLI ("claude") wa
 
 ---
 
-### User Story 3 - Terminal panel toggles with Cmd+T (Priority: P2)
+### User Story 3 - Terminal panel toggle is discoverable in the native menu (Priority: P2)
 
-A user wants to show or hide the terminal panel without reaching for the mouse. Pressing Cmd+T (native macOS app) toggles the terminal panel exactly as clicking the existing Terminal toggle button does — opening it if hidden/closed, and hiding it if currently visible.
+A user wants to show or hide the terminal panel without reaching for the mouse, using a shortcut that works identically in both the native macOS app and the browser distribution. The existing Ctrl+\` shortcut (already implemented, see `TerminalPanel.tsx`) already does this — it deliberately isn't Cmd+T/Cmd+\`, since browsers reserve Cmd+T/Ctrl+T for new-tab and macOS reserves Cmd+\` for window cycling, so neither could be safely captured in the browser distribution. This story adds the same Ctrl+\` binding to the native macOS app's menu as a visible, discoverable menu item (so it shows up in the menu bar with its key equivalent) rather than introducing a second, browser-incompatible shortcut.
 
-**Why this priority**: A pure keyboard-shortcut addition with no layout risk; independent of the folder-scroll fix and the menu-migration items.
+**Why this priority**: A pure discoverability addition with no layout risk and no new shortcut semantics — the toggle behavior itself already exists and is unchanged; independent of the folder-scroll fix and the menu-migration items.
 
-**Independent Test**: With the terminal panel hidden, press Cmd+T and confirm it opens (creating a default tab if none exist, matching current click behavior); press Cmd+T again and confirm it hides.
+**Independent Test**: With the terminal panel hidden, press Ctrl+\` and confirm it opens (creating a default tab if none exist, matching current click behavior); press Ctrl+\` again and confirm it hides; confirm the native app's menu shows a "Toggle Terminal" item with Ctrl+\` as its key equivalent.
 
 **Acceptance Scenarios**:
 
-1. **Given** the terminal panel is hidden with no open tabs, **When** the user presses Cmd+T, **Then** a terminal opens exactly as clicking the toolbar Terminal button does today.
-2. **Given** the terminal panel is visible, **When** the user presses Cmd+T, **Then** the panel hides, preserving existing session state (same behavior as the current toggle button/Ctrl+\` shortcut).
-3. **Given** the browser distribution, where Cmd+T/Ctrl+T is reserved by the browser itself for opening a new browser tab, **When** the shortcut cannot be safely intercepted, **Then** the existing Ctrl+\`/Cmd+\` terminal-toggle shortcut continues to work as the browser-safe equivalent, and Cmd+T is wired only where it can be reliably captured (the native macOS app's menu shortcut).
+1. **Given** the terminal panel is hidden with no open tabs, **When** the user presses Ctrl+\`, **Then** a terminal opens exactly as clicking the toolbar Terminal button does today (unchanged, already true).
+2. **Given** the terminal panel is visible, **When** the user presses Ctrl+\`, **Then** the panel hides, preserving existing session state (unchanged, already true).
+3. **Given** the native macOS app, **When** the user opens the app menu, **Then** a "Toggle Terminal" item is present showing Ctrl+\` as its shortcut, dispatching the same toggle the existing browser-side listener handles.
 
 ---
 
@@ -112,7 +112,7 @@ The "Tracked/All/Local" files-visibility dropdown is removed from the left sideb
 - If a user has both a Claude and a Codex terminal tab open in the same session, does fixing the PATH resolution for one need to be re-verified independently for the other, given they may resolve to different underlying CLIs installed via different means (e.g. one via nvm, one via a package manager)?
 - What happens if `claude` (or `codex`) is aliased rather than a plain PATH binary (e.g. a shell function or alias defined only in `~/.zshrc`)? Should the fix's shell-profile-sourcing approach still make it resolve?
 - On the browser distribution, does the relocated dotfile/tracked-filter control need its own toolbar affordance, or can both share one combined "view options" control? (See Assumptions.)
-- If a user has the browser distribution open in a browser that does allow overriding Ctrl+T (uncommon, but some kiosk/PWA-installed contexts do), should GitLocal attempt to intercept it there, or is Ctrl+\`/Cmd+\` the sole supported shortcut for all browser contexts regardless of what the browser technically allows?
+- Does the native menu's "Toggle Terminal" item need its own `@objc` handler dispatching through the existing `dispatchNativeCommand`/`gitlocal:native-command` bridge, or can it be wired as a plain key-equivalent-only menu item that lets the browser-side Ctrl+\` listener fire naturally (since Ctrl+\` is not otherwise reserved by macOS)?
 - Does removing the toolbar Refresh button change any existing keyboard-focus order (tab order) through the toolbar in a way that needs to be preserved for accessibility?
 
 ## Requirements *(mandatory)*
@@ -122,8 +122,8 @@ The "Tracked/All/Local" files-visibility dropdown is removed from the left sideb
 - **FR-001**: The folder/content view MUST remain independently scrollable to reach all entries regardless of the terminal panel's visibility, expanded/collapsed state, or height.
 - **FR-002**: Claude and Codex terminal tabs MUST resolve and launch their respective CLI using the same environment/PATH resolution a user's interactive login shell uses (i.e. must find CLIs that are only resolvable via shell profile scripts such as `~/.zshrc`/`~/.bashrc`, not just `process.env.PATH` as inherited by the server process).
 - **FR-003**: If the CLI genuinely cannot be resolved even via shell-profile resolution, the existing "not found on PATH" error MUST still be shown (no silent failure, no false positive).
-- **FR-004**: A Cmd+T keyboard shortcut (native macOS app) MUST toggle the terminal panel's visibility identically to the existing Terminal toolbar button / Ctrl+\` shortcut.
-- **FR-005**: The browser distribution MUST NOT rely on intercepting Cmd+T/Ctrl+T for the terminal toggle (browsers reserve it); the existing Ctrl+\`/Cmd+\` shortcut remains the supported terminal-toggle shortcut there.
+- **FR-004**: The native macOS app menu MUST include a "Toggle Terminal" item showing Ctrl+\` as its key equivalent, toggling the terminal panel's visibility identically to the existing Terminal toolbar button / Ctrl+\` shortcut.
+- **FR-005**: No Cmd+T or Cmd+\` shortcut MUST be introduced for the terminal toggle in either distribution (both are reserved — Cmd+T/Ctrl+T for browser tabs, Cmd+\` for macOS window cycling); Ctrl+\` remains the single supported shortcut in both the native app and the browser distribution.
 - **FR-006**: Dotfile visibility ("Hide .* files") MUST become a single piece of shared state that drives both the sidebar file tree and the content panel's folder/git views, replacing the two independent, unsynchronized toggles that exist today.
 - **FR-007**: In the native macOS app, dotfile visibility MUST be exposed as an app-menu item (with a keyboard shortcut and a checked/unchecked state reflecting the current value), and the two inline toggle controls MUST be removed from the sidebar and content panel.
 - **FR-008**: In the browser distribution, dotfile visibility MUST be exposed via a single, always-reachable toolbar-level control, replacing the two removed inline toggles.
@@ -147,14 +147,14 @@ The "Tracked/All/Local" files-visibility dropdown is removed from the left sideb
 
 - **SC-001**: Users can scroll to the last entry of any folder listing regardless of terminal panel state, in 100% of manual verification passes across the three terminal states (hidden/collapsed/expanded).
 - **SC-002**: A Claude terminal tab launches successfully (no PATH error) whenever the CLI is runnable from a manually-typed Regular terminal tab in the same environment.
-- **SC-003**: Cmd+T toggles the terminal panel in the native macOS app with no additional clicks required; browser users retain a working terminal-toggle shortcut (Ctrl+\`/Cmd+\`) with zero regression.
+- **SC-003**: Ctrl+\` toggles the terminal panel identically in both the native macOS app and the browser distribution, and the native app menu shows it as a discoverable "Toggle Terminal" item, with zero regression to existing behavior.
 - **SC-004**: Dotfile visibility requires exactly one interaction to change, and that change is reflected in both the sidebar and content panel with no possibility of the two disagreeing.
 - **SC-005**: Refresh and the Tracked/All/Local filter remain fully reachable (menu, browser equivalent, and/or shortcut) after their toolbar/sidebar controls are removed, with zero loss of functionality.
 
 ## Assumptions
 
 - "The same" browser experience for menu-relocated items (User Stories 4 and 6) means a single, consistently-placed, always-reachable control (e.g. a compact "View" control near the toolbar) rather than a literal dropdown menu — the browser distribution has no native OS menu bar to mirror exactly.
-- Cmd+T cannot be safely captured by the browser distribution because operating systems/browsers reserve it for tab management; the existing Ctrl+\`/Cmd+\` shortcut remains the terminal-toggle shortcut for the browser distribution, and Cmd+T is added only to the native macOS app's menu/global shortcut handling.
+- Cmd+T is dropped entirely rather than made native-only: it cannot be safely captured by the browser distribution (browsers reserve Cmd+T/Ctrl+T for tab management) and Cmd+\` is separately reserved by macOS for window cycling, so a single shared shortcut (the existing Ctrl+\`) serves both distributions with no distribution-specific special-casing.
 - The Claude/Codex PATH fix resolves the launch command through the same mechanism an interactive login shell uses (sourcing the user's shell profile) rather than hardcoding specific tool paths (e.g. nvm), so it generalizes across differing user environments without per-tool special-casing.
 - "The app menu" refers to the existing native macOS `NSMenu` structure already installed by `AppDelegate.swift` (018-macos-homebrew-app); this patch extends it rather than introducing a new menu system.
 - Removing the toolbar Refresh button and sidebar Tracked/All/Local dropdown does not remove the underlying React state/query-invalidation logic — only the inline control markup and its former location.
