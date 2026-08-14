@@ -485,7 +485,7 @@ describe('App branch coverage', () => {
       resolvedPathType: 'missing',
       statusMessage: 'README.md moved away.',
     }))
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
 
     await waitFor(() => {
       expect(screen.getByTestId('content-props')).toHaveTextContent('"selectedPath":""')
@@ -867,7 +867,7 @@ describe('App branch coverage', () => {
       fileStatus: 'changed',
       workingTreeRevision: 'rev-2',
     }))
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
 
     await waitFor(() => {
       expect(api.getSyncStatus).toHaveBeenCalledWith('README.md', 'main')

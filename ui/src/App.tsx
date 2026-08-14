@@ -21,6 +21,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
@@ -408,6 +410,13 @@ export default function App() {
     postNativeAppCommand('dotfiles-state', String(hideDotfiles))
   }, [hideDotfiles])
 
+  // Keeps the native app's "Tracked/All/Local" submenu checkmark in sync however
+  // generatedLocalVisibility changed — via this toolbar control or via the submenu itself
+  // dispatching 'set-tracked-visibility'.
+  useEffect(() => {
+    postNativeAppCommand('tracked-visibility-state', generatedLocalVisibility)
+  }, [generatedLocalVisibility])
+
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
       setSearchPresentation('expanded')
@@ -607,6 +616,15 @@ export default function App() {
       if (command === 'toggle-dotfiles') {
         event.preventDefault()
         setHideDotfiles((value) => !value)
+        return
+      }
+
+      if (command === 'set-tracked-visibility') {
+        event.preventDefault()
+        const target = detail?.message
+        if (target === 'hide' || target === 'show' || target === 'only') {
+          setGeneratedLocalVisibility(target)
+        }
         return
       }
 
@@ -1292,6 +1310,19 @@ export default function App() {
                   >
                     Hide Dotfiles
                   </DropdownMenuCheckboxItem>
+                  {info?.isGitRepo ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup
+                        value={generatedLocalVisibility}
+                        onValueChange={(value) => setGeneratedLocalVisibility(value as GeneratedLocalVisibility)}
+                      >
+                        <DropdownMenuRadioItem value="hide">Tracked</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="show">All</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="only">Local</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
@@ -1325,20 +1356,6 @@ export default function App() {
           ) : (
             <aside className="sidebar flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
               <div className="sidebar-toolbar flex justify-end p-3 pb-2">
-                {info?.isGitRepo ? (
-                  <label className="generated-local-toggle">
-                    <span>Files</span>
-                    <select
-                      aria-label="Generated and local files visibility"
-                      value={generatedLocalVisibility}
-                      onChange={(event) => setGeneratedLocalVisibility(event.target.value as GeneratedLocalVisibility)}
-                    >
-                      <option value="hide">Tracked</option>
-                      <option value="show">All</option>
-                      <option value="only">Local</option>
-                    </select>
-                  </label>
-                ) : null}
                 <button
                   type="button"
                   className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"

@@ -144,15 +144,15 @@ Existing single-repo layout: `src/` (Hono backend), `ui/src/` (Vite/React fronte
 
 ### Tests for User Story 6
 
-- [ ] T029 [P] [US6] Update `ui/src/App.test.tsx` to assert: the inline Tracked/All/Local `<select>` no longer renders in the sidebar toolbar; the "View options" control's Tracked/All/Local selector drives the same `generatedLocalVisibility` state; a `'set-tracked-visibility'` native-command event with each of `hide`/`show`/`only` in its `detail.message` updates the state accordingly.
+- [x] T029 [P] [US6] Update `ui/src/App.test.tsx` to assert: the inline Tracked/All/Local `<select>` no longer renders in the sidebar toolbar; the "View options" control's Tracked/All/Local selector drives the same `generatedLocalVisibility` state; a `'set-tracked-visibility'` native-command event with each of `hide`/`show`/`only` in its `detail.message` updates the state accordingly.
 
 ### Implementation for User Story 6
 
-- [ ] T030 [US6] Remove the inline Tracked/All/Local `<select>` from the sidebar toolbar in `ui/src/App.tsx` (lines 1250-1264).
-- [ ] T031 [US6] Add a Tracked/All/Local selector to the "View options" toolbar control (from T019/T027), wired to the existing `generatedLocalVisibility`/`setGeneratedLocalVisibility` state — no new state needed (FR-013/FR-015).
-- [ ] T032 [US6] Add a `'set-tracked-visibility'` branch to the `handleNativeCommand` listener in `ui/src/App.tsx`, reading the target value (`'hide'` | `'show'` | `'only'`) from `detail.message` (reusing the existing `NativeAppCommandEvent` shape rather than extending it) and calling `setGeneratedLocalVisibility`.
-- [ ] T033 [US6] Add `@objc func setTrackedVisibilityHide/Show/Only(_ sender: Any?)` (or a single handler keyed off `sender.title`) to `ViewerWindowController.swift`, each dispatching `dispatchNativeCommand("set-tracked-visibility", message: "hide" | "show" | "only")`.
-- [ ] T034 [US6] Add a "Tracked/All/Local" submenu (three items — Tracked, All, Local — with a checkmark on the active value) to the app menu in `AppDelegate.swift`, wired to the T033 handlers; sync the checkmark the same way T023 syncs the dotfiles checkmark (a `'tracked-visibility-state'` outbound command on every change).
+- [x] T030 [US6] Remove the inline Tracked/All/Local `<select>` from the sidebar toolbar in `ui/src/App.tsx` (lines 1250-1264).
+- [x] T031 [US6] Add a Tracked/All/Local selector to the "View options" toolbar control (from T019/T027), wired to the existing `generatedLocalVisibility`/`setGeneratedLocalVisibility` state — no new state needed (FR-013/FR-015).
+- [x] T032 [US6] Add a `'set-tracked-visibility'` branch to the `handleNativeCommand` listener in `ui/src/App.tsx`, reading the target value (`'hide'` | `'show'` | `'only'`) from `detail.message` (reusing the existing `NativeAppCommandEvent` shape rather than extending it) and calling `setGeneratedLocalVisibility`.
+- [x] T033 [US6] Add `@objc func setTrackedVisibilityHide/Show/Only(_ sender: Any?)` (or a single handler keyed off `sender.title`) to `ViewerWindowController.swift`, each dispatching `dispatchNativeCommand("set-tracked-visibility", message: "hide" | "show" | "only")`.
+- [x] T034 [US6] Add a "Tracked/All/Local" submenu (three items — Tracked, All, Local — with a checkmark on the active value) to the app menu in `AppDelegate.swift`, wired to the T033 handlers; sync the checkmark the same way T023 syncs the dotfiles checkmark (a `'tracked-visibility-state'` outbound command on every change).
 
 **Checkpoint**: No inline Tracked/All/Local dropdown; native submenu and browser "View options" control both filter identically to the removed dropdown.
 

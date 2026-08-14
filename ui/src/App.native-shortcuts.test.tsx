@@ -182,12 +182,12 @@ describe('native app shortcut bridge', () => {
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
   })
 
-  it('refreshes the current view from the visible header button', async () => {
+  it('refreshes the current view from the Ctrl+Alt+R browser shortcut', async () => {
     renderWithClient()
 
     expect(await screen.findByTestId('content-refresh-token')).toHaveTextContent('0')
 
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
 
     await waitFor(() => {
       expect(screen.getByTestId('tree-refresh-token')).toHaveTextContent('1')

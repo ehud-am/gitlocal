@@ -1704,25 +1704,6 @@ pre {
   color: var(--foreground);
 }
 
-.generated-local-toggle {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--muted-foreground);
-  font-size: 0.78rem;
-}
-
-.generated-local-toggle select {
-  min-width: 5.25rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  color: var(--foreground);
-  padding: 0.3rem 1.5rem 0.3rem 0.45rem;
-  font-size: 0.78rem;
-}
-
 .picker-file-tree {
   max-height: 100%;
 }

@@ -146,6 +146,11 @@ async function clickRefreshViaViewOptions() {
   fireEvent.click(await screen.findByRole('menuitem', { name: /^refresh$/i }))
 }
 
+async function selectTrackedVisibility(name: RegExp) {
+  await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+  fireEvent.click(await screen.findByRole('menuitemradio', { name }))
+}
+
 describe('App', () => {
   const getItem = vi.fn()
   const setItem = vi.fn()
@@ -992,6 +997,69 @@ describe('App', () => {
     expect(postMessage).toHaveBeenCalledWith({ command: 'dotfiles-state', value: 'true' })
   })
 
+  it('does not render an inline Tracked/All/Local dropdown in the sidebar toolbar', async () => {
+    renderWithClient()
+
+    await screen.findByRole('heading', { name: 'repo' })
+    expect(screen.queryByLabelText(/generated and local files visibility/i)).not.toBeInTheDocument()
+  })
+
+  it('updates generatedLocalVisibility from the View options Tracked/All/Local selector', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient()
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    expect(within(tree).getByText('README.md')).toBeInTheDocument()
+
+    await selectTrackedVisibility(/^local$/i)
+
+    await waitFor(() => {
+      expect(within(tree).getByText('dist')).toBeInTheDocument()
+    })
+    expect(within(tree).queryByText('README.md')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['show', 'hide', ['README.md']],
+    ['hide', 'show', ['README.md', 'dist']],
+    ['hide', 'only', ['dist']],
+  ] as const)('applies %s -> %s from the set-tracked-visibility native command and syncs the state back to native', async (initial, target, visibleAfter) => {
+    window.history.replaceState(null, '', `/?generatedLocalVisibility=${initial}`)
+    const postMessage = vi.fn()
+    Object.defineProperty(window, 'webkit', {
+      value: { messageHandlers: { gitlocalNative: { postMessage } } },
+      configurable: true,
+    })
+
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient()
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    await within(tree).findByText(initial === 'only' ? 'dist' : 'README.md')
+
+    postMessage.mockClear()
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'set-tracked-visibility', message: target },
+    }))
+
+    await waitFor(() => {
+      for (const name of ['README.md', 'dist'] as const) {
+        if ((visibleAfter as readonly string[]).includes(name)) {
+          expect(within(tree).getByText(name)).toBeInTheDocument()
+        } else {
+          expect(within(tree).queryByText(name)).not.toBeInTheDocument()
+        }
+      }
+    })
+    expect(postMessage).toHaveBeenCalledWith({ command: 'tracked-visibility-state', value: target })
+  })
+
   it('does not render a Refresh button in the top toolbar', async () => {
     renderWithClient()
 
@@ -1375,7 +1443,7 @@ describe('App', () => {
 
     expect(await screen.findByText(/2 local changes/i)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /repository status summary/i })).not.toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'show' } })
+    await selectTrackedVisibility(/^all$/i)
 
     await waitFor(() => {
       expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, true)
@@ -1392,7 +1460,7 @@ describe('App', () => {
 
     const tree = await screen.findByRole('tree', { name: /repository files/i })
     expect(within(tree).getByText('README.md')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'only' } })
+    await selectTrackedVisibility(/^local$/i)
 
     await waitFor(() => {
       expect(within(tree).getByText('dist')).toBeInTheDocument()

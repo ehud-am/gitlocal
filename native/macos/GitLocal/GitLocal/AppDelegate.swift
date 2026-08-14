@@ -193,6 +193,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleDotfilesItem.target = controller
         viewMenu.addItem(toggleDotfilesItem)
         controller.dotfilesMenuItem = toggleDotfilesItem
+        viewMenu.addItem(NSMenuItem.separator())
+        let trackedVisibilityItem = NSMenuItem(title: "Tracked/All/Local", action: nil, keyEquivalent: "")
+        let trackedVisibilityMenu = NSMenu(title: "Tracked/All/Local")
+        let trackedItem = NSMenuItem(
+            title: "Tracked",
+            action: #selector(ViewerWindowController.setTrackedVisibilityHide(_:)),
+            keyEquivalent: ""
+        )
+        trackedItem.target = controller
+        trackedVisibilityMenu.addItem(trackedItem)
+        controller.trackedVisibilityHideItem = trackedItem
+        let allFilesItem = NSMenuItem(
+            title: "All",
+            action: #selector(ViewerWindowController.setTrackedVisibilityShow(_:)),
+            keyEquivalent: ""
+        )
+        allFilesItem.target = controller
+        trackedVisibilityMenu.addItem(allFilesItem)
+        controller.trackedVisibilityShowItem = allFilesItem
+        let localOnlyItem = NSMenuItem(
+            title: "Local",
+            action: #selector(ViewerWindowController.setTrackedVisibilityOnly(_:)),
+            keyEquivalent: ""
+        )
+        localOnlyItem.target = controller
+        trackedVisibilityMenu.addItem(localOnlyItem)
+        controller.trackedVisibilityOnlyItem = localOnlyItem
+        trackedVisibilityItem.submenu = trackedVisibilityMenu
+        viewMenu.addItem(trackedVisibilityItem)
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
