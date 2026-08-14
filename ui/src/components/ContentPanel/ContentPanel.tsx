@@ -110,10 +110,10 @@ function KebabIcon() {
   )
 }
 
-function CloseIcon() {
+function BackToFolderIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9.5 3L4.5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -1009,6 +1009,20 @@ export default function ContentPanel({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!confirmDiscardIfNeeded()) return
+              onOpenPath(parentPathOf(selectedPath), 'dir', false)
+            }}
+            aria-label="Back to folder"
+            title="Back to folder"
+          >
+            <BackToFolderIcon />
+            Back to folder
+          </Button>
           {mode === 'view' ? (
             <>
             {canSearchCurrentFile ? (
@@ -1109,18 +1123,6 @@ export default function ContentPanel({
             ) : null}
             </>
           ) : null}
-          <button
-            type="button"
-            className="panel-icon-button content-close-trigger"
-            aria-label="Close file and return to folder"
-            title="Close file"
-            onClick={() => {
-              if (!confirmDiscardIfNeeded()) return
-              onOpenPath(parentPathOf(selectedPath), 'dir', false)
-            }}
-          >
-            <CloseIcon />
-          </button>
         </div>
       </div>
 

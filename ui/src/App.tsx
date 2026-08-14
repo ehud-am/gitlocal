@@ -1354,19 +1354,17 @@ export default function App() {
               </div>
             </aside>
           ) : (
-            <aside className="sidebar flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
-              <div className="sidebar-toolbar flex justify-end p-3 pb-2">
-                <button
-                  type="button"
-                  className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                  aria-label="Collapse navigation"
-                  title="Collapse navigation"
-                  onClick={() => setSidebarCollapsed(true)}
-                >
-                  <PanelToggleIcon collapsed={false} />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">
+            <aside className="sidebar relative flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
+              <button
+                type="button"
+                className="panel-icon-button sidebar-float-toggle absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] shadow-sm backdrop-blur transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                aria-label="Collapse navigation"
+                title="Collapse navigation"
+                onClick={() => setSidebarCollapsed(true)}
+              >
+                <PanelToggleIcon collapsed={false} />
+              </button>
+              <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
                 <FileTree
                   branch={currentBranch}
                   refreshToken={treeRefreshToken}

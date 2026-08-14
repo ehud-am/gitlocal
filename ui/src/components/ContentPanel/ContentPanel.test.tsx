@@ -2314,7 +2314,7 @@ describe('ContentPanel', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /close file/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /back to folder/i }))
 
     expect(onOpenPath).toHaveBeenCalledWith('docs', 'dir', false)
   })
@@ -2340,7 +2340,7 @@ describe('ContentPanel', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
     fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /close file/i }))
+    fireEvent.click(screen.getByRole('button', { name: /back to folder/i }))
 
     expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved file changes?')
     expect(onOpenPath).not.toHaveBeenCalled()
