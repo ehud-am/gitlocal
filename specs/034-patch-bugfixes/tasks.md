@@ -121,14 +121,14 @@ Existing single-repo layout: `src/` (Hono backend), `ui/src/` (Vite/React fronte
 
 ### Tests for User Story 5
 
-- [ ] T024 [P] [US5] Update `ui/src/App.test.tsx` to assert: no Refresh button renders in the top toolbar; a `keydown` with `ctrlKey && altKey && key === 'r'` calls `refreshCurrentView()`; the "View options" control exposes a refresh action that also calls `refreshCurrentView()`.
+- [x] T024 [P] [US5] Update `ui/src/App.test.tsx` to assert: no Refresh button renders in the top toolbar; a `keydown` with `ctrlKey && altKey && key === 'r'` calls `refreshCurrentView()`; the "View options" control exposes a refresh action that also calls `refreshCurrentView()`.
 
 ### Implementation for User Story 5
 
-- [ ] T025 [US5] Remove the Refresh `Button` from the top toolbar in `ui/src/App.tsx` (lines 1199-1209).
-- [ ] T026 [US5] Add a global `keydown` listener in `ui/src/App.tsx` (new `useEffect`, following the same pattern as `TerminalPanel.tsx:107-116`'s Ctrl+\` listener) matching `event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === 'r'`, calling `event.preventDefault()` and `refreshCurrentView()` — the browser-safe Ctrl+Alt+R shortcut decided in plan.md Phase 0 Research #2 (Cmd+R/Ctrl+R is unusable: every browser reserves it for page reload).
-- [ ] T027 [US5] Add a refresh action to the "View options" toolbar control from T019, so browser users have an always-visible non-keyboard way to refresh (FR-011).
-- [ ] T028 [US5] Verify (no code change expected) that the native View menu's existing Refresh item (`AppDelegate.swift:155-161`, already Cmd+R, already wired to `refreshViewer(_:)` → `dispatchNativeCommand("refresh")` → the existing `'refresh'` branch in `App.tsx`) continues to work unchanged now that the toolbar button is gone.
+- [x] T025 [US5] Remove the Refresh `Button` from the top toolbar in `ui/src/App.tsx` (lines 1199-1209).
+- [x] T026 [US5] Add a global `keydown` listener in `ui/src/App.tsx` (new `useEffect`, following the same pattern as `TerminalPanel.tsx:107-116`'s Ctrl+\` listener) matching `event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === 'r'`, calling `event.preventDefault()` and `refreshCurrentView()` — the browser-safe Ctrl+Alt+R shortcut decided in plan.md Phase 0 Research #2 (Cmd+R/Ctrl+R is unusable: every browser reserves it for page reload).
+- [x] T027 [US5] Add a refresh action to the "View options" toolbar control from T019, so browser users have an always-visible non-keyboard way to refresh (FR-011).
+- [x] T028 [US5] Verify (no code change expected) that the native View menu's existing Refresh item (`AppDelegate.swift:155-161`, already Cmd+R, already wired to `refreshViewer(_:)` → `dispatchNativeCommand("refresh")` → the existing `'refresh'` branch in `App.tsx`) continues to work unchanged now that the toolbar button is gone.
 
 **Checkpoint**: No toolbar Refresh button; native Cmd+R unchanged; Ctrl+Alt+R and the "View options" control both refresh in the browser distribution.
 

@@ -20,6 +20,8 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
@@ -640,6 +642,19 @@ export default function App() {
     return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
   }, [openNativeFile, persistDefaultReaderPreference, refreshCurrentView])
 
+  // Cmd/Ctrl+R is unusable as a browser shortcut (every browser reserves it for page reload),
+  // so the browser distribution's refresh shortcut is Ctrl+Alt+R instead. The native macOS app
+  // keeps its own Cmd+R menu item, wired through the 'refresh' native-command branch above.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'r' || !event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      void refreshCurrentView()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [refreshCurrentView])
+
   useEffect(() => {
     if (!nativeDefaultReaderAvailable) return
     api.getDefaultReaderPreference()
@@ -1244,17 +1259,6 @@ export default function App() {
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              disabled={refreshingCurrentView}
-              onClick={() => { void refreshCurrentView() }}
-              aria-label="Refresh current page"
-            >
-              <RefreshIcon spinning={refreshingCurrentView} />
-              {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            <Button
-              type="button"
               variant="highlight"
               size="sm"
               onClick={() => terminalPanelRef.current?.toggleTerminal()}
@@ -1273,6 +1277,15 @@ export default function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="gap-2"
+                    disabled={refreshingCurrentView}
+                    onSelect={() => { void refreshCurrentView() }}
+                  >
+                    <RefreshIcon spinning={refreshingCurrentView} />
+                    {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuCheckboxItem
                     checked={hideDotfiles}
                     onCheckedChange={(checked) => setHideDotfiles(checked === true)}

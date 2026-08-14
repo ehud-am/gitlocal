@@ -141,6 +141,11 @@ function renderWithClient() {
   )
 }
 
+async function clickRefreshViaViewOptions() {
+  await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: /^refresh$/i }))
+}
+
 describe('App', () => {
   const getItem = vi.fn()
   const setItem = vi.fn()
@@ -807,7 +812,7 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByText('guide content')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
 
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
     expect(await screen.findByText('guide content')).toBeInTheDocument()
@@ -898,7 +903,7 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByText(/up to date/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
 
     expect(await screen.findByText(/1 local change/i)).toBeInTheDocument()
     expect(screen.queryByText(/up to date/i)).not.toBeInTheDocument()
@@ -987,34 +992,53 @@ describe('App', () => {
     expect(postMessage).toHaveBeenCalledWith({ command: 'dotfiles-state', value: 'true' })
   })
 
-  it('shows an icon on the Refresh control', async () => {
+  it('does not render a Refresh button in the top toolbar', async () => {
     renderWithClient()
 
-    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
+    await screen.findByRole('button', { name: /toggle terminal/i })
+    expect(screen.queryByRole('button', { name: /refresh current page/i })).not.toBeInTheDocument()
+  })
+
+  it('shows an icon on the Refresh action in the View options menu', async () => {
+    renderWithClient()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+    const refresh = await screen.findByRole('menuitem', { name: /^refresh$/i })
     expect(refresh.querySelector('svg')).toBeInTheDocument()
   })
 
-  it('renders Refresh and Parent Folder as plain/low-emphasis and Terminal as a highlighted control', async () => {
+  it('renders Parent Folder as a plain/low-emphasis control and Terminal as a highlighted control', async () => {
     renderWithClient()
 
-    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
     const terminal = await screen.findByRole('button', { name: /toggle terminal/i })
     const [parentFolder] = await screen.findAllByRole('button', { name: 'Parent Folder' })
 
-    expect(refresh.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
     expect(parentFolder.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
     expect(terminal.className).toContain('text-[var(--success)]')
   })
 
-  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Refresh, Terminal', async () => {
+  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Terminal', async () => {
     renderWithClient()
 
     const toolbarButtons = await screen.findAllByRole('button', {
-      name: /^parent folder$|refresh current page|toggle terminal/i,
+      name: /^parent folder$|toggle terminal/i,
     })
     expect(toolbarButtons[0]).toHaveAccessibleName('Parent Folder')
-    expect(toolbarButtons[1]).toHaveAccessibleName(/refresh current page/i)
-    expect(toolbarButtons[2]).toHaveAccessibleName(/toggle terminal/i)
+    expect(toolbarButtons[1]).toHaveAccessibleName(/toggle terminal/i)
+  })
+
+  it('calls refreshCurrentView from the Ctrl+Alt+R shortcut', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    renderWithClient()
+
+    await screen.findByText('guide content')
+    vi.mocked(api.getFile).mockClear()
+
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
   })
 
   it('toggles the theme and persists the preference', async () => {
@@ -1277,7 +1301,7 @@ describe('App', () => {
     expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
     expect(api.getFile).not.toHaveBeenCalledWith('README.md', 'main', false)
 
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
     expect(screen.queryByText(/refreshing current view/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
 
