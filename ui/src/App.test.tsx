@@ -1041,7 +1041,7 @@ describe('App', () => {
 
     renderWithClient()
     const tree = await screen.findByRole('tree', { name: /repository files/i })
-    await within(tree).findByText(initial === 'only' ? 'dist' : 'README.md')
+    await within(tree).findByText('README.md')
 
     postMessage.mockClear()
     window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
