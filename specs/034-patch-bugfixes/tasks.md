@@ -162,7 +162,7 @@ Existing single-repo layout: `src/` (Hono backend), `ui/src/` (Vite/React fronte
 
 **Purpose**: Final verification across all six stories together.
 
-- [ ] T035 [P] Run the existing `jest-axe` suites for `App`, `FileTree`, and `ContentPanel` — confirm no new accessibility violations from the Refresh-button removal or the new "View options" control (FR-016).
+- [x] T035 [P] Run the existing `jest-axe` suites for `App`, `FileTree`, and `ContentPanel` — confirm no new accessibility violations from the Refresh-button removal or the new "View options" control (FR-016).
 - [ ] T036 [P] Manually tab through the toolbar to confirm focus order still makes sense after T025 (Refresh removal) and T019 (new control's addition) — per spec.md's Edge Cases question about tab order.
 - [ ] T037 Manual quickstart.md walkthrough for all six user stories, including the native macOS app build for US3/US4/US6's menu items (cannot be automated in this environment).
 - [ ] T038 Update `CLAUDE.md`'s "Recent Changes" section with a `034-patch-bugfixes` entry once implementation is complete, per repository convention (see existing `033-`/`032-`/`018-` entries).
