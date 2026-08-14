@@ -375,6 +375,15 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
   })
 
+  it('keeps the content area shrinkable so the folder/file view can scroll independently of the terminal panel', async () => {
+    renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+    const contentArea = document.querySelector('main.content-area')
+    expect(contentArea).toHaveClass('min-h-0')
+  })
+
   it('asks for default Markdown reader setup only after the native app announces support', async () => {
     renderWithClient()
 
@@ -899,6 +908,83 @@ describe('App', () => {
       expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, false)
       expect(vi.mocked(api.getNavigationHints).mock.calls.length).toBeGreaterThanOrEqual(2)
     })
+  })
+
+  it('routes the toggle-terminal native command to the terminal panel toggle, same as clicking the toolbar button', async () => {
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'toggle-terminal' },
+    }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('toggles dotfile visibility for both FileTree and ContentPanel from the View options toolbar control, and persists it', async () => {
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
+      if (path === 'docs') {
+        return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+      }
+
+      return [
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+        { name: '.env', path: '.env', type: 'file', localOnly: false },
+      ]
+    })
+
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    expect(await within(tree).findByText('.env')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /hide dotfiles/i }))
+
+    await waitFor(() => {
+      expect(within(tree).queryByText('.env')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /open file \.env/i })).not.toBeInTheDocument()
+    })
+    expect(window.location.search).toContain('hideDotfiles=true')
+  })
+
+  it('flips the shared dotfile-visibility state from the toggle-dotfiles native command and syncs the state back to native', async () => {
+    const postMessage = vi.fn()
+    Object.defineProperty(window, 'webkit', {
+      value: { messageHandlers: { gitlocalNative: { postMessage } } },
+      configurable: true,
+    })
+
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
+      if (path === 'docs') {
+        return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+      }
+
+      return [
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+        { name: '.env', path: '.env', type: 'file', localOnly: false },
+      ]
+    })
+
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    await within(tree).findByText('.env')
+
+    postMessage.mockClear()
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'toggle-dotfiles' },
+    }))
+
+    await waitFor(() => {
+      expect(within(tree).queryByText('.env')).not.toBeInTheDocument()
+    })
+    expect(postMessage).toHaveBeenCalledWith({ command: 'dotfiles-state', value: 'true' })
   })
 
   it('shows an icon on the Refresh control', async () => {

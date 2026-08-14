@@ -174,6 +174,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         shareMarkdownItem.target = controller
         viewMenu.addItem(shareMarkdownItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        let toggleTerminalItem = NSMenuItem(
+            title: "Toggle Terminal",
+            action: #selector(ViewerWindowController.toggleTerminal(_:)),
+            keyEquivalent: "`"
+        )
+        toggleTerminalItem.keyEquivalentModifierMask = [.control]
+        toggleTerminalItem.target = controller
+        viewMenu.addItem(toggleTerminalItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        let toggleDotfilesItem = NSMenuItem(
+            title: "Hide Dotfiles",
+            action: #selector(ViewerWindowController.toggleDotfiles(_:)),
+            keyEquivalent: "."
+        )
+        toggleDotfilesItem.keyEquivalentModifierMask = [.command, .shift]
+        toggleDotfilesItem.target = controller
+        viewMenu.addItem(toggleDotfilesItem)
+        controller.dotfilesMenuItem = toggleDotfilesItem
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 

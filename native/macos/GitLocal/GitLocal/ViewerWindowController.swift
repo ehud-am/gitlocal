@@ -7,6 +7,7 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
     private let onDefaultReaderSetupRequested: () -> Result<String, Error>
     private var pageLoaded = false
     private var pendingOpenFilePaths: [String] = []
+    weak var dotfilesMenuItem: NSMenuItem?
 
     init(url: URL, onDefaultReaderSetupRequested: @escaping () -> Result<String, Error>) {
         self.initialURL = url
@@ -72,6 +73,14 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
         dispatchNativeCommand("share-markdown")
     }
 
+    @objc func toggleTerminal(_ sender: Any?) {
+        dispatchNativeCommand("toggle-terminal")
+    }
+
+    @objc func toggleDotfiles(_ sender: Any?) {
+        dispatchNativeCommand("toggle-dotfiles")
+    }
+
     @objc func setDefaultMarkdownReader(_ sender: Any?) {
         switch onDefaultReaderSetupRequested() {
         case .success(let message):
@@ -101,6 +110,11 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
 
         if command == "set-default-markdown-reader" {
             setDefaultMarkdownReader(nil)
+        }
+
+        if command == "dotfiles-state" {
+            let hideDotfiles = (body["value"] as? String) == "true"
+            dotfilesMenuItem?.state = hideDotfiles ? .on : .off
         }
     }
 

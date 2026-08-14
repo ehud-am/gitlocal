@@ -770,10 +770,49 @@ describe('ContentPanel', () => {
     expect(onOpenPath).toHaveBeenNthCalledWith(2, 'docs/.env', 'file', true)
   })
 
-  it('shows dotfiles by default and hides them from directory listings when requested', async () => {
+  it('shows dotfiles by default and hides them from directory listings when the hideDotfiles prop is set', async () => {
     vi.mocked(api.getTree).mockResolvedValue([
       { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
       { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+    ])
+
+    const queryClient = makeClient()
+    const { rerender } = renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+      queryClient,
+    )
+
+    expect(await screen.findByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ContentPanel
+          canMutateFiles={false}
+          refreshToken={0}
+          selectedPath="docs"
+          selectedPathType="dir"
+          branch="main"
+          hideDotfiles
+          onNavigate={vi.fn()}
+          onOpenPath={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+    expect(screen.queryByRole('button', { name: /open file \.env/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/i)).toBeInTheDocument()
+  })
+
+  it('no longer renders an inline dotfile-visibility checkbox (moved to the View options toolbar control)', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: '.env', path: 'docs/.env', type: 'file', localOnly: true },
     ])
 
     renderWithClient(
@@ -788,11 +827,8 @@ describe('ContentPanel', () => {
       />,
     )
 
-    expect(await screen.findByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('checkbox', { name: /hide \.\* files/i }))
-    expect(screen.queryByRole('button', { name: /open file \.env/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open file guide\.md/i })).toBeInTheDocument()
-    expect(screen.getByText(/1 hidden/i)).toBeInTheDocument()
+    await screen.findByRole('button', { name: /open file \.env/i })
+    expect(screen.queryByRole('checkbox', { name: /hide \.\* files/i })).not.toBeInTheDocument()
   })
 
   it('shows local-only cues in ignored directory rows and active folder context', async () => {

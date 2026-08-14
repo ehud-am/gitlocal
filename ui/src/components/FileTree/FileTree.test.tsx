@@ -84,16 +84,21 @@ describe('FileTree', () => {
     })
   })
 
-  it('shows dotfiles by default and hides them when the dotfile checkbox is enabled', async () => {
+  it('shows dotfiles by default and hides them when the hideDotfiles prop is set', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: '.env', path: '.env', type: 'file', localOnly: true },
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
-    renderWithClient(<FileTree {...defaultProps} />)
+    const queryClient = makeQueryClient()
+    const { rerender } = renderWithClient(<FileTree {...defaultProps} />, queryClient)
 
     expect(await screen.findByText('.env')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('checkbox', { name: /hide \.\* files/i }))
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <FileTree {...defaultProps} hideDotfiles />
+      </QueryClientProvider>
+    )
     expect(screen.queryByText('.env')).not.toBeInTheDocument()
     expect(screen.getByText('README.md')).toBeInTheDocument()
   })
@@ -104,10 +109,20 @@ describe('FileTree', () => {
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
     ])
 
-    renderWithClient(<FileTree {...defaultProps} selectedPath=".env" selectedPathType="file" />)
+    renderWithClient(<FileTree {...defaultProps} selectedPath=".env" selectedPathType="file" hideDotfiles />)
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /hide \.\* files/i }))
-    expect(screen.getByText('.env')).toBeInTheDocument()
+    expect(await screen.findByText('.env')).toBeInTheDocument()
+  })
+
+  it('no longer renders an inline dotfile-visibility checkbox (moved to the View options toolbar control)', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: '.env', path: '.env', type: 'file', localOnly: true },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    await screen.findByText('.env')
+    expect(screen.queryByRole('checkbox', { name: /hide \.\* files/i })).not.toBeInTheDocument()
   })
 
   it('shows a local-only cue for ignored tree entries in git repos', async () => {

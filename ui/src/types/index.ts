@@ -93,7 +93,10 @@ export type NativeAppCommand =
   | 'default-reader-setup-succeeded'
   | 'default-reader-setup-failed'
   | 'open-file'
-export type NativeAppOutboundCommand = 'set-default-markdown-reader'
+  | 'toggle-terminal'
+  | 'toggle-dotfiles'
+  | 'set-tracked-visibility'
+export type NativeAppOutboundCommand = 'set-default-markdown-reader' | 'dotfiles-state' | 'tracked-visibility-state'
 export interface NativeAppCommandEvent extends CustomEvent<{ command: NativeAppCommand; message?: string; path?: string }> {
   type: 'gitlocal:native-command'
 }
@@ -107,6 +110,7 @@ export interface ViewerState {
   pathType: ViewerPathType
   raw: boolean
   sidebarCollapsed: boolean
+  hideDotfiles: boolean
   generatedLocalVisibility: GeneratedLocalVisibility
   searchRootPath: string
   searchContentKind: SearchContentKind
