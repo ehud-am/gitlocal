@@ -1628,13 +1628,17 @@ pre {
 }
 
 .picker-shell {
-  min-height: 100vh;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--background);
   color: var(--foreground);
 }
 
 .picker-shell > .app-header {
   height: 3rem;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--border);
   background: var(--header-bg);
   padding: 0 1rem;
@@ -1644,7 +1648,8 @@ pre {
 .picker-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  min-height: calc(100vh - 48px);
+  min-height: 0;
+  flex: 1;
 }
 
 .picker-layout-collapsed {
@@ -1663,19 +1668,9 @@ pre {
   flex-direction: column;
 }
 
-.picker-sidebar .sidebar-toolbar,
 .picker-sidebar-rail .sidebar-rail-toolbar {
   display: flex;
   padding: 0.75rem;
-}
-
-.picker-sidebar .sidebar-toolbar {
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 0.5rem;
-}
-
-.picker-sidebar-rail .sidebar-rail-toolbar {
   flex-direction: column;
   justify-content: center;
   gap: 0.45rem;
@@ -1709,6 +1704,8 @@ pre {
 }
 
 .picker-main {
+  min-height: 0;
+  overflow-y: auto;
   padding: 1.25rem;
 }
 

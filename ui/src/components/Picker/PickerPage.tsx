@@ -2,9 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../services/api'
 import { writeViewerState } from '../../services/viewerState'
 import type { FolderBrowseEntry, StartupFolderSource } from '../../types'
+import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { MetaTag } from '../ui/meta-tag'
 import { Switch } from '../ui/switch'
+
+function ParentFolderIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 function ThemeIcon({ darkMode }: { darkMode: boolean }) {
   return darkMode ? (
@@ -275,6 +284,18 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
         </span>
         <span className="repo-name">Open local folder</span>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!parentPath}
+            onClick={() => { if (parentPath) void loadPath(parentPath) }}
+            aria-label="Parent Folder"
+            title="Go to parent folder"
+          >
+            <ParentFolderIcon />
+            Parent Folder
+          </Button>
           <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
             <ThemeIcon darkMode={darkMode} />
             <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
@@ -298,19 +319,17 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
             </div>
           </aside>
         ) : (
-          <aside className="picker-sidebar">
-            <div className="sidebar-toolbar">
-              <button
-                type="button"
-                className="panel-icon-button sidebar-toggle-button"
-                aria-label="Collapse navigation"
-                title="Collapse navigation"
-                onClick={() => setSidebarCollapsed(true)}
-              >
-                <PanelToggleIcon collapsed={false} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">
+          <aside className="picker-sidebar relative">
+            <button
+              type="button"
+              className="panel-icon-button sidebar-toggle-button sidebar-float-toggle absolute right-2 top-2 z-10"
+              aria-label="Collapse navigation"
+              title="Collapse navigation"
+              onClick={() => setSidebarCollapsed(true)}
+            >
+              <PanelToggleIcon collapsed={false} />
+            </button>
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
               <div className="file-tree picker-file-tree" role="tree" aria-label="folder contents navigation">
                 {browseLoading ? (
                   <div className="file-tree-skeleton border-0 bg-transparent" aria-label="loading">
