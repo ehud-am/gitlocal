@@ -16,6 +16,16 @@ import {
 } from './components/AppDialogs'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './components/ui/dropdown-menu'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import {
   readDefaultReaderPromptPreference,
@@ -23,6 +33,7 @@ import {
   readViewerState,
   rememberRecentChangedItems,
   rememberRecentItem,
+  resetViewerState,
   writeDefaultReaderPromptPreference,
   writeViewerState,
 } from './services/viewerState'
@@ -104,6 +115,17 @@ function ParentFolderIcon() {
   )
 }
 
+function ViewOptionsIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="5" cy="4" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="11" cy="8" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="6" cy="12" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
 function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -147,13 +169,22 @@ function ErrorScreen({
   )
 }
 
-function postNativeAppCommand(command: NativeAppOutboundCommand): boolean {
+// The native macOS app's menu bar already exposes Refresh, Hide Dotfiles, and the tracked-file
+// visibility submenu, so the browser-only "View options" toolbar control stays hidden there.
+function isRunningInNativeApp(): boolean {
+  return Boolean(
+    (window as typeof window & { webkit?: { messageHandlers?: { gitlocalNative?: unknown } } }).webkit
+      ?.messageHandlers?.gitlocalNative,
+  )
+}
+
+function postNativeAppCommand(command: NativeAppOutboundCommand, value?: string): boolean {
   const messageHandlers = (window as typeof window & {
-    webkit?: { messageHandlers?: { gitlocalNative?: { postMessage: (message: { command: NativeAppOutboundCommand }) => void } } }
+    webkit?: { messageHandlers?: { gitlocalNative?: { postMessage: (message: { command: NativeAppOutboundCommand; value?: string }) => void } } }
   }).webkit?.messageHandlers
   const handler = messageHandlers?.gitlocalNative
   if (!handler) return false
-  handler.postMessage({ command })
+  handler.postMessage(value === undefined ? { command } : { command, value })
   return true
 }
 
@@ -169,6 +200,7 @@ export default function App() {
   const [currentBranch, setCurrentBranch] = useState(initialViewerState.branch)
   const [showRaw, setShowRaw] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialViewerState.sidebarCollapsed)
+  const [hideDotfiles, setHideDotfiles] = useState(initialViewerState.hideDotfiles)
   const [generatedLocalVisibility, setGeneratedLocalVisibility] = useState<GeneratedLocalVisibility>(initialViewerState.generatedLocalVisibility)
   const [searchPresentation, setSearchPresentation] = useState<SearchPresentation>(initialViewerState.searchPresentation)
   const [searchQuery, setSearchQuery] = useState(initialViewerState.searchQuery)
@@ -360,6 +392,7 @@ export default function App() {
       pathType: selectedPathType,
       raw: showRaw,
       sidebarCollapsed,
+      hideDotfiles,
       generatedLocalVisibility,
       searchPresentation,
       searchQuery,
@@ -370,7 +403,20 @@ export default function App() {
       searchTrackedMode,
       searchLimit,
     })
-  }, [currentBranch, generatedLocalVisibility, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
+  }, [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
+
+  // Keeps the native app's "Hide Dotfiles" menu checkmark in sync however hideDotfiles changed —
+  // via this toolbar control or via the menu item itself dispatching 'toggle-dotfiles'.
+  useEffect(() => {
+    postNativeAppCommand('dotfiles-state', String(hideDotfiles))
+  }, [hideDotfiles])
+
+  // Keeps the native app's "Tracked/All/Local" submenu checkmark in sync however
+  // generatedLocalVisibility changed — via this toolbar control or via the submenu itself
+  // dispatching 'set-tracked-visibility'.
+  useEffect(() => {
+    postNativeAppCommand('tracked-visibility-state', generatedLocalVisibility)
+  }, [generatedLocalVisibility])
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && searchPresentation !== 'expanded') {
@@ -562,6 +608,27 @@ export default function App() {
         return
       }
 
+      if (command === 'toggle-terminal') {
+        event.preventDefault()
+        terminalPanelRef.current?.toggleTerminal()
+        return
+      }
+
+      if (command === 'toggle-dotfiles') {
+        event.preventDefault()
+        setHideDotfiles((value) => !value)
+        return
+      }
+
+      if (command === 'set-tracked-visibility') {
+        event.preventDefault()
+        const target = detail?.message
+        if (target === 'hide' || target === 'show' || target === 'only') {
+          setGeneratedLocalVisibility(target)
+        }
+        return
+      }
+
       if (command === 'default-reader-available') {
         event.preventDefault()
         setNativeDefaultReaderAvailable(true)
@@ -593,6 +660,19 @@ export default function App() {
     window.addEventListener('gitlocal:native-command', handleNativeCommand)
     return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
   }, [openNativeFile, persistDefaultReaderPreference, refreshCurrentView])
+
+  // Cmd/Ctrl+R is unusable as a browser shortcut (every browser reserves it for page reload),
+  // so the browser distribution's refresh shortcut is Ctrl+Alt+R instead. The native macOS app
+  // keeps its own Cmd+R menu item, wired through the 'refresh' native-command branch above.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'r' || !event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      void refreshCurrentView()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [refreshCurrentView])
 
   useEffect(() => {
     if (!nativeDefaultReaderAvailable) return
@@ -762,6 +842,7 @@ export default function App() {
     try {
       const result = await api.showParentFolder()
       if (result.ok) {
+        resetViewerState()
         window.location.reload()
         return
       }
@@ -1135,10 +1216,12 @@ export default function App() {
     )
   }
 
+  const darkMode = theme === 'dark'
+
   if (info?.pickerMode) {
     return (
       <>
-        <PickerPage />
+        <PickerPage darkMode={darkMode} onToggleTheme={(checked) => setTheme(checked ? 'dark' : 'light')} />
         <AppFooter version={info.version} />
       </>
     )
@@ -1151,7 +1234,6 @@ export default function App() {
   const visibleSelectedPathLocalOnly = hasRepoMismatch || startupOpenTargetPending || startupOpenTargetBlocksSavedSelection ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
-  const darkMode = theme === 'dark'
 
   let emptyStateTitle: string | undefined
   let emptyStateDetail: string | undefined
@@ -1174,6 +1256,13 @@ export default function App() {
     }
   }
 
+  // Clicking Parent Folder usually just browses to the containing folder within this repository
+  // (handleNavigateParent -> handleSelectFolder), but from the repository root it instead leaves
+  // the repository into the folder browser (handleBrowseParentRequest, gated by a confirmation
+  // dialog). The tooltip previews which one is about to happen so the reload/leave-repo case
+  // isn't a surprise; aria-label stays constant so the button's accessible name doesn't change.
+  const parentFolderLeavesRepository = !(visibleSelectedPathType !== 'none' && visibleSelectedPath)
+
   return (
     <>
       <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
@@ -1191,21 +1280,10 @@ export default function App() {
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
               onClick={handleNavigateParent}
               aria-label="Parent Folder"
-              title="Go to parent folder"
+              title={parentFolderLeavesRepository ? 'Leave this repository and browse its parent folder' : 'Go to parent folder'}
             >
               <ParentFolderIcon />
               Parent Folder
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={refreshingCurrentView}
-              onClick={() => { void refreshCurrentView() }}
-              aria-label="Refresh current page"
-            >
-              <RefreshIcon spinning={refreshingCurrentView} />
-              {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
             </Button>
             <Button
               type="button"
@@ -1218,6 +1296,46 @@ export default function App() {
               <TerminalIcon />
               Terminal
             </Button>
+            {!isRunningInNativeApp() ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" aria-label="View options">
+                    <ViewOptionsIcon />
+                    View options
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="gap-2"
+                    disabled={refreshingCurrentView}
+                    onSelect={() => { void refreshCurrentView() }}
+                  >
+                    <RefreshIcon spinning={refreshingCurrentView} />
+                    {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={hideDotfiles}
+                    onCheckedChange={(checked) => setHideDotfiles(checked === true)}
+                  >
+                    Hide Dotfiles
+                  </DropdownMenuCheckboxItem>
+                  {info?.isGitRepo ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup
+                        value={generatedLocalVisibility}
+                        onValueChange={(value) => setGeneratedLocalVisibility(value as GeneratedLocalVisibility)}
+                      >
+                        <DropdownMenuRadioItem value="hide">Tracked</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="show">All</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="only">Local</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
               <ThemeIcon darkMode={darkMode} />
               <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
@@ -1246,33 +1364,17 @@ export default function App() {
               </div>
             </aside>
           ) : (
-            <aside className="sidebar flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
-              <div className="sidebar-toolbar flex justify-end p-3 pb-2">
-                {info?.isGitRepo ? (
-                  <label className="generated-local-toggle">
-                    <span>Files</span>
-                    <select
-                      aria-label="Generated and local files visibility"
-                      value={generatedLocalVisibility}
-                      onChange={(event) => setGeneratedLocalVisibility(event.target.value as GeneratedLocalVisibility)}
-                    >
-                      <option value="hide">Tracked</option>
-                      <option value="show">All</option>
-                      <option value="only">Local</option>
-                    </select>
-                  </label>
-                ) : null}
-                <button
-                  type="button"
-                  className="panel-icon-button inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                  aria-label="Collapse navigation"
-                  title="Collapse navigation"
-                  onClick={() => setSidebarCollapsed(true)}
-                >
-                  <PanelToggleIcon collapsed={false} />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">
+            <aside className="sidebar relative flex w-[300px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]">
+              <button
+                type="button"
+                className="panel-icon-button sidebar-float-toggle absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] shadow-sm backdrop-blur transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                aria-label="Collapse navigation"
+                title="Collapse navigation"
+                onClick={() => setSidebarCollapsed(true)}
+              >
+                <PanelToggleIcon collapsed={false} />
+              </button>
+              <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
                 <FileTree
                   branch={currentBranch}
                   refreshToken={treeRefreshToken}
@@ -1280,6 +1382,7 @@ export default function App() {
                   selectedPathType={visibleSelectedPathType}
                   isGitRepo={info?.isGitRepo}
                   generatedLocalVisibility={generatedLocalVisibility}
+                  hideDotfiles={hideDotfiles}
                   onSelect={(path, type, localOnly) => {
                     if (type === 'dir') {
                       handleSelectFolder(path, localOnly)
@@ -1293,7 +1396,7 @@ export default function App() {
             </aside>
           )}
 
-          <main className="content-area flex min-w-0 flex-1 flex-col">
+          <main className="content-area flex min-h-0 min-w-0 flex-1 flex-col">
             {showDefaultReaderPrompt ? (
               <div className="border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--foreground)]" role="region" aria-label="Default Markdown reader setup">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1414,6 +1517,7 @@ export default function App() {
                     navigationHints={navigationHints}
                     recentItems={recentItems}
                     generatedLocalVisibility={generatedLocalVisibility}
+                    hideDotfiles={hideDotfiles}
                     onNavigate={handleSelectFile}
                     onOpenPath={(path, type, localOnly) => {
                       if (type === 'dir') {

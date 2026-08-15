@@ -631,14 +631,6 @@ pre {
   gap: 0.5rem;
 }
 
-.file-tree-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
 .file-tree {
   min-height: 0;
   flex: 1;
@@ -1309,24 +1301,6 @@ pre {
   gap: 0.5rem;
 }
 
-.dotfile-toggle {
-  display: inline-flex;
-  min-height: 2rem;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  padding: 0.35rem 0.6rem;
-  color: var(--foreground);
-  font-size: 0.8125rem;
-  line-height: 1;
-}
-
-.dotfile-toggle input {
-  margin: 0;
-}
-
 .dotfile-toggle-count {
   color: var(--muted-foreground);
   font-size: 0.75rem;
@@ -1628,13 +1602,17 @@ pre {
 }
 
 .picker-shell {
-  min-height: 100vh;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--background);
   color: var(--foreground);
 }
 
 .picker-shell > .app-header {
   height: 3rem;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--border);
   background: var(--header-bg);
   padding: 0 1rem;
@@ -1644,7 +1622,8 @@ pre {
 .picker-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  min-height: calc(100vh - 48px);
+  min-height: 0;
+  flex: 1;
 }
 
 .picker-layout-collapsed {
@@ -1663,19 +1642,9 @@ pre {
   flex-direction: column;
 }
 
-.picker-sidebar .sidebar-toolbar,
 .picker-sidebar-rail .sidebar-rail-toolbar {
   display: flex;
   padding: 0.75rem;
-}
-
-.picker-sidebar .sidebar-toolbar {
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 0.5rem;
-}
-
-.picker-sidebar-rail .sidebar-rail-toolbar {
   flex-direction: column;
   justify-content: center;
   gap: 0.45rem;
@@ -1704,30 +1673,13 @@ pre {
   color: var(--foreground);
 }
 
-.generated-local-toggle {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--muted-foreground);
-  font-size: 0.78rem;
-}
-
-.generated-local-toggle select {
-  min-width: 5.25rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  color: var(--foreground);
-  padding: 0.3rem 1.5rem 0.3rem 0.45rem;
-  font-size: 0.78rem;
-}
-
 .picker-file-tree {
   max-height: 100%;
 }
 
 .picker-main {
+  min-height: 0;
+  overflow-y: auto;
   padding: 1.25rem;
 }
 

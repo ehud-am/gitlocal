@@ -66,6 +66,7 @@ interface Props {
   navigationHints?: NavigationHintsResponse
   recentItems?: RecentItem[]
   generatedLocalVisibility?: GeneratedLocalVisibility
+  hideDotfiles?: boolean
   onNavigate: (path: string) => void
   onOpenPath: (path: string, type: 'file' | 'dir', localOnly: boolean) => void
   onDirtyChange?: (value: boolean) => void
@@ -109,10 +110,10 @@ function KebabIcon() {
   )
 }
 
-function CloseIcon() {
+function BackToFolderIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9.5 3L4.5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -221,6 +222,7 @@ export default function ContentPanel({
   navigationHints,
   recentItems = [],
   generatedLocalVisibility = 'hide',
+  hideDotfiles = false,
   onNavigate,
   onOpenPath,
   onDirtyChange,
@@ -248,7 +250,6 @@ export default function ContentPanel({
   const [fileFindQuery, setFileFindQuery] = useState('')
   const [fileFindCaseSensitive, setFileFindCaseSensitive] = useState(false)
   const [activeFileFindIndex, setActiveFileFindIndex] = useState(0)
-  const [showDotfiles, setShowDotfiles] = useState(true)
   const fileFindInputRef = useRef<HTMLInputElement | null>(null)
   const panelRootRef = useRef<HTMLDivElement | null>(null)
   const selectionRootRef = useRef<HTMLElement | null>(null)
@@ -561,7 +562,7 @@ export default function ContentPanel({
       return tracked || activeException
     })
 
-    if (showDotfiles) return generatedFilteredEntries
+    if (!hideDotfiles) return generatedFilteredEntries
     return generatedFilteredEntries.filter((entry) => {
       const activeException = Boolean(selectedPath && (entry.path === selectedPath || selectedPath.startsWith(`${entry.path}/`)))
       return !entry.name.startsWith('.') || activeException
@@ -659,9 +660,9 @@ export default function ContentPanel({
       ? (emptyStateDetail ?? placeholder ?? 'This repository does not have any visible files yet.')
       : `This folder does not have any visible files or folders yet.`
     const visibleEntries = filterVisibleEntries(entries)
-    const hiddenDotfileCount = showDotfiles
-      ? 0
-      : entries.filter((entry) => entry.name.startsWith('.') && !visibleEntries.some((visibleEntry) => visibleEntry.path === entry.path)).length
+    const hiddenDotfileCount = hideDotfiles
+      ? entries.filter((entry) => entry.name.startsWith('.') && !visibleEntries.some((visibleEntry) => visibleEntry.path === entry.path)).length
+      : 0
     const rows: DirectoryRow[] = visibleEntries.map((entry) => ({
       ...entry,
       displayPath: entry.path,
@@ -702,14 +703,6 @@ export default function ContentPanel({
                 </div>
               </div>
               <div className="content-directory-controls">
-                <label className="dotfile-toggle">
-                  <input
-                    type="checkbox"
-                    checked={!showDotfiles}
-                    onChange={(event) => setShowDotfiles(!event.target.checked)}
-                  />
-                  <span>Hide .* files</span>
-                </label>
                 {hiddenDotfileCount > 0 ? (
                   <span className="dotfile-toggle-count">{hiddenDotfileCount} hidden</span>
                 ) : null}
@@ -1016,6 +1009,20 @@ export default function ContentPanel({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!confirmDiscardIfNeeded()) return
+              onOpenPath(parentPathOf(selectedPath), 'dir', false)
+            }}
+            aria-label="Back to folder"
+            title="Back to folder"
+          >
+            <BackToFolderIcon />
+            Back to folder
+          </Button>
           {mode === 'view' ? (
             <>
             {canSearchCurrentFile ? (
@@ -1116,18 +1123,6 @@ export default function ContentPanel({
             ) : null}
             </>
           ) : null}
-          <button
-            type="button"
-            className="panel-icon-button content-close-trigger"
-            aria-label="Close file and return to folder"
-            title="Close file"
-            onClick={() => {
-              if (!confirmDiscardIfNeeded()) return
-              onOpenPath(parentPathOf(selectedPath), 'dir', false)
-            }}
-          >
-            <CloseIcon />
-          </button>
         </div>
       </div>
 

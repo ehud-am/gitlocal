@@ -1,11 +1,35 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join, delimiter } from 'node:path'
 import { tmpdir } from 'node:os'
-import { isPtySupported, isCliAvailable, detectCapabilities } from '../../../src/terminal/cli-detection.js'
 
 // T035 (US4): PATH-based CLI detection, used by src/handlers/terminal.ts's pre-flight check
 // (FR-010) and the /api/terminal/capabilities endpoint.
+// 034-patch-bugfixes/US2: detectCapabilities() also falls back to a login-shell probe
+// (execFileSync) when the raw PATH walk misses, since the server process doesn't inherit
+// shell-profile-sourced PATH extensions (nvm, ~/.zshrc exports, etc.).
+
+const execFileSyncMock = vi.fn()
+vi.mock('node:child_process', () => ({
+  execFileSync: (...args: unknown[]) => execFileSyncMock(...args),
+}))
+
+// Lets the detectCapabilities tests force the raw PATH walk to always miss, deterministically
+// exercising the login-shell fallback regardless of this environment's real PATH contents.
+let forceAccessSyncMiss = false
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    accessSync: (...args: Parameters<typeof actual.accessSync>) => {
+      if (forceAccessSyncMiss) throw new Error('ENOENT')
+      return actual.accessSync(...args)
+    },
+  }
+})
+
+const { isPtySupported, isCliAvailable, isCliAvailableViaLoginShell, detectCapabilities, resetLoginShellProbeCache } =
+  await import('../../../src/terminal/cli-detection.js')
 
 describe('isPtySupported', () => {
   it('recognizes the platforms node-pty ships prebuilds for', () => {
@@ -82,6 +106,19 @@ describe('isCliAvailable', () => {
 })
 
 describe('detectCapabilities', () => {
+  beforeEach(() => {
+    forceAccessSyncMiss = true
+    resetLoginShellProbeCache()
+    execFileSyncMock.mockReset()
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('command not found')
+    })
+  })
+
+  afterEach(() => {
+    forceAccessSyncMiss = false
+  })
+
   it('reports pty support alongside claude/codex CLI availability', () => {
     const capabilities = detectCapabilities()
     expect(capabilities).toEqual({
@@ -89,5 +126,79 @@ describe('detectCapabilities', () => {
       claudeCliFound: expect.any(Boolean),
       codexCliFound: expect.any(Boolean),
     })
+  })
+
+  it('falls back to a login-shell probe when the raw PATH walk misses the CLI (US2)', () => {
+    execFileSyncMock.mockImplementation((_shell, args) => {
+      const probe = String(args?.[1] ?? '')
+      if (probe.includes('claude')) return Buffer.from('/opt/nvm/bin/claude\n')
+      throw new Error('command not found')
+    })
+
+    const capabilities = detectCapabilities()
+
+    expect(capabilities.claudeCliFound).toBe(true)
+    expect(execFileSyncMock).toHaveBeenCalled()
+  })
+
+  it('reports codex as found via the same login-shell fallback (FR-002 acceptance scenario 2)', () => {
+    execFileSyncMock.mockImplementation((_shell, args) => {
+      const probe = String(args?.[1] ?? '')
+      if (probe.includes('codex')) return Buffer.from('/opt/nvm/bin/codex\n')
+      throw new Error('command not found')
+    })
+
+    expect(detectCapabilities().codexCliFound).toBe(true)
+  })
+
+  it('fails closed when the login-shell probe throws (no false positive, FR-003)', () => {
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('command not found')
+    })
+
+    const capabilities = detectCapabilities()
+
+    expect(capabilities.claudeCliFound).toBe(false)
+    expect(capabilities.codexCliFound).toBe(false)
+  })
+
+  it('fails closed when the login-shell probe times out', () => {
+    execFileSyncMock.mockImplementation(() => {
+      const error = new Error('ETIMEDOUT') as Error & { code?: string }
+      error.code = 'ETIMEDOUT'
+      throw error
+    })
+
+    expect(detectCapabilities().claudeCliFound).toBe(false)
+  })
+
+  it('caches a login-shell probe result instead of re-spawning a shell on every call', () => {
+    execFileSyncMock.mockImplementation((_shell, args) => {
+      const probe = String(args?.[1] ?? '')
+      if (probe.includes('claude')) return Buffer.from('/opt/nvm/bin/claude\n')
+      throw new Error('command not found')
+    })
+
+    expect(detectCapabilities().claudeCliFound).toBe(true)
+    const callsAfterFirst = execFileSyncMock.mock.calls.length
+
+    // Even though the mock would now report claude as missing, the cached "found" result from
+    // the first call is reused instead of re-probing.
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('command not found')
+    })
+    expect(detectCapabilities().claudeCliFound).toBe(true)
+    expect(execFileSyncMock.mock.calls.length).toBe(callsAfterFirst)
+  })
+
+  it('never interpolates an unsafe command name into the shell probe (defense-in-depth)', () => {
+    // Called only with the fixed literals 'claude'/'codex' today via detectCapabilities(), but
+    // this guards isCliAvailableViaLoginShell itself against ever becoming a shell-injection
+    // vector if it's later generalized to an externally-influenced command name.
+    execFileSyncMock.mockImplementation(() => Buffer.from('/usr/bin/claude\n'))
+
+    expect(isCliAvailableViaLoginShell("claude'; rm -rf /", 'linux')).toBe(false)
+    expect(isCliAvailableViaLoginShell('claude && echo pwned', 'linux')).toBe(false)
+    expect(execFileSyncMock).not.toHaveBeenCalled()
   })
 })

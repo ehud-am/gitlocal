@@ -28,6 +28,7 @@ const DEFAULTS: ViewerState = {
   pathType: 'none',
   raw: false,
   sidebarCollapsed: false,
+  hideDotfiles: false,
   generatedLocalVisibility: 'hide',
   searchRootPath: '',
   searchContentKind: 'all',
@@ -102,6 +103,7 @@ export function readViewerState(): ViewerState {
           : DEFAULTS.pathType,
     raw: parseBoolean(params.get('raw'), DEFAULTS.raw),
     sidebarCollapsed: parseBoolean(params.get('sidebarCollapsed'), DEFAULTS.sidebarCollapsed),
+    hideDotfiles: parseBoolean(params.get('hideDotfiles'), DEFAULTS.hideDotfiles),
     generatedLocalVisibility: parseGeneratedLocalVisibility(params.get('generatedLocalVisibility')),
     searchRootPath: params.get('searchRootPath') ?? DEFAULTS.searchRootPath,
     searchContentKind: parseSearchContentKind(params.get('searchContentKind')),
@@ -124,6 +126,7 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
   if (next.pathType !== DEFAULTS.pathType) params.set('pathType', next.pathType)
   if (next.raw) params.set('raw', 'true')
   if (next.sidebarCollapsed) params.set('sidebarCollapsed', 'true')
+  if (next.hideDotfiles) params.set('hideDotfiles', 'true')
   if (next.generatedLocalVisibility !== DEFAULTS.generatedLocalVisibility) params.set('generatedLocalVisibility', next.generatedLocalVisibility)
   if (next.searchRootPath) params.set('searchRootPath', next.searchRootPath)
   if (next.searchContentKind !== DEFAULTS.searchContentKind) params.set('searchContentKind', next.searchContentKind)

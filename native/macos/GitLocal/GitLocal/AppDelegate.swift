@@ -174,6 +174,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         shareMarkdownItem.target = controller
         viewMenu.addItem(shareMarkdownItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        let toggleTerminalItem = NSMenuItem(
+            title: "Toggle Terminal",
+            action: #selector(ViewerWindowController.toggleTerminal(_:)),
+            keyEquivalent: "`"
+        )
+        toggleTerminalItem.keyEquivalentModifierMask = [.control]
+        toggleTerminalItem.target = controller
+        viewMenu.addItem(toggleTerminalItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        let toggleDotfilesItem = NSMenuItem(
+            title: "Hide Dotfiles",
+            action: #selector(ViewerWindowController.toggleDotfiles(_:)),
+            keyEquivalent: "."
+        )
+        toggleDotfilesItem.keyEquivalentModifierMask = [.command, .shift]
+        toggleDotfilesItem.target = controller
+        // Matches DEFAULTS.hideDotfiles (false) in ui/src/services/viewerState.ts, so the checkmark
+        // is already correct for a fresh viewer before the page's first dotfiles-state round-trip.
+        toggleDotfilesItem.state = .off
+        viewMenu.addItem(toggleDotfilesItem)
+        controller.dotfilesMenuItem = toggleDotfilesItem
+        viewMenu.addItem(NSMenuItem.separator())
+        let trackedVisibilityItem = NSMenuItem(title: "Tracked/All/Local", action: nil, keyEquivalent: "")
+        let trackedVisibilityMenu = NSMenu(title: "Tracked/All/Local")
+        let trackedItem = NSMenuItem(
+            title: "Tracked",
+            action: #selector(ViewerWindowController.setTrackedVisibilityHide(_:)),
+            keyEquivalent: ""
+        )
+        trackedItem.target = controller
+        // Matches DEFAULTS.generatedLocalVisibility ('hide') in ui/src/services/viewerState.ts, so
+        // the checkmark is already correct for a fresh viewer before the page's first
+        // tracked-visibility-state round-trip.
+        trackedItem.state = .on
+        trackedVisibilityMenu.addItem(trackedItem)
+        controller.trackedVisibilityHideItem = trackedItem
+        let allFilesItem = NSMenuItem(
+            title: "All",
+            action: #selector(ViewerWindowController.setTrackedVisibilityShow(_:)),
+            keyEquivalent: ""
+        )
+        allFilesItem.target = controller
+        allFilesItem.state = .off
+        trackedVisibilityMenu.addItem(allFilesItem)
+        controller.trackedVisibilityShowItem = allFilesItem
+        let localOnlyItem = NSMenuItem(
+            title: "Local",
+            action: #selector(ViewerWindowController.setTrackedVisibilityOnly(_:)),
+            keyEquivalent: ""
+        )
+        localOnlyItem.target = controller
+        localOnlyItem.state = .off
+        trackedVisibilityMenu.addItem(localOnlyItem)
+        controller.trackedVisibilityOnlyItem = localOnlyItem
+        trackedVisibilityItem.submenu = trackedVisibilityMenu
+        viewMenu.addItem(trackedVisibilityItem)
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 

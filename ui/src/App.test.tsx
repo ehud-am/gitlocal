@@ -141,6 +141,16 @@ function renderWithClient() {
   )
 }
 
+async function clickRefreshViaViewOptions() {
+  await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: /^refresh$/i }))
+}
+
+async function selectTrackedVisibility(name: RegExp) {
+  await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+  fireEvent.click(await screen.findByRole('menuitemradio', { name }))
+}
+
 describe('App', () => {
   const getItem = vi.fn()
   const setItem = vi.fn()
@@ -373,6 +383,15 @@ describe('App', () => {
     expect(screen.getByText('https://github.com/ehud-am/gitlocal')).toBeInTheDocument()
     expect(screen.getByText(/local user <local@example.com>/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'https://github.com/ehud-am/gitlocal' })).toBeInTheDocument()
+  })
+
+  it('keeps the content area shrinkable so the folder/file view can scroll independently of the terminal panel', async () => {
+    renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+    const contentArea = document.querySelector('main.content-area')
+    expect(contentArea).toHaveClass('min-h-0')
   })
 
   it('asks for default Markdown reader setup only after the native app announces support', async () => {
@@ -798,7 +817,7 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByText('guide content')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
 
     expect(await screen.findByText(/current view refreshed/i)).toBeInTheDocument()
     expect(await screen.findByText('guide content')).toBeInTheDocument()
@@ -889,7 +908,7 @@ describe('App', () => {
     renderWithClient()
 
     expect(await screen.findByText(/up to date/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
 
     expect(await screen.findByText(/1 local change/i)).toBeInTheDocument()
     expect(screen.queryByText(/up to date/i)).not.toBeInTheDocument()
@@ -901,34 +920,193 @@ describe('App', () => {
     })
   })
 
-  it('shows an icon on the Refresh control', async () => {
+  it('routes the toggle-terminal native command to the terminal panel toggle, same as clicking the toolbar button', async () => {
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'toggle-terminal' },
+    }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('toggles dotfile visibility for both FileTree and ContentPanel from the View options toolbar control, and persists it', async () => {
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
+      if (path === 'docs') {
+        return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+      }
+
+      return [
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+        { name: '.env', path: '.env', type: 'file', localOnly: false },
+      ]
+    })
+
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    expect(await within(tree).findByText('.env')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open file \.env/i })).toBeInTheDocument()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /hide dotfiles/i }))
+
+    await waitFor(() => {
+      expect(within(tree).queryByText('.env')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /open file \.env/i })).not.toBeInTheDocument()
+    })
+    expect(window.location.search).toContain('hideDotfiles=true')
+  })
+
+  it('flips the shared dotfile-visibility state from the toggle-dotfiles native command and syncs the state back to native', async () => {
+    const postMessage = vi.fn()
+    Object.defineProperty(window, 'webkit', {
+      value: { messageHandlers: { gitlocalNative: { postMessage } } },
+      configurable: true,
+    })
+
+    vi.mocked(api.getTree).mockImplementation(async (path?: string) => {
+      if (path === 'docs') {
+        return [{ name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false }]
+      }
+
+      return [
+        { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+        { name: '.env', path: '.env', type: 'file', localOnly: false },
+      ]
+    })
+
+    renderWithClient()
+    await screen.findByRole('heading', { name: 'repo' })
+
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    await within(tree).findByText('.env')
+
+    postMessage.mockClear()
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'toggle-dotfiles' },
+    }))
+
+    await waitFor(() => {
+      expect(within(tree).queryByText('.env')).not.toBeInTheDocument()
+    })
+    expect(postMessage).toHaveBeenCalledWith({ command: 'dotfiles-state', value: 'true' })
+  })
+
+  it('does not render an inline Tracked/All/Local dropdown in the sidebar toolbar', async () => {
     renderWithClient()
 
-    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
+    await screen.findByRole('heading', { name: 'repo' })
+    expect(screen.queryByLabelText(/generated and local files visibility/i)).not.toBeInTheDocument()
+  })
+
+  it('updates generatedLocalVisibility from the View options Tracked/All/Local selector', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient()
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    expect(within(tree).getByText('README.md')).toBeInTheDocument()
+
+    await selectTrackedVisibility(/^local$/i)
+
+    await waitFor(() => {
+      expect(within(tree).getByText('dist')).toBeInTheDocument()
+    })
+    expect(within(tree).queryByText('README.md')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['show', 'hide', ['README.md']],
+    ['hide', 'show', ['README.md', 'dist']],
+    ['hide', 'only', ['dist']],
+  ] as const)('applies %s -> %s from the set-tracked-visibility native command and syncs the state back to native', async (initial, target, visibleAfter) => {
+    window.history.replaceState(null, '', `/?generatedLocalVisibility=${initial}`)
+    const postMessage = vi.fn()
+    Object.defineProperty(window, 'webkit', {
+      value: { messageHandlers: { gitlocalNative: { postMessage } } },
+      configurable: true,
+    })
+
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
+      { name: 'dist', path: 'dist', type: 'dir', localOnly: true, generatedLocalState: 'generated' },
+    ])
+
+    renderWithClient()
+    const tree = await screen.findByRole('tree', { name: /repository files/i })
+    await within(tree).findByText('README.md')
+
+    postMessage.mockClear()
+    window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+      detail: { command: 'set-tracked-visibility', message: target },
+    }))
+
+    await waitFor(() => {
+      for (const name of ['README.md', 'dist'] as const) {
+        if ((visibleAfter as readonly string[]).includes(name)) {
+          expect(within(tree).getByText(name)).toBeInTheDocument()
+        } else {
+          expect(within(tree).queryByText(name)).not.toBeInTheDocument()
+        }
+      }
+    })
+    expect(postMessage).toHaveBeenCalledWith({ command: 'tracked-visibility-state', value: target })
+  })
+
+  it('does not render a Refresh button in the top toolbar', async () => {
+    renderWithClient()
+
+    await screen.findByRole('button', { name: /toggle terminal/i })
+    expect(screen.queryByRole('button', { name: /refresh current page/i })).not.toBeInTheDocument()
+  })
+
+  it('shows an icon on the Refresh action in the View options menu', async () => {
+    renderWithClient()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /view options/i }))
+    const refresh = await screen.findByRole('menuitem', { name: /^refresh$/i })
     expect(refresh.querySelector('svg')).toBeInTheDocument()
   })
 
-  it('renders Refresh and Parent Folder as plain/low-emphasis and Terminal as a highlighted control', async () => {
+  it('renders Parent Folder as a plain/low-emphasis control and Terminal as a highlighted control', async () => {
     renderWithClient()
 
-    const refresh = await screen.findByRole('button', { name: /refresh current page/i })
     const terminal = await screen.findByRole('button', { name: /toggle terminal/i })
     const [parentFolder] = await screen.findAllByRole('button', { name: 'Parent Folder' })
 
-    expect(refresh.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
     expect(parentFolder.className).toContain('text-[var(--muted-foreground)] hover:bg-[var(--muted)]')
     expect(terminal.className).toContain('text-[var(--success)]')
   })
 
-  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Refresh, Terminal', async () => {
+  it('orders toolbar buttons from most page-specific to most global: Parent Folder, Terminal', async () => {
     renderWithClient()
 
     const toolbarButtons = await screen.findAllByRole('button', {
-      name: /^parent folder$|refresh current page|toggle terminal/i,
+      name: /^parent folder$|toggle terminal/i,
     })
     expect(toolbarButtons[0]).toHaveAccessibleName('Parent Folder')
-    expect(toolbarButtons[1]).toHaveAccessibleName(/refresh current page/i)
-    expect(toolbarButtons[2]).toHaveAccessibleName(/toggle terminal/i)
+    expect(toolbarButtons[1]).toHaveAccessibleName(/toggle terminal/i)
+  })
+
+  it('calls refreshCurrentView from the Ctrl+Alt+R shortcut', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    renderWithClient()
+
+    await screen.findByText('guide content')
+    vi.mocked(api.getFile).mockClear()
+
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
+
+    await waitFor(() => {
+      expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false)
+    })
   })
 
   it('toggles the theme and persists the preference', async () => {
@@ -1191,7 +1369,7 @@ describe('App', () => {
     expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
     expect(api.getFile).not.toHaveBeenCalledWith('README.md', 'main', false)
 
-    fireEvent.click(screen.getByRole('button', { name: /refresh current page/i }))
+    await clickRefreshViaViewOptions()
     expect(screen.queryByText(/refreshing current view/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/edit file content/i)).toHaveValue('dirty guide')
 
@@ -1265,7 +1443,7 @@ describe('App', () => {
 
     expect(await screen.findByText(/2 local changes/i)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /repository status summary/i })).not.toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'show' } })
+    await selectTrackedVisibility(/^all$/i)
 
     await waitFor(() => {
       expect(api.getNavigationHints).toHaveBeenCalledWith('main', true, true)
@@ -1282,7 +1460,7 @@ describe('App', () => {
 
     const tree = await screen.findByRole('tree', { name: /repository files/i })
     expect(within(tree).getByText('README.md')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/generated and local files visibility/i), { target: { value: 'only' } })
+    await selectTrackedVisibility(/^local$/i)
 
     await waitFor(() => {
       expect(within(tree).getByText('dist')).toBeInTheDocument()
@@ -1537,6 +1715,30 @@ describe('App', () => {
 
     expect(await screen.findByText(/choose what gitlocal should open/i)).toBeInTheDocument()
     expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
+  })
+
+  it('toggles the theme from the picker page header', async () => {
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: '',
+      path: '/tmp',
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: true,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
+      gitContext: null,
+    })
+
+    renderWithClient()
+
+    const toggle = await screen.findByRole('switch', { name: /toggle dark theme/i })
+    fireEvent.click(toggle)
+
+    await waitFor(() => {
+      expect(setItem).toHaveBeenCalledWith('gitlocal-theme', 'dark')
+    })
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
   it('shows a failure screen with a retry action instead of the app shell when the bootstrap info fetch fails', async () => {

@@ -10,7 +10,10 @@ This contract defines user-visible behavior for macOS native app commands. It is
 | Cut | Command-X | Yes | Selected editable text | Selected text is removed and placed on the clipboard |
 | Paste | Command-V | Yes | Focused editable text field | Clipboard text is inserted at the cursor or selection |
 | Find | Command-F | Yes | Visible preview panel | Preview-scoped find opens or focuses |
-| Refresh | Command-R | Yes | Current app view | Current repository view reloads from local state |
+| Refresh | Command-R (native) / Control-Option-R (browser) | Yes | Current app view | Current repository view reloads from local state; same shortcut works in both distributions in the browser, since Command-R/Control-R is reserved by every browser for page reload |
+| Toggle Terminal | Control-\` (both distributions, identical) | Yes (native only; already implemented in the browser) | Any | Terminal panel opens if hidden/closed, hides if visible. Not Command-T: browsers reserve Command-T/Control-T for opening a new tab, so it cannot be intercepted there. |
+| Hide Dotfiles | Command-Shift-. (native only) | Yes (native); single toolbar control (browser) | Sidebar file tree and content panel folder/git views | Toggles a single shared setting; both views update together. Matches macOS Finder's own convention for the same action. |
+| Tracked/All/Local | None (native menu submenu; single toolbar control in browser) | Yes | Sidebar file tree and content panel folder/git views | Selecting a value filters both views identically to the removed inline dropdown. |
 
 ## Behavioral Rules
 
@@ -19,6 +22,7 @@ This contract defines user-visible behavior for macOS native app commands. It is
 - Find must search only the visible preview panel and must not match sidebar, toolbar, navigation, menu, or dialog text.
 - Refresh must not restart the native app or require the user to reselect the repository when the current context remains valid.
 - Unsupported command invocations must fail quietly or remain disabled; they must not corrupt text, change unrelated app state, or crash the app.
+- No shortcut may be assigned that a major browser or macOS itself reserves and won't deliver to page JavaScript (e.g. Command-T/Control-T for new tab, Command-R/Control-R for reload, Command-\` for window cycling) — added in 034-patch-bugfixes after discovering Command-T could not be wired for the terminal toggle.
 
 ## Acceptance Fixtures
 

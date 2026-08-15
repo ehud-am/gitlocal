@@ -6,6 +6,7 @@ import type { SyncStatus } from './types'
 
 const readViewerState = vi.fn()
 const writeViewerState = vi.fn()
+const resetViewerState = vi.fn()
 const applyTheme = vi.fn()
 const writeStoredTheme = vi.fn()
 const getInitialTheme = vi.fn(() => 'light')
@@ -13,6 +14,7 @@ const getInitialTheme = vi.fn(() => 'light')
 vi.mock('./services/viewerState', () => ({
   readViewerState: () => readViewerState(),
   writeViewerState: (...args: unknown[]) => writeViewerState(...args),
+  resetViewerState: () => resetViewerState(),
   readRecentItems: () => [],
   rememberRecentItem: vi.fn((item) => item),
   rememberRecentChangedItems: vi.fn((items) => items),
