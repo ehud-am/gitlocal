@@ -1717,6 +1717,30 @@ describe('App', () => {
     expect(screen.getByText(`v${APP_VERSION.version}`)).toBeInTheDocument()
   })
 
+  it('toggles the theme from the picker page header', async () => {
+    vi.mocked(api.getInfo).mockResolvedValueOnce({
+      name: '',
+      path: '/tmp',
+      currentBranch: '',
+      isGitRepo: false,
+      pickerMode: true,
+      version: APP_VERSION.version,
+      hasCommits: false,
+      rootEntryCount: 0,
+      gitContext: null,
+    })
+
+    renderWithClient()
+
+    const toggle = await screen.findByRole('switch', { name: /toggle dark theme/i })
+    fireEvent.click(toggle)
+
+    await waitFor(() => {
+      expect(setItem).toHaveBeenCalledWith('gitlocal-theme', 'dark')
+    })
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
   it('shows a failure screen with a retry action instead of the app shell when the bootstrap info fetch fails', async () => {
     vi.mocked(api.getInfo).mockReset()
     vi.mocked(api.getInfo).mockRejectedValueOnce({ error: 'Permission was denied while accessing this path.', code: 'PERMISSION_DENIED' })

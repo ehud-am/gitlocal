@@ -4,6 +4,20 @@ import { writeViewerState } from '../../services/viewerState'
 import type { FolderBrowseEntry, StartupFolderSource } from '../../types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { MetaTag } from '../ui/meta-tag'
+import { Switch } from '../ui/switch'
+
+function ThemeIcon({ darkMode }: { darkMode: boolean }) {
+  return darkMode ? (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M9.5 2.25A5.75 5.75 0 1 0 13.75 10A4.75 4.75 0 0 1 9.5 2.25z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M12.6 3.4l-.9.9M4.3 11.7l-.9.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 function KebabIcon() {
   return (
@@ -51,7 +65,12 @@ function ChevronIcon() {
   )
 }
 
-export default function PickerPage() {
+type PickerPageProps = {
+  darkMode?: boolean
+  onToggleTheme?: (checked: boolean) => void
+}
+
+export default function PickerPage({ darkMode = false, onToggleTheme = () => {} }: PickerPageProps) {
   const [path, setPath] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -255,6 +274,13 @@ export default function PickerPage() {
           <span className="logo">GitLocal</span>
         </span>
         <span className="repo-name">Open local folder</span>
+        <div className="ml-auto flex items-center gap-2">
+          <label className="inline-flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--foreground)] shadow-sm">
+            <ThemeIcon darkMode={darkMode} />
+            <span>{darkMode ? 'Dark theme' : 'Light theme'}</span>
+            <Switch checked={darkMode} aria-label="Toggle dark theme" onCheckedChange={onToggleTheme} />
+          </label>
+        </div>
       </header>
       <div className={`picker-layout${sidebarCollapsed ? ' picker-layout-collapsed' : ''}`}>
         {sidebarCollapsed ? (

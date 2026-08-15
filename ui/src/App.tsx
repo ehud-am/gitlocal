@@ -1216,10 +1216,12 @@ export default function App() {
     )
   }
 
+  const darkMode = theme === 'dark'
+
   if (info?.pickerMode) {
     return (
       <>
-        <PickerPage />
+        <PickerPage darkMode={darkMode} onToggleTheme={(checked) => setTheme(checked ? 'dark' : 'light')} />
         <AppFooter version={info.version} />
       </>
     )
@@ -1232,7 +1234,6 @@ export default function App() {
   const visibleSelectedPathLocalOnly = hasRepoMismatch || startupOpenTargetPending || startupOpenTargetBlocksSavedSelection ? false : selectedPathLocalOnly
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
-  const darkMode = theme === 'dark'
 
   let emptyStateTitle: string | undefined
   let emptyStateDetail: string | undefined
