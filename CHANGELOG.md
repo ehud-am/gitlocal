@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.2 - 2026-08-15
+
+- Fixed the folder/content view losing the ability to scroll to the last entry depending on the terminal panel's visibility, expanded/collapsed state, or height.
+- Fixed Claude and Codex terminal tabs failing to launch with a "not found on PATH" error when the CLI is only resolvable via shell profile scripts (e.g. `~/.zshrc`/`~/.bashrc`), by resolving them the same way an interactive login shell would; a genuinely missing CLI still shows the existing error.
+- Added a Ctrl+\` terminal-toggle shortcut and a matching native macOS "Toggle Terminal" menu item.
+- Unified dotfile visibility ("Hide .* files") into a single global setting driving both the sidebar file tree and the content panel, replacing two independent, unsynchronized toggles; exposed via a native app-menu item (macOS) or a single toolbar "View options" control (browser).
+- Moved Refresh into the "View options" control/native menu behind a Ctrl+Alt+R shortcut, removing the standalone toolbar Refresh button while keeping it reachable via shortcut and a non-keyboard-only control in the browser distribution.
+- Moved the Tracked/All/Local files-visibility selector out of the sidebar and into the same "View options" control/native menu.
+- Fixed the folder picker (used when browsing outside a repository) losing independent scrolling in its sidebar and main panes, floated its sidebar collapse toggle to match the main app, and added a "Parent Folder" button to its header.
+
 ## 0.10.1 - 2026-08-09
 
 - Restructured the repository block into two lines (name, search, and branch selection on line 1; tags, root, and readme on line 2) so the repository name is no longer clipped on narrower windows, and reduced its internal spacing.
