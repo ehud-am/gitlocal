@@ -33,6 +33,7 @@ import {
   readViewerState,
   rememberRecentChangedItems,
   rememberRecentItem,
+  resetViewerState,
   writeDefaultReaderPromptPreference,
   writeViewerState,
 } from './services/viewerState'
@@ -841,6 +842,7 @@ export default function App() {
     try {
       const result = await api.showParentFolder()
       if (result.ok) {
+        resetViewerState()
         window.location.reload()
         return
       }
