@@ -39,18 +39,46 @@ export function isCliAvailable(
   return false
 }
 
-// Falls back to sourcing the user's shell profile (~/.zshrc, ~/.bashrc, nvm, etc.) when a plain
-// PATH walk misses, since that's how a command typed into a Regular terminal tab actually
-// resolves. Fails closed on any error/timeout — never treat a probe failure as "found".
-function isCliAvailableViaLoginShell(command: string, platform: NodeJS.Platform): boolean {
-  if (!LOGIN_SHELL_PROBE_PLATFORMS.has(platform)) return false
+// Only ever called with the fixed literals 'claude'/'codex' today, but this guards the
+// interpolation below against ever becoming a shell-injection vector if this helper is later
+// generalized to an externally-influenced command name.
+const SAFE_COMMAND_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+
+// The login-shell probe (~/.zshrc, ~/.bashrc, nvm, etc.) spawns a real shell and can take up to
+// its timeout to resolve, so results are cached briefly to avoid re-paying that cost on every
+// terminal-tab-open/capabilities check. A short TTL still picks up a CLI installed mid-session.
+const LOGIN_SHELL_PROBE_TTL_MS = 30_000
+const loginShellProbeCache = new Map<string, { value: boolean; expiresAt: number }>()
+
+export function resetLoginShellProbeCache(): void {
+  loginShellProbeCache.clear()
+}
+
+function probeLoginShell(command: string): boolean {
   const shell = process.env.SHELL || '/bin/sh'
   try {
-    execFileSync(shell, ['-ilc', `command -v ${command}`], { timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] })
+    execFileSync(shell, ['-ilc', `command -v -- '${command}'`], { timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] })
     return true
   } catch {
     return false
   }
+}
+
+// Falls back to sourcing the user's shell profile when a plain PATH walk misses, since that's
+// how a command typed into a Regular terminal tab actually resolves. Fails closed on any
+// error/timeout, unsupported platform, or unsafe command name — never treat a probe failure (or
+// a name we won't interpolate into a shell string) as "found".
+export function isCliAvailableViaLoginShell(command: string, platform: NodeJS.Platform): boolean {
+  if (!LOGIN_SHELL_PROBE_PLATFORMS.has(platform)) return false
+  if (!SAFE_COMMAND_NAME.test(command)) return false
+
+  const cached = loginShellProbeCache.get(command)
+  const now = Date.now()
+  if (cached && cached.expiresAt > now) return cached.value
+
+  const value = probeLoginShell(command)
+  loginShellProbeCache.set(command, { value, expiresAt: now + LOGIN_SHELL_PROBE_TTL_MS })
+  return value
 }
 
 export function detectCapabilities(): TerminalCapabilities {

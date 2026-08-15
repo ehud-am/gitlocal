@@ -631,14 +631,6 @@ pre {
   gap: 0.5rem;
 }
 
-.file-tree-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
 .file-tree {
   min-height: 0;
   flex: 1;
@@ -1307,24 +1299,6 @@ pre {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-}
-
-.dotfile-toggle {
-  display: inline-flex;
-  min-height: 2rem;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  padding: 0.35rem 0.6rem;
-  color: var(--foreground);
-  font-size: 0.8125rem;
-  line-height: 1;
-}
-
-.dotfile-toggle input {
-  margin: 0;
 }
 
 .dotfile-toggle-count {

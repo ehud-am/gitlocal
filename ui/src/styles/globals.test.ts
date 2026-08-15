@@ -32,10 +32,9 @@ describe('global responsive layout styles', () => {
     expect(css).toContain('white-space: pre-wrap')
   })
 
-  it('defines compact folder page controls for dotfile filtering', () => {
+  it('defines folder page layout styles, including the hidden-dotfile count next to the View options dropdown', () => {
     expect(css).toContain('.content-directory-controls')
-    expect(css).toContain('.dotfile-toggle')
-    expect(css).toContain('min-height: 2rem')
+    expect(css).toContain('.dotfile-toggle-count')
     expect(css).toContain('.content-no-readme-panel')
     expect(css).toContain('.file-tree-shell')
   })

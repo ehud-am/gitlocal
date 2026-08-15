@@ -28,7 +28,8 @@ vi.mock('node:fs', async (importOriginal) => {
   }
 })
 
-const { isPtySupported, isCliAvailable, detectCapabilities } = await import('../../../src/terminal/cli-detection.js')
+const { isPtySupported, isCliAvailable, isCliAvailableViaLoginShell, detectCapabilities, resetLoginShellProbeCache } =
+  await import('../../../src/terminal/cli-detection.js')
 
 describe('isPtySupported', () => {
   it('recognizes the platforms node-pty ships prebuilds for', () => {
@@ -107,6 +108,7 @@ describe('isCliAvailable', () => {
 describe('detectCapabilities', () => {
   beforeEach(() => {
     forceAccessSyncMiss = true
+    resetLoginShellProbeCache()
     execFileSyncMock.mockReset()
     execFileSyncMock.mockImplementation(() => {
       throw new Error('command not found')
@@ -168,5 +170,35 @@ describe('detectCapabilities', () => {
     })
 
     expect(detectCapabilities().claudeCliFound).toBe(false)
+  })
+
+  it('caches a login-shell probe result instead of re-spawning a shell on every call', () => {
+    execFileSyncMock.mockImplementation((_shell, args) => {
+      const probe = String(args?.[1] ?? '')
+      if (probe.includes('claude')) return Buffer.from('/opt/nvm/bin/claude\n')
+      throw new Error('command not found')
+    })
+
+    expect(detectCapabilities().claudeCliFound).toBe(true)
+    const callsAfterFirst = execFileSyncMock.mock.calls.length
+
+    // Even though the mock would now report claude as missing, the cached "found" result from
+    // the first call is reused instead of re-probing.
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('command not found')
+    })
+    expect(detectCapabilities().claudeCliFound).toBe(true)
+    expect(execFileSyncMock.mock.calls.length).toBe(callsAfterFirst)
+  })
+
+  it('never interpolates an unsafe command name into the shell probe (defense-in-depth)', () => {
+    // Called only with the fixed literals 'claude'/'codex' today via detectCapabilities(), but
+    // this guards isCliAvailableViaLoginShell itself against ever becoming a shell-injection
+    // vector if it's later generalized to an externally-influenced command name.
+    execFileSyncMock.mockImplementation(() => Buffer.from('/usr/bin/claude\n'))
+
+    expect(isCliAvailableViaLoginShell("claude'; rm -rf /", 'linux')).toBe(false)
+    expect(isCliAvailableViaLoginShell('claude && echo pwned', 'linux')).toBe(false)
+    expect(execFileSyncMock).not.toHaveBeenCalled()
   })
 })

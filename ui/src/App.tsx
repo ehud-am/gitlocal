@@ -1256,6 +1256,13 @@ export default function App() {
     }
   }
 
+  // Clicking Parent Folder usually just browses to the containing folder within this repository
+  // (handleNavigateParent -> handleSelectFolder), but from the repository root it instead leaves
+  // the repository into the folder browser (handleBrowseParentRequest, gated by a confirmation
+  // dialog). The tooltip previews which one is about to happen so the reload/leave-repo case
+  // isn't a surprise; aria-label stays constant so the button's accessible name doesn't change.
+  const parentFolderLeavesRepository = !(visibleSelectedPathType !== 'none' && visibleSelectedPath)
+
   return (
     <>
       <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
@@ -1273,7 +1280,7 @@ export default function App() {
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
               onClick={handleNavigateParent}
               aria-label="Parent Folder"
-              title="Go to parent folder"
+              title={parentFolderLeavesRepository ? 'Leave this repository and browse its parent folder' : 'Go to parent folder'}
             >
               <ParentFolderIcon />
               Parent Folder

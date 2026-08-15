@@ -191,6 +191,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         toggleDotfilesItem.keyEquivalentModifierMask = [.command, .shift]
         toggleDotfilesItem.target = controller
+        // Matches DEFAULTS.hideDotfiles (false) in ui/src/services/viewerState.ts, so the checkmark
+        // is already correct for a fresh viewer before the page's first dotfiles-state round-trip.
+        toggleDotfilesItem.state = .off
         viewMenu.addItem(toggleDotfilesItem)
         controller.dotfilesMenuItem = toggleDotfilesItem
         viewMenu.addItem(NSMenuItem.separator())
@@ -202,6 +205,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         trackedItem.target = controller
+        // Matches DEFAULTS.generatedLocalVisibility ('hide') in ui/src/services/viewerState.ts, so
+        // the checkmark is already correct for a fresh viewer before the page's first
+        // tracked-visibility-state round-trip.
+        trackedItem.state = .on
         trackedVisibilityMenu.addItem(trackedItem)
         controller.trackedVisibilityHideItem = trackedItem
         let allFilesItem = NSMenuItem(
@@ -210,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         allFilesItem.target = controller
+        allFilesItem.state = .off
         trackedVisibilityMenu.addItem(allFilesItem)
         controller.trackedVisibilityShowItem = allFilesItem
         let localOnlyItem = NSMenuItem(
@@ -218,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         localOnlyItem.target = controller
+        localOnlyItem.state = .off
         trackedVisibilityMenu.addItem(localOnlyItem)
         controller.trackedVisibilityOnlyItem = localOnlyItem
         trackedVisibilityItem.submenu = trackedVisibilityMenu
