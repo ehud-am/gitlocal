@@ -1,0 +1,128 @@
+=== root (src/) ===
+(node:18119) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18132) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Unused devDependencies (2)
+@emnapi/core     package.json:65:6
+@emnapi/runtime  package.json:66:6
+Unlisted binaries (2)
+mkfifo  tests/integration/server.test.ts
+mkfifo  tests/unit/git/repo.test.ts     
+Unused exports (4)
+isRepositoryRoot          function  src/git/repo.ts:372:17                   
+getCurrentUpstreamRef     function  src/git/repo.ts:877:17                   
+getPlatformDocumentsPath  function  src/services/startup-preferences.ts:68:17
+spawnRealPty                        src/terminal/session-manager.ts:34:14    
+Unused exported types (32)
+SpawnPtyOptions                  interface  src/terminal/session-manager.ts:20:18
+TerminalUnavailableErrorCode     type       src/terminal/types.ts:31:13          
+TerminalUnavailableResponse      interface  src/terminal/types.ts:33:18          
+GitUserSource                    type       src/types.ts:13:13                   
+SshKeyDirectory                  interface  src/types.ts:40:18                   
+SshKeyCandidate                  interface  src/types.ts:46:18                   
+LocalGitState                    type       src/types.ts:74:13                   
+LocalOpenMode                    type       src/types.ts:75:13                   
+LocalPathType                    type       src/types.ts:76:13                   
+StartupFolderSource              type       src/types.ts:89:13                   
+StartupOpenStatus                type       src/types.ts:92:13                   
+StartupFolderUpdateResponse      interface  src/types.ts:116:18                  
+StartupOpenTargetResponse        interface  src/types.ts:136:18                  
+DefaultReaderPreferenceResponse  interface  src/types.ts:154:18                  
+ViewerState                      interface  src/types.ts:160:18                  
+BranchSwitchResolution           type       src/types.ts:181:13                  
+BranchSwitchStatus               type       src/types.ts:182:13                  
+RepoSyncMode                     type       src/types.ts:214:13                  
+CommitChangesStatus              type       src/types.ts:235:13                  
+RemoteSyncStatus                 type       src/types.ts:245:13                  
+FileEncoding                     type       src/types.ts:272:13                  
+FileContentType                  type       src/types.ts:273:13                  
+ManualFileOperation              type       src/types.ts:291:13                  
+ManualFileOperationStatus        type       src/types.ts:292:13                  
+FolderBrowseRoot                 interface  src/types.ts:369:18                  
+SearchMatchType                  type       src/types.ts:407:13                  
+KeyDocumentCategory              type       src/types.ts:413:13                  
+BackgroundChangeKind             type       src/types.ts:426:13                  
+ReadingPreference                interface  src/types.ts:428:18                  
+RepositoryStatusSummaryPayload   interface  src/types.ts:446:18                  
+RecentItem                       interface  src/types.ts:485:18                  
+SearchRequest                    interface  src/types.ts:538:18                  
+Configuration hints (3)
+src/**/*.test.ts    knip.json  Remove from ignore            
+src/index.ts        knip.json  Remove redundant entry pattern
+src/cli.ts          knip.json  Remove redundant entry pattern
+
+=== ui (ui/src/) ===
+(node:18157) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18170) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18170) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Unused dependencies (3)
+@radix-ui/react-select     package.json:19:6
+@radix-ui/react-separator  package.json:20:6
+tailwindcss                package.json:36:6
+Unused devDependencies (2)
+@emnapi/core     package.json:39:6
+@emnapi/runtime  package.json:40:6
+Unused exports (5)
+selectNativeControl    function  src/components/ContentPanel/content-panel-selection.ts:19:17
+selectElementContents  function  src/components/ContentPanel/content-panel-selection.ts:35:17
+slugifyHeading         function  src/components/ContentPanel/markdown-navigation.ts:8:17     
+basenameOfPath         function  src/components/ContentPanel/markdown-output.ts:26:17        
+readStoredTheme        function  src/services/theme.ts:9:17                                  
+Unused exported types (48)
+JsonValueKind                   type       src/components/ContentPanel/json-tree.ts:1:13            
+ParsedJsonTree                  interface  src/components/ContentPanel/json-tree.ts:11:18           
+ParsedJsonFailure               interface  src/components/ContentPanel/json-tree.ts:16:18           
+FrontMatterStatus               type       src/components/ContentPanel/markdown-frontmatter.ts:1:13 
+MetadataEntryKind               type       src/components/ContentPanel/markdown-frontmatter.ts:3:13 
+FrontMatterMetadata             interface  src/components/ContentPanel/markdown-frontmatter.ts:12:18
+MarkdownOutputMode              type       src/components/ContentPanel/markdown-output.ts:1:13      
+ButtonProps                     interface  src/components/ui/button.tsx:33:18                       
+InputProps                      interface  src/components/ui/input.tsx:4:18                         
+NewTerminalTab                  interface  src/hooks/useTerminalPanel.ts:10:18                      
+TerminalIoOutboundFrame         interface  src/services/terminalApi.ts:18:18                        
+GitUserSource                   type       src/types/index.ts:13:13                                 
+RepoRemoteContext               interface  src/types/index.ts:22:18                                 
+SshKeyDirectory                 interface  src/types/index.ts:40:18                                 
+SshKeyValidationRequest         interface  src/types/index.ts:57:18                                 
+CopyRepresentation              type       src/types/index.ts:76:13                                 
+RenderedPdfOutputState          type       src/types/index.ts:77:13                                 
+NativeAppCommand                type       src/types/index.ts:84:13                                 
+LocalGitState                   type       src/types/index.ts:103:13                                
+LocalOpenMode                   type       src/types/index.ts:104:13                                
+BranchSwitchResolution          type       src/types/index.ts:135:13                                
+BranchSwitchStatus              type       src/types/index.ts:136:13                                
+RepoSyncMode                    type       src/types/index.ts:168:13                                
+CommitChangesStatus             type       src/types/index.ts:189:13                                
+RemoteSyncStatus                type       src/types/index.ts:199:13                                
+FileEncoding                    type       src/types/index.ts:218:13                                
+FileContentType                 type       src/types/index.ts:219:13                                
+ManualFileOperation             type       src/types/index.ts:250:13                                
+ManualFileOperationStatus       type       src/types/index.ts:251:13                                
+FolderOperation                 type       src/types/index.ts:274:13                                
+FolderOperationStatus           type       src/types/index.ts:275:13                                
+FolderBrowseRoot                interface  src/types/index.ts:300:18                                
+StartupFolderUpdateSource       type       src/types/index.ts:347:13                                
+StartupOpenSource               type       src/types/index.ts:348:13                                
+StartupOpenStatus               type       src/types/index.ts:349:13                                
+GeneratedLocalState             type       src/types/index.ts:427:13                                
+RepositoryStatusTone            type       src/types/index.ts:430:13                                
+KeyDocumentCategory             type       src/types/index.ts:431:13                                
+ChangedFileState                type       src/types/index.ts:432:13                                
+BackgroundChangeKind            type       src/types/index.ts:444:13                                
+ReadingPreference               interface  src/types/index.ts:446:18                                
+RepositoryStatusSummary         interface  src/types/index.ts:452:18                                
+RepositoryStatusSummaryPayload  interface  src/types/index.ts:464:18                                
+ChangedFilesSummary             interface  src/types/index.ts:473:18                                
+KeyDocumentItem                 interface  src/types/index.ts:495:18                                
+SearchScope                     interface  src/types/index.ts:521:18                                
+TerminalExitInfo                interface  src/types/index.ts:609:18                                
+TerminalUnavailableErrorCode    type       src/types/index.ts:631:13                                
+Configuration hints (4)
+src/**/*.test.{ts,tsx}    knip.json  Remove from ignore                                           
+src/test-setup.ts         knip.json  Remove from ignore                                           
+src/main.tsx              knip.json  Remove redundant entry pattern                               
+.css                      knip.json  Compiled extension excluded by project (imports not followed)
