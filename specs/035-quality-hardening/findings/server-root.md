@@ -2,21 +2,14 @@
 
 **Scope**: src/index.ts, src/cli.ts, src/server.ts, src/types.ts — server entry/bootstrap/shared types
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| SR-001 | `src/types.ts` | 1-589 | duplicate | high | Verified by direct comparison against ui/src/types/index.ts: dozens of interfaces/types are byte-for-byte identical across the two files (e.g. RepoInfo lines 1-11 vs ui 1-11, GitContext, Branch lines 171-179 vs ui 125-133, BranchSwitchResponse, TreeNode, FileContent, Commit, FolderBrowseResponse, StartupOpenTarget lines 122-134 vs ui 373-385, SearchScope lines 503-511 vs ui 521-529, RepoSummaryResponse lines 513-523 vs ui 531-541, SyncStatus lines 570-588 vs ui 581-599, and many more). The UI file's own comment (ui/src/types/index.ts:601-603) states types are 'kept in sync by hand since the server bundle and UI bundle are built separately and don't share a types module' for terminal types, and the same manual-duplication pattern demonstrably extends across nearly the entire request/response surface. This is a genuine cross-cutting duplication of the server/client wire-format contract, not incidental name collision. | pass1-confirmed | verified |
+| SR-002 | `src/server.ts` | 312-323 | efficiency | medium | The SPA fallback route performs `await import('node:fs')` inside the request handler on every unmatched GET request. node:fs is a built-in module (unlike the legitimately-deferred dynamic imports of 'open' in cli.ts:27 and 'node-pty' in terminal/session-manager.ts:35, which are optional/heavy dependencies loaded once or on-demand), so there is no benefit to deferring it — it should be a top-level static import, avoiding a promise resolution and dynamic-import machinery on every request that falls through to the SPA fallback. | pass1-confirmed | verified |
+| SR-003 | `src/types.ts` | 538-543 | dead-code | low | The `SearchRequest` interface (query, branch?, mode, caseSensitive?) is exported but has zero usages anywhere in src/, ui/src/, or tests/ (confirmed via repo-wide grep). The actual /api/search handler (src/handlers/search.ts, searchHandler ~line 149) reads parameters individually via c.req.query('query'), c.req.query('branch'), c.req.query('mode'), c.req.query('caseSensitive') rather than constructing or typing a SearchRequest object — the interface appears to be a leftover from an earlier design and no longer reflects how the endpoint is implemented. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
-
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a thin, well-organized composition root: cli.ts (process/CLI concerns), index.ts (a 7-line public library re-export barrel for the npm package entrypoint), server.ts (Hono app wiring plus a small amount of startup-path-classification business logic), and types.ts (589 lines of shared response/request contracts). The main structural concern is that server.ts mixes two responsibilities that could be split — pure route wiring/module state (createApp, get/setRepoPath etc.) versus non-trivial path-classification business logic (resolveOpenTarget, initializePaths, classifyServerError) that arguably belongs in a service module alongside git/repo.ts's classifyLocalPath, which it wraps. The single biggest architectural issue is the server/client type boundary: types.ts has no shared package with ui/src/types/index.ts, so ~80 request/response types are hand-copied verbatim on both sides of the JSON wire format, with the UI file's own comment admitting this is a known manual-sync liability (for terminal types, but the pattern is pervasive). A generated-types or shared-package approach at this boundary would remove a whole category of future drift risk. Module state (currentRepoPath, currentPickerPath, etc. in server.ts) is deliberately global/mutable, justified by a single-threaded comment, which is reasonable but constrains createApp to being effectively a singleton factory rather than a truly isolated app instance — worth flagging if multi-instance/testing-in-parallel needs ever arise.
