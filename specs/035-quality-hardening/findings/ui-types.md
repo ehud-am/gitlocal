@@ -2,21 +2,14 @@
 
 **Scope**: ui/src/types/ — shared UI types
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| UT-001 | `ui/src/types/index.ts` | 556-566 | duplicate | medium | `SearchResult.matchType` is inlined as the literal `'name' \| 'content'` instead of reusing a `SearchMatchType` alias. The server's equivalent (`src/types.ts:548`) uses `matchType: SearchMatchType` referencing `type SearchMatchType = 'name' \| 'content'` (`src/types.ts:407`) — the UI never defines or imports an equivalent alias, so the two copies express the same constraint differently. A byte-level divergence within the broader SR-001 duplication (Batch A). | pass1-confirmed | verified |
+| UT-002 | `ui/src/types/index.ts` | 1-661 | duplicate | medium | Re-verified SR-001 from the UI side with an independent script comparing every exported interface/type between `src/types.ts` and `ui/src/types/index.ts`: 87 type names appear in both files, 84 are byte-for-byte identical, and only 3 differ (`RepoLocationResponse`: JSDoc-only difference; `SearchResult`: see UT-001; `ViewerState`: genuinely divergent shape, see UT-003). Confirmed zero UI source files import from `src/types.ts` — all 28 files that use these types import the local `ui/src/types/index.ts` copy instead. UI-only type count is 20, server-only is 7. This closes out the UI-side half of SR-001: there is no shared types module across the esbuild server bundle and Vite UI bundle boundary, only hand-synchronized duplicates. | pass1-confirmed | verified |
+| UT-003 | `ui/src/types/index.ts` | 106-123 | bug | low | `ViewerState` in the UI (8 fields beyond the server's version: `repoPath`, `hideDotfiles`, `generatedLocalVisibility`, `searchRootPath`, `searchContentKind`, `searchTrackedMode`, `searchLimit`, `searchPresentation`) has silently diverged from the identically-named `ViewerState` in `src/types.ts:160-169` (only `branch`, `path`, `pathType`, `raw`, `sidebarCollapsed`, `searchMode`, `searchQuery`, `caseSensitive`). Per the project's knip baseline, the server's `ViewerState` is flagged as an unused/dead interface — never referenced anywhere else in `src/` — while the UI's `ViewerState` is actively used (`ui/src/services/viewerState.ts`, `App.tsx`, `PickerPage.tsx`, plus 5 test files). Two types sharing a name but serving completely different real-world roles is misleading for anyone cross-referencing the wire boundary by name. **Cross-batch note**: the server-side deletion of the dead `ViewerState` interface belongs to whichever unit owns `src/types.ts` (Batch A's server-root, already reviewed) — flagged here for coordination during the fix phase rather than acted on unilaterally. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
-
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a pure type-definitions module (661 lines, no logic) that mirrors `src/types.ts` across the wire boundary with zero shared module — confirmed independently from the UI side: all 28 UI files that need these types import the local `ui/src/types/index.ts` copy, never `src/types.ts`, and 84 of 87 common type names are byte-for-byte identical, strongly suggesting copy-paste origin kept in sync purely by discipline (an explicit comment at lines 601-603 even documents this manual-sync policy for the terminal types). This is architecturally risky: it already produced one real divergence — `ViewerState` (UT-003) — where the server copy went dead and the UI copy diverged into a much richer, differently-shaped type reusing the same name. The terminal feature adds a second, smaller duplication seam (`ui/src/types/index.ts` vs `src/terminal/types.ts`, see Batch B's ST-001/ST-004) with the same manual-sync risk, which has also already drifted. The highest-leverage structural fix for this unit is the same one identified for SR-001: a shared types package/module consumed by both the esbuild server bundle and the Vite UI bundle would eliminate this entire class of drift bugs. `jest-axe.d.ts` is a small, correctly-justified ambient module declaration (the installed `jest-axe` 10.0.0 ships no types) — not a duplication concern.

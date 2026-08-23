@@ -2,21 +2,21 @@
 
 **Scope**: ui/src/services/ — UI API/service layer
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| US-001 | `ui/src/services/theme.ts` | 9-14 | dead-code | low | `readStoredTheme` is exported but only consumed internally by `getInitialTheme` (line 24) within the same file; grepping the rest of `ui/src` for imports returns zero external usages (only `applyTheme`, `getInitialTheme`, `writeStoredTheme`, `ThemeMode` are imported elsewhere). Unnecessarily part of the module's public surface. | pass1-confirmed | verified |
+| US-002 | `ui/src/services/api.ts` | 130-267 (12 functions) | duplicate | medium | Query-string construction is inconsistent across 12 functions: most build `params` then guard with `qs ? '?' + qs : ''`, while `getFile`, `getFolderDeletePreview`, `getSearchResults`, and `getSyncStatus` interpolate `${params.toString()}` directly after a literal `?`. Harmless for the functions with a guaranteed non-empty required param, but `getSyncStatus`/`getFolderBrowse` show the same construction duplicated with two different idioms for no functional reason — a real maintainability/consistency issue even though it rarely produces an actual empty `?` in practice. | pass1-confirmed | verified |
+| US-003 | `ui/src/services/viewerState.ts` | 205-241 | duplicate | medium | `rememberRecentItem` (205-221) and `rememberRecentChangedItems` (223-241) both normalize a `RecentItem` with identical logic: trim path, derive label via `item.label \|\| normalizedPath.split('/').pop() \|\| normalizedPath`, default a timestamp via `?? new Date().toISOString()`. Duplicated verbatim, differing only in field name (`lastViewedAt` vs `lastChangedAt`). Could extract a shared `normalizeRecentItem(item, timestampField)` helper. | pass1-confirmed | verified |
+| US-004 | `ui/src/services/viewerState.ts` + `theme.ts` | viewerState.ts: 154, 182, 190, 217, 237, 244; theme.ts: 11, 18 | readability | low | The localStorage-availability guard (`typeof window.localStorage?.getItem/setItem/removeItem !== 'function'` or its inverse) is repeated 6 times in viewerState.ts and twice more in theme.ts. Extracting a shared `isLocalStorageAvailable()` or a thin `safeLocalStorage` wrapper (get/set/remove) would remove the duplication and reduce the risk of an inconsistent check being introduced later. | pass1-confirmed | verified |
+| US-005 | `ui/src/services/api.ts` | 67-106 | duplicate | medium | `branchSwitchRequest` (89-106) is a near-verbatim copy of `mutate` (67-87) — same fetch/POST/JSON-stringify/parse shape — but deliberately omits the `if (!res.ok) throw` check. **Adjudicated (kept, recategorized)**: Pass 1 flagged this as a bug; adjudication confirmed no functional defect (the server's `branchSwitchHandler`, `src/handlers/repo.ts:363-395`, always returns a well-formed `BranchSwitchResponse` body with 200/400/409 for all expected outcomes, and both App.tsx call sites correctly branch on `result.ok`/`result.status` rather than expecting a throw). However, grepping all of `ui/src/services/*.ts` shows this is the *only* function with a non-throwing catch-and-return shape — not an established convention, just a one-off duplicate of `mutate` with the throw removed — and both callers still wrap it in try/catch as if it could throw, reinforcing this as a real, undocumented contract divergence. Kept as duplicate/readability risk rather than bug. | pass2-added | verified |
+| US-006 | `ui/src/services/terminalApi.ts` | 10-16 | duplicate | low | `requestJson` duplicates the structure of `request` in `api.ts` (55-65) almost exactly: fetch GET, check `res.ok`, parse JSON with a catch-fallback, throw or return — differing only in the fallback error object's shape. A cross-file duplicate Pass 1 didn't catch (it only compared within-file). A shared generic HTTP client helper (parameterized by fallback-error-shape) would remove the duplication across both service files. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Adjudication Log
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+- `api.ts:67-106` (`branchSwitchRequest` vs `mutate`, disputed by Pass 2 on categorization): **kept, recategorized from bug to duplicate/readability**. Adjudicator verified the server always returns well-formed response bodies for all expected branch-switch outcomes and both UI call sites read `result.status`/`result.ok` correctly — no observed functional defect, contradicting Pass 1's "bug" framing. But confirmed this is the only non-throwing function in the module (a genuine, undocumented divergence from the rest of the client's error-handling contract), so the finding is kept at medium severity as a latent maintainability risk, not a current break. See US-005.
 
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a thin, mostly well-organized client-side data-access layer: `api.ts`/`terminalApi.ts` wrap fetch/WebSocket calls behind typed objects, while `theme.ts`/`viewerState.ts` manage browser-storage-backed UI state (theme, URL query params, recent items, localStorage preferences). The main structural weakness is duplication rather than complexity: `api.ts`'s `request`/`mutate` pair is re-implemented almost verbatim as `requestJson` in `terminalApi.ts` (US-006), and `branchSwitchRequest` is a near-clone of `mutate` that intentionally skips the throw-on-`!ok` behavior because the branch-switch endpoint uses HTTP status codes to carry expected business outcomes rather than true exceptions (US-005) — legitimate but undocumented. `viewerState.ts` additionally repeats localStorage-availability guards (US-004) and item-normalization logic (US-003) across several functions. None of this is large in scope (four small, single-purpose files), but the volume of copy-pasted request/storage boilerplate suggests a shared `httpClient` helper (configurable throw-vs-return-on-error, shared JSON-fallback logic) and a `safeLocalStorage` wrapper would meaningfully shrink and clarify all four files without changing behavior.
