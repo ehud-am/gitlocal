@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { GeneratedLocalVisibility, TreeNode } from '../../types'
@@ -255,24 +255,33 @@ export default function FileTree({
   // flat, in-order list of currently visible node paths (and their parents),
   // ahead of the actual JSX render pass. This backs roving tabindex + arrow-key
   // navigation and must reflect exactly what's on screen (collapsed subtrees excluded).
-  const computeVisibleOrder = (nodes: TreeNode[], ancestorPaths = new Set<string>(), parentPath?: string): void => {
-    for (const node of filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)) {
-      if (ancestorPaths.has(node.path)) continue
-      visibleOrder.current.push(node.path)
-      if (parentPath) parentOf.current.set(node.path, parentPath)
-      else parentOf.current.delete(node.path)
+  // Memoized so this tree walk only reruns when the visible set can actually
+  // change, instead of duplicating renderNodes' filtering work on every render.
+  const visibleOrderState = useMemo(() => {
+    const order: string[] = []
+    const parents = new Map<string, string>()
 
-      const state = nodeStates.get(node.path)
-      if (node.type === 'dir' && state?.expanded && state.children) {
-        const childAncestorPaths = new Set(ancestorPaths)
-        childAncestorPaths.add(node.path)
-        computeVisibleOrder(state.children, childAncestorPaths, node.path)
+    const walk = (nodes: TreeNode[], ancestorPaths = new Set<string>(), parentPath?: string): void => {
+      for (const node of filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)) {
+        if (ancestorPaths.has(node.path)) continue
+        order.push(node.path)
+        if (parentPath) parents.set(node.path, parentPath)
+
+        const state = nodeStates.get(node.path)
+        if (node.type === 'dir' && state?.expanded && state.children) {
+          const childAncestorPaths = new Set(ancestorPaths)
+          childAncestorPaths.add(node.path)
+          walk(state.children, childAncestorPaths, node.path)
+        }
       }
     }
-  }
 
-  visibleOrder.current = []
-  if (roots) computeVisibleOrder(roots)
+    if (roots) walk(roots)
+    return { order, parents }
+  }, [roots, nodeStates, generatedLocalVisibility, hideDotfiles, selectedPath])
+
+  visibleOrder.current = visibleOrderState.order
+  parentOf.current = visibleOrderState.parents
   const rovingTargetPath = focusedPath && visibleOrder.current.includes(focusedPath) ? focusedPath : visibleOrder.current[0]
 
   const renderNodes = (nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (

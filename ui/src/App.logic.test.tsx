@@ -85,7 +85,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
   default: (props: {
     branch: string
     branchDisabled?: boolean
-    syncActionLabel?: string
     onBranchChange: (branch: string) => void
     onEditGitIdentity?: () => void
     onOpenSearch?: () => void
@@ -96,7 +95,6 @@ vi.mock('./components/RepoContext/RepoContextHeader', () => ({
         {JSON.stringify({
           branch: props.branch,
           branchDisabled: props.branchDisabled,
-          syncActionLabel: props.syncActionLabel,
         })}
       </div>
       <button type="button" onClick={() => props.onBranchChange('release')}>switch-branch</button>

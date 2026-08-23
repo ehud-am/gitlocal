@@ -77,17 +77,3 @@ export function describeRepoSyncState(repoSync?: RepoSyncState): SyncPresentatio
   }
 }
 
-export function getRepoSyncActionLabel(repoSync?: RepoSyncState): string {
-  switch (repoSync?.mode) {
-    case 'ahead':
-      return 'Push to remote'
-    case 'behind':
-      return 'Pull from remote'
-    case 'diverged':
-      return 'Sync with remote'
-    case 'up-to-date':
-      return 'Check remote sync'
-    default:
-      return 'Sync with remote'
-  }
-}
