@@ -994,6 +994,7 @@ export default function ContentPanel({
   const showSourceCopyAction = mode === 'view' && canSearchCurrentFile && !showMarkdownShareActions
   const activeContentPanelClass = [
     'content-panel',
+    'content-panel-file',
     mode === 'edit' ? 'content-panel-editing' : '',
   ].filter(Boolean).join(' ')
 

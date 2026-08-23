@@ -1310,6 +1310,22 @@ pre {
   margin-bottom: 1rem;
 }
 
+.content-panel-file {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-panel-file > .content-active-context {
+  flex-shrink: 0;
+}
+
+.content-panel-file > .content-panel-selection-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .content-active-heading-row {
   display: flex;
   flex-wrap: wrap;
