@@ -19,10 +19,10 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 | ui-search | 2 | 0 | 0 | 4 | 2 | 8 | E |
 | ui-file-tree | 3 | 0 | 1 | 6 | 2 | 12 | E |
 | ui-primitives-misc | 0 | 3 | 0 | 1 | 0 | 4 | E |
-| native-macos | 0 | 0 | 0 | 0 | 0 | 0 | F |
+| native-macos | 5 | 1 | 2 | 2 | 4 | 14 | F |
 
-**Total findings logged**: 96
-**Last updated**: Batch E complete (ui-search, ui-file-tree, ui-primitives-misc)
+**Total findings logged**: 110
+**Last updated**: Batch F complete (native-macos) — Phase 3 review complete, all batches A-F done
 
 \* ui-app-shell's 7 counted findings exclude AS-003, a required architecture verdict (not a defect) confirming App.tsx is NOT an oversized "god component" — see ui-app-shell.md for the full rationale. This closes plan.md's Q1 open question and tasks.md's T018.
 
