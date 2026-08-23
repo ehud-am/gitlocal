@@ -346,7 +346,6 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                       className={`file-tree-node${path === entry.path ? ' selected' : ''}`}
                       style={{ paddingLeft: '8px' }}
                       role="treeitem"
-                      aria-expanded={entry.type === 'dir' ? false : undefined}
                       aria-selected={path === entry.path}
                       onClick={() => setPath(entry.path)}
                       onDoubleClick={() => {
@@ -355,14 +354,12 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                           return
                         }
 
-                        if (!entry.isParent && entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
+                        if (entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
                           void loadPath(entry.path)
                           return
                         }
 
-                        if (!entry.isParent) {
-                          void handleOpenPath(entry.path)
-                        }
+                        void handleOpenPath(entry.path)
                       }}
                     >
                       {entry.type === 'dir' ? (

@@ -1,6 +1,8 @@
+import Darwin
 import Foundation
 
 enum GitLocalServiceError: LocalizedError {
+    case missingBundleResources
     case missingRuntime(String)
     case missingCLI(String)
     case startupTimedOut
@@ -9,6 +11,8 @@ enum GitLocalServiceError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .missingBundleResources:
+            return "GitLocal could not locate its app bundle resources."
         case .missingRuntime(let path):
             return "GitLocal could not find the bundled Node runtime at \(path)."
         case .missingCLI(let path):
@@ -37,7 +41,10 @@ final class GitLocalService {
     func start(openPath: String? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
         self.completion = completion
 
-        let paths = BundlePaths()
+        guard let paths = BundlePaths() else {
+            finish(.failure(GitLocalServiceError.missingBundleResources))
+            return
+        }
         guard FileManager.default.isExecutableFile(atPath: paths.nodeRuntime.path) else {
             finish(.failure(GitLocalServiceError.missingRuntime(paths.nodeRuntime.path)))
             return
@@ -90,15 +97,28 @@ final class GitLocalService {
         guard let process else { return }
         if process.isRunning {
             process.terminate()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
-                if process.isRunning {
-                    process.interrupt()
+            if !waitUntilExited(process, timeout: 1.0) {
+                process.interrupt()
+                if !waitUntilExited(process, timeout: 1.0) {
+                    kill(process.processIdentifier, SIGKILL)
+                    _ = waitUntilExited(process, timeout: 1.0)
                 }
             }
         }
         self.process = nil
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         outputPipe = nil
+    }
+
+    /// Blocks the calling thread, polling `process.isRunning`, until the process exits or
+    /// `timeout` elapses. Used by `stop()` to synchronously escalate SIGTERM -> SIGINT -> SIGKILL
+    /// so cleanup is guaranteed to complete before callers like `applicationWillTerminate` return.
+    private func waitUntilExited(_ process: Process, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return !process.isRunning
     }
 
     private func handleOutput() {

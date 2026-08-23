@@ -6,8 +6,8 @@ struct BundlePaths {
     let cliScript: URL
     let nodeRuntime: URL
 
-    init(bundle: Bundle = .main) {
-        let resources = bundle.resourceURL ?? URL(fileURLWithPath: ".")
+    init?(bundle: Bundle = .main) {
+        guard let resources = bundle.resourceURL else { return nil }
         self.resources = resources
         self.gitlocalRoot = resources.appendingPathComponent("gitlocal", isDirectory: true)
         self.cliScript = gitlocalRoot.appendingPathComponent("dist/cli.js")

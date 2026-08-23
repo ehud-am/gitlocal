@@ -139,12 +139,12 @@ All 16 open bug findings, sorted by severity, batched into three checkpoints of 
 
 ### Checkpoint B2 (6 fixes)
 
-- [ ] T057 Fix FT-011 (ui-file-tree, medium).
-- [ ] T058 Fix NM-002 (native-macos, medium): shutdown never escalates to SIGKILL, doesn't block, orphans child process on quit.
-- [ ] T059 Fix NM-011 (native-macos, medium).
-- [ ] T060 Fix SH-007 (server-handlers, low, adjudicated finding).
-- [ ] T061 Fix SV-003 (server-services, low).
-- [ ] T062 Fix UT-003 (ui-types, low): `ViewerState` drift between server/client types.
+- [x] T057 Fix FT-011 (ui-file-tree, medium).
+- [x] T058 Fix NM-002 (native-macos, medium): shutdown never escalates to SIGKILL, doesn't block, orphans child process on quit.
+- [x] T059 Fix NM-011 (native-macos, medium).
+- [x] T060 Fix SH-007 (server-handlers, low, adjudicated finding).
+- [x] T061 Fix SV-003 (server-services, low).
+- [x] T062 Fix UT-003 (ui-types, low): `ViewerState` drift between server/client types.
 
 ### Checkpoint B3 (4 fixes)
 

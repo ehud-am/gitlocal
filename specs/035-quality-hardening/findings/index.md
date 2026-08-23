@@ -45,13 +45,12 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 
 ## Totals by status
 
-Phase 4 (US2: bug fixes) is underway. Checkpoint B1 (T051-T056) fixed 6 findings; the remaining 104 are still review-confirmed and open in the fix-lifecycle sense.
+Phase 4 (US2: bug fixes) is underway. Checkpoints B1 (T051-T056) and B2 (T057-T062) have together fixed 12 findings; the remaining 98 are still review-confirmed and open in the fix-lifecycle sense.
 
 | Fix-lifecycle status | Count | Meaning |
 |----------------------|-------|---------|
-| `fixed`        | 6     | Checkpoint B1 (T051-T056): NM-001, NM-004, ST-001, SV-001, RC-008, FT-010 |
-| `verified`     | 103   | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute); not yet fixed |
-| `adjudicated`  | 1     | SH-007 — disputed between Pass 1/Pass 2, resolved (kept) by a targeted Pass 3; not yet fixed |
+| `fixed`        | 12    | Checkpoint B1 (T051-T056): NM-001, NM-004, ST-001, SV-001, RC-008, FT-010. Checkpoint B2 (T057-T062): FT-011, NM-002, NM-011, SH-007, SV-003, UT-003 |
+| `verified`     | 98    | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute); not yet fixed |
 
 2 additional findings (AS-003, CP-010) are architecture verdicts, not defects, and are excluded from all counts above — see the unit footnotes.
 

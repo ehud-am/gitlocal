@@ -157,17 +157,6 @@ export interface DefaultReaderPreferenceResponse {
   message: string
 }
 
-export interface ViewerState {
-  branch: string
-  path: string
-  pathType: ViewerPathType
-  raw: boolean
-  sidebarCollapsed: boolean
-  searchMode: SearchMode
-  searchQuery: string
-  caseSensitive: boolean
-}
-
 export interface Branch {
   name: string
   isCurrent: boolean

@@ -164,7 +164,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   if (stats.isFile()) {
     const parentPath = dirname(resolvedInputPath)
     let rootPath = parentPath
-    let selectedPath = basename(path)
+    let selectedPath = basename(resolvedInputPath)
 
     if (classification.repositoryRootPath) {
       rootPath = classification.repositoryRootPath

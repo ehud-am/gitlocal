@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { platform, tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
@@ -1481,6 +1481,44 @@ describe('remoteSyncHandler', () => {
     } finally {
       rmSync(remoteDir, { recursive: true, force: true })
       repo.cleanup()
+    }
+  })
+})
+
+describe('repositoryOpenHandler', () => {
+  it('derives selectedPath from the canonicalized file path, not the raw request path, for a non-repo file', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'gitlocal-open-non-repo-'))
+    const realFile = join(folder, 'real-name.md')
+    const aliasLink = join(folder, 'alias-name.md')
+    writeFileSync(realFile, '# Real file')
+
+    try {
+      if (platform() !== 'win32') {
+        symlinkSync(realFile, aliasLink)
+      }
+      const requestPath = platform() === 'win32' ? realFile : aliasLink
+
+      const app = createApp('')
+      const res = await app.fetch(new Request('http://localhost/api/repo/open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: requestPath }),
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { ok: boolean; selectedPath: string; path: string; gitState: string }
+      expect(body.ok).toBe(true)
+      expect(body.gitState).toBe('outside-repository')
+      // The canonicalized path (following the symlink) points at the real file...
+      expect(realpathSync(body.path)).toBe(realpathSync(realFile))
+      // ...so selectedPath must reflect the real file's basename, not the raw
+      // request path's (symlinked alias) basename.
+      if (platform() !== 'win32') {
+        expect(body.selectedPath).toBe(basename(realFile))
+        expect(body.selectedPath).not.toBe(basename(aliasLink))
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
     }
   })
 })

@@ -186,14 +186,15 @@ export function resolveStartupFolder(options: {
     }
   }
 
+  const homeReadable = isReadableDirectory(homePath)
   return {
-    path: canonicalDirectory(homePath),
+    path: homeReadable ? canonicalDirectory(homePath) : resolve(homePath),
     source: 'home-fallback',
-    exists: true,
-    readable: true,
+    exists: homeReadable,
+    readable: homeReadable,
     platformDefaultPath,
     lastUsedPath: preference?.path ?? '',
-    fallbackReason: 'Platform Documents folder is unavailable.',
+    fallbackReason: homeReadable ? 'Platform Documents folder is unavailable.' : 'Home folder is unavailable.',
   }
 }
 
