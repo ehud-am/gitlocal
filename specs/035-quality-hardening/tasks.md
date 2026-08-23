@@ -126,12 +126,36 @@ description: "Task list for the 0.10.3 quality-hardening effort"
 
 **Goal**: Every open bug finding from `findings/index.md` is fixed with a regression test, or explicitly deferred to the user (FR-008) if the correct fix would change behavior.
 
-**Procedure** (concrete T-numbers appended to this file once T045 exists):
-1. Sort open bug findings by severity.
-2. Batch into checkpoints of ≤6 fixes each.
-3. Per finding: write/confirm a failing regression test → fix → confirm test passes → `npm run verify` green.
-4. Per checkpoint: present the batch's fixes + test evidence to user, get go-ahead, commit.
-5. Any finding requiring a behavior/feature decision is pulled out into a separate "deferred findings" list for the user, not fixed.
+All 16 open bug findings, sorted by severity, batched into three checkpoints of ≤6 each. Per finding: write/confirm a failing regression test → fix → confirm test passes → `npm run verify` green (TS/JS findings). Native Swift findings use an adapted procedure — see note below.
+
+### Checkpoint B1 (6 fixes: both high-severity + 4 next-highest)
+
+- [x] T051 Fix NM-001 (native-macos, high): unsynchronized `completed` flag race across 3 GCD queues in `GitLocalService`.
+- [x] T052 Fix NM-004 (native-macos, high): incomplete JS-string escaping in the Finder→WebView JS bridge (script injection via filename).
+- [x] T053 Fix ST-001 (server-terminal, medium): stale `TerminalUnavailableErrorCode` type unenforced because the handler never imports it.
+- [x] T054 Fix SV-001 (server-services, medium).
+- [x] T055 Fix RC-008 (ui-repo-context, medium).
+- [x] T056 Fix FT-010 (ui-file-tree, medium): tree/treeitem ARIA roles with no keyboard operability.
+
+### Checkpoint B2 (6 fixes)
+
+- [ ] T057 Fix FT-011 (ui-file-tree, medium).
+- [ ] T058 Fix NM-002 (native-macos, medium): shutdown never escalates to SIGKILL, doesn't block, orphans child process on quit.
+- [ ] T059 Fix NM-011 (native-macos, medium).
+- [ ] T060 Fix SH-007 (server-handlers, low, adjudicated finding).
+- [ ] T061 Fix SV-003 (server-services, low).
+- [ ] T062 Fix UT-003 (ui-types, low): `ViewerState` drift between server/client types.
+
+### Checkpoint B3 (4 fixes)
+
+- [ ] T063 Fix SE-007 (ui-search, low).
+- [ ] T064 Fix SE-008 (ui-search, low).
+- [ ] T065 Fix FT-009 (ui-file-tree, low).
+- [ ] T066 Fix NM-003 (native-macos, low).
+
+**Native Swift procedure note**: this sandbox has no Swift compiler and no automated XCTest suite (`native/macos/GitLocalTests/` holds only manual Markdown test plans). NM-findings are fixed via careful manual code reasoning and documented as a new/updated scenario in `LifecycleTests.md` or `ShortcutCommandTests.md` in place of an automated regression test. Build/runtime verification of these fixes requires a Mac.
+
+Any finding requiring a behavior/feature decision is pulled into a separate "deferred findings" list for the user, not fixed, at the relevant checkpoint.
 
 Model: Sonnet 5 (fix + test authoring), Sonnet 5 high-effort for anything touching `src/git/` (highest blast-radius unit by line count and by being the product's core data layer).
 

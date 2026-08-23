@@ -70,7 +70,6 @@ import {
   shouldRefreshActiveFileAfterSyncChange,
   updateBranchCacheAfterSwitch,
 } from './lib/app-helpers'
-import { getRepoSyncActionLabel } from './lib/sync'
 
 type LandingAction = { label: string; action: 'create-file' }
 type BranchScope = 'local' | 'remote'
@@ -1443,7 +1442,6 @@ export default function App() {
                 onCloseChangedFiles={() => setChangedFiles(null)}
                 onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
-                syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 onNavigateHome={info?.isGitRepo ? handleNavigateHome : undefined}
                 repoLocation={repoLocation}
                 onNavigateReadme={info?.isGitRepo ? handleNavigateReadme : undefined}

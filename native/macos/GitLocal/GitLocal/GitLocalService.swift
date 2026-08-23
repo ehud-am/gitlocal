@@ -28,6 +28,10 @@ final class GitLocalService {
     private var outputPipe: Pipe?
     private var outputBuffer = ""
     private var completion: ((Result<URL, Error>) -> Void)?
+    // NM-001: guards `completed` (and the check-then-set around it), since it is read/written
+    // from the readability handler, the termination handler, and the startup-timeout closure,
+    // each of which can run concurrently on different GCD queues.
+    private let completionStateQueue = DispatchQueue(label: "com.gitlocal.GitLocalService.completionState")
     private var completed = false
 
     func start(openPath: String? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
@@ -61,7 +65,10 @@ final class GitLocalService {
         }
 
         process.terminationHandler = { [weak self] _ in
-            guard let self, !self.completed else { return }
+            guard let self else { return }
+            // `finish` itself performs the atomic check-then-set on `completionStateQueue`, so
+            // the only responsibility here is to avoid running the (non-idempotent) `stop()`/
+            // cleanup path when we're already done.
             self.finish(.failure(GitLocalServiceError.terminatedBeforeReady(self.outputBuffer)))
         }
 
@@ -69,9 +76,10 @@ final class GitLocalService {
             try process.run()
             self.process = process
             DispatchQueue.global().asyncAfter(deadline: .now() + 10) { [weak self] in
-                guard let self, !self.completed else { return }
+                guard let self else { return }
+                guard self.markCompletedIfNeeded() else { return }
                 self.stop()
-                self.finish(.failure(GitLocalServiceError.startupTimedOut))
+                self.finishAlreadyMarkedCompleted(.failure(GitLocalServiceError.startupTimedOut))
             }
         } catch {
             finish(.failure(error))
@@ -94,7 +102,7 @@ final class GitLocalService {
     }
 
     private func handleOutput() {
-        guard !completed else { return }
+        guard !completionStateQueue.sync(execute: { completed }) else { return }
         let pattern = #"gitlocal listening on (http://[^\s]+)"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
         let range = NSRange(outputBuffer.startIndex..<outputBuffer.endIndex, in: outputBuffer)
@@ -118,9 +126,24 @@ final class GitLocalService {
         return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
+    /// Atomically checks `completed` and, if not already set, marks it `true`. Returns whether
+    /// this call was the one that transitioned it (i.e. whether the caller now owns finishing).
+    private func markCompletedIfNeeded() -> Bool {
+        completionStateQueue.sync {
+            guard !completed else { return false }
+            completed = true
+            return true
+        }
+    }
+
     private func finish(_ result: Result<URL, Error>) {
-        guard !completed else { return }
-        completed = true
+        guard markCompletedIfNeeded() else { return }
+        finishAlreadyMarkedCompleted(result)
+    }
+
+    /// Runs the completion side effects. Callers must have already won the atomic transition via
+    /// `markCompletedIfNeeded()` (directly or through `finish`).
+    private func finishAlreadyMarkedCompleted(_ result: Result<URL, Error>) {
         outputPipe?.fileHandleForReading.readabilityHandler = nil
         completion?(result)
         completion = nil

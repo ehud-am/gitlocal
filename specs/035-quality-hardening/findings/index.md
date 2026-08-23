@@ -45,13 +45,14 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 
 ## Totals by status
 
-All 110 findings are review-confirmed (Pass 1 + Pass 2, with Pass 3 adjudication resolving the disagreements listed in each unit's Adjudication Log) and are **open** in the fix-lifecycle sense — Phase 3 makes no code changes, so nothing has been fixed, deferred, or rejected yet.
+Phase 4 (US2: bug fixes) is underway. Checkpoint B1 (T051-T056) fixed 6 findings; the remaining 104 are still review-confirmed and open in the fix-lifecycle sense.
 
-| Review status | Count | Meaning |
-|----------------|-------|---------|
-| `verified`     | 109   | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute) |
-| `adjudicated`  | 1     | SH-007 — disputed between Pass 1/Pass 2, resolved (kept) by a targeted Pass 3 |
+| Fix-lifecycle status | Count | Meaning |
+|----------------------|-------|---------|
+| `fixed`        | 6     | Checkpoint B1 (T051-T056): NM-001, NM-004, ST-001, SV-001, RC-008, FT-010 |
+| `verified`     | 103   | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute); not yet fixed |
+| `adjudicated`  | 1     | SH-007 — disputed between Pass 1/Pass 2, resolved (kept) by a targeted Pass 3; not yet fixed |
 
 2 additional findings (AS-003, CP-010) are architecture verdicts, not defects, and are excluded from all counts above — see the unit footnotes.
 
-Phases 4-8 will flip individual findings to `fixed`, `deferred`, or `rejected` as work proceeds; this table should be updated at each of those phases' checkpoints alongside the per-unit table above.
+Phases 4-8 will continue to flip individual findings to `fixed`, `deferred`, or `rejected` as work proceeds; this table is updated at each checkpoint alongside the per-unit table above.

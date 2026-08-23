@@ -24,7 +24,6 @@ interface Props {
   onCloseChangedFiles?: () => void
   onOpenChangedFile?: (item: ChangedFileItem) => void
   branchDisabled?: boolean
-  syncActionLabel?: string
   branchSwitchDialog?: ReactNode
   onNavigateHome?: () => void
   repoLocation?: RepoLocationResponse

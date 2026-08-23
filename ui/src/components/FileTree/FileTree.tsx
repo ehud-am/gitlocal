@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { GeneratedLocalVisibility, TreeNode } from '../../types'
@@ -55,6 +55,10 @@ export default function FileTree({
   onSelect,
 }: Props) {
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map())
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
+  const nodeElements = useRef<Map<string, HTMLDivElement>>(new Map())
+  const visibleOrder = useRef<string[]>([])
+  const parentOf = useRef<Map<string, string>>(new Map())
 
   const { data: roots, isLoading, isError } = useQuery({
     queryKey: ['tree', '', branch, refreshToken],
@@ -182,6 +186,95 @@ export default function FileTree({
     }, Promise.resolve())
   }, [selectedPath, selectedPathType, branch, nodeStates])
 
+  const activateNode = useCallback((node: TreeNode) => {
+    if (node.type === 'dir') {
+      onSelect(node.path, 'dir', Boolean(node.localOnly))
+      toggleDir(node)
+    } else {
+      onSelect(node.path, 'file', Boolean(node.localOnly))
+    }
+  }, [onSelect, toggleDir])
+
+  const focusPath = useCallback((path: string) => {
+    setFocusedPath(path)
+    nodeElements.current.get(path)?.focus()
+  }, [])
+
+  const handleKeyDown = useCallback((node: TreeNode, event: KeyboardEvent<HTMLDivElement>) => {
+    const order = visibleOrder.current
+    const index = order.indexOf(node.path)
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault()
+        const next = order[index + 1]
+        if (next) focusPath(next)
+        break
+      }
+      case 'ArrowUp': {
+        event.preventDefault()
+        const prev = order[index - 1]
+        if (prev) focusPath(prev)
+        break
+      }
+      case 'ArrowRight': {
+        event.preventDefault()
+        if (node.type === 'dir') {
+          const state = nodeStates.get(node.path)
+          if (!state?.expanded) {
+            void toggleDir(node)
+            break
+          }
+        }
+        const next = order[index + 1]
+        if (next && parentOf.current.get(next) === node.path) focusPath(next)
+        break
+      }
+      case 'ArrowLeft': {
+        event.preventDefault()
+        if (node.type === 'dir' && nodeStates.get(node.path)?.expanded) {
+          void toggleDir(node)
+          break
+        }
+        const parentPath = parentOf.current.get(node.path)
+        if (parentPath) focusPath(parentPath)
+        break
+      }
+      case 'Enter':
+      case ' ': {
+        event.preventDefault()
+        activateNode(node)
+        break
+      }
+      default:
+        break
+    }
+  }, [activateNode, focusPath, nodeStates, toggleDir])
+
+  // Walk the same filtering/expansion logic used for rendering to compute the
+  // flat, in-order list of currently visible node paths (and their parents),
+  // ahead of the actual JSX render pass. This backs roving tabindex + arrow-key
+  // navigation and must reflect exactly what's on screen (collapsed subtrees excluded).
+  const computeVisibleOrder = (nodes: TreeNode[], ancestorPaths = new Set<string>(), parentPath?: string): void => {
+    for (const node of filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)) {
+      if (ancestorPaths.has(node.path)) continue
+      visibleOrder.current.push(node.path)
+      if (parentPath) parentOf.current.set(node.path, parentPath)
+      else parentOf.current.delete(node.path)
+
+      const state = nodeStates.get(node.path)
+      if (node.type === 'dir' && state?.expanded && state.children) {
+        const childAncestorPaths = new Set(ancestorPaths)
+        childAncestorPaths.add(node.path)
+        computeVisibleOrder(state.children, childAncestorPaths, node.path)
+      }
+    }
+  }
+
+  visibleOrder.current = []
+  if (roots) computeVisibleOrder(roots)
+  const rovingTargetPath = focusedPath && visibleOrder.current.includes(focusedPath) ? focusedPath : visibleOrder.current[0]
+
   const renderNodes = (nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
     <>
       {filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)
@@ -191,6 +284,7 @@ export default function FileTree({
         const isExpanded = state?.expanded ?? false
         const childAncestorPaths = new Set(ancestorPaths)
         childAncestorPaths.add(node.path)
+
         return (
           <React.Fragment key={node.path}>
             <FileTreeNode
@@ -200,12 +294,15 @@ export default function FileTree({
               depth={depth}
               showLocalOnly={isGitRepo}
               onClick={() => {
-                if (node.type === 'dir') {
-                  onSelect(node.path, 'dir', Boolean(node.localOnly))
-                  toggleDir(node)
-                } else {
-                  onSelect(node.path, 'file', Boolean(node.localOnly))
-                }
+                setFocusedPath(node.path)
+                activateNode(node)
+              }}
+              tabIndex={rovingTargetPath === node.path ? 0 : -1}
+              onFocus={() => setFocusedPath(node.path)}
+              onKeyDown={(event) => handleKeyDown(node, event)}
+              nodeRef={(el) => {
+                if (el) nodeElements.current.set(node.path, el)
+                else nodeElements.current.delete(node.path)
               }}
             />
             {node.type === 'dir' && isExpanded && (

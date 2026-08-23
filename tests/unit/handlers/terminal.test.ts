@@ -140,6 +140,29 @@ describe('terminal handlers', () => {
     })
   })
 
+  // ST-001: session-manager can also reject with 'session_limit_reached', which the handler's
+  // response type must include (it was previously missing from TerminalUnavailableErrorCode).
+  it('returns 503 with a well-formed session_limit_reached body when the session manager is at capacity', async () => {
+    mockCreateSession.mockResolvedValue({
+      ok: false,
+      error: 'session_limit_reached',
+      message: 'Too many open terminal sessions (limit 20). Close one and try again.',
+    } satisfies CreateSessionResult)
+
+    const app = createApp(dir)
+    const res = await app.request('/api/terminal/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'regular' }),
+    })
+
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({
+      error: 'session_limit_reached',
+      message: 'Too many open terminal sessions (limit 20). Close one and try again.',
+    })
+  })
+
   it('lists sessions', async () => {
     const sessions = [fakeSession({ id: 'a' }), fakeSession({ id: 'b', kind: 'claude' })]
     mockListSessions.mockReturnValue(sessions)
