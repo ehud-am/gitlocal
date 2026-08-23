@@ -2,21 +2,23 @@
 
 **Scope**: ui/src/components/Search/ — search UI
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| SE-001 | `ui/src/components/Search/SearchPanel.tsx` | 82-110 | efficiency | medium | Seven separate `useEffect` hooks each sync a single prop to local draft state (query/cursor, mode, caseSensitive, rootPath, contentKinds, trackedMode, limit). Each fires independently on every parent re-render where the corresponding prop reference changes, producing extra render passes instead of deriving draft state directly or consolidating into fewer effects/a reducer. | pass1-confirmed | verified |
+| SE-002 | `ui/src/components/Search/SearchPanel.tsx` | 58-81 | efficiency | medium | SearchPanel mirrors seven parent-owned props into local draft state and recomputes `isDraftDirty` (lines 73-80) by comparing every draft field back against props each render. `App.tsx` (~line 1469) owns all seven values as the source of truth and only pushes them back down via `onSearch`, so the prop-to-state-to-effect round trip is unnecessary machinery for what is effectively a local form buffered against a parent-confirmed value. | pass1-confirmed | verified |
+| SE-003 | `ui/src/components/Search/SearchResults.tsx` | 31-56 | readability | low | Undocumented two-field precedence between `generatedLocalLabel` (line 55) and the `result.localOnly` fallback (line 56) — requires reading `formatGeneratedLocalLabel` (lines 11-15) to understand why both branches exist. | pass1-confirmed | verified |
+| SE-004 | `ui/src/components/Search/SearchResults.tsx` | 46-49 | readability | low | `MetaTag icon='git'` is used for "Name match" and `icon='local-change'` for "Content match" — neither icon has an obvious semantic tie to filename vs. content matching; a document/text icon would communicate better. | pass1-confirmed | verified |
+| SE-005 | `ui/src/components/Search/SearchResults.tsx` | 17-75 | efficiency | low | Not wrapped in `React.memo`, so it re-renders on every SearchPanel keystroke. Downgraded from Pass 1's medium: no component in the codebase uses `React.memo` (verified via repo-wide grep), so this is a pre-existing project-wide pattern rather than a unit-specific regression, and result counts are bounded (25-100 per the limit options). | pass1-confirmed | verified |
+| SE-006 | `ui/src/components/Search/SearchPanel.tsx` | 112-122 | efficiency | low | The `useQuery` queryKey/queryFn read props directly while the separate, effect-synced `draft*` state feeds only the form controls/`isDraftDirty` — same root cause as SE-002, called out separately since it's where the indirection surfaces in the queryKey's 7 dependency arrays. | pass1-confirmed | verified |
+| SE-007 | `ui/src/components/Search/SearchPanel.tsx` | 68-70 | bug | low | `submittedMode = mode` then checks `submittedMode !== undefined`, but the `mode` prop is typed as non-optional `SearchMode` union (Props interface lines 11, 19-27) — this check is dead/always-true, harmless but misleading, likely leftover from an earlier optional-mode design. | pass2-added | verified |
+| SE-008 | `ui/src/components/Search/SearchPanel.tsx` | 66,82-85,112-120,148,291 | bug | low | **Adjudicated (kept)**: pagination `cursor` state resets only on `query` prop change (lines 82-85) or `submitSearch()` (line 148), NOT on `branch` change; `branch` feeds the queryKey/queryFn directly (not through draft+effect), and the server's cursor (`src/handlers/search.ts` `parseCursor`) is a branch-agnostic integer offset. `SearchPanel` renders without a `key` prop in `App.tsx` (~line 1469), so it stays mounted (including its `cursor`) across a branch switch, and `finalizeBranchSwitch` never resets `searchPresentation` or dismisses the panel — so switching branches while a "Load more" cursor is set will reissue the next search against the new branch at the stale offset, silently skipping/mismatching leading results. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Adjudication Log
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+- `SearchPanel.tsx:66,82-85,112-120,148,291` (stale pagination cursor across a branch switch, disputed by Pass 2): **kept**. Adjudicator traced `App.tsx` and confirmed `SearchPanel` stays mounted across a branch switch (no `key` prop, `finalizeBranchSwitch` never resets `searchPresentation` or the panel's `cursor`) and confirmed server-side `parseCursor` is a branch-agnostic offset — the stale-offset path is reachable. See SE-008.
 
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+The unit is small and its three files have clean separation: `SearchTrigger` is a trivial stateless button, `SearchResults` is a pure presentational list, and `SearchPanel` is the sole stateful piece. The main structural concern is that `SearchPanel` is a controlled component from the parent's perspective (`App.tsx` owns query/mode/caseSensitive/rootPath/contentKinds/trackedMode/limit as the committed search state) but re-implements an uncontrolled draft/form layer on top via seven props mirrored into local state plus seven single-purpose `useEffect`s plus a manual `isDraftDirty` diff — a "submit-to-apply" form pattern that would be far simpler as an internal `useReducer` or a single derived-state object, and that is the dominant complexity driver in the whole unit (SE-001, SE-002, SE-006). On the cross-cutting checks requested for this batch: `SearchResult.matchType` is used correctly and consistently as `'name' | 'content'` matching the server type (`src/types.ts`), with no divergence from Batch C's UT-001 found in this unit; and no client-side inefficiency compounds Batch A's SG-004 server-side git `ls-files` re-spawn — react-query's queryKey correctly gates refetches on actual submitted-value changes (not draft keystrokes), so this UI does not cause extra search requests beyond what the user explicitly submits or paginates.

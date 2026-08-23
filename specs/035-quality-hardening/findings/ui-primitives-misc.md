@@ -2,21 +2,19 @@
 
 **Scope**: ui/src/components/ui/, ui/src/lib/, ui/src/hooks/, top-level components — primitives & misc
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| PM-001 | `ui/src/components/ui/button.tsx` | 33-37 | dead-code | medium | `ButtonProps` interface is exported but not imported anywhere else; `Button` uses it inline via `React.forwardRef<HTMLButtonElement, ButtonProps>`. Grep across `ui/src` confirms zero external imports, and it appears in the knip baseline (`knip-baseline.txt:83`) as an unused export. | pass1-confirmed | verified |
+| PM-002 | `ui/src/components/ui/input.tsx` | 4 | dead-code | medium | `InputProps` interface is exported but not imported anywhere outside `input.tsx`. Confirmed unused in the knip baseline (`knip-baseline.txt:84`). Adds nothing beyond `React.InputHTMLAttributes<HTMLInputElement>` (empty body), so it provides no additional typing value even if consumed. | pass1-confirmed | verified |
+| PM-003 | `ui/src/lib/app-helpers.ts` | 41-46 | efficiency | low | In the filter predicate `!(option.name === nextBranch \|\| (option.scope === 'remote' && (option.trackingRef === target \|\| option.name === nextBranch)))`, the inner `option.name === nextBranch` disjunct (line 44) is logically redundant with the outer disjunct (line 43) — `A \|\| (B && (C \|\| A))` reduces to `A \|\| (B && C)` for any option. Removing it wouldn't change behavior; it's dead logic that obscures whether it was meant to test something else. | pass1-confirmed | verified |
+| PM-004 | `ui/src/components/ui/button.tsx` | 14 | dead-code | low | **Adjudicated (kept)**: the `outline` variant is exercised only in `button.test.tsx:20` and never used by application code (grep for `variant="outline"` outside test files returns nothing). By contrast, sibling variants `highlight`/`dangerOutline` each have real call sites in `App.tsx`, so "unused design-system surface" is not the norm here — `outline` is the only variant with zero production consumers. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Adjudication Log
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+- `button.tsx:14` (`outline` button variant unused outside tests, disputed by Pass 2): **kept**. Adjudicator confirmed via repo-wide grep that no non-test call site exists, and that every sibling variant in the same `buttonVariants` map except `outline` is actually consumed by app code — a legitimate, low-severity dead-code finding rather than intentional design-system surface. See PM-004.
 
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a clean, conventional shadcn/radix-style primitives layer plus two small presentation-mapping modules (`app-helpers.ts`, `sync.ts`). The Radix wrapper components (dialog, dropdown-menu, switch, button, input) are boilerplate-consistent, fully consumed, and free of real bugs. `app-helpers.ts` and `sync.ts` are appropriately scoped pure-function modules with good test coverage (`App.helpers.test.ts`) and no unused exports beyond PM-001/PM-002. The one real gap is architectural rather than local to this unit: `ui/src/lib/utils.ts` currently holds only the single `cn()` classname helper, even though it is the most natural shared home for the triplicated path-utility functions (`parentPathOf`/`basenameOf`) that Batch C's CP-009 found duplicated across `App.tsx`, `ContentPanel.tsx`, and `markdown-navigation.ts` (plus a near-duplicate `basenameOfPath` in `markdown-output.ts`). Those call sites live outside this unit's file list so the duplication itself isn't re-flagged here, but the architecture review should record `utils.ts` as the intended consolidation point — it's currently under-utilized as a shared-lib module despite the project's existing convention of putting cross-cutting non-React helpers in `ui/src/lib/`. No near-duplication was found between `app-helpers.ts`/`sync.ts` and `App.tsx` logic itself, and PK-001's duplicated icon components (Batch D) live outside this unit's files, so no new evidence either way on a shared icons module was gathered here.

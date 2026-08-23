@@ -16,13 +16,13 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 | ui-repo-context | 1 | 1 | 3 | 0 | 4 | 9 | D |
 | ui-terminal-panel | 0 | 1 | 0 | 0 | 1 | 2 | D |
 | ui-picker | 0 | 0 | 5 | 1 | 3 | 9 | D |
-| ui-search | 0 | 0 | 0 | 0 | 0 | 0 | E |
-| ui-file-tree | 0 | 0 | 0 | 0 | 0 | 0 | E |
-| ui-primitives-misc | 0 | 0 | 0 | 0 | 0 | 0 | E |
+| ui-search | 2 | 0 | 0 | 4 | 2 | 8 | E |
+| ui-file-tree | 3 | 0 | 1 | 6 | 2 | 12 | E |
+| ui-primitives-misc | 0 | 3 | 0 | 1 | 0 | 4 | E |
 | native-macos | 0 | 0 | 0 | 0 | 0 | 0 | F |
 
-**Total findings logged**: 72
-**Last updated**: Batch D complete (ui-repo-context, ui-terminal-panel, ui-picker)
+**Total findings logged**: 96
+**Last updated**: Batch E complete (ui-search, ui-file-tree, ui-primitives-misc)
 
 \* ui-app-shell's 7 counted findings exclude AS-003, a required architecture verdict (not a defect) confirming App.tsx is NOT an oversized "god component" — see ui-app-shell.md for the full rationale. This closes plan.md's Q1 open question and tasks.md's T018.
 
