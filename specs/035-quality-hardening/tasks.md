@@ -115,8 +115,8 @@ description: "Task list for the 0.10.3 quality-hardening effort"
 
 ### Synthesis
 
-- [ ] T044 [US1] Write `architecture-review.md`: module boundaries, layering, structural concerns, and an explicit verdict on the `App.tsx`/`ContentPanel` "god component" question raised in T018/T023 (Sonnet 5)
-- [ ] T045 [US1] Finalize `findings/index.md`: full counts by category/severity/status across all 15 units; this is the concrete input Phases 4-8 get expanded from (Sonnet 5)
+- [x] T044 [US1] Write `architecture-review.md`: module boundaries, layering, structural concerns, and an explicit verdict on the `App.tsx`/`ContentPanel` "god component" question raised in T018/T023 (Sonnet 5)
+- [x] T045 [US1] Finalize `findings/index.md`: full counts by category/severity/status across all 15 units; this is the concrete input Phases 4-8 get expanded from (Sonnet 5)
 
 **Checkpoint 7 (Phase 3 complete)**: Present `architecture-review.md` + final findings inventory to user. Get explicit go-ahead before expanding Phases 4-8 below into real task IDs. Commit.
 

@@ -22,8 +22,36 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 | native-macos | 5 | 1 | 2 | 2 | 4 | 14 | F |
 
 **Total findings logged**: 110
-**Last updated**: Batch F complete (native-macos) — Phase 3 review complete, all batches A-F done
+**Last updated**: Phase 3 complete (T044/T045) — `architecture-review.md` written, findings inventory finalized, all 16 units reviewed (batches A-F)
 
 \* ui-app-shell's 7 counted findings exclude AS-003, a required architecture verdict (not a defect) confirming App.tsx is NOT an oversized "god component" — see ui-app-shell.md for the full rationale. This closes plan.md's Q1 open question and tasks.md's T018.
 
 \* ui-content-panel's 9 counted findings exclude CP-010, a required architecture verdict (not a defect) confirming ContentPanel.tsx is NOT an oversized "god component," though it notes an optional (non-mandatory) shrink path — see ui-content-panel.md for the full rationale.
+
+## Totals by category
+
+| Bug | Dead Code | Duplicate | Efficiency | Readability | **Total** |
+|-----|-----------|-----------|------------|--------------|-----------|
+| 16  | 18        | 27        | 21         | 28           | **110**   |
+
+## Totals by severity
+
+| Severity | Count | Notes |
+|----------|-------|-------|
+| High     | 5     | SG-004, SR-001, PK-001, NM-001, NM-004 — see `architecture-review.md` §4 |
+| Medium   | 31    | |
+| Low      | 74    | |
+| **Total**| **110** | |
+
+## Totals by status
+
+All 110 findings are review-confirmed (Pass 1 + Pass 2, with Pass 3 adjudication resolving the disagreements listed in each unit's Adjudication Log) and are **open** in the fix-lifecycle sense — Phase 3 makes no code changes, so nothing has been fixed, deferred, or rejected yet.
+
+| Review status | Count | Meaning |
+|----------------|-------|---------|
+| `verified`     | 109   | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute) |
+| `adjudicated`  | 1     | SH-007 — disputed between Pass 1/Pass 2, resolved (kept) by a targeted Pass 3 |
+
+2 additional findings (AS-003, CP-010) are architecture verdicts, not defects, and are excluded from all counts above — see the unit footnotes.
+
+Phases 4-8 will flip individual findings to `fixed`, `deferred`, or `rejected` as work proceeds; this table should be updated at each of those phases' checkpoints alongside the per-unit table above.
