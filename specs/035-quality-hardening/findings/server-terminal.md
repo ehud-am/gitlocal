@@ -2,21 +2,16 @@
 
 **Scope**: src/terminal/ — PTY session management
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| ST-001 | `src/terminal/types.ts` | 31-36 | bug | medium | `TerminalUnavailableErrorCode` is `'cli_not_found' \| 'pty_unavailable'`, but `session-manager.ts`'s `CreateSessionResult` (line 57) can also return `error: 'session_limit_reached'`, and `handlers/terminal.ts:86` passes that error straight through via `c.json(result.error, ...)` without importing or checking against this type. The UI's independently-maintained copy (`ui/src/types/index.ts:631`) correctly includes `'session_limit_reached'`, so the server-side type is stale and the handler is not actually type-checked against it — it never imports `TerminalUnavailableResponse`/`TerminalUnavailableErrorCode` at all. Runtime impact is muted (the UI's catch-all branch in `TerminalPanel.tsx:69-70` still surfaces the message text), but the API contract type is unsound and would not catch a future regression. | pass1-confirmed | verified |
+| ST-002 | `src/terminal/session-manager.ts` | 34-44 | dead-code | low | `spawnRealPty` is exported but only referenced at line 232 (module-level `sessionManager` construction) within this same file; no other module imports it. Independently confirmed by the project's knip baseline. Tests inject a fake `PtyFactory` instead of importing this. | pass1-confirmed | verified |
+| ST-003 | `src/terminal/session-manager.ts` | 20-25 | dead-code | low | `SpawnPtyOptions` is exported but used only internally as the parameter type for the `PtyFactory` alias (line 27); no other file imports it. Independently confirmed by the project's knip baseline. | pass1-confirmed | verified |
+| ST-004 | `src/terminal/types.ts` | 31-36 | dead-code | medium | `TerminalUnavailableErrorCode` and `TerminalUnavailableResponse` are exported but never imported by any server-side file (`handlers/terminal.ts` builds its error responses with untyped object literals). Confirmed via grep: only `ui/src/types/index.ts`, `ui/src/services/terminalApi.ts`, and `ui/src/components/TerminalPanel/TerminalPanel.tsx` reference these names, and the UI copy is a separately-maintained, more-correct duplicate. Also flagged independently by the project's knip baseline. This compounds ST-001: because nothing on the server imports/uses this type, its staleness went unnoticed by `tsc`. | pass1-confirmed | verified |
+| ST-005 | `src/terminal/session-manager.ts` | 86-91 | efficiency | low | `appendBuffered`'s truncation writes `session.outputBuffer.slice(session.outputBuffer.length - MAX_BUFFERED_OUTPUT_CHARS)`, which can be simplified to `slice(-MAX_BUFFERED_OUTPUT_CHARS)`. Minor readability win more than a real efficiency win (the length lookup is O(1) on a JS string), but removes a redundant expression. | pass1-confirmed | verified |
 
-## Pass 2 (deep review)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
-
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a clean, well-isolated slice: `cli-detection.ts` (pure PATH/login-shell probing), `session-manager.ts` (in-memory PTY session registry with a factory-injection seam for testability), `types.ts` (shared shapes), and `websocket.ts` (thin transport adapter over the session manager) each have a single clear responsibility, and the factory/dependency-injection pattern for `PtyLike`/`PtyFactory` is a good testability boundary given node-pty's native-binary constraint. The main structural wart is the error-code/type duplication between `src/terminal/types.ts` and `ui/src/types/index.ts` (see ST-001/ST-004): the server's `TerminalUnavailableErrorCode` is stale relative to what `session-manager.ts` can actually return, and since `handlers/terminal.ts` never imports/uses these server-side types when building its JSON error response, nothing enforces the contract at the server boundary — only the UI's independently-maintained copy is correct. This reinforces the project-wide SR-001 finding (server/client type duplication) from Batch A: either the handler should be typed against `TerminalUnavailableResponse`/`CreateSessionResult`'s error union so a mismatch fails `tsc`, or the type should be shared with the UI rather than hand-duplicated.

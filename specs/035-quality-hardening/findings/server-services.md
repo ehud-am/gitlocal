@@ -2,21 +2,20 @@
 
 **Scope**: src/services/ — misc server services
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| SV-001 | `src/services/repo-watch.ts` | 69-70 | bug | medium | In the early-return branch of `getSyncStatus` (triggered when `repoPath` is falsy or the branch is not the working-tree branch), `currentPathType`/`resolvedPathType` are computed as `currentPath ? 'file' : 'none'`. This ignores the `'dir'` and `'missing'` variants that `SyncStatus['currentPathType']` allows and that the main code path (line 88, via `getPathType`) correctly computes. `getPathType` (`src/git/repo.ts:603-610`) can return `'dir'` for directories and `'missing'` for nonexistent/out-of-repo paths, so any non-empty `currentPath` that is actually a directory or missing will be misreported as `'file'` whenever the branch check short-circuits (e.g. viewing a non-current branch). The existing test (`tests/unit/services/repo-watch.test.ts:33-42`) only exercises this path with a `currentPath` that is a real file, so the bug is untested and unseen. | pass1-confirmed | verified |
+| SV-002 | `src/services/startup-preferences.ts` | 68-71 | dead-code | low | `getPlatformDocumentsPath` is exported but only referenced internally at line 148 (`resolveStartupFolder`, same file). No other source file imports it; independently flagged by the project's knip baseline; test suite only exercises `getLinuxDocumentsPath` directly. | pass1-confirmed | verified |
+| SV-003 | `src/services/startup-preferences.ts` | 189-197 | bug | low | The final home-fallback branch of `resolveStartupFolder` calls `canonicalDirectory(homePath)` (internally `realpathSync(resolve(path))`) unconditionally, with no prior `isReadableDirectory` guard — unlike the explicit, last-used, and platform-default branches, which all check readability first. If `homePath` is missing/unreadable, this throws an uncaught exception instead of degrading gracefully; `resolveStartupFolder` is called at startup (`src/cli.ts:64`, `src/server.ts:100`) with no surrounding try/catch and no process-level `uncaughtException` handler, so this could crash startup. Untested — `tests/unit/services/startup-preferences.test.ts`'s "falls back to home" test always uses a valid, readable `homePath`. **Adjudicated (kept)**: real, narrow gap; trivial fix (reuse the existing `isReadableDirectory` guard used three times above); kept at low severity for maintainer triage rather than dismissed as an acceptable edge case. | pass2-added | verified |
+| SV-004 | `src/services/repo-watch.ts` | 13-24 | duplicate | low | `emptyChangedFilesSummary()` builds an 8-field zero-value object (`total, modified, added, deleted, renamed, untracked, remoteRelevant, tracked`). `src/handlers/sync.ts:33-42` hand-rolls the identical object literal inline instead of importing/calling this helper — `sync.ts` does not import `emptyChangedFilesSummary`, and the helper is not currently exported from `repo-watch.ts`. **Adjudicated (kept)**: verified real and anchored inside this unit's files, but remediation (exporting the helper + updating `handlers/sync.ts`) spans into the Batch A `server-handlers` unit — flagged for coordination with that unit's fix work rather than unilateral action here. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Adjudication Log
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+- SV-003 (`startup-preferences.ts:189-197`): disputed on whether a rare degraded-HOME scenario is worth hardening vs. accepted edge case. Adjudicator verified no try/catch or uncaughtException handler exists at either call site, and the fix is a one-line reuse of an existing guard — **kept**, low severity.
+- SV-004 (`repo-watch.ts:13-24` / `handlers/sync.ts:33-42`): disputed on whether a duplicate spanning outside this unit's assigned files is in-scope. Adjudicator confirmed `src/handlers/` was Batch A's scope and `src/services/` is this unit's scope, but since the duplicate's anchor point sits inside this unit's own file, **kept** — flagged as requiring cross-batch coordination when fixed.
 
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is small, focused, and well-tested. `repo-watch.ts` is a thin, single-purpose service (one exported function, `getSyncStatus`) that composes primitives from `git/repo.ts` into a `SyncStatus` DTO for the sync handler — good separation of concerns. `startup-preferences.ts` cleanly separates three concerns (startup-folder preference, default-reader preference, platform documents-path resolution) behind simple read/write functions with sensible env-var overrides for testability. The main structural smell is that `getSyncStatus`'s early-return branch duplicates field-shape logic from the main path but computes two derived fields with a cruder heuristic instead of reusing `getPathType` — the root cause of SV-001, and a sign the early-return object literal should share more logic with the main path rather than being maintained as a parallel copy. The only cross-unit boundary concern is SV-004: the handler layer occasionally reaches for local literals instead of importing shared constructors from the service layer.
