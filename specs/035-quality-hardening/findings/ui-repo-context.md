@@ -1,22 +1,21 @@
 # Findings: ui-repo-context
 
-**Scope**: ui/src/components/RepoContext/ — repo/branch context UI
+**Scope**: ui/src/components/RepoContext/ — repo/branch context header, changed-files panel, branch-switch dialog
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| RC-001 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 287-290, 316-319 | duplicate | medium | The close-button SVG (X icon) is byte-for-byte identical in both changed-files-panel branches. Unlike `ChevronIcon`/`EditIcon`/`HomeIcon`/`ReadmeIcon`, already extracted as named components at the top of the file, this icon is inlined twice instead of following the same pattern as a `CloseIcon()` component. | pass1-confirmed | verified |
+| RC-002 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 279-325 | duplicate | medium | The `items.length > 0` branch (280-309) and the empty-state branch (311-324) both render a `<section className="changed-files-panel">` with an identical header/title/close-button block, differing only in the body content. Could collapse into one section with conditional body content, removing ~15 duplicated lines. | pass1-confirmed | verified |
+| RC-003 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 206-263 | duplicate | medium | Home and Readme nav are each rendered as two nearly-identical `<Button>` elements (icon-only for small screens, labeled for large), repeated once for Home and once for Readme — 4 near-identical blocks differing only in icon, label, className breakpoint, onClick, and disabled flag. A small responsive-nav-button helper would collapse this to one parameterized implementation. | pass1-confirmed | verified |
+| RC-004 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 139 | readability | low | `showSyncBadge` combines a truthiness check with a negated compound condition, making the intent (hide the "up to date" badge once local changes exist) non-obvious. Extracting the inner condition to a named variable (e.g. `isStaleUpToDateBadge`) would clarify intent. | pass1-confirmed | verified |
+| RC-005 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 145 | readability | low | `hasTags` wraps values in `Boolean()` unnecessarily inside a boolean OR expression, and `showSyncBadge && Boolean(repoSyncBadge)` is doubly redundant since `showSyncBadge` (line 139) already requires `Boolean(repoSyncBadge)` to be true — reduces to just `showSyncBadge`. | pass1-confirmed | verified |
+| RC-006 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 197, 284 | readability | low | Inline singular/plural ternaries appear twice in this file, duplicating logic that already exists as a reusable `pluralize()` helper in the sibling file `BranchSwitchDialog.tsx` (lines 27-29) but isn't imported/shared here. Consolidating into one shared utility would remove the duplicated ternary pattern across both files. | pass1-confirmed | verified |
+| RC-007 | `ui/src/components/RepoContext/BranchSwitchDialog.tsx` | 27-29 | dead-code | low | `pluralize()` is defined but called exactly once (line 69) — not dead in the strict sense, but a generalized utility introduced for a single call site; confirmed via repo-wide grep that no other file imports or uses it. Better framed as a single-use abstraction than true dead code; see RC-006 for the shared-utility angle. | pass1-confirmed | verified |
+| RC-008 | `ui/src/components/RepoContext/RepoContextHeader.tsx` + `ui/src/App.tsx` | RepoContextHeader.tsx: 27, 106-129; App.tsx: 1446 | bug | medium | `syncActionLabel?: string` is declared in `Props` (line 27) and the caller `App.tsx` computes and passes it via `syncActionLabel={getRepoSyncActionLabel(repoSync)}` (App.tsx:1446), but `RepoContextHeader`'s destructured parameter list never includes `syncActionLabel`, and grep confirms no reference to it anywhere else in the component body — the prop is silently dropped. Either the sync-badge UI is missing an intended action label/tooltip, or the prop and its caller-side computation are dead and should be removed. | pass2-added | verified |
+| RC-009 | `ui/src/components/RepoContext/RepoContextHeader.tsx` | 146, 189 | readability | low | `hasRootReadme` is misleadingly named — it does not test for a root README's presence; it tests whether the Home or Readme nav button should be considered for rendering (gates the meta-tag/button row's visibility at line 189). A name like `hasNavActions` would better reflect its purpose. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
-
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+This unit is a presentational pair: `RepoContextHeader` is a fairly large (400+ line) single-file component mixing four loosely-related concerns — branch selector, sync/remote status badges, a changed-files panel, and an expandable details drawer — plus five inline SVG icon components. It composes cleanly with `BranchSwitchDialog` (passed through as a `branchSwitchDialog` ReactNode prop rather than imported directly, keeping `RepoContextHeader` decoupled from branch-switch business logic). The main structural smell is repeated JSX shapes (icon-only/labeled button pairs, the two changed-files-panel branches, inline pluralization) that would benefit from small local sub-components or a `pluralize` utility shared between the two files (RC-001, RC-002, RC-003, RC-006/RC-007). The confirmed unused `syncActionLabel` prop (RC-008) suggests either an incomplete feature or drift from a prior refactor — worth flagging in the architecture review as a signal to audit for other props threaded through App.tsx that aren't actually consumed downstream.

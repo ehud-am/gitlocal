@@ -1,22 +1,25 @@
 # Findings: ui-picker
 
-**Scope**: ui/src/components/Picker/ — folder/repo picker UI
+**Scope**: ui/src/components/Picker/ — pre-shell folder/repo picker screen
 
-## Pass 1 (mechanical sweep)
+## Findings
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| PK-001 | `ui/src/components/Picker/PickerPage.tsx` | 10-15, 18-29, 41-51 | duplicate | high | `ParentFolderIcon`, `ThemeIcon`, and `PanelToggleIcon` are byte-for-byte identical to `App.tsx` lines 110-115, 87-98, and 129-139 respectively. No shared icons module exists anywhere in `ui/src` (confirmed via search), so this duplication is systemic, not unique to this file pair. Should be extracted to a shared `ui/src/components/ui/icons.tsx`. | pass1-confirmed | verified |
+| PK-002 | `ui/src/components/Picker/PickerPage.tsx` | 352-366, 450-462 | duplicate | medium | The `onDoubleClick` handler (isParent → loadPath; dir-and-not-repo → loadPath; else → handleOpenPath) is duplicated near-verbatim between the sidebar tree rendering and the table rendering, differing only in a redundant extra guard in the sidebar version. Could be extracted to a single `handleEntryActivate(entry)` function shared by both renderers. | pass1-confirmed | verified |
+| PK-003 | `ui/src/components/Picker/PickerPage.tsx` | 343-381, 446-492 | duplicate | medium | `rows.map()` is invoked twice (sidebar list, table body) with the same underlying entry data, selection state, and click/double-click semantics, only differing in markup (div vs tr/td). The shared selection/activation logic could be factored into a common hook while leaving markup separate. | pass1-confirmed | verified |
+| PK-004 | `ui/src/components/Picker/PickerPage.tsx` | 353-365 | readability | low | Line 353 returns early when `entry.isParent` is true, so by line 358 `entry.isParent` is always false; the `!entry.isParent &&` at line 358 and the `if (!entry.isParent)` at line 363 are both dead/redundant conditions that only obscure the actual logic (dir-not-repo → loadPath, else → handleOpenPath). | pass1-confirmed | verified |
+| PK-005 | `ui/src/components/Picker/PickerPage.tsx` | 456 | readability | low | The table double-click handler omits the redundant `!entry.isParent &&` guard that the sidebar handler (line 358) includes after both already early-return on `entry.isParent`. Behaviorally identical (both leave `entry.isParent` guaranteed false past the early return) — a stylistic inconsistency, not a functional bug; worth normalizing once PK-004's redundant guard is removed. | pass1-confirmed | verified |
+| PK-006 | `ui/src/components/Picker/PickerPage.tsx` | 271-276 | efficiency | low | `rows` is a plain array literal rebuilt on every render, including renders triggered only by clicking a row to update selection, not just when entries/parentPath change. Wrapping in `useMemo(() => [...], [parentPath, entries])` would avoid the reallocation on selection-only re-renders. Impact is low since directory listings are typically small. | pass1-confirmed | verified |
+| PK-007 | `ui/src/components/Picker/PickerPage.tsx` | 162-202 | duplicate | low | `handleSubmit` (162-184) and `handleOpenPath` (186-202) both call `api.openRepository`, branch on `result.ok` into `reloadAfterOpen` vs `setError`, and share the same catch/finally `setLoading(false)` boilerplate. `handleSubmit` is effectively `handleOpenPath(path.trim())` plus an empty-path validation check and could delegate to it. | pass2-added | verified |
+| PK-008 | `ui/src/components/Picker/PickerPage.tsx` | 204-269 | duplicate | low | `handleCreateFolder`, `handleInitGit`, and `handleCloneIntoChild` each repeat the same `setError('')` / `setLoading(true)` / try-catch-with-generic-message / finally `setLoading(false)` skeleton around a single api call. A small helper (e.g. `runFolderAction(fn, failureMessage)`) could remove ~5 repeated lines from each of the three handlers. | pass2-added | verified |
+| PK-009 | `ui/src/components/Picker/PickerPage.tsx` | 333, 349 | readability | low | **Adjudicated (kept)**: the sidebar list uses `role="tree"`/`role="treeitem"` with `aria-expanded={entry.type === 'dir' ? false : undefined}`, but nothing in this component ever expands a node in place — double-clicking a directory navigates to a new listing via `loadPath` rather than expanding a nested subtree. Verified against `FileTree.tsx`/`FileTreeNode.tsx` (the genuine tree widget using the same CSS classes), which has dynamic `aria-expanded` bound to real toggle state and in-place expansion; PickerPage has no expand state, no keyboard tree navigation (grepped: no `onKeyDown`/`ArrowRight`/`tabIndex`), and `aria-expanded` is permanently `false`. This is copy-pasted tree markup/CSS from FileTree without the corresponding behavior — misinforms assistive tech that items are collapsible/hierarchical when the list is flat and navigation-based. A listbox/option or plain button-list pattern would better match the real interaction. | pass2-added | verified |
 
-## Pass 2 (deep review)
+## Adjudication Log
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
+- `PickerPage.tsx:333,349` (`role="tree"`/`treeitem` with static `aria-expanded`, disputed by Pass 2): **kept**. Adjudicator confirmed via comparison against `FileTree.tsx`/`FileTreeNode.tsx` that the tree/treeitem roles here are copy-pasted markup without the corresponding expand-in-place behavior or keyboard support that the genuine tree widget has — a real, if low-severity, a11y semantics issue rather than an intentional design tradeoff. See PK-009.
 
-## Pass 3 (adjudication, only if Pass 1/Pass 2 disagree)
+## Architecture Notes
 
-| ID | File | Lines | Category | Severity | Evidence | Status | Resolving Commit |
-|----|------|-------|----------|----------|----------|--------|-------------------|
-| | | | | | | | |
-
+`PickerPage.tsx` is a self-contained pre-shell screen (rendered by App.tsx when `info.pickerMode` is true, before a repo is opened) with its own state machine for folder browsing, distinct from `FileTree.tsx`'s lazy-expanding in-repo tree — the two don't actually duplicate navigation logic, since FileTree handles recursive expand/collapse of an open repo's tree while PickerPage does flat single-level directory listing with server-round-trip navigation (`loadPath`). The real duplication is narrower than "picker duplicates FileTree": (1) three icon components copy-pasted verbatim from App.tsx (PK-001 — no shared icon module exists anywhere in `ui/src`, so this is a systemic gap, not unique to this file), and (2) the file renders the same row data twice (sidebar tree-style list and main table) with duplicated double-click/selection logic (PK-002, PK-003), plus a family of five async handlers (open/create/init/clone) that repeat the same try/set-loading/set-error/finally boilerplate (PK-007, PK-008). At 526 lines with 7 inline SVG icon components plus the full picker state/handlers, the file is doing a lot in one place; splitting the icons out (shared module) and extracting a `renderEntryRow`/`useEntryActions`-style helper for the sidebar+table would meaningfully shrink it without changing behavior. None of the duplication is a functional bug — the sidebar/table double-click handlers are behaviorally identical despite a stylistic guard difference (PK-004, PK-005).
