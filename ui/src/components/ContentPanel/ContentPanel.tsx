@@ -319,7 +319,7 @@ export default function ContentPanel({
     [canSearchCurrentFile, data?.content, fileFindCaseSensitive, trimmedFileFindQuery],
   )
   const activeFileFindMatch = fileFindMatches[activeFileFindIndex] ?? null
-  const visibleFileFindMatches = fileFindMatches.slice(0, 12)
+  const visibleFileFindMatches = useMemo(() => fileFindMatches.slice(0, 12), [fileFindMatches])
 
   useEffect(() => {
     onDirtyChange?.(dirty)

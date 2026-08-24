@@ -5,6 +5,7 @@ import type { GeneratedLocalVisibility, SearchResult, SearchScope, TreeNode } fr
 import {
   classifyGeneratedLocalState,
   getTrackedPathType,
+  getTrackedWorkingTreeFiles,
   listWorkingTreeDirectoryEntries,
   normalizeRepoRelativePath,
   resolveSafeRepoPath,
@@ -49,7 +50,7 @@ export function listWorkingTreeDir(repoPath: string, subpath: string = ''): Tree
   return listWorkingTreeDirectoryEntries(repoPath, subpath)
 }
 
-function getSearchableWorkingTreeEntries(repoPath: string, subpath: string = ''): TreeNode[] {
+function getSearchableWorkingTreeEntries(repoPath: string, subpath: string, trackedFiles: string[]): TreeNode[] {
   const normalized = normalizeRepoRelativePath(subpath)
   const dirPath = normalized ? resolveSafeRepoPath(repoPath, normalized) : repoPath
 
@@ -59,7 +60,7 @@ function getSearchableWorkingTreeEntries(repoPath: string, subpath: string = '')
   const results: TreeNode[] = []
 
   for (const entry of entries) {
-    const trackedType = getTrackedPathType(repoPath, entry.path)
+    const trackedType = getTrackedPathType(repoPath, entry.path, trackedFiles)
     const included = entry.localOnly || trackedType === entry.type
     if (!included) continue
 
@@ -68,7 +69,7 @@ function getSearchableWorkingTreeEntries(repoPath: string, subpath: string = '')
     // Avoid crawling ignored/local-only directories like node_modules or nested worktrees.
     // We still surface the directory itself as a name match from the parent listing.
     if (entry.type === 'dir' && trackedType === 'dir') {
-      results.push(...getSearchableWorkingTreeEntries(repoPath, entry.path))
+      results.push(...getSearchableWorkingTreeEntries(repoPath, entry.path, trackedFiles))
     }
   }
 
@@ -97,8 +98,8 @@ function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown|mdx|mdown)$/i.test(path)
 }
 
-function matchesTrackedMode(repoPath: string, path: string, trackedMode: SearchScope['trackedMode']): boolean {
-  const state = classifyGeneratedLocalState(repoPath, path)
+function matchesTrackedMode(repoPath: string, path: string, trackedMode: SearchScope['trackedMode'], trackedFiles: string[]): boolean {
+  const state = classifyGeneratedLocalState(repoPath, path, trackedFiles)
   if (trackedMode === 'tracked-only') return state === 'tracked'
   if (trackedMode === 'generated-local-only') return state !== 'tracked'
   return true
@@ -120,7 +121,8 @@ export function filterTreeByGeneratedLocalVisibility(
 }
 
 export function searchWorkingTreeByName(repoPath: string, query: string, caseSensitive: boolean): TreeNode[] {
-  const entries = getSearchableWorkingTreeEntries(repoPath)
+  const trackedFiles = getTrackedWorkingTreeFiles(repoPath)
+  const entries = getSearchableWorkingTreeEntries(repoPath, '', trackedFiles)
   const needle = caseSensitive ? query : query.toLowerCase()
   return entries.filter((entry) => {
     const hay = caseSensitive ? entry.path : entry.path.toLowerCase()
@@ -129,7 +131,8 @@ export function searchWorkingTreeByName(repoPath: string, query: string, caseSen
 }
 
 export function searchWorkingTreeByContent(repoPath: string, query: string, caseSensitive: boolean): Array<TreeNode & { snippet: string; line: number }> {
-  const entries = getSearchableWorkingTreeEntries(repoPath).filter((entry) => entry.type === 'file')
+  const trackedFiles = getTrackedWorkingTreeFiles(repoPath)
+  const entries = getSearchableWorkingTreeEntries(repoPath, '', trackedFiles).filter((entry) => entry.type === 'file')
   const matches: Array<TreeNode & { snippet: string; line: number }> = []
 
   for (const entry of entries) {
@@ -145,9 +148,10 @@ export function searchWorkingTreeByContent(repoPath: string, query: string, case
 }
 
 export function searchWorkingTreeScoped(repoPath: string, query: string, scope: SearchScope): SearchResult[] {
+  const trackedFiles = getTrackedWorkingTreeFiles(repoPath)
   const normalizedRoot = normalizeRepoRelativePath(scope.rootPath)
-  const entries = getSearchableWorkingTreeEntries(repoPath, normalizedRoot)
-    .filter((entry) => matchesTrackedMode(repoPath, entry.path, scope.trackedMode))
+  const entries = getSearchableWorkingTreeEntries(repoPath, normalizedRoot, trackedFiles)
+    .filter((entry) => matchesTrackedMode(repoPath, entry.path, scope.trackedMode, trackedFiles))
   const needle = scope.caseSensitive ? query : query.toLowerCase()
   const results: SearchResult[] = []
 
@@ -155,7 +159,7 @@ export function searchWorkingTreeScoped(repoPath: string, query: string, scope: 
     for (const entry of entries) {
       const hay = scope.caseSensitive ? entry.path : entry.path.toLowerCase()
       if (!needle || !hay.includes(needle)) continue
-      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path, trackedFiles)
       results.push({
         path: entry.path,
         type: entry.type,
@@ -177,7 +181,7 @@ export function searchWorkingTreeScoped(repoPath: string, query: string, scope: 
       if (statSync(fullPath).size > 512_000) continue
       const snippet = readSnippet(fullPath, query, scope.caseSensitive)
       if (!snippet) continue
-      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path, trackedFiles)
       results.push({
         path: entry.path,
         type: 'file',

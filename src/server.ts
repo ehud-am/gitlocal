@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import {
   infoHandler,
@@ -309,17 +310,13 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
     }),
   )
   // SPA fallback — serve index.html for any unmatched path
-  app.get('/*', async (c) => {
-    return c.html(
-      await import('node:fs').then((fs) => {
-        try {
-          return fs.readFileSync(join(uiDir, 'index.html'), 'utf-8')
-          /* v8 ignore next 3 */
-        } catch {
-          return '<html><body><p>UI not built. Run <code>npm run build:ui</code></p></body></html>'
-        }
-      }),
-    )
+  app.get('/*', (c) => {
+    try {
+      return c.html(readFileSync(join(uiDir, 'index.html'), 'utf-8'))
+      /* v8 ignore next 3 */
+    } catch {
+      return c.html('<html><body><p>UI not built. Run <code>npm run build:ui</code></p></body></html>')
+    }
   })
 
   return app

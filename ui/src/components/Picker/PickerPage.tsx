@@ -216,12 +216,15 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
     }, 'Failed to clone the repository from GitLocal.')
   }
 
-  const rows = [
-    ...(parentPath
-      ? [{ name: '..', path: parentPath, type: 'dir' as const, isGitRepo: false, isParent: true as const }]
-      : []),
-    ...entries.map((entry) => ({ ...entry, isParent: false as const })),
-  ]
+  const rows = useMemo(
+    () => [
+      ...(parentPath
+        ? [{ name: '..', path: parentPath, type: 'dir' as const, isGitRepo: false, isParent: true as const }]
+        : []),
+      ...entries.map((entry) => ({ ...entry, isParent: false as const })),
+    ],
+    [parentPath, entries],
+  )
 
   function handleEntryActivate(entry: (typeof rows)[number]): void {
     if (entry.isParent) {

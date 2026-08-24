@@ -802,10 +802,10 @@ export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
   }
 }
 
-export function getTrackedPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
+export function getTrackedPathType(repoPath: string, filePath: string, trackedFiles?: string[]): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
 
-  const files = getTrackedWorkingTreeFiles(repoPath)
+  const files = trackedFiles ?? getTrackedWorkingTreeFiles(repoPath)
   if (files.includes(filePath)) return 'file'
   return files.some((candidate) => candidate.startsWith(`${filePath}/`)) ? 'dir' : 'missing'
 }
@@ -1020,18 +1020,19 @@ function isLikelyGeneratedPath(path: string): boolean {
   return /(^|\/)(node_modules|dist|build|coverage|\.vite|\.next|\.turbo|target|DerivedData)(\/|$)/.test(normalized)
 }
 
-function isTrackedRepoPath(repoPath: string, filePath: string): boolean {
+function isTrackedRepoPath(repoPath: string, filePath: string, trackedFiles?: string[]): boolean {
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized) return false
+  if (trackedFiles) return trackedFiles.includes(normalized)
   const result = runGitCapture(repoPath, 'ls-files', '--error-unmatch', normalized)
   return result.status === 0
 }
 
-export function classifyGeneratedLocalState(repoPath: string, filePath: string): GeneratedLocalState {
+export function classifyGeneratedLocalState(repoPath: string, filePath: string, trackedFiles?: string[]): GeneratedLocalState {
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized || !validateRepo(repoPath)) return 'unknown'
-  if (isTrackedRepoPath(repoPath, normalized)) return 'tracked'
-  const trackedType = getTrackedPathType(repoPath, normalized)
+  if (isTrackedRepoPath(repoPath, normalized, trackedFiles)) return 'tracked'
+  const trackedType = getTrackedPathType(repoPath, normalized, trackedFiles)
   if (trackedType !== 'missing') return 'tracked'
   if (isIgnoredPath(repoPath, normalized)) return isLikelyGeneratedPath(normalized) ? 'generated' : 'ignored'
   return getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only'

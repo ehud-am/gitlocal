@@ -24,6 +24,11 @@ export default function InlineFileEditor({ path, content, busy = false, error, o
   const [history, setHistory] = useState<EditorHistoryState>(() => createEditorHistory(content))
   const isConflict = Boolean(error && /changed on disk|revision token|reload/i.test(error))
 
+  const historyRef = useRef(history)
+  historyRef.current = history
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
   useEffect(() => {
     setHistory(createEditorHistory(content))
   }, [path])
@@ -57,17 +62,21 @@ export default function InlineFileEditor({ path, content, busy = false, error, o
       if (!editorHasFocus()) return
       if (command === 'undo') {
         event.preventDefault()
-        handleUndo()
+        const next = undoEditorChange(historyRef.current)
+        setHistory(next)
+        onChangeRef.current(next.present)
       }
       if (command === 'redo') {
         event.preventDefault()
-        handleRedo()
+        const next = redoEditorChange(historyRef.current)
+        setHistory(next)
+        onChangeRef.current(next.present)
       }
     }
 
     window.addEventListener('gitlocal:native-command', handleNativeCommand)
     return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
-  })
+  }, [])
 
   return (
     <div className="manual-editor-card manual-editor-expanded">
