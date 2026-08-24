@@ -41,6 +41,7 @@ import type {
   StartupOpenTargetResponse,
   TreeNode,
 } from '../types'
+import { getJson } from './httpClient'
 
 const BASE = ''
 
@@ -52,19 +53,22 @@ interface SearchOptions {
   cursor?: string
 }
 
-async function request<T>(path: string): Promise<T> {
-  const res = await fetch(BASE + path)
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({
-      error: res.statusText,
-      code: 'UNKNOWN',
-    }))
-    throw err
-  }
-  return res.json() as Promise<T>
+function buildQuery(params: URLSearchParams): string {
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
 }
 
-async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: unknown): Promise<T> {
+async function request<T>(path: string): Promise<T> {
+  return getJson<T>(BASE + path, (res) => ({ error: res.statusText, code: 'UNKNOWN' }))
+}
+
+async function mutate<T>(
+  path: string,
+  method: 'POST' | 'PUT' | 'DELETE',
+  body: unknown,
+  opts: { throwOnError?: boolean; fallback?: (res: Response) => T } = {},
+): Promise<T> {
+  const { throwOnError = true, fallback } = opts
   const res = await fetch(BASE + path, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -73,36 +77,30 @@ async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: 
 
   const payload = await res.json().catch(
     () =>
-      ({
-        error: res.statusText,
-        code: 'UNKNOWN',
-      }) satisfies ApiError,
+      (fallback
+        ? fallback(res)
+        : ({
+            error: res.statusText,
+            code: 'UNKNOWN',
+          } satisfies ApiError)) as T,
   )
 
-  if (!res.ok) {
+  if (!res.ok && throwOnError) {
     throw payload
   }
 
   return payload as T
 }
 
-async function branchSwitchRequest(payload: BranchSwitchRequest): Promise<BranchSwitchResponse> {
-  const res = await fetch(BASE + '/api/branches/switch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+function branchSwitchRequest(payload: BranchSwitchRequest): Promise<BranchSwitchResponse> {
+  return mutate<BranchSwitchResponse>('/api/branches/switch', 'POST', payload, {
+    throwOnError: false,
+    fallback: (res) => ({
+      ok: false,
+      status: 'failed',
+      message: res.statusText || 'Branch switch failed.',
+    }),
   })
-
-  const body = await res.json().catch(
-    () =>
-      ({
-        ok: false,
-        status: 'failed',
-        message: res.statusText || 'Branch switch failed.',
-      }) satisfies BranchSwitchResponse,
-  )
-
-  return body as BranchSwitchResponse
 }
 
 export const api = {
@@ -130,16 +128,14 @@ export const api = {
   getRepoSummary: (branch?: string): Promise<RepoSummaryResponse> => {
     const params = new URLSearchParams()
     if (branch) params.set('branch', branch)
-    const qs = params.toString()
-    return request(`/api/repo/summary${qs ? '?' + qs : ''}`)
+    return request(`/api/repo/summary${buildQuery(params)}`)
   },
 
   getChangedFiles: (branch?: string, includeGeneratedLocal = false): Promise<ChangedFilesResponse> => {
     const params = new URLSearchParams()
     if (branch) params.set('branch', branch)
     if (includeGeneratedLocal) params.set('includeGeneratedLocal', 'true')
-    const qs = params.toString()
-    return request(`/api/repo/changes${qs ? '?' + qs : ''}`)
+    return request(`/api/repo/changes${buildQuery(params)}`)
   },
 
   getNavigationHints: (
@@ -151,8 +147,7 @@ export const api = {
     if (branch) params.set('branch', branch)
     if (!includeRecent) params.set('includeRecent', 'false')
     if (includeGeneratedLocal) params.set('includeGeneratedLocal', 'true')
-    const qs = params.toString()
-    return request(`/api/repo/navigation-hints${qs ? '?' + qs : ''}`)
+    return request(`/api/repo/navigation-hints${buildQuery(params)}`)
   },
 
   getBranches: (): Promise<Branch[]> => request('/api/branches'),
@@ -161,15 +156,14 @@ export const api = {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
     if (branch) params.set('branch', branch)
-    const qs = params.toString()
-    return request(`/api/tree${qs ? '?' + qs : ''}`)
+    return request(`/api/tree${buildQuery(params)}`)
   },
 
   getFile: (path: string, branch?: string, raw?: boolean): Promise<FileContent> => {
     const params = new URLSearchParams({ path })
     if (branch) params.set('branch', branch)
     if (raw) params.set('raw', 'true')
-    return request(`/api/file?${params.toString()}`)
+    return request(`/api/file${buildQuery(params)}`)
   },
 
   createFile: (payload: ManualFileMutationRequest): Promise<ManualFileOperationResult> =>
@@ -186,7 +180,7 @@ export const api = {
 
   getFolderDeletePreview: (path: string): Promise<FolderOperationResult> => {
     const params = new URLSearchParams({ path })
-    return request(`/api/folder/delete-preview?${params.toString()}`)
+    return request(`/api/folder/delete-preview${buildQuery(params)}`)
   },
 
   deleteFolder: (payload: FolderDeleteRequest): Promise<FolderOperationResult> =>
@@ -196,24 +190,21 @@ export const api = {
     const params = new URLSearchParams()
     if (branch) params.set('branch', branch)
     if (limit !== undefined) params.set('limit', limit.toString())
-    const qs = params.toString()
-    return request(`/api/commits${qs ? '?' + qs : ''}`)
+    return request(`/api/commits${buildQuery(params)}`)
   },
 
   getReadme: (path?: string, branch?: string): Promise<{ path: string }> => {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
     if (branch) params.set('branch', branch)
-    const qs = params.toString()
-    return request(`/api/readme${qs ? '?' + qs : ''}`)
+    return request(`/api/readme${buildQuery(params)}`)
   },
 
   getRepoLocation: (path?: string, branch?: string): Promise<RepoLocationResponse> => {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
     if (branch) params.set('branch', branch)
-    const qs = params.toString()
-    return request(`/api/repo/location${qs ? '?' + qs : ''}`)
+    return request(`/api/repo/location${buildQuery(params)}`)
   },
 
   switchBranch: (payload: BranchSwitchRequest): Promise<BranchSwitchResponse> =>
@@ -249,21 +240,20 @@ export const api = {
     if (options.trackedMode) params.set('trackedMode', options.trackedMode)
     if (options.limit !== undefined) params.set('limit', String(options.limit))
     if (options.cursor) params.set('cursor', options.cursor)
-    return request(`/api/search?${params.toString()}`)
+    return request(`/api/search${buildQuery(params)}`)
   },
 
   getSyncStatus: (path: string, branch?: string): Promise<SyncStatus> => {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
     if (branch) params.set('branch', branch)
-    return request(`/api/sync?${params.toString()}`)
+    return request(`/api/sync${buildQuery(params)}`)
   },
 
   getFolderBrowse: (path?: string): Promise<FolderBrowseResponse> => {
     const params = new URLSearchParams()
     if (path) params.set('path', path)
-    const qs = params.toString()
-    return request(`/api/folder/browse${qs ? '?' + qs : ''}`)
+    return request(`/api/folder/browse${buildQuery(params)}`)
   },
 
   openRepository: (path: string): Promise<LocalActionResponse> =>

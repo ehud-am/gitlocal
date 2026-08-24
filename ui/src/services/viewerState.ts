@@ -202,17 +202,22 @@ export function readRecentItems(): RecentItem[] {
   return readRecentItemsFromStorage()
 }
 
-export function rememberRecentItem(item: RecentItem): RecentItem[] {
+function normalizeRecentItem(item: RecentItem, timestampField: 'lastViewedAt' | 'lastChangedAt'): RecentItem | null {
   const normalizedPath = item.path.trim()
-  if (!normalizedPath) return readRecentItemsFromStorage()
-
-  const nextItem: RecentItem = {
+  if (!normalizedPath) return null
+  return {
     ...item,
     path: normalizedPath,
     label: item.label || normalizedPath.split('/').pop() || normalizedPath,
-    lastViewedAt: item.lastViewedAt ?? new Date().toISOString(),
+    [timestampField]: item[timestampField] ?? new Date().toISOString(),
   }
-  const withoutDuplicate = readRecentItemsFromStorage().filter((existing) => existing.path !== normalizedPath)
+}
+
+export function rememberRecentItem(item: RecentItem): RecentItem[] {
+  const nextItem = normalizeRecentItem(item, 'lastViewedAt')
+  if (!nextItem) return readRecentItemsFromStorage()
+
+  const withoutDuplicate = readRecentItemsFromStorage().filter((existing) => existing.path !== nextItem.path)
   const next = [nextItem, ...withoutDuplicate].slice(0, MAX_RECENT_ITEMS)
   if (typeof window.localStorage?.setItem === 'function') {
     window.localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(next))
@@ -223,15 +228,9 @@ export function rememberRecentItem(item: RecentItem): RecentItem[] {
 export function rememberRecentChangedItems(items: RecentItem[]): RecentItem[] {
   let current = readRecentItemsFromStorage()
   for (const item of items) {
-    const normalizedPath = item.path.trim()
-    if (!normalizedPath) continue
-    const nextItem: RecentItem = {
-      ...item,
-      path: normalizedPath,
-      label: item.label || normalizedPath.split('/').pop() || normalizedPath,
-      lastChangedAt: item.lastChangedAt ?? new Date().toISOString(),
-    }
-    current = [nextItem, ...current.filter((existing) => existing.path !== normalizedPath)].slice(0, MAX_RECENT_ITEMS)
+    const nextItem = normalizeRecentItem(item, 'lastChangedAt')
+    if (!nextItem) continue
+    current = [nextItem, ...current.filter((existing) => existing.path !== nextItem.path)].slice(0, MAX_RECENT_ITEMS)
   }
 
   if (typeof window.localStorage?.setItem === 'function') {
