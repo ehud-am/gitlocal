@@ -65,7 +65,7 @@ export function getLinuxDocumentsPath(homePath = homedir(), env = process.env): 
   return join(homePath, 'Documents')
 }
 
-export function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
+function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
   if (platform() === 'linux') return getLinuxDocumentsPath(homePath, env)
   return join(homePath, 'Documents')
 }

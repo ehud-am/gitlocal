@@ -5,12 +5,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var service: GitLocalService?
     private var windowController: ViewerWindowController?
     private var pendingOpenFilePaths: [String] = []
-    private var serviceStarted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let service = GitLocalService()
         self.service = service
-        serviceStarted = true
         let initialOpenPath = pendingOpenFilePaths.last
 
         service.start(openPath: initialOpenPath) { [weak self] result in
@@ -51,9 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         pendingOpenFilePaths.append(contentsOf: markdownPaths)
-        if !serviceStarted {
-            return
-        }
         flushPendingOpenFiles()
     }
 

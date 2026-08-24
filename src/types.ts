@@ -524,13 +524,6 @@ export interface NavigationHintsResponse {
   changedItems: ChangedFileItem[]
 }
 
-export interface SearchRequest {
-  query: string
-  branch?: string
-  mode: SearchMode
-  caseSensitive?: boolean
-}
-
 export interface SearchResult {
   path: string
   type: 'file' | 'dir'

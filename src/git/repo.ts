@@ -369,12 +369,8 @@ export function classifyLocalPath(inputPath: string): LocalPathClassification {
   }
 }
 
-export function isRepositoryRoot(repoPath: string): boolean {
-  return classifyLocalPath(repoPath).gitState === 'repository-root'
-}
-
 export function validateRepo(repoPath: string): boolean {
-  return isRepositoryRoot(repoPath)
+  return classifyLocalPath(repoPath).gitState === 'repository-root'
 }
 
 export function getCurrentBranch(repoPath: string): string {
@@ -874,7 +870,7 @@ export function getWorkingTreeChanges(repoPath: string): WorkingTreeChangeSummar
   }
 }
 
-export function getCurrentUpstreamRef(repoPath: string): string {
+function getCurrentUpstreamRef(repoPath: string): string {
   const result = runGitCapture(repoPath, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}')
   return result.status === 0 ? result.stdout.trim() : ''
 }
