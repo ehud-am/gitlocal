@@ -1021,10 +1021,13 @@ export default function ContentPanel({
                 variant="secondary"
                 size="sm"
                 onClick={() => {
-                  setFileFindOpen((currentValue) => !currentValue)
-                  setFileFindQuery('')
-                  setFileFindCaseSensitive(false)
-                  setActiveFileFindIndex(0)
+                  const next = !fileFindOpen
+                  setFileFindOpen(next)
+                  if (!next) {
+                    setFileFindQuery('')
+                    setFileFindCaseSensitive(false)
+                    setActiveFileFindIndex(0)
+                  }
                 }}
                 aria-pressed={fileFindOpen}
               >

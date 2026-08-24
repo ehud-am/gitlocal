@@ -187,14 +187,15 @@ export default function RepoContextHeader({
   const repoSyncBadge = describeRepoSyncState(repoSync)
   const summaryLocalChangeCount = repoSummary?.statusSummary.localChangeCount
   const changeSummary = summaryLocalChangeCount ?? (trackedChangeCount + untrackedChangeCount)
-  const showSyncBadge = Boolean(repoSyncBadge) && !(repoSync?.mode === 'up-to-date' && changeSummary > 0)
+  const isStaleUpToDateBadge = repoSync?.mode === 'up-to-date' && changeSummary > 0
+  const showSyncBadge = Boolean(repoSyncBadge) && !isStaleUpToDateBadge
   const isGitRepo = Boolean(info?.isGitRepo)
   const repoName = info?.name || (isGitRepo ? 'Repository' : 'Folder')
   const hasActivePath = selectedPathType !== 'none' && Boolean(selectedPath)
   const homeEnabled = Boolean(repoLocation?.repositoryRootPath) && !repoLocation?.isRepositoryRoot
   const readmeEnabled = Boolean(repoLocation?.homeReadmePath)
-  const hasTags = isGitRepo || Boolean(remote) || (showSyncBadge && Boolean(repoSyncBadge)) || changeSummary > 0
-  const hasRootReadme = isGitRepo && (Boolean(onNavigateHome) || Boolean(onNavigateReadme))
+  const hasTags = isGitRepo || Boolean(remote) || showSyncBadge || changeSummary > 0
+  const hasNavActions = isGitRepo && (Boolean(onNavigateHome) || Boolean(onNavigateReadme))
 
   return (
     <section className="repo-context-header overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] shadow-sm">
@@ -237,7 +238,7 @@ export default function RepoContextHeader({
           </div>
         </div>
 
-        {hasTags || hasRootReadme ? (
+        {hasTags || hasNavActions ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               {isGitRepo ? <MetaTag label="Git" icon="git" tone="neutral" compact /> : null}

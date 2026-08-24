@@ -30,13 +30,13 @@ export function listDir(repoPath: string, branch: string, subpath: string = ''):
   for (const line of output.split('\n').filter(Boolean)) {
     const spaceIdx = line.indexOf(' ')
     const objType = line.slice(0, spaceIdx)
-      const name = line.slice(spaceIdx + 1)
-      /* v8 ignore next */
-      if (!name) continue
-      const type: 'file' | 'dir' = objType === 'tree' ? 'dir' : 'file'
-      const fullPath = subpath ? `${subpath}/${name}` : name
-      nodes.push({ name, path: fullPath, type, localOnly: false })
-    }
+    const name = line.slice(spaceIdx + 1)
+    /* v8 ignore next */
+    if (!name) continue
+    const type: 'file' | 'dir' = objType === 'tree' ? 'dir' : 'file'
+    const fullPath = subpath ? `${subpath}/${name}` : name
+    nodes.push({ name, path: fullPath, type, localOnly: false })
+  }
 
   // Sort: dirs first (lexicographic), then files (lexicographic)
   return nodes.sort((a, b) => {

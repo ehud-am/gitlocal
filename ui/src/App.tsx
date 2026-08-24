@@ -441,7 +441,7 @@ export default function App() {
     }
 
     if (selectedPath === syncStatus.currentPath && syncStatus.currentPathType !== 'missing') {
-      setSelectedPathType(syncStatus.currentPathType === 'none' ? 'none' : syncStatus.currentPathType)
+      setSelectedPathType(syncStatus.currentPathType)
     }
   }, [queryClient, selectedPath, syncStatus])
 
