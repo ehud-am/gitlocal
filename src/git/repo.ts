@@ -381,6 +381,12 @@ export function getCurrentBranch(repoPath: string): string {
   }
 }
 
+// Handlers resolve a request branch the same way everywhere: honor an explicit branch for a
+// real repo, otherwise fall back to the current branch, and treat non-repos as branch-less.
+export function resolveCurrentBranch(repoPath: string, requestedBranch?: string | null): string {
+  return validateRepo(repoPath) ? requestedBranch ?? getCurrentBranch(repoPath) : ''
+}
+
 export function hasCommits(repoPath: string): boolean {
   const result = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
     cwd: repoPath,

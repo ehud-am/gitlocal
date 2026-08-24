@@ -10,7 +10,7 @@ import {
 } from '../git/repo.js'
 import type { BackgroundChangeNotice, ChangedFilesSummary, SyncStatus } from '../types.js'
 
-function emptyChangedFilesSummary(): ChangedFilesSummary {
+export function emptyChangedFilesSummary(): ChangedFilesSummary {
   return {
     total: 0,
     modified: 0,

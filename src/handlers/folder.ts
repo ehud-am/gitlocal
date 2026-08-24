@@ -9,15 +9,15 @@ import {
   createWorkingTreeFolder,
   deleteWorkingTreeFolder,
   classifyLocalPath,
-  getCurrentBranch,
   getRepoParentPath,
   initializeGitRepository,
   isWorkingTreeBranch,
   normalizeRepoRelativePath,
-  validateRepo,
+  resolveCurrentBranch,
 } from '../git/repo.js'
 import { getPickerPath, setPickerPath } from '../server.js'
 import { rememberStartupFolder } from '../services/startup-preferences.js'
+import { blockedMutationResponse } from './mutation-response.js'
 import type {
   FolderBrowseEntry,
   FolderBrowseResponse,
@@ -114,15 +114,17 @@ function folderMutationBlocked(
   parentPath = '',
   resultStatus: FolderOperationStatus = 'blocked',
 ): Response {
-  const body: FolderOperationResult = {
-    ok: false,
-    operation,
-    path,
-    status: resultStatus,
-    message,
-    parentPath,
-  }
-  return Response.json(body, { status })
+  return blockedMutationResponse(
+    {
+      ok: false,
+      operation,
+      path,
+      status: resultStatus,
+      message,
+      parentPath,
+    },
+    status,
+  )
 }
 
 function isFilesystemError(error: unknown): boolean {
@@ -214,7 +216,7 @@ export async function createFolderHandler(c: Context<{ Variables: Variables }>):
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  const branch = validateRepo(repoPath) ? getCurrentBranch(repoPath) : ''
+  const branch = resolveCurrentBranch(repoPath)
   /* v8 ignore next 3 -- folder creation always targets the current working tree */
   if (!isWorkingTreeBranch(repoPath, branch)) {
     return folderMutationBlocked('create-folder', '', 'Folder creation is only available on the current working tree.', 409)
@@ -253,7 +255,7 @@ export async function folderDeletePreviewHandler(c: Context<{ Variables: Variabl
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  const branch = validateRepo(repoPath) ? c.req.query('branch') ?? getCurrentBranch(repoPath) : ''
+  const branch = resolveCurrentBranch(repoPath, c.req.query('branch'))
   if (!isWorkingTreeBranch(repoPath, branch)) {
     return folderMutationBlocked('preview-delete-folder', '', 'Folder deletion is only available on the current working tree.', 409)
   }
@@ -341,7 +343,7 @@ export async function deleteFolderHandler(c: Context<{ Variables: Variables }>):
   const repoPath = c.get('repoPath')
   if (!repoPath) return c.json({ error: 'No folder loaded' }, 400)
 
-  const branch = validateRepo(repoPath) ? c.req.query('branch') ?? getCurrentBranch(repoPath) : ''
+  const branch = resolveCurrentBranch(repoPath, c.req.query('branch'))
   if (!isWorkingTreeBranch(repoPath, branch)) {
     return folderMutationBlocked('delete-folder', '', 'Folder deletion is only available on the current working tree.', 409)
   }

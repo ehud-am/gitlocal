@@ -45,13 +45,14 @@ Running counts by unit, updated after each Phase 3 checkpoint. Status values: `o
 
 ## Totals by status
 
-Phase 4 (US2: bug fixes) landed Checkpoints B1+B2 (12 findings). Phase 5 (US3: dead code removal) is now complete — Checkpoint C1 fixed 6 findings and Checkpoints C2+C3 fixed the remaining 11, with 1 (RC-007) rejected as not actionable. All 18 dead-code findings are now dispositioned. 80 findings remain review-confirmed and open in the fix-lifecycle sense.
+Phase 4 (US2: bug fixes) landed Checkpoints B1+B2 (12 findings). Phase 5 (US3: dead code removal) is complete — Checkpoint C1 fixed 6 findings and Checkpoints C2+C3 fixed the remaining 11, with 1 (RC-007) rejected as not actionable; all 18 dead-code findings are dispositioned. Phase 6 (US4: duplicate-code consolidation) is underway; Checkpoint D1 has fixed 5 more findings, deferred 1, and rejected 1. 73 findings remain review-confirmed and open in the fix-lifecycle sense.
 
 | Fix-lifecycle status | Count | Meaning |
 |----------------------|-------|---------|
-| `fixed`        | 29    | Checkpoint B1 (T051-T056): NM-001, NM-004, ST-001, SV-001, RC-008, FT-010. Checkpoint B2 (T057-T062): FT-011, NM-002, NM-011, SH-007, SV-003, UT-003. Checkpoint C1: NM-007, SG-002, SG-003, SR-003, SV-002, ST-002. Checkpoints C2+C3: ST-003, ST-004, CP-005, CP-006, CP-007, CP-008, PM-001, PM-002, PM-004, US-001, TP-001 |
-| `verified`     | 80    | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute); not yet fixed |
-| `rejected`     | 1     | RC-007 — re-verified at fix time to already be file-private with no dead `export` to remove; not actionable as dead code (see ui-repo-context.md Adjudication Log) |
+| `fixed`        | 34    | Checkpoint B1 (T051-T056): NM-001, NM-004, ST-001, SV-001, RC-008, FT-010. Checkpoint B2 (T057-T062): FT-011, NM-002, NM-011, SH-007, SV-003, UT-003. Checkpoint C1: NM-007, SG-002, SG-003, SR-003, SV-002, ST-002. Checkpoints C2+C3: ST-003, ST-004, CP-005, CP-006, CP-007, CP-008, PM-001, PM-002, PM-004, US-001, TP-001. Checkpoint D1: SH-002, SH-003, SH-004, SH-005, SV-004 |
+| `verified`     | 73    | Confirmed real by Pass 2 (or Pass 1 alone where Pass 2 independently agreed with no dispute); not yet fixed |
+| `deferred`     | 1     | Checkpoint D1: SH-001 (see server-handlers.md Adjudication Log — merging risks reordering validation/error precedence) |
+| `rejected`     | 2     | RC-007 (see ui-repo-context.md Adjudication Log — already file-private, no dead export to remove). Checkpoint D1: SG-005 (see server-git.md Adjudication Log — comparators proved not behavior-equivalent; a test broke when unified) |
 
 2 additional findings (AS-003, CP-010) are architecture verdicts, not defects, and are excluded from all counts above — see the unit footnotes.
 
