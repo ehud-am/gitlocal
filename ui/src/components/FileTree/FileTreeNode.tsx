@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react'
 import type { TreeNode } from '../../types'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
+import { resolveGeneratedLocalState } from './tree-node-state'
 
 interface Props {
   node: TreeNode
@@ -40,7 +41,7 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 
 export default function FileTreeNode({ node, isExpanded, isSelected, depth, showLocalOnly, onClick, tabIndex, onFocus, onKeyDown, nodeRef }: Props) {
   const syncState = describeFileSyncState(node.syncState)
-  const generatedLocalState = node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')
+  const generatedLocalState = resolveGeneratedLocalState(node)
   const localLabel = generatedLocalState === 'generated'
     ? 'generated'
     : generatedLocalState === 'ignored'

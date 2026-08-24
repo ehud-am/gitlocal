@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import ContentPanel from './components/ContentPanel/ContentPanel'
 import FileTree from './components/FileTree/FileTree'
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
+import { parentPathOf } from './lib/utils'
 import {
   readDefaultReaderPromptPreference,
   readRecentItems,
@@ -185,6 +186,23 @@ function postNativeAppCommand(command: NativeAppOutboundCommand, value?: string)
   if (!handler) return false
   handler.postMessage(value === undefined ? { command } : { command, value })
   return true
+}
+
+const WORKSPACE_QUERY_KEYS = [
+  'info',
+  'git-context',
+  'branches',
+  'tree',
+  'file',
+  'readme',
+  'directory-readme',
+  'sync',
+  'repo-summary',
+  'navigation-hints',
+] as const
+
+function invalidateQueryKeys(queryClient: QueryClient, keys: readonly string[]): Promise<unknown> {
+  return Promise.all(keys.map((key) => queryClient.invalidateQueries({ queryKey: [key] })))
 }
 
 export default function App() {
@@ -479,18 +497,7 @@ export default function App() {
     setTreeRefreshToken((value) => value + 1)
 
     try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['info'] }),
-        queryClient.invalidateQueries({ queryKey: ['git-context'] }),
-        queryClient.invalidateQueries({ queryKey: ['branches'] }),
-        queryClient.invalidateQueries({ queryKey: ['tree'] }),
-        queryClient.invalidateQueries({ queryKey: ['file'] }),
-        queryClient.invalidateQueries({ queryKey: ['readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['sync'] }),
-        queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
-      ])
+      await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
       setStatusMessage('Current view refreshed.')
     } finally {
       nativeRefreshPendingRef.current = false
@@ -511,18 +518,7 @@ export default function App() {
   }, [])
 
   const invalidateWorkspaceQueries = useCallback(async (): Promise<void> => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['info'] }),
-      queryClient.invalidateQueries({ queryKey: ['git-context'] }),
-      queryClient.invalidateQueries({ queryKey: ['branches'] }),
-      queryClient.invalidateQueries({ queryKey: ['tree'] }),
-      queryClient.invalidateQueries({ queryKey: ['file'] }),
-      queryClient.invalidateQueries({ queryKey: ['readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['sync'] }),
-      queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
-      queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
-    ])
+    await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
   }, [queryClient])
 
   const applyAcceptedOpenTarget = useCallback((target: Pick<StartupOpenTarget, 'rootPath' | 'selectedPath' | 'selectedPathType' | 'message'>): void => {
@@ -749,45 +745,30 @@ export default function App() {
     return window.confirm('Discard your unsaved file changes?')
   }
 
-  function handleSelectFile(path: string, localOnly = false): boolean {
+  function selectPath(path: string, type: 'file' | 'dir', localOnly = false): boolean {
     if (!confirmDiscardChanges()) return false
     setSelectedPath(path)
-    setSelectedPathType(path ? 'file' : 'none')
+    setSelectedPathType(path ? type : 'none')
     setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
     if (path) {
       setRecentItems(rememberRecentItem({
         path,
-        type: 'file',
+        type: type === 'file' ? 'file' : 'folder',
         label: path.split('/').pop() || path,
         available: true,
       }))
     }
     return true
+  }
+
+  function handleSelectFile(path: string, localOnly = false): boolean {
+    return selectPath(path, 'file', localOnly)
   }
 
   function handleSelectFolder(path: string, localOnly = false): boolean {
-    if (!confirmDiscardChanges()) return false
-    setSelectedPath(path)
-    setSelectedPathType(path ? 'dir' : 'none')
-    setSelectedPathLocalOnly(path ? localOnly : false)
-    setStatusMessage('')
-    setShowRaw(false)
-    if (path) {
-      setRecentItems(rememberRecentItem({
-        path,
-        type: 'folder',
-        label: path.split('/').pop() || path,
-        available: true,
-      }))
-    }
-    return true
-  }
-
-  function parentPathOf(path: string): string {
-    const boundary = path.lastIndexOf('/')
-    return boundary >= 0 ? path.slice(0, boundary) : ''
+    return selectPath(path, 'dir', localOnly)
   }
 
   async function openChangedFiles(): Promise<void> {
@@ -1030,13 +1011,7 @@ export default function App() {
       setShowRaw(false)
       setStatusMessage(result.message)
       setTreeRefreshToken((value) => value + 1)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['tree'] }),
-        queryClient.invalidateQueries({ queryKey: ['file'] }),
-        queryClient.invalidateQueries({ queryKey: ['readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['sync'] }),
-      ])
+      await invalidateQueryKeys(queryClient, ['tree', 'file', 'readme', 'directory-readme', 'sync'])
     } catch (error) {
       setFolderDeleteError(getErrorMessage(error, 'Could not delete the folder.'))
     } finally {
@@ -1106,15 +1081,7 @@ export default function App() {
     setStatusMessage(nextStatusMessage)
     setTreeRefreshToken((value) => value + 1)
 
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['info'] }),
-      queryClient.invalidateQueries({ queryKey: ['branches'] }),
-      queryClient.invalidateQueries({ queryKey: ['tree'] }),
-      queryClient.invalidateQueries({ queryKey: ['file'] }),
-      queryClient.invalidateQueries({ queryKey: ['readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['sync'] }),
-    ])
+    await invalidateQueryKeys(queryClient, ['info', 'branches', 'tree', 'file', 'readme', 'directory-readme', 'sync'])
   }
 
   async function submitBranchSwitch(resolution: 'commit' | 'discard'): Promise<void> {

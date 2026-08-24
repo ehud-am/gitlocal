@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
+import { basenameOf, parentPathOf } from '../../lib/utils'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 import CopyButton from './CopyButton'
 import { parseJsonTree } from './json-tree'
@@ -116,18 +117,6 @@ function BackToFolderIcon() {
       <path d="M9.5 3L4.5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
-}
-
-function parentPathOf(path: string): string {
-  const boundary = path.lastIndexOf('/')
-  return boundary >= 0 ? path.slice(0, boundary) : ''
-}
-
-function basenameOf(path: string): string {
-  if (!path) return ''
-  const normalized = path.replace(/\/+$/, '')
-  const boundary = normalized.lastIndexOf('/')
-  return boundary >= 0 ? normalized.slice(boundary + 1) : normalized
 }
 
 function buildSuggestedFilename(entries: TreeNode[]): string {

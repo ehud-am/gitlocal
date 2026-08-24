@@ -1,3 +1,5 @@
+import { basenameOf } from '../../lib/utils'
+
 export interface MarkdownOutputDetails {
   sourcePath: string
   title: string
@@ -17,19 +19,13 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function basenameOfPath(path: string): string {
-  const normalized = path.replace(/\/+$/, '')
-  const boundary = normalized.lastIndexOf('/')
-  return boundary >= 0 ? normalized.slice(boundary + 1) : normalized
-}
-
 export function titleFromMarkdown(content: string, path: string): string {
   const heading = content
     .split('\n')
     .map((line) => line.match(/^#\s+(.+?)\s*#*\s*$/)?.[1]?.trim())
     .find((value): value is string => Boolean(value))
 
-  return heading || basenameOfPath(path) || 'Markdown document'
+  return heading || basenameOf(path) || 'Markdown document'
 }
 
 export function markdownToPlainText(content: string): string {
@@ -87,7 +83,7 @@ export function buildMarkdownOutputDetails(
   includesUnsavedEdits: boolean,
 ): MarkdownOutputDetails {
   const title = titleFromMarkdown(content, path)
-  const filenameBase = (basenameOfPath(path) || title)
+  const filenameBase = (basenameOf(path) || title)
     .replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')

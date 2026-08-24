@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../services/api'
 import type { GeneratedLocalVisibility, TreeNode } from '../../types'
 import FileTreeNode from './FileTreeNode'
+import { resolveGeneratedLocalState } from './tree-node-state'
 
 interface Props {
   branch: string
@@ -23,7 +24,7 @@ interface NodeState {
 }
 
 function isTrackedNode(node: TreeNode): boolean {
-  return (node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')) === 'tracked'
+  return resolveGeneratedLocalState(node) === 'tracked'
 }
 
 function filterNodes(nodes: TreeNode[], visibility: GeneratedLocalVisibility, activePath: string): TreeNode[] {
