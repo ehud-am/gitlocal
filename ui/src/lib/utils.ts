@@ -17,3 +17,7 @@ export function basenameOf(path: string): string {
   const boundary = normalized.lastIndexOf('/')
   return boundary >= 0 ? normalized.slice(boundary + 1) : normalized
 }
+
+export function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { BackgroundChangeNotice, Branch, ChangedFilesResponse, ChangedFileItem, RepoInfo, RepoLocationResponse, RepoSummaryResponse, RepoSyncState, ViewerPathType } from '../../types'
 import { describeRepoSyncState } from '../../lib/sync'
+import { pluralize } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import SearchTrigger from '../Search/SearchTrigger'
@@ -102,6 +103,57 @@ function ReadmeIcon() {
   )
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function ResponsiveNavButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  disabled: boolean
+}) {
+  return (
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon"
+        className="h-7 w-7 xl:hidden"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        title={label}
+      >
+        {icon}
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="hidden h-7 gap-1 px-2 text-[11px] xl:inline-flex"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        title={label}
+      >
+        {icon}
+        {label}
+      </Button>
+    </>
+  )
+}
+
 export default function RepoContextHeader({
   info,
   branch,
@@ -193,7 +245,7 @@ export default function RepoContextHeader({
               {showSyncBadge && repoSyncBadge ? <MetaTag label={repoSyncBadge.label} icon={repoSyncBadge.icon} tone={repoSyncBadge.tone} compact /> : null}
               {changeSummary > 0 ? (
                 <MetaTag
-                  label={`${changeSummary} local ${changeSummary === 1 ? 'change' : 'changes'}`}
+                  label={pluralize(changeSummary, 'local change', 'local changes')}
                   icon="local-change"
                   tone="info"
                   compact
@@ -203,62 +255,10 @@ export default function RepoContextHeader({
 
             <div className="flex flex-wrap items-center gap-1.5">
               {isGitRepo && onNavigateHome ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 xl:hidden"
-                    onClick={onNavigateHome}
-                    disabled={!homeEnabled}
-                    aria-label="Root"
-                    title="Root"
-                  >
-                    <HomeIcon />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="hidden h-7 gap-1 px-2 text-[11px] xl:inline-flex"
-                    onClick={onNavigateHome}
-                    disabled={!homeEnabled}
-                    aria-label="Root"
-                    title="Root"
-                  >
-                    <HomeIcon />
-                    Root
-                  </Button>
-                </>
+                <ResponsiveNavButton icon={<HomeIcon />} label="Root" onClick={onNavigateHome} disabled={!homeEnabled} />
               ) : null}
               {isGitRepo && onNavigateReadme ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 xl:hidden"
-                    onClick={onNavigateReadme}
-                    disabled={!readmeEnabled}
-                    aria-label="Readme"
-                    title="Readme"
-                  >
-                    <ReadmeIcon />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="hidden h-7 gap-1 px-2 text-[11px] xl:inline-flex"
-                    onClick={onNavigateReadme}
-                    disabled={!readmeEnabled}
-                    aria-label="Readme"
-                    title="Readme"
-                  >
-                    <ReadmeIcon />
-                    Readme
-                  </Button>
-                </>
+                <ResponsiveNavButton icon={<ReadmeIcon />} label="Readme" onClick={onNavigateReadme} disabled={!readmeEnabled} />
               ) : null}
             </div>
           </div>
@@ -275,51 +275,43 @@ export default function RepoContextHeader({
           </div>
         ) : null}
 
-        {changedFiles && changedFiles.items.length > 0 ? (
+        {changedFiles ? (
           <section className="changed-files-panel" aria-label="changed files">
             <div className="changed-files-panel-header">
               <p className="changed-files-title">Changed files</p>
-              <div className="changed-files-panel-actions">
-                <span>{changedFiles.summary.total} {changedFiles.summary.total === 1 ? 'path' : 'paths'}</span>
-                {onCloseChangedFiles ? (
-                  <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
-                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-                      <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-            <ul>
-              {changedFiles.items.map((item) => (
-                <li key={`${item.changeState}:${item.path}`}>
-                  <button type="button" onClick={() => onOpenChangedFile?.(item)}>
-                    <span className="changed-file-path">{item.path}</span>
-                    <span className="changed-file-meta">
-                      {item.changeState}
-                      {item.generatedLocalState !== 'tracked' ? ` · ${item.generatedLocalState}` : ''}
-                      {!item.canOpen ? ' · unavailable' : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : changedFiles ? (
-          <section className="changed-files-panel" aria-label="changed files">
-            <div className="changed-files-panel-header">
-              <p className="changed-files-title">Changed files</p>
-              {onCloseChangedFiles ? (
+              {changedFiles.items.length > 0 ? (
+                <div className="changed-files-panel-actions">
+                  <span>{pluralize(changedFiles.summary.total, 'path')}</span>
+                  {onCloseChangedFiles ? (
+                    <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
+                      <CloseIcon />
+                    </Button>
+                  ) : null}
+                </div>
+              ) : onCloseChangedFiles ? (
                 <Button type="button" variant="ghost" size="icon" aria-label="Close changed files" onClick={onCloseChangedFiles}>
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-                    <path d="M4 4L12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M12 4L4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
+                  <CloseIcon />
                 </Button>
               ) : null}
             </div>
-            <p>No changed files to review.</p>
+            {changedFiles.items.length > 0 ? (
+              <ul>
+                {changedFiles.items.map((item) => (
+                  <li key={`${item.changeState}:${item.path}`}>
+                    <button type="button" onClick={() => onOpenChangedFile?.(item)}>
+                      <span className="changed-file-path">{item.path}</span>
+                      <span className="changed-file-meta">
+                        {item.changeState}
+                        {item.generatedLocalState !== 'tracked' ? ` · ${item.generatedLocalState}` : ''}
+                        {!item.canOpen ? ' · unavailable' : ''}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No changed files to review.</p>
+            )}
           </section>
         ) : null}
 

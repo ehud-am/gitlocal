@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { Input } from '../ui/input'
+import { pluralize } from '../../lib/utils'
 
 interface Props {
   open: boolean
@@ -22,10 +23,6 @@ interface Props {
   onCancel: () => void
   onCommit: () => void
   onDiscard: () => void
-}
-
-function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`
 }
 
 export default function BranchSwitchDialog({
