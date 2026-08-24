@@ -1,9 +1,3 @@
-export type MarkdownOutputMode =
-  | 'pdf'
-  | 'system-share'
-  | 'copy'
-  | 'download'
-
 export interface MarkdownOutputDetails {
   sourcePath: string
   title: string
@@ -23,7 +17,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function basenameOfPath(path: string): string {
+function basenameOfPath(path: string): string {
   const normalized = path.replace(/\/+$/, '')
   const boundary = normalized.lastIndexOf('/')
   return boundary >= 0 ? normalized.slice(boundary + 1) : normalized

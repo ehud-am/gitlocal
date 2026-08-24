@@ -5,7 +5,7 @@ export function stripHiddenMarkdownComments(content: string): string {
     .replace(/^\[comment\]:\s*#\s*\(.*\)\s*$/gim, '')
 }
 
-export function slugifyHeading(text: string): string {
+function slugifyHeading(text: string): string {
   const slug = text
     .trim()
     .toLowerCase()

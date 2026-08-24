@@ -28,7 +28,7 @@ export interface CreateTerminalSessionRequest {
   contextType?: TerminalContextType
 }
 
-export type TerminalUnavailableErrorCode = 'cli_not_found' | 'pty_unavailable' | 'session_limit_reached'
+type TerminalUnavailableErrorCode = 'cli_not_found' | 'pty_unavailable' | 'session_limit_reached'
 
 export interface TerminalUnavailableResponse {
   error: TerminalUnavailableErrorCode

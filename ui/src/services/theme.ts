@@ -6,7 +6,7 @@ function isThemeMode(value: string | null): value is ThemeMode {
   return value === 'light' || value === 'dark'
 }
 
-export function readStoredTheme(): ThemeMode | null {
+function readStoredTheme(): ThemeMode | null {
   if (typeof window === 'undefined') return null
   if (typeof window.localStorage?.getItem !== 'function') return null
   const value = window.localStorage.getItem(STORAGE_KEY)

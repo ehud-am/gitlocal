@@ -17,7 +17,7 @@ export interface PtyLike {
   kill(): void
 }
 
-export interface SpawnPtyOptions {
+interface SpawnPtyOptions {
   shell: string
   cwd: string
   cols: number

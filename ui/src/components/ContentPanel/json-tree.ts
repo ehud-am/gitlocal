@@ -1,4 +1,4 @@
-export type JsonValueKind = 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null'
+type JsonValueKind = 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null'
 
 export interface JsonTreeNode {
   key?: string
@@ -8,12 +8,12 @@ export interface JsonTreeNode {
   childCount?: number
 }
 
-export interface ParsedJsonTree {
+interface ParsedJsonTree {
   ok: true
   root: JsonTreeNode
 }
 
-export interface ParsedJsonFailure {
+interface ParsedJsonFailure {
   ok: false
   message: string
 }

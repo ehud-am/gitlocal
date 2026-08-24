@@ -6,7 +6,7 @@
 
 | ID | File | Lines | Category | Severity | Evidence | Source | Status |
 |----|------|-------|----------|----------|----------|--------|--------|
-| TP-001 | `ui/src/hooks/useTerminalPanel.ts` | 10-16 | dead-code | low | `NewTerminalTab` is an exported interface used only internally (as `addTab`'s parameter type) and never imported by any other module. Confirmed via repo-wide grep — only three references, all within this file. Matches the project's knip baseline. | pass1-confirmed | verified |
+| TP-001 | `ui/src/hooks/useTerminalPanel.ts` | 10-16 | dead-code | low | `NewTerminalTab` is an exported interface used only internally (as `addTab`'s parameter type) and never imported by any other module. Confirmed via repo-wide grep — only three references, all within this file. Matches the project's knip baseline. | pass1-confirmed | fixed |
 | TP-002 | `ui/src/components/TerminalPanel/TerminalPanel.tsx` | 276 | readability | low | `TerminalView` is given a synthetic session object with hardcoded `createdAt: ''` and `exitInfo: null` that don't reflect real tab data, because `TerminalTabRef` (the client-side tab state type) doesn't carry these fields at all — the panel fabricates placeholder values purely to satisfy `TerminalSession`'s shape. Confirmed `TerminalView.tsx` never reads `session.createdAt`/`session.exitInfo` (only `session.id`), so this is currently harmless but a type-safety smell: if `TerminalView` ever starts using those fields it will silently render an empty timestamp/null exit info instead of real data. Downgraded from Pass 1's "bug" framing since there is no current behavioral defect. | pass1-confirmed | verified |
 
 ## Architecture Notes
