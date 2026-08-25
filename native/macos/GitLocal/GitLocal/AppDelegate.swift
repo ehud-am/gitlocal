@@ -9,6 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let service = GitLocalService()
         self.service = service
+        // Only the most recent pre-launch "Open With" target becomes the initial window's
+        // content; any earlier ones queued before launch are dropped here (as opposed to
+        // application(_:open:)'s post-launch path, which flushes every pending path to the
+        // already-open window instead of picking just one).
         let initialOpenPath = pendingOpenFilePaths.last
 
         service.start(openPath: initialOpenPath) { [weak self] result in

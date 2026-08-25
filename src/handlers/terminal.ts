@@ -49,6 +49,9 @@ function resolveSessionCwd(repoPath: string, contextPath?: string, contextType?:
   }
 
   let candidate = contextType === 'file' ? dirname(safePath) : safePath
+  // The `candidate !== repoPath` comparison is a plain string equality check, which only
+  // terminates correctly because both sides are canonicalPath values from classifyLocalPath —
+  // if either were passed in un-normalized, this loop could walk past repoPath undetected.
   while (candidate !== repoPath) {
     const classification = classifyLocalPath(candidate)
     if (classification.exists && classification.pathType === 'directory') {

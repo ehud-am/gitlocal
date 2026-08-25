@@ -52,6 +52,10 @@ export default function SearchResults({ results, response, onSelect, onLoadMore 
                   <span>{result.type === 'dir' ? 'Folder' : 'File'}</span>
                   {result.scopeLabel ? <span>{result.scopeLabel}</span> : null}
                   {result.changeState ? <MetaTag label={result.changeState} icon="local-change" tone="info" compact /> : null}
+                  {/* generatedLocalState (via formatGeneratedLocalLabel) takes precedence over the plain
+                      localOnly flag: it's the more specific signal, distinguishing e.g. "Generated" or
+                      "Ignored" from a generic "Local only". Fall back to localOnly only when the
+                      server didn't report a more specific generated-local state. */}
                   {generatedLocalLabel ? <MetaTag label={generatedLocalLabel} icon="local-only" tone="neutral" compact /> : null}
                   {!generatedLocalLabel && result.localOnly ? <MetaTag label="Local only" icon="local-only" tone="neutral" compact /> : null}
                 </span>
