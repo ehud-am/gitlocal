@@ -45,7 +45,7 @@ export default function SearchResults({ results, response, onSelect, onLoadMore 
                 <span className="search-result-meta">
                   <MetaTag
                     label={result.matchType === 'name' ? 'Name match' : 'Content match'}
-                    icon={result.matchType === 'name' ? 'git' : 'local-change'}
+                    icon={result.matchType === 'name' ? 'name-match' : 'content-match'}
                     tone={result.matchType === 'name' ? 'neutral' : 'info'}
                     compact
                   />

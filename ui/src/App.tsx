@@ -16,7 +16,7 @@ import {
 } from './components/AppDialogs'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
-import { ParentFolderIcon, PanelToggleIcon, ThemeIcon } from './components/ui/icons'
+import { ParentFolderIcon, PanelToggleIcon, RefreshIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -75,36 +75,6 @@ import {
 
 type LandingAction = { label: string; action: 'create-file' }
 type BranchScope = 'local' | 'remote'
-
-function RefreshIcon({ spinning = false }: { spinning?: boolean }) {
-  return (
-    <svg className={spinning ? 'toolbar-icon is-spinning' : 'toolbar-icon'} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M13 7a5 5 0 1 0-1.45 3.54" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M13 3.5V7h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function TerminalIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M4 6l2.5 2.5L4 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function ViewOptionsIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="5" cy="4" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="11" cy="8" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="6" cy="12" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  )
-}
 
 interface BranchSwitchDialogState {
   target: string
@@ -171,6 +141,43 @@ const WORKSPACE_QUERY_KEYS = [
 
 function invalidateQueryKeys(queryClient: QueryClient, keys: readonly string[]): Promise<unknown> {
   return Promise.all(keys.map((key) => queryClient.invalidateQueries({ queryKey: [key] })))
+}
+
+function computeEmptyState({
+  visibleSelectedPath,
+  hasRepoMismatch,
+  isWorkingTreeBranchSelected,
+  isGitRepo,
+  rootEntryCount,
+  canMutateFiles,
+}: {
+  visibleSelectedPath: string
+  hasRepoMismatch: boolean
+  isWorkingTreeBranchSelected: boolean
+  isGitRepo: boolean | undefined
+  rootEntryCount: number | undefined
+  canMutateFiles: boolean
+}): { title: string; detail: string; actions?: LandingAction[] } | undefined {
+  if (visibleSelectedPath || hasRepoMismatch) return undefined
+
+  if (isWorkingTreeBranchSelected && rootEntryCount === 0) {
+    return {
+      title: isGitRepo ? 'This repository is ready for a first file' : 'This folder is ready for a first file',
+      detail: isGitRepo
+        ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
+        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.',
+      actions: canMutateFiles ? [{ label: 'Create first file', action: 'create-file' }] : undefined,
+    }
+  }
+
+  if (!isWorkingTreeBranchSelected) {
+    return {
+      title: 'Browsing a non-current branch',
+      detail: 'This branch opens in read-only mode so you can compare tree contents without changing your working tree.',
+    }
+  }
+
+  return undefined
 }
 
 export default function App() {
@@ -368,9 +375,8 @@ export default function App() {
     }
   }, [currentBranch, info, viewerRepoPath])
 
-  useEffect(() => {
-    if (!startupOpenTargetFetched) return
-    writeViewerState({
+  const viewerStateSnapshot = useMemo(
+    () => ({
       repoPath: viewerRepoPath,
       branch: currentBranch,
       path: selectedPath,
@@ -387,8 +393,16 @@ export default function App() {
       searchContentKind,
       searchTrackedMode,
       searchLimit,
-    })
-  }, [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
+    }),
+    [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath],
+  )
+
+  // Gated separately from the snapshot above: this effect only decides *whether* to persist
+  // (wait for the startup open-target fetch), not *what* to persist.
+  useEffect(() => {
+    if (!startupOpenTargetFetched) return
+    writeViewerState(viewerStateSnapshot)
+  }, [startupOpenTargetFetched, viewerStateSnapshot])
 
   // Keeps the native app's "Hide Dotfiles" menu checkmark in sync however hideDotfiles changed —
   // via this toolbar control or via the menu item itself dispatching 'toggle-dotfiles'.
@@ -1169,26 +1183,17 @@ export default function App() {
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
 
-  let emptyStateTitle: string | undefined
-  let emptyStateDetail: string | undefined
-  let emptyStateActions: LandingAction[] | undefined
-
-  if (!visibleSelectedPath && !hasRepoMismatch) {
-    if (isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
-      emptyStateTitle = info?.isGitRepo
-        ? 'This repository is ready for a first file'
-        : 'This folder is ready for a first file'
-      emptyStateDetail = info?.isGitRepo
-        ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
-        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.'
-      emptyStateActions = canMutateFiles
-        ? [{ label: 'Create first file', action: 'create-file' }]
-        : undefined
-    } else if (!isWorkingTreeBranchSelected) {
-      emptyStateTitle = 'Browsing a non-current branch'
-      emptyStateDetail = 'This branch opens in read-only mode so you can compare tree contents without changing your working tree.'
-    }
-  }
+  const emptyState = computeEmptyState({
+    visibleSelectedPath,
+    hasRepoMismatch,
+    isWorkingTreeBranchSelected,
+    isGitRepo: info?.isGitRepo,
+    rootEntryCount: info?.rootEntryCount,
+    canMutateFiles,
+  })
+  const emptyStateTitle = emptyState?.title
+  const emptyStateDetail = emptyState?.detail
+  const emptyStateActions = emptyState?.actions
 
   // Clicking Parent Folder usually just browses to the containing folder within this repository
   // (handleNavigateParent -> handleSelectFolder), but from the repository root it instead leaves

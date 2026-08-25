@@ -1,3 +1,33 @@
+export function RefreshIcon({ spinning = false }: { spinning?: boolean }) {
+  return (
+    <svg className={spinning ? 'toolbar-icon is-spinning' : 'toolbar-icon'} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M13 7a5 5 0 1 0-1.45 3.54" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M13 3.5V7h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function TerminalIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4 6l2.5 2.5L4 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function ViewOptionsIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="5" cy="4" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="11" cy="8" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="6" cy="12" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
 export function ParentFolderIcon() {
   return (
     <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
