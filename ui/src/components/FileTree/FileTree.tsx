@@ -285,7 +285,7 @@ export default function FileTree({
   parentOf.current = visibleOrderState.parents
   const rovingTargetPath = focusedPath && visibleOrder.current.includes(focusedPath) ? focusedPath : visibleOrder.current[0]
 
-  const renderNodes = (nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
+  const renderNodes = useCallback((nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
     <>
       {filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)
         .filter((node) => !ancestorPaths.has(node.path))
@@ -329,7 +329,7 @@ export default function FileTree({
         )
       })}
     </>
-  )
+  ), [generatedLocalVisibility, selectedPath, hideDotfiles, nodeStates, isGitRepo, rovingTargetPath, activateNode, handleKeyDown])
 
   if (isLoading) {
     return (

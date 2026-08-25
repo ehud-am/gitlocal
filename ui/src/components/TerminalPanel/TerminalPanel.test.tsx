@@ -36,10 +36,10 @@ const terminalFocusCalls: string[] = []
 vi.mock('./TerminalView', () => ({
   TerminalView: forwardRef(function FakeTerminalView(
     {
-      session,
+      sessionId,
       onExit,
     }: {
-      session: TerminalSession
+      sessionId: string
       onExit: (code: number | null, signal: string | null) => void
     },
     ref: Ref<{ focus: () => void }>,
@@ -47,10 +47,10 @@ vi.mock('./TerminalView', () => ({
     useEffect(() => {
       terminalViewMountCount += 1
     }, [])
-    useImperativeHandle(ref, () => ({ focus: () => terminalFocusCalls.push(session.id) }), [session.id])
+    useImperativeHandle(ref, () => ({ focus: () => terminalFocusCalls.push(sessionId) }), [sessionId])
     return (
       <div data-testid="fake-terminal-view">
-        {session.id}:{session.status}
+        {sessionId}
         <button onClick={() => onExit(0, null)}>simulate exit</button>
       </div>
     )
@@ -171,7 +171,7 @@ describe('TerminalPanel', () => {
 
     await waitFor(() => expect(screen.getByRole('tab', { name: 'Claude' })).toBeInTheDocument())
     expect(mockCreateSession).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claude' }))
-    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('claude-1:running')
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('claude-1')
   })
 
   it('synthesizes a local "unavailable" tab with the server message when the CLI is missing (FR-010)', async () => {
@@ -302,7 +302,7 @@ describe('TerminalPanel', () => {
     expect(terminalViewMountCount).toBe(1)
     expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:running')
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
 
     await user.click(screen.getByRole('button', { name: 'Show terminal' }))
 
@@ -310,7 +310,7 @@ describe('TerminalPanel', () => {
     expect(mockCloseSession).not.toHaveBeenCalled()
     expect(terminalViewMountCount).toBe(1)
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
-    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:running')
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
   })
 
   it('keeps panel visibility unchanged across unrelated App state changes until explicitly toggled (US2)', async () => {
@@ -370,7 +370,11 @@ describe('TerminalPanel', () => {
     expect(screen.getByTestId('terminal-panel-empty')).toBeInTheDocument()
   })
 
-  it('marks a tab exited when its TerminalView reports the underlying shell exited', async () => {
+  // TerminalView no longer receives tab status as a prop (it never rendered based on it —
+  // see TP-002), so this only asserts what stays observable here: the exit report is handled
+  // without unmounting/recreating the view. The status itself flipping to 'exited' is covered
+  // directly by useTerminalPanel.test.ts's 'updateTabStatus updates only the matching tab'.
+  it('does not unmount the TerminalView when it reports the underlying shell exited', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue({
       id: 'session-1',
@@ -383,11 +387,13 @@ describe('TerminalPanel', () => {
 
     render(<TerminalPanel />)
     await openTerminal(user)
-    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:running')
+    expect(terminalViewMountCount).toBe(1)
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
 
     await user.click(screen.getByRole('button', { name: 'simulate exit' }))
 
-    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1:exited')
+    expect(terminalViewMountCount).toBe(1)
+    expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
   })
 
   it('closing a tab does not surface a rejected server-side close as an error', async () => {

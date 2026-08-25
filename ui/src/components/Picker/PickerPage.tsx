@@ -34,7 +34,10 @@ function FileIcon() {
   )
 }
 
-function ChevronIcon() {
+// Static disclosure marker for directory rows: this sidebar navigates forward into folders
+// (double-click replaces the listing) rather than expanding them in place, so unlike
+// FileTreeNode's ChevronIcon it intentionally never rotates.
+function DirectoryDisclosureIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
       <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
@@ -295,7 +298,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
               <PanelToggleIcon collapsed={false} />
             </button>
             <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
-              <div className="file-tree picker-file-tree" role="tree" aria-label="folder contents navigation">
+              <div className="file-tree picker-file-tree" role="listbox" aria-label="folder contents navigation">
                 {browseLoading ? (
                   <div className="file-tree-skeleton border-0 bg-transparent" aria-label="loading">
                     {[70, 90, 65, 80, 55].map((width, index) => (
@@ -310,14 +313,14 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                       key={`sidebar:${entry.isParent ? 'parent:' : ''}${entry.path}`}
                       className={`file-tree-node${path === entry.path ? ' selected' : ''}`}
                       style={{ paddingLeft: '8px' }}
-                      role="treeitem"
+                      role="option"
                       aria-selected={path === entry.path}
                       onClick={() => setPath(entry.path)}
                       onDoubleClick={() => handleEntryActivate(entry)}
                     >
                       {entry.type === 'dir' ? (
                         <span className="text-[var(--muted-foreground)]">
-                          <ChevronIcon />
+                          <DirectoryDisclosureIcon />
                         </span>
                       ) : null}
                       <span className={entry.type === 'dir' ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}>

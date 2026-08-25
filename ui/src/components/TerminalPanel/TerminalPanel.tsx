@@ -273,7 +273,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   if (handle) viewHandlesRef.current.set(tab.id, handle)
                   else viewHandlesRef.current.delete(tab.id)
                 }}
-                session={{ id: tab.id, kind: tab.kind, cwd: tab.cwd, status: tab.status, createdAt: '', exitInfo: null }}
+                sessionId={tab.id}
                 onExit={() => handleExit(tab.id)}
                 onToggleShortcut={toggleOrOpenTerminal}
               />

@@ -260,13 +260,13 @@ export const api = {
     mutate('/api/repo/open', 'POST', { path }),
 
   createChildFolder: (payload: FolderCreateChildRequest): Promise<LocalActionResponse> =>
-    mutate('/api/folder/create-child', 'POST', payload),
+    mutate('/api/folder/create-child', 'POST', payload, { throwOnError: false }),
 
   initFolderRepository: (payload: FolderInitRepositoryRequest): Promise<LocalActionResponse> =>
-    mutate('/api/folder/init-repository', 'POST', payload),
+    mutate('/api/folder/init-repository', 'POST', payload, { throwOnError: false }),
 
   cloneRepositoryIntoFolder: (payload: FolderCloneRepositoryRequest): Promise<LocalActionResponse> =>
-    mutate('/api/folder/clone-repository', 'POST', payload),
+    mutate('/api/folder/clone-repository', 'POST', payload, { throwOnError: false }),
 
   showParentFolder: (): Promise<LocalActionResponse> =>
     mutate('/api/repo/parent-folder', 'POST', {}),

@@ -7,6 +7,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingOpenFilePaths: [String] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let existingInstance = Self.alreadyRunningInstance() {
+            // GitLocalService binds its own ephemeral port per instance, so a second launch
+            // would otherwise spawn an uncoordinated second Node server. Hand off to the
+            // existing instance instead, before starting a service here.
+            existingInstance.activate(options: .activateIgnoringOtherApps)
+            NSApp.terminate(self)
+            return
+        }
+
         let service = GitLocalService()
         self.service = service
         // Only the most recent pre-launch "Open With" target becomes the initial window's
@@ -54,6 +63,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         pendingOpenFilePaths.append(contentsOf: markdownPaths)
         flushPendingOpenFiles()
+    }
+
+    private static func alreadyRunningInstance() -> NSRunningApplication? {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first { $0 != .current }
     }
 
     private static func isSupportedMarkdownURL(_ url: URL) -> Bool {

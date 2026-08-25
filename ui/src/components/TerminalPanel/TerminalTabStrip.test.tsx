@@ -19,16 +19,16 @@ vi.mock('../../services/terminalApi', () => ({
 // affects the tab acted on (US3's independent-tabs guarantee).
 let mountedIds: string[] = []
 vi.mock('./TerminalView', () => ({
-  TerminalView: ({ session }: { session: TerminalSession }) => {
+  TerminalView: ({ sessionId }: { sessionId: string }) => {
     useEffect(() => {
-      mountedIds.push(session.id)
+      mountedIds.push(sessionId)
       return () => {
-        mountedIds = mountedIds.filter((id) => id !== session.id)
+        mountedIds = mountedIds.filter((id) => id !== sessionId)
       }
-    }, [session.id])
+    }, [sessionId])
     return (
-      <div data-testid="fake-terminal-view" data-session-id={session.id}>
-        {session.id}:{session.status}
+      <div data-testid="fake-terminal-view" data-session-id={sessionId}>
+        {sessionId}
       </div>
     )
   },

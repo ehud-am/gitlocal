@@ -461,8 +461,8 @@ describe('PickerPage', () => {
   it('uses the sidebar tree to select and browse folders', async () => {
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
-    const projectsItem = within(tree).getByText('projects').closest('[role="treeitem"]')
+    const tree = await screen.findByRole('listbox', { name: /folder contents navigation/i })
+    const projectsItem = within(tree).getByText('projects').closest('[role="option"]')
     expect(projectsItem).not.toBeNull()
     fireEvent.click(projectsItem as HTMLElement)
 
@@ -473,7 +473,7 @@ describe('PickerPage', () => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/projects')
     })
 
-    const parentItem = within(tree).getByText('..').closest('[role="treeitem"]')
+    const parentItem = within(tree).getByText('..').closest('[role="option"]')
     expect(parentItem).not.toBeNull()
     fireEvent.doubleClick(parentItem as HTMLElement)
 
@@ -485,12 +485,12 @@ describe('PickerPage', () => {
   it('does not render a stale aria-expanded on sidebar directory rows (PickerPage has no in-place expand/collapse state)', async () => {
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
-    const projectsItem = within(tree).getByText('projects').closest('[role="treeitem"]')
+    const tree = await screen.findByRole('listbox', { name: /folder contents navigation/i })
+    const projectsItem = within(tree).getByText('projects').closest('[role="option"]')
     expect(projectsItem).not.toBeNull()
     expect(projectsItem as HTMLElement).not.toHaveAttribute('aria-expanded')
 
-    const gitlocalItem = within(tree).getByText('gitlocal').closest('[role="treeitem"]')
+    const gitlocalItem = within(tree).getByText('gitlocal').closest('[role="option"]')
     expect(gitlocalItem).not.toBeNull()
     expect(gitlocalItem as HTMLElement).not.toHaveAttribute('aria-expanded')
   })
@@ -515,7 +515,7 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    const tree = await screen.findByRole('listbox', { name: /folder contents navigation/i })
     expect(within(tree).queryByText(/^local$/i)).not.toBeInTheDocument()
     expect(within(tree).getByText(/^git$/i)).toBeInTheDocument()
   })
@@ -549,7 +549,7 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    const tree = await screen.findByRole('listbox', { name: /folder contents navigation/i })
     expect(within(tree).queryByText(/^git$/i)).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /^docs folder$/i })).toBeInTheDocument()
   })

@@ -192,7 +192,7 @@ export async function folderCreateChildHandler(c: Context<{ Variables: Variables
   try {
     payload = await c.req.json<FolderCreateChildRequest>()
   } catch {
-    return c.json({ ok: false, error: 'Invalid JSON body.' })
+    return c.json({ ok: false, error: 'Invalid JSON body.' }, 400)
   }
 
   try {
@@ -205,10 +205,13 @@ export async function folderCreateChildHandler(c: Context<{ Variables: Variables
       message: 'Folder created successfully.',
     })
   } catch (error) {
-    return c.json({
-      ok: false,
-      error: getActionError(error, 'Failed to create the folder.'),
-    })
+    return c.json(
+      {
+        ok: false,
+        error: getActionError(error, 'Failed to create the folder.'),
+      },
+      isFilesystemError(error) ? 500 : 400,
+    )
   }
 }
 
@@ -288,7 +291,7 @@ export async function folderInitRepositoryHandler(c: Context<{ Variables: Variab
   try {
     payload = await c.req.json<FolderInitRepositoryRequest>()
   } catch {
-    return c.json({ ok: false, error: 'Invalid JSON body.' })
+    return c.json({ ok: false, error: 'Invalid JSON body.' }, 400)
   }
 
   try {
@@ -301,10 +304,13 @@ export async function folderInitRepositoryHandler(c: Context<{ Variables: Variab
       message: 'Git repository initialized successfully.',
     })
   } catch (error) {
-    return c.json({
-      ok: false,
-      error: getActionError(error, 'Failed to initialize the repository.'),
-    })
+    return c.json(
+      {
+        ok: false,
+        error: getActionError(error, 'Failed to initialize the repository.'),
+      },
+      isFilesystemError(error) ? 500 : 400,
+    )
   }
 }
 
@@ -313,7 +319,7 @@ export async function folderCloneRepositoryHandler(c: Context<{ Variables: Varia
   try {
     payload = await c.req.json<FolderCloneRepositoryRequest>()
   } catch {
-    return c.json({ ok: false, error: 'Invalid JSON body.' })
+    return c.json({ ok: false, error: 'Invalid JSON body.' }, 400)
   }
 
   try {
@@ -332,10 +338,13 @@ export async function folderCloneRepositoryHandler(c: Context<{ Variables: Varia
       message: 'Repository cloned successfully.',
     })
   } catch (error) {
-    return c.json({
-      ok: false,
-      error: getActionError(error, 'Failed to clone the repository.'),
-    })
+    return c.json(
+      {
+        ok: false,
+        error: getActionError(error, 'Failed to clone the repository.'),
+      },
+      isFilesystemError(error) ? 500 : 400,
+    )
   }
 }
 
