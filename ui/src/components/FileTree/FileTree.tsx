@@ -60,6 +60,13 @@ export default function FileTree({
   const nodeElements = useRef<Map<string, HTMLDivElement>>(new Map())
   const visibleOrder = useRef<string[]>([])
   const parentOf = useRef<Map<string, string>>(new Map())
+  // Mirrors nodeStates for callbacks/effects below that only need to read the *current* value at
+  // call time (not react to every change) — keeps toggleDir and the two effects below from being
+  // torn down and rebuilt on every expand/collapse/fetch, which nodeStates itself changes on.
+  const nodeStatesRef = useRef(nodeStates)
+  useEffect(() => {
+    nodeStatesRef.current = nodeStates
+  }, [nodeStates])
 
   const { data: roots, isLoading, isError } = useQuery({
     queryKey: ['tree', '', branch, refreshToken],
@@ -67,7 +74,7 @@ export default function FileTree({
   })
 
   const toggleDir = useCallback(async (node: TreeNode) => {
-    const current = nodeStates.get(node.path)
+    const current = nodeStatesRef.current.get(node.path)
     if (current?.expanded) {
       setNodeStates(prev => {
         const next = new Map(prev)
@@ -104,10 +111,10 @@ export default function FileTree({
         return next
       })
     }
-  }, [nodeStates, branch])
+  }, [branch])
 
   useEffect(() => {
-    const expandedPaths = Array.from(nodeStates.entries())
+    const expandedPaths = Array.from(nodeStatesRef.current.entries())
       .filter(([, state]) => state.expanded)
       .map(([path]) => path)
 
@@ -161,7 +168,7 @@ export default function FileTree({
 
     void directories.reduce<Promise<void>>(async (previous, dirPath) => {
       await previous
-      const current = nodeStates.get(dirPath)
+      const current = nodeStatesRef.current.get(dirPath)
       if (current?.expanded || current?.children || current?.error) return
 
       setNodeStates((prev) => {
@@ -315,11 +322,16 @@ export default function FileTree({
                 else nodeElements.current.delete(node.path)
               }}
             />
-            {node.type === 'dir' && isExpanded && (
+            {node.type === 'dir' && (isExpanded || state?.error) && (
               <div className="file-tree-children">
                 {state?.loading && (
                   <div style={{ paddingLeft: `${8 + (depth + 1) * 16}px`, color: '#768390', fontSize: 12 }}>
                     Loading...
+                  </div>
+                )}
+                {state?.error && (
+                  <div style={{ paddingLeft: `${8 + (depth + 1) * 16}px`, color: '#cf222e', fontSize: 12 }}>
+                    Failed to load — click to retry
                   </div>
                 )}
                 {state?.children && renderNodes(state.children, depth + 1, childAncestorPaths)}

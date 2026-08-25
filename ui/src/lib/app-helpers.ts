@@ -41,7 +41,7 @@ export function updateBranchCacheAfterSwitch(
     nextOptions = nextOptions.filter((option) =>
       !(
         option.name === nextBranch
-        || (option.scope === 'remote' && (option.trackingRef === target || option.name === nextBranch))
+        || (option.scope === 'remote' && option.trackingRef === target)
       ),
     )
 

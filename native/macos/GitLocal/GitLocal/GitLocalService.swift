@@ -121,10 +121,14 @@ final class GitLocalService {
         return !process.isRunning
     }
 
+    // Compiled once with `try!`: the pattern is a fixed literal that cannot fail to compile, so a
+    // failure here means the literal itself was edited incorrectly — fail loudly at first use
+    // rather than silently returning and leaving the 10s startup timer as the only diagnostic.
+    private static let listeningURLRegex = try! NSRegularExpression(pattern: #"gitlocal listening on (http://[^\s]+)"#)
+
     private func handleOutput() {
         guard !completionStateQueue.sync(execute: { completed }) else { return }
-        let pattern = #"gitlocal listening on (http://[^\s]+)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        let regex = Self.listeningURLRegex
         let range = NSRange(outputBuffer.startIndex..<outputBuffer.endIndex, in: outputBuffer)
         guard let match = regex.firstMatch(in: outputBuffer, range: range),
               let urlRange = Range(match.range(at: 1), in: outputBuffer) else {

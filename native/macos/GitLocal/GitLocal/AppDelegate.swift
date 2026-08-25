@@ -256,13 +256,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .failure(AppDelegateError.missingBundleIdentifier)
         }
 
-        if isDefaultMarkdownReader(bundleIdentifier: bundleIdentifier) {
-            return .success("GitLocal is already the default Markdown reader.")
-        }
-
+        // Single pass: read each content type's current handler once, and only issue a write for
+        // the types that actually need one (skips the redundant round-trip the two-pass version
+        // made even for types already pointing at us, and — unlike the old all-or-nothing
+        // isDefaultMarkdownReader() pre-check — still fixes a type left over from a partial prior
+        // registration instead of reporting "already default" and leaving it unset).
         let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
+        var alreadyCorrectTypes: [String] = []
         var failedTypes: [String] = []
         for contentType in contentTypes {
+            if currentRoleHandler(for: contentType) == bundleIdentifier {
+                alreadyCorrectTypes.append(contentType)
+                continue
+            }
             let status = LSSetDefaultRoleHandlerForContentType(
                 contentType as CFString,
                 LSRolesMask.all,
@@ -273,24 +279,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if failedTypes.count == contentTypes.count {
+        if alreadyCorrectTypes.count == contentTypes.count {
+            return .success("GitLocal is already the default Markdown reader.")
+        }
+        if failedTypes.count == contentTypes.count - alreadyCorrectTypes.count {
             return .failure(AppDelegateError.defaultReaderSetupFailed)
         }
 
         return .success("GitLocal is now the default Markdown reader.")
     }
 
-    private func isDefaultMarkdownReader(bundleIdentifier: String) -> Bool {
-        let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
-        return contentTypes.contains { contentType in
-            guard let handler = LSCopyDefaultRoleHandlerForContentType(
-                contentType as CFString,
-                LSRolesMask.all
-            )?.takeRetainedValue() as String? else {
-                return false
-            }
-            return handler == bundleIdentifier
-        }
+    private func currentRoleHandler(for contentType: String) -> String? {
+        LSCopyDefaultRoleHandlerForContentType(
+            contentType as CFString,
+            LSRolesMask.all
+        )?.takeRetainedValue() as String?
     }
 }
 

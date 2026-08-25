@@ -86,7 +86,7 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
   function appendBuffered(session: ManagedSession, chunk: string): void {
     session.outputBuffer += chunk
     if (session.outputBuffer.length > MAX_BUFFERED_OUTPUT_CHARS) {
-      session.outputBuffer = session.outputBuffer.slice(session.outputBuffer.length - MAX_BUFFERED_OUTPUT_CHARS)
+      session.outputBuffer = session.outputBuffer.slice(-MAX_BUFFERED_OUTPUT_CHARS)
     }
   }
 

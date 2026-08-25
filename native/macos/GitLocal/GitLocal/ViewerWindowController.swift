@@ -159,7 +159,11 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
           detail: { command: \(jsStringLiteral(command)), message: \(jsStringLiteral(message)), path: \(jsStringLiteral(path)) }
         }));
         """
-        webView.evaluateJavaScript(script)
+        webView.evaluateJavaScript(script) { _, error in
+            if let error {
+                NSLog("GitLocal: dispatchNativeCommand(\(command)) failed: \(error)")
+            }
+        }
     }
 
     /// Encodes a Swift string as a JSON string literal, which is also a safe JS string literal:
