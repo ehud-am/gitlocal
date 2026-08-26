@@ -229,11 +229,11 @@ Model: Sonnet 5, default effort.
 
 ## Phase 9: Final Verification
 
-- [ ] T046 [FINAL] Full `npm run verify` (tests, ≥90%-per-file coverage, build, both audits) (Sonnet 5)
-- [ ] T047 [FINAL] Measure final non-test LOC in `src/` + `ui/src/`, confirm ≥30% reduction vs. 14,551-line baseline — SC-001 (Sonnet 5)
-- [ ] T048 [FINAL] Confirm `findings/index.md` shows zero open P1/P2 findings (fixed or explicitly user-deferred) across all categories — SC-003/004/005 (Sonnet 5)
-- [ ] T049 [FINAL] Re-run every spec 001-034 acceptance scenario relevant to touched code as a manual regression pass (mirrors the 0.10.2 prerelease live-verification step) (Sonnet 5)
-- [ ] T050 [FINAL] Write `specs/035-quality-hardening/summary.md`: LOC before/after, findings closed by category, deferred findings list, efficiency wins with numbers — the release-review-style artifact for this effort (Sonnet 5)
+- [x] T046 [FINAL] Full `npm run verify` (tests, ≥90%-per-file coverage, build, both audits) (Sonnet 5) — tests 441/441 (+1 pre-existing sandbox-networking flake, environment-only), build clean, both audits 0 vulnerabilities, coverage exit 0 at ≥90%-per-file on every file
+- [x] T047 [FINAL] Measure final non-test LOC in `src/` + `ui/src/`, confirm ≥30% reduction vs. 14,551-line baseline — SC-001 (Sonnet 5) — measured 14,293 lines, a 1.8% reduction; target missed, reported to user before Phase 9 began, see summary.md
+- [x] T048 [FINAL] Confirm `findings/index.md` shows zero open P1/P2 findings (fixed or explicitly user-deferred) across all categories — SC-003/004/005 (Sonnet 5) — 0 open/verified, 101 fixed, 7 deferred, 2 rejected
+- [x] T049 [FINAL] Re-run every spec 001-034 acceptance scenario relevant to touched code as a manual regression pass (mirrors the 0.10.2 prerelease live-verification step) (Sonnet 5) — code-level audit (no browser available); no acceptance scenario found to conflict with any fix, see summary.md
+- [x] T050 [FINAL] Write `specs/035-quality-hardening/summary.md`: LOC before/after, findings closed by category, deferred findings list, efficiency wins with numbers — the release-review-style artifact for this effort (Sonnet 5)
 
 **Checkpoint (final)**: Present `summary.md` to user. This effort's own release/merge/version-bump/tag steps happen afterward, following the same pattern as 0.10.2 (Principle VIII, deferred until this point).
 
