@@ -10,7 +10,7 @@ import {
 } from '../git/repo.js'
 import type { BackgroundChangeNotice, ChangedFilesSummary, SyncStatus } from '../types.js'
 
-function emptyChangedFilesSummary(): ChangedFilesSummary {
+export function emptyChangedFilesSummary(): ChangedFilesSummary {
   return {
     total: 0,
     modified: 0,
@@ -58,6 +58,7 @@ function buildActivePathNotice(
 export function getSyncStatus(repoPath: string, branch: string, currentPath: string): SyncStatus {
   const checkedAt = new Date().toISOString()
   if (!repoPath || !isWorkingTreeBranch(repoPath, branch)) {
+    const earlyReturnPathType = repoPath ? getPathType(repoPath, currentPath) : currentPath ? 'file' : 'none'
     return {
       branch,
       repoPath,
@@ -66,8 +67,8 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
       fileStatus: 'unchanged',
       currentPath,
       resolvedPath: currentPath,
-      currentPathType: currentPath ? 'file' : 'none',
-      resolvedPathType: currentPath ? 'file' : 'none',
+      currentPathType: earlyReturnPathType,
+      resolvedPathType: earlyReturnPathType,
       pathSyncState: 'none',
       trackedChangeCount: 0,
       untrackedChangeCount: 0,

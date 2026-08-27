@@ -67,7 +67,7 @@ export default function SearchPanel({
   const submittedQuery = query.trim()
   const submittedMode = mode
   const resolvedDraftMode = resolveMode(searchNames, searchContents)
-  const readyForResults = submittedQuery.length >= 3 && submittedMode !== undefined
+  const readyForResults = submittedQuery.length >= 3
   const draftQuery = draft.trim()
   const isSubmitBlocked = draftQuery.length < 3 || !resolvedDraftMode
   const isDraftDirty =
@@ -81,33 +81,19 @@ export default function SearchPanel({
 
   useEffect(() => {
     setDraft(query)
-    setCursor('')
-  }, [query])
-
-  useEffect(() => {
     setSearchNames(modeIncludes(mode, 'name'))
     setSearchContents(modeIncludes(mode, 'content'))
-  }, [mode])
-
-  useEffect(() => {
     setDraftCaseSensitive(caseSensitive)
-  }, [caseSensitive])
-
-  useEffect(() => {
     setDraftRootPath(rootPath)
-  }, [rootPath])
-
-  useEffect(() => {
     setDraftContentKinds(contentKinds)
-  }, [contentKinds])
-
-  useEffect(() => {
     setDraftTrackedMode(trackedMode)
-  }, [trackedMode])
+    setDraftLimit(limit)
+    setCursor('')
+  }, [query, mode, caseSensitive, rootPath, contentKinds, trackedMode, limit])
 
   useEffect(() => {
-    setDraftLimit(limit)
-  }, [limit])
+    setCursor('')
+  }, [branch])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['search', branch, submittedQuery, submittedMode, caseSensitive, rootPath, contentKinds, trackedMode, limit, cursor],

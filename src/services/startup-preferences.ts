@@ -65,7 +65,7 @@ export function getLinuxDocumentsPath(homePath = homedir(), env = process.env): 
   return join(homePath, 'Documents')
 }
 
-export function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
+function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
   if (platform() === 'linux') return getLinuxDocumentsPath(homePath, env)
   return join(homePath, 'Documents')
 }
@@ -186,14 +186,15 @@ export function resolveStartupFolder(options: {
     }
   }
 
+  const homeReadable = isReadableDirectory(homePath)
   return {
-    path: canonicalDirectory(homePath),
+    path: homeReadable ? canonicalDirectory(homePath) : resolve(homePath),
     source: 'home-fallback',
-    exists: true,
-    readable: true,
+    exists: homeReadable,
+    readable: homeReadable,
     platformDefaultPath,
     lastUsedPath: preference?.path ?? '',
-    fallbackReason: 'Platform Documents folder is unavailable.',
+    fallbackReason: homeReadable ? 'Platform Documents folder is unavailable.' : 'Home folder is unavailable.',
   }
 }
 

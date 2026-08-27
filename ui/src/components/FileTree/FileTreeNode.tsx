@@ -1,6 +1,8 @@
+import type { KeyboardEvent } from 'react'
 import type { TreeNode } from '../../types'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
+import { resolveGeneratedLocalState } from './tree-node-state'
 
 interface Props {
   node: TreeNode
@@ -9,6 +11,10 @@ interface Props {
   depth: number
   showLocalOnly: boolean
   onClick: () => void
+  tabIndex: number
+  onFocus: () => void
+  onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
+  nodeRef: (el: HTMLDivElement | null) => void
 }
 
 const FolderIcon = ({ open }: { open: boolean }) => (
@@ -33,9 +39,9 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
   </svg>
 )
 
-export default function FileTreeNode({ node, isExpanded, isSelected, depth, showLocalOnly, onClick }: Props) {
+export default function FileTreeNode({ node, isExpanded, isSelected, depth, showLocalOnly, onClick, tabIndex, onFocus, onKeyDown, nodeRef }: Props) {
   const syncState = describeFileSyncState(node.syncState)
-  const generatedLocalState = node.generatedLocalState ?? (node.localOnly ? 'local-only' : 'tracked')
+  const generatedLocalState = resolveGeneratedLocalState(node)
   const localLabel = generatedLocalState === 'generated'
     ? 'generated'
     : generatedLocalState === 'ignored'
@@ -46,12 +52,16 @@ export default function FileTreeNode({ node, isExpanded, isSelected, depth, show
 
   return (
     <div
+      ref={nodeRef}
       className={`file-tree-node${isSelected ? ' selected' : ''}`}
       style={{ paddingLeft: `${8 + depth * 16}px` }}
       onClick={onClick}
+      onFocus={onFocus}
+      onKeyDown={onKeyDown}
       role="treeitem"
       aria-expanded={node.type === 'dir' ? isExpanded : undefined}
       aria-selected={isSelected}
+      tabIndex={tabIndex}
     >
       {node.type === 'dir' && <span className="text-[var(--muted-foreground)]"><ChevronIcon open={isExpanded} /></span>}
       <span className={node.type === 'dir' ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}>

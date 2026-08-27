@@ -4,29 +4,9 @@ import { writeViewerState } from '../../services/viewerState'
 import type { FolderBrowseEntry, StartupFolderSource } from '../../types'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { ParentFolderIcon, PanelToggleIcon, ThemeIcon } from '../ui/icons'
 import { MetaTag } from '../ui/meta-tag'
 import { Switch } from '../ui/switch'
-
-function ParentFolderIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ThemeIcon({ darkMode }: { darkMode: boolean }) {
-  return darkMode ? (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M9.5 2.25A5.75 5.75 0 1 0 13.75 10A4.75 4.75 0 0 1 9.5 2.25z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ) : (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M12.6 3.4l-.9.9M4.3 11.7l-.9.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 function KebabIcon() {
   return (
@@ -34,18 +14,6 @@ function KebabIcon() {
       <circle cx="8" cy="3.5" r="1.25" fill="currentColor" />
       <circle cx="8" cy="8" r="1.25" fill="currentColor" />
       <circle cx="8" cy="12.5" r="1.25" fill="currentColor" />
-    </svg>
-  )
-}
-
-function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
-  return collapsed ? (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M10 3.5L5.5 8L10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -66,7 +34,10 @@ function FileIcon() {
   )
 }
 
-function ChevronIcon() {
+// Static disclosure marker for directory rows: this sidebar navigates forward into folders
+// (double-click replaces the listing) rather than expanding them in place, so unlike
+// FileTreeNode's ChevronIcon it intentionally never rotates.
+function DirectoryDisclosureIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
       <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
@@ -161,26 +132,12 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
-
-    if (!path.trim()) {
+    const trimmedPath = path.trim()
+    if (!trimmedPath) {
       setError('Please choose or enter a folder path.')
       return
     }
-
-    setLoading(true)
-    try {
-      const result = await api.openRepository(path.trim())
-      if (result.ok) {
-        reloadAfterOpen(result, path.trim())
-      } else {
-        setError(result.error || 'An error occurred. Please try again.')
-      }
-    } catch {
-      setError('Failed to connect to GitLocal server.')
-    } finally {
-      setLoading(false)
-    }
+    await handleOpenPath(trimmedPath)
   }
 
   async function handleOpenPath(nextPath: string) {
@@ -201,41 +158,41 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
     }
   }
 
+  async function runFolderAction(action: () => Promise<void>, failureMessage: string): Promise<void> {
+    setError('')
+    setLoading(true)
+    try {
+      await action()
+    } catch {
+      setError(failureMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleCreateFolder() {
     const name = window.prompt('New subfolder name')
     if (!name?.trim()) return
 
-    setError('')
-    setLoading(true)
-    try {
+    await runFolderAction(async () => {
       const result = await api.createChildFolder({ parentPath: currentPath, name: name.trim() })
       if (result.ok) {
         await loadPath(currentPath)
       } else {
         setError(result.error || 'Could not create the folder.')
       }
-    } catch {
-      setError('Failed to create the folder from GitLocal.')
-    } finally {
-      setLoading(false)
-    }
+    }, 'Failed to create the folder from GitLocal.')
   }
 
   async function handleInitGit() {
-    setError('')
-    setLoading(true)
-    try {
+    await runFolderAction(async () => {
       const result = await api.initFolderRepository({ path: currentPath })
       if (result.ok && result.path) {
         await handleOpenPath(result.path)
       } else {
         setError(result.error || 'Could not initialize git in this folder.')
       }
-    } catch {
-      setError('Failed to initialize git from GitLocal.')
-    } finally {
-      setLoading(false)
-    }
+    }, 'Failed to initialize git from GitLocal.')
   }
 
   async function handleCloneIntoChild() {
@@ -248,9 +205,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
     const name = window.prompt('Clone into subfolder', suggestedName)
     if (!name?.trim()) return
 
-    setError('')
-    setLoading(true)
-    try {
+    await runFolderAction(async () => {
       const result = await api.cloneRepositoryIntoFolder({
         parentPath: currentPath,
         name: name.trim(),
@@ -261,19 +216,32 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
       } else {
         setError(result.error || 'Could not clone into this folder.')
       }
-    } catch {
-      setError('Failed to clone the repository from GitLocal.')
-    } finally {
-      setLoading(false)
-    }
+    }, 'Failed to clone the repository from GitLocal.')
   }
 
-  const rows = [
-    ...(parentPath
-      ? [{ name: '..', path: parentPath, type: 'dir' as const, isGitRepo: false, isParent: true as const }]
-      : []),
-    ...entries.map((entry) => ({ ...entry, isParent: false as const })),
-  ]
+  const rows = useMemo(
+    () => [
+      ...(parentPath
+        ? [{ name: '..', path: parentPath, type: 'dir' as const, isGitRepo: false, isParent: true as const }]
+        : []),
+      ...entries.map((entry) => ({ ...entry, isParent: false as const })),
+    ],
+    [parentPath, entries],
+  )
+
+  function handleEntryActivate(entry: (typeof rows)[number]): void {
+    if (entry.isParent) {
+      void loadPath(entry.path)
+      return
+    }
+
+    if (entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
+      void loadPath(entry.path)
+      return
+    }
+
+    void handleOpenPath(entry.path)
+  }
 
   return (
     <div className="picker-shell">
@@ -330,7 +298,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
               <PanelToggleIcon collapsed={false} />
             </button>
             <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
-              <div className="file-tree picker-file-tree" role="tree" aria-label="folder contents navigation">
+              <div className="file-tree picker-file-tree" role="group" aria-label="folder contents navigation">
                 {browseLoading ? (
                   <div className="file-tree-skeleton border-0 bg-transparent" aria-label="loading">
                     {[70, 90, 65, 80, 55].map((width, index) => (
@@ -341,33 +309,18 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                   <p className="picker-helper px-3 py-2">This folder is empty.</p>
                 ) : (
                   rows.map((entry) => (
-                    <div
+                    <button
                       key={`sidebar:${entry.isParent ? 'parent:' : ''}${entry.path}`}
+                      type="button"
                       className={`file-tree-node${path === entry.path ? ' selected' : ''}`}
                       style={{ paddingLeft: '8px' }}
-                      role="treeitem"
-                      aria-expanded={entry.type === 'dir' ? false : undefined}
-                      aria-selected={path === entry.path}
+                      aria-current={path === entry.path ? 'true' : undefined}
                       onClick={() => setPath(entry.path)}
-                      onDoubleClick={() => {
-                        if (entry.isParent) {
-                          void loadPath(entry.path)
-                          return
-                        }
-
-                        if (!entry.isParent && entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
-                          void loadPath(entry.path)
-                          return
-                        }
-
-                        if (!entry.isParent) {
-                          void handleOpenPath(entry.path)
-                        }
-                      }}
+                      onDoubleClick={() => handleEntryActivate(entry)}
                     >
                       {entry.type === 'dir' ? (
                         <span className="text-[var(--muted-foreground)]">
-                          <ChevronIcon />
+                          <DirectoryDisclosureIcon />
                         </span>
                       ) : null}
                       <span className={entry.type === 'dir' ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}>
@@ -377,7 +330,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                         <span className="file-tree-node-name" title={entry.name}>{entry.name}</span>
                         {entry.isParent || !entry.isGitRepo ? null : <MetaTag label="git" icon="git" tone="neutral" compact />}
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -447,19 +400,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                       <tr
                         key={`${entry.isParent ? 'parent:' : ''}${entry.path}`}
                         className={`picker-entry${path === entry.path ? ' selected' : ''}`}
-                        onDoubleClick={() => {
-                          if (entry.isParent) {
-                            void loadPath(entry.path)
-                            return
-                          }
-
-                          if (entry.type === 'dir' && !entry.isGitRepo && entry.openMode !== 'repository') {
-                            void loadPath(entry.path)
-                            return
-                          }
-
-                          void handleOpenPath(entry.path)
-                        }}
+                        onDoubleClick={() => handleEntryActivate(entry)}
                       >
                         <td className="picker-entry-cell picker-entry-cell-name">
                           <button

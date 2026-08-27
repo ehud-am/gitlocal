@@ -369,12 +369,8 @@ export function classifyLocalPath(inputPath: string): LocalPathClassification {
   }
 }
 
-export function isRepositoryRoot(repoPath: string): boolean {
-  return classifyLocalPath(repoPath).gitState === 'repository-root'
-}
-
 export function validateRepo(repoPath: string): boolean {
-  return isRepositoryRoot(repoPath)
+  return classifyLocalPath(repoPath).gitState === 'repository-root'
 }
 
 export function getCurrentBranch(repoPath: string): string {
@@ -383,6 +379,12 @@ export function getCurrentBranch(repoPath: string): string {
   } catch {
     return ''
   }
+}
+
+// Handlers resolve a request branch the same way everywhere: honor an explicit branch for a
+// real repo, otherwise fall back to the current branch, and treat non-repos as branch-less.
+export function resolveCurrentBranch(repoPath: string, requestedBranch?: string | null): string {
+  return validateRepo(repoPath) ? requestedBranch ?? getCurrentBranch(repoPath) : ''
 }
 
 export function hasCommits(repoPath: string): boolean {
@@ -800,10 +802,10 @@ export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
   }
 }
 
-export function getTrackedPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
+export function getTrackedPathType(repoPath: string, filePath: string, trackedFiles?: string[]): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
 
-  const files = getTrackedWorkingTreeFiles(repoPath)
+  const files = trackedFiles ?? getTrackedWorkingTreeFiles(repoPath)
   if (files.includes(filePath)) return 'file'
   return files.some((candidate) => candidate.startsWith(`${filePath}/`)) ? 'dir' : 'missing'
 }
@@ -874,7 +876,7 @@ export function getWorkingTreeChanges(repoPath: string): WorkingTreeChangeSummar
   }
 }
 
-export function getCurrentUpstreamRef(repoPath: string): string {
+function getCurrentUpstreamRef(repoPath: string): string {
   const result = runGitCapture(repoPath, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}')
   return result.status === 0 ? result.stdout.trim() : ''
 }
@@ -1018,18 +1020,19 @@ function isLikelyGeneratedPath(path: string): boolean {
   return /(^|\/)(node_modules|dist|build|coverage|\.vite|\.next|\.turbo|target|DerivedData)(\/|$)/.test(normalized)
 }
 
-function isTrackedRepoPath(repoPath: string, filePath: string): boolean {
+function isTrackedRepoPath(repoPath: string, filePath: string, trackedFiles?: string[]): boolean {
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized) return false
+  if (trackedFiles) return trackedFiles.includes(normalized)
   const result = runGitCapture(repoPath, 'ls-files', '--error-unmatch', normalized)
   return result.status === 0
 }
 
-export function classifyGeneratedLocalState(repoPath: string, filePath: string): GeneratedLocalState {
+export function classifyGeneratedLocalState(repoPath: string, filePath: string, trackedFiles?: string[]): GeneratedLocalState {
   const normalized = normalizeRepoRelativePath(filePath)
   if (!normalized || !validateRepo(repoPath)) return 'unknown'
-  if (isTrackedRepoPath(repoPath, normalized)) return 'tracked'
-  const trackedType = getTrackedPathType(repoPath, normalized)
+  if (isTrackedRepoPath(repoPath, normalized, trackedFiles)) return 'tracked'
+  const trackedType = getTrackedPathType(repoPath, normalized, trackedFiles)
   if (trackedType !== 'missing') return 'tracked'
   if (isIgnoredPath(repoPath, normalized)) return isLikelyGeneratedPath(normalized) ? 'generated' : 'ignored'
   return getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only'

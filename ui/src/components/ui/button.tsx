@@ -11,7 +11,6 @@ const buttonVariants = cva(
         default: 'bg-[var(--accent-foreground)] text-[var(--primary-foreground)] hover:opacity-95',
         secondary: 'border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-strong)]',
         ghost: 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]',
-        outline: 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)]',
         danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-strong)]',
         dangerOutline: 'border border-[color-mix(in_srgb,var(--danger)_65%,var(--border))] bg-[var(--card)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,var(--background))]',
         highlight: 'border border-[color-mix(in_srgb,var(--success)_55%,var(--border))] bg-[color-mix(in_srgb,var(--success)_5%,var(--card))] text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_8%,var(--card))]',
@@ -30,7 +29,7 @@ const buttonVariants = cva(
   },
 )
 
-export interface ButtonProps
+interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean

@@ -1,0 +1,18 @@
+# Findings: ui-terminal-panel
+
+**Scope**: ui/src/components/TerminalPanel/ — terminal panel UI (tabs, view, kind select) + ui/src/hooks/useTerminalPanel.ts
+
+## Findings
+
+| ID | File | Lines | Category | Severity | Evidence | Source | Status |
+|----|------|-------|----------|----------|----------|--------|--------|
+| TP-001 | `ui/src/hooks/useTerminalPanel.ts` | 10-16 | dead-code | low | `NewTerminalTab` is an exported interface used only internally (as `addTab`'s parameter type) and never imported by any other module. Confirmed via repo-wide grep — only three references, all within this file. Matches the project's knip baseline. | pass1-confirmed | fixed |
+| TP-002 | `ui/src/components/TerminalPanel/TerminalPanel.tsx` | 276 | readability | low | `TerminalView` is given a synthetic session object with hardcoded `createdAt: ''` and `exitInfo: null` that don't reflect real tab data, because `TerminalTabRef` (the client-side tab state type) doesn't carry these fields at all — the panel fabricates placeholder values purely to satisfy `TerminalSession`'s shape. Confirmed `TerminalView.tsx` never reads `session.createdAt`/`session.exitInfo` (only `session.id`), so this is currently harmless but a type-safety smell: if `TerminalView` ever starts using those fields it will silently render an empty timestamp/null exit info instead of real data. Downgraded from Pass 1's "bug" framing since there is no current behavioral defect. | pass1-confirmed | fixed |
+
+## Adjudication Log
+
+- **TP-002 fixed (Phase 8 Checkpoint F4)**: narrowed `TerminalView`'s props from a full `session: TerminalSession` to just `sessionId: string` (the only field it ever read), eliminating the need for `TerminalPanel.tsx` to fabricate a synthetic session object with placeholder `createdAt`/`exitInfo` values. Updated the two consuming test files (`TerminalPanel.test.tsx`, `TerminalTabStrip.test.tsx`) to mock `TerminalView` on the new narrower shape; the "marks a tab exited" integration test was rewritten to assert the still-meaningful invariant that exit-handling doesn't unmount/recreate the view (the `'exited'` vs `'running'` status transition itself is already covered directly by `useTerminalPanel.test.ts`). Verified via `tsc --noEmit`, the full server+UI `vitest run` (444/444 in `ui/`), and `npm run build`.
+
+## Architecture Notes
+
+This unit is a clean, well-decomposed vertical slice: `useTerminalPanel.ts` owns pure tab/visibility state, `TerminalView.tsx` owns one xterm.js instance's lifecycle keyed to `session.id`, `TerminalTabStrip`/`TerminalKindSelect` are small presentational pieces reused across the empty-state and populated-state UI, and `TerminalPanel.tsx` composes them plus resize/keyboard-shortcut/focus-management concerns. The "keep every tab's TerminalView mounted, CSS-hidden when inactive" pattern is correctly and consistently applied so scrollback survives tab switches. The main structural note is that `TerminalPanel.tsx` (~285 lines) does a lot — session creation, error state, resize-drag physics, global keyboard shortcut wiring, focus management, and tab rendering all live in one component; still readable, but the natural next candidate for splitting (e.g. extracting the resize-handle and its height state into its own hook) if the file grows further. The client-side `TerminalTabRef`/`NewTerminalTab` types duplicating a slice of the server's `TerminalSession` (minus `createdAt`/`exitInfo`) is a reasonable simplification but forces the awkward hand-built synthetic session object (TP-002); a narrower `TerminalView` props type keyed only on the fields it actually uses (`id`) would remove the need to fabricate values entirely.

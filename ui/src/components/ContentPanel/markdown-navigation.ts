@@ -1,3 +1,5 @@
+import { parentPathOf } from '../../lib/utils'
+
 export function stripHiddenMarkdownComments(content: string): string {
   return content
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -5,7 +7,7 @@ export function stripHiddenMarkdownComments(content: string): string {
     .replace(/^\[comment\]:\s*#\s*\(.*\)\s*$/gim, '')
 }
 
-export function slugifyHeading(text: string): string {
+function slugifyHeading(text: string): string {
   const slug = text
     .trim()
     .toLowerCase()
@@ -22,12 +24,6 @@ export function createUniqueHeadingId(text: string, seen: Map<string, number>): 
   const count = seen.get(slug) ?? 0
   seen.set(slug, count + 1)
   return count === 0 ? slug : `${slug}-${count + 1}`
-}
-
-function parentPathOf(path: string): string {
-  const normalized = path.replace(/\\/g, '/')
-  const boundary = normalized.lastIndexOf('/')
-  return boundary >= 0 ? normalized.slice(0, boundary) : ''
 }
 
 function normalizeSegments(path: string): string {

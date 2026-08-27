@@ -11,6 +11,8 @@ export type MetaTagIcon =
   | 'local-commit'
   | 'remote-update'
   | 'diverged'
+  | 'name-match'
+  | 'content-match'
 
 interface Props {
   label: string
@@ -68,6 +70,21 @@ function iconFor(name: MetaTagIcon): ReactNode {
       return (
         <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
           <path d="M5 2a1.75 1.75 0 1 1 0 3.5H4.5v2.2l3.5 3.5v1.3H7v-1l-3.5-3.5V5.5H3A1.75 1.75 0 0 1 3 2h2Zm6 0A1.75 1.75 0 1 1 11 5.5h-.5V8L7 11.5v1H6v-1.3l3.5-3.5V5.5H9A1.75 1.75 0 0 1 9 2h2Z" fill="currentColor" />
+        </svg>
+      )
+    case 'name-match':
+      return (
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <path d="M4 1.5h5.5l3 3v9.5h-8.5z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          <path d="M9.5 1.5v3h3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'content-match':
+      return (
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <path d="M4 1.5h5.5l3 3v9.5h-8.5z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          <path d="M9.5 1.5v3h3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          <path d="M5.5 8h5M5.5 10h5M5.5 12h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
         </svg>
       )
   }

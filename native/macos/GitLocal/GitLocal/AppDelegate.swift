@@ -5,12 +5,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var service: GitLocalService?
     private var windowController: ViewerWindowController?
     private var pendingOpenFilePaths: [String] = []
-    private var serviceStarted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let existingInstance = Self.alreadyRunningInstance() {
+            // GitLocalService binds its own ephemeral port per instance, so a second launch
+            // would otherwise spawn an uncoordinated second Node server. Hand off to the
+            // existing instance instead, before starting a service here.
+            existingInstance.activate(options: .activateIgnoringOtherApps)
+            NSApp.terminate(self)
+            return
+        }
+
         let service = GitLocalService()
         self.service = service
-        serviceStarted = true
+        // Only the most recent pre-launch "Open With" target becomes the initial window's
+        // content; any earlier ones queued before launch are dropped here (as opposed to
+        // application(_:open:)'s post-launch path, which flushes every pending path to the
+        // already-open window instead of picking just one).
         let initialOpenPath = pendingOpenFilePaths.last
 
         service.start(openPath: initialOpenPath) { [weak self] result in
@@ -51,10 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         pendingOpenFilePaths.append(contentsOf: markdownPaths)
-        if !serviceStarted {
-            return
-        }
         flushPendingOpenFiles()
+    }
+
+    private static func alreadyRunningInstance() -> NSRunningApplication? {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first { $0 != .current }
     }
 
     private static func isSupportedMarkdownURL(_ url: URL) -> Bool {
@@ -242,13 +256,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .failure(AppDelegateError.missingBundleIdentifier)
         }
 
-        if isDefaultMarkdownReader(bundleIdentifier: bundleIdentifier) {
-            return .success("GitLocal is already the default Markdown reader.")
-        }
-
+        // Single pass: read each content type's current handler once, and only issue a write for
+        // the types that actually need one (skips the redundant round-trip the two-pass version
+        // made even for types already pointing at us, and — unlike the old all-or-nothing
+        // isDefaultMarkdownReader() pre-check — still fixes a type left over from a partial prior
+        // registration instead of reporting "already default" and leaving it unset).
         let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
+        var alreadyCorrectTypes: [String] = []
         var failedTypes: [String] = []
         for contentType in contentTypes {
+            if currentRoleHandler(for: contentType) == bundleIdentifier {
+                alreadyCorrectTypes.append(contentType)
+                continue
+            }
             let status = LSSetDefaultRoleHandlerForContentType(
                 contentType as CFString,
                 LSRolesMask.all,
@@ -259,24 +279,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if failedTypes.count == contentTypes.count {
+        if alreadyCorrectTypes.count == contentTypes.count {
+            return .success("GitLocal is already the default Markdown reader.")
+        }
+        if failedTypes.count == contentTypes.count - alreadyCorrectTypes.count {
             return .failure(AppDelegateError.defaultReaderSetupFailed)
         }
 
         return .success("GitLocal is now the default Markdown reader.")
     }
 
-    private func isDefaultMarkdownReader(bundleIdentifier: String) -> Bool {
-        let contentTypes = ["net.daringfireball.markdown", "public.markdown"]
-        return contentTypes.contains { contentType in
-            guard let handler = LSCopyDefaultRoleHandlerForContentType(
-                contentType as CFString,
-                LSRolesMask.all
-            )?.takeRetainedValue() as String? else {
-                return false
-            }
-            return handler == bundleIdentifier
-        }
+    private func currentRoleHandler(for contentType: String) -> String? {
+        LSCopyDefaultRoleHandlerForContentType(
+            contentType as CFString,
+            LSRolesMask.all
+        )?.takeRetainedValue() as String?
     }
 }
 

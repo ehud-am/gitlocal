@@ -17,7 +17,7 @@ describe('Button', () => {
 
   it('supports rendering through a child element', () => {
     render(
-      <Button asChild variant="outline">
+      <Button asChild variant="secondary">
         <a href="/docs">Docs</a>
       </Button>,
     )

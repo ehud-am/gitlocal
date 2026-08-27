@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -68,6 +68,7 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.3",
     "esbuild": "^0.28.1",
+    "knip": "^6.32.2",
     "typescript": "^5.8.3",
     "vitest": "^4.1.3"
   },

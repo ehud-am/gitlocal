@@ -1,3 +1,5 @@
+import { safeLocalStorageGet, safeLocalStorageSet } from './safeLocalStorage'
+
 export type ThemeMode = 'light' | 'dark'
 
 const STORAGE_KEY = 'gitlocal-theme'
@@ -6,17 +8,13 @@ function isThemeMode(value: string | null): value is ThemeMode {
   return value === 'light' || value === 'dark'
 }
 
-export function readStoredTheme(): ThemeMode | null {
-  if (typeof window === 'undefined') return null
-  if (typeof window.localStorage?.getItem !== 'function') return null
-  const value = window.localStorage.getItem(STORAGE_KEY)
+function readStoredTheme(): ThemeMode | null {
+  const value = safeLocalStorageGet(STORAGE_KEY)
   return isThemeMode(value) ? value : null
 }
 
 export function writeStoredTheme(theme: ThemeMode): void {
-  if (typeof window === 'undefined') return
-  if (typeof window.localStorage?.setItem !== 'function') return
-  window.localStorage.setItem(STORAGE_KEY, theme)
+  safeLocalStorageSet(STORAGE_KEY, theme)
 }
 
 export function getInitialTheme(): ThemeMode {

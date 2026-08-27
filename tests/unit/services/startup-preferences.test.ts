@@ -164,6 +164,34 @@ describe('startup preferences', () => {
     }
   })
 
+  it('falls back gracefully when remembered, documents, and home folders are all unavailable', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-home-missing-'))
+    const missingHome = join(home, 'no-such-home')
+
+    expect(() =>
+      resolveStartupFolder({
+        preferencePath: join(home, 'missing-pref.json'),
+        homePath: missingHome,
+        env: { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') },
+      }),
+    ).not.toThrow()
+
+    try {
+      const resolution = resolveStartupFolder({
+        preferencePath: join(home, 'missing-pref.json'),
+        homePath: missingHome,
+        env: { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') },
+      })
+      expect(resolution.source).toBe('home-fallback')
+      expect(resolution.path).toBe(missingHome)
+      expect(resolution.exists).toBe(false)
+      expect(resolution.readable).toBe(false)
+      expect(resolution.fallbackReason).toBe('Home folder is unavailable.')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('ignores invalid preference files', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-invalid-'))
     const prefPath = join(dir, 'pref.json')

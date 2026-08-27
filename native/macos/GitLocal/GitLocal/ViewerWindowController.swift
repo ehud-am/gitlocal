@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import WebKit
 
 final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, WKNavigationDelegate {
@@ -149,18 +150,32 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
         }
     }
 
+    // NM-004: values are JSON-encoded (not ad-hoc escaped) before interpolation, since `path`
+    // in particular comes from real Finder paths, which may contain quotes, newlines, or other
+    // characters that are meaningful to a hand-escaped JS string literal.
     private func dispatchNativeCommand(_ command: String, message: String = "", path: String = "") {
-        let escapedCommand = command.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        let escapedMessage = message.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        let escapedPath = path.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
         let script = """
         window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
-          detail: { command: '\(escapedCommand)', message: '\(escapedMessage)', path: '\(escapedPath)' }
+          detail: { command: \(jsStringLiteral(command)), message: \(jsStringLiteral(message)), path: \(jsStringLiteral(path)) }
         }));
         """
-        webView.evaluateJavaScript(script)
+        webView.evaluateJavaScript(script) { _, error in
+            if let error {
+                NSLog("GitLocal: dispatchNativeCommand(\(command)) failed: \(error)")
+            }
+        }
+    }
+
+    /// Encodes a Swift string as a JSON string literal, which is also a safe JS string literal:
+    /// JSON's escaping rules for quotes, backslashes, newlines, and other control characters are
+    /// a strict subset of what JS expects for a double-quoted string.
+    private func jsStringLiteral(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let encoded = String(data: data, encoding: .utf8) else {
+            return "\"\""
+        }
+        // `encoded` is a single-element JSON array, e.g. ["some \"value\""]; strip the
+        // surrounding brackets to get just the JSON string literal.
+        return String(encoded.dropFirst().dropLast())
     }
 }

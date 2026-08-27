@@ -651,6 +651,11 @@ pre {
   padding-bottom: 0.28rem;
   cursor: pointer;
   color: var(--foreground);
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
 }
 
 .file-tree-node:hover {
@@ -1308,6 +1313,22 @@ pre {
 
 .content-active-context {
   margin-bottom: 1rem;
+}
+
+.content-panel-file {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-panel-file > .content-active-context {
+  flex-shrink: 0;
+}
+
+.content-panel-file > .content-panel-selection-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .content-active-heading-row {

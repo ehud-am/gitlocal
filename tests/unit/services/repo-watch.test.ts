@@ -41,6 +41,30 @@ describe('repo-watch', () => {
     }
   })
 
+  it('reports the correct path type for a directory viewed on a non-current branch', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const status = getSyncStatus(dir, 'feature-sync', 'docs')
+      expect(status.treeStatus).toBe('unchanged')
+      expect(status.currentPathType).toBe('dir')
+      expect(status.resolvedPathType).toBe('dir')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('reports a missing path type for a nonexistent path viewed on a non-current branch', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const status = getSyncStatus(dir, 'feature-sync', 'docs/missing/file.md')
+      expect(status.treeStatus).toBe('unchanged')
+      expect(status.currentPathType).toBe('missing')
+      expect(status.resolvedPathType).toBe('missing')
+    } finally {
+      cleanup()
+    }
+  })
+
   it('keeps existing tracked files marked as unchanged', () => {
     const { dir, branch, cleanup } = makeGitRepo()
     try {

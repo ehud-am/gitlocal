@@ -9,6 +9,7 @@ import type {
   SearchTrackedMode,
   ViewerState,
 } from '../types'
+import { safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from './safeLocalStorage'
 
 const RECENT_ITEMS_KEY = 'gitlocal:recent-items'
 const DEFAULT_READER_PROMPT_KEY = 'gitlocal:default-markdown-reader-prompt'
@@ -151,8 +152,7 @@ export function resetViewerState(): void {
 
 export function readDefaultReaderPromptPreference(): DefaultReaderPreference {
   try {
-    if (typeof window.localStorage?.getItem !== 'function') return { ...DEFAULT_READER_PROMPT }
-    const raw = window.localStorage.getItem(DEFAULT_READER_PROMPT_KEY)
+    const raw = safeLocalStorageGet(DEFAULT_READER_PROMPT_KEY)
     if (!raw) return { ...DEFAULT_READER_PROMPT }
     const parsed = JSON.parse(raw) as Partial<DefaultReaderPreference>
     return {
@@ -179,16 +179,13 @@ export function writeDefaultReaderPromptPreference(
     message,
   }
 
-  if (typeof window.localStorage?.setItem === 'function') {
-    window.localStorage.setItem(DEFAULT_READER_PROMPT_KEY, JSON.stringify(preference))
-  }
+  safeLocalStorageSet(DEFAULT_READER_PROMPT_KEY, JSON.stringify(preference))
   return preference
 }
 
 function readRecentItemsFromStorage(): RecentItem[] {
   try {
-    if (typeof window.localStorage?.getItem !== 'function') return []
-    const raw = window.localStorage.getItem(RECENT_ITEMS_KEY)
+    const raw = safeLocalStorageGet(RECENT_ITEMS_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as RecentItem[]
     if (!Array.isArray(parsed)) return []
@@ -202,46 +199,39 @@ export function readRecentItems(): RecentItem[] {
   return readRecentItemsFromStorage()
 }
 
-export function rememberRecentItem(item: RecentItem): RecentItem[] {
+function normalizeRecentItem(item: RecentItem, timestampField: 'lastViewedAt' | 'lastChangedAt'): RecentItem | null {
   const normalizedPath = item.path.trim()
-  if (!normalizedPath) return readRecentItemsFromStorage()
-
-  const nextItem: RecentItem = {
+  if (!normalizedPath) return null
+  return {
     ...item,
     path: normalizedPath,
     label: item.label || normalizedPath.split('/').pop() || normalizedPath,
-    lastViewedAt: item.lastViewedAt ?? new Date().toISOString(),
+    [timestampField]: item[timestampField] ?? new Date().toISOString(),
   }
-  const withoutDuplicate = readRecentItemsFromStorage().filter((existing) => existing.path !== normalizedPath)
+}
+
+export function rememberRecentItem(item: RecentItem): RecentItem[] {
+  const nextItem = normalizeRecentItem(item, 'lastViewedAt')
+  if (!nextItem) return readRecentItemsFromStorage()
+
+  const withoutDuplicate = readRecentItemsFromStorage().filter((existing) => existing.path !== nextItem.path)
   const next = [nextItem, ...withoutDuplicate].slice(0, MAX_RECENT_ITEMS)
-  if (typeof window.localStorage?.setItem === 'function') {
-    window.localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(next))
-  }
+  safeLocalStorageSet(RECENT_ITEMS_KEY, JSON.stringify(next))
   return next
 }
 
 export function rememberRecentChangedItems(items: RecentItem[]): RecentItem[] {
   let current = readRecentItemsFromStorage()
   for (const item of items) {
-    const normalizedPath = item.path.trim()
-    if (!normalizedPath) continue
-    const nextItem: RecentItem = {
-      ...item,
-      path: normalizedPath,
-      label: item.label || normalizedPath.split('/').pop() || normalizedPath,
-      lastChangedAt: item.lastChangedAt ?? new Date().toISOString(),
-    }
-    current = [nextItem, ...current.filter((existing) => existing.path !== normalizedPath)].slice(0, MAX_RECENT_ITEMS)
+    const nextItem = normalizeRecentItem(item, 'lastChangedAt')
+    if (!nextItem) continue
+    current = [nextItem, ...current.filter((existing) => existing.path !== nextItem.path)].slice(0, MAX_RECENT_ITEMS)
   }
 
-  if (typeof window.localStorage?.setItem === 'function') {
-    window.localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(current))
-  }
+  safeLocalStorageSet(RECENT_ITEMS_KEY, JSON.stringify(current))
   return current
 }
 
 export function clearRecentItems(): void {
-  if (typeof window.localStorage?.removeItem === 'function') {
-    window.localStorage.removeItem(RECENT_ITEMS_KEY)
-  }
+  safeLocalStorageRemove(RECENT_ITEMS_KEY)
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api } from './services/api'
 import ContentPanel from './components/ContentPanel/ContentPanel'
 import FileTree from './components/FileTree/FileTree'
@@ -16,6 +16,7 @@ import {
 } from './components/AppDialogs'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
+import { ParentFolderIcon, PanelToggleIcon, RefreshIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -27,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
+import { parentPathOf } from './lib/utils'
 import {
   readDefaultReaderPromptPreference,
   readRecentItems,
@@ -70,73 +72,9 @@ import {
   shouldRefreshActiveFileAfterSyncChange,
   updateBranchCacheAfterSwitch,
 } from './lib/app-helpers'
-import { getRepoSyncActionLabel } from './lib/sync'
 
 type LandingAction = { label: string; action: 'create-file' }
 type BranchScope = 'local' | 'remote'
-
-function RefreshIcon({ spinning = false }: { spinning?: boolean }) {
-  return (
-    <svg className={spinning ? 'toolbar-icon is-spinning' : 'toolbar-icon'} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M13 7a5 5 0 1 0-1.45 3.54" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M13 3.5V7h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ThemeIcon({ darkMode }: { darkMode: boolean }) {
-  return darkMode ? (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M9.5 2.25A5.75 5.75 0 1 0 13.75 10A4.75 4.75 0 0 1 9.5 2.25z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ) : (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M12.6 3.4l-.9.9M4.3 11.7l-.9.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function TerminalIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M4 6l2.5 2.5L4 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function ParentFolderIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ViewOptionsIcon() {
-  return (
-    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="5" cy="4" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="11" cy="8" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="6" cy="12" r="1.5" fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  )
-}
-
-function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
-  return collapsed ? (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M10 3.5L5.5 8L10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 interface BranchSwitchDialogState {
   target: string
@@ -186,6 +124,60 @@ function postNativeAppCommand(command: NativeAppOutboundCommand, value?: string)
   if (!handler) return false
   handler.postMessage(value === undefined ? { command } : { command, value })
   return true
+}
+
+const WORKSPACE_QUERY_KEYS = [
+  'info',
+  'git-context',
+  'branches',
+  'tree',
+  'file',
+  'readme',
+  'directory-readme',
+  'sync',
+  'repo-summary',
+  'navigation-hints',
+] as const
+
+function invalidateQueryKeys(queryClient: QueryClient, keys: readonly string[]): Promise<unknown> {
+  return Promise.all(keys.map((key) => queryClient.invalidateQueries({ queryKey: [key] })))
+}
+
+function computeEmptyState({
+  visibleSelectedPath,
+  hasRepoMismatch,
+  isWorkingTreeBranchSelected,
+  isGitRepo,
+  rootEntryCount,
+  canMutateFiles,
+}: {
+  visibleSelectedPath: string
+  hasRepoMismatch: boolean
+  isWorkingTreeBranchSelected: boolean
+  isGitRepo: boolean | undefined
+  rootEntryCount: number | undefined
+  canMutateFiles: boolean
+}): { title: string; detail: string; actions?: LandingAction[] } | undefined {
+  if (visibleSelectedPath || hasRepoMismatch) return undefined
+
+  if (isWorkingTreeBranchSelected && rootEntryCount === 0) {
+    return {
+      title: isGitRepo ? 'This repository is ready for a first file' : 'This folder is ready for a first file',
+      detail: isGitRepo
+        ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
+        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.',
+      actions: canMutateFiles ? [{ label: 'Create first file', action: 'create-file' }] : undefined,
+    }
+  }
+
+  if (!isWorkingTreeBranchSelected) {
+    return {
+      title: 'Browsing a non-current branch',
+      detail: 'This branch opens in read-only mode so you can compare tree contents without changing your working tree.',
+    }
+  }
+
+  return undefined
 }
 
 export default function App() {
@@ -383,9 +375,8 @@ export default function App() {
     }
   }, [currentBranch, info, viewerRepoPath])
 
-  useEffect(() => {
-    if (!startupOpenTargetFetched) return
-    writeViewerState({
+  const viewerStateSnapshot = useMemo(
+    () => ({
       repoPath: viewerRepoPath,
       branch: currentBranch,
       path: selectedPath,
@@ -402,8 +393,16 @@ export default function App() {
       searchContentKind,
       searchTrackedMode,
       searchLimit,
-    })
-  }, [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, startupOpenTargetFetched, viewerRepoPath])
+    }),
+    [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath],
+  )
+
+  // Gated separately from the snapshot above: this effect only decides *whether* to persist
+  // (wait for the startup open-target fetch), not *what* to persist.
+  useEffect(() => {
+    if (!startupOpenTargetFetched) return
+    writeViewerState(viewerStateSnapshot)
+  }, [startupOpenTargetFetched, viewerStateSnapshot])
 
   // Keeps the native app's "Hide Dotfiles" menu checkmark in sync however hideDotfiles changed —
   // via this toolbar control or via the menu item itself dispatching 'toggle-dotfiles'.
@@ -456,7 +455,7 @@ export default function App() {
     }
 
     if (selectedPath === syncStatus.currentPath && syncStatus.currentPathType !== 'missing') {
-      setSelectedPathType(syncStatus.currentPathType === 'none' ? 'none' : syncStatus.currentPathType)
+      setSelectedPathType(syncStatus.currentPathType)
     }
   }, [queryClient, selectedPath, syncStatus])
 
@@ -480,18 +479,7 @@ export default function App() {
     setTreeRefreshToken((value) => value + 1)
 
     try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['info'] }),
-        queryClient.invalidateQueries({ queryKey: ['git-context'] }),
-        queryClient.invalidateQueries({ queryKey: ['branches'] }),
-        queryClient.invalidateQueries({ queryKey: ['tree'] }),
-        queryClient.invalidateQueries({ queryKey: ['file'] }),
-        queryClient.invalidateQueries({ queryKey: ['readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['sync'] }),
-        queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
-      ])
+      await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
       setStatusMessage('Current view refreshed.')
     } finally {
       nativeRefreshPendingRef.current = false
@@ -512,18 +500,7 @@ export default function App() {
   }, [])
 
   const invalidateWorkspaceQueries = useCallback(async (): Promise<void> => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['info'] }),
-      queryClient.invalidateQueries({ queryKey: ['git-context'] }),
-      queryClient.invalidateQueries({ queryKey: ['branches'] }),
-      queryClient.invalidateQueries({ queryKey: ['tree'] }),
-      queryClient.invalidateQueries({ queryKey: ['file'] }),
-      queryClient.invalidateQueries({ queryKey: ['readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['sync'] }),
-      queryClient.invalidateQueries({ queryKey: ['repo-summary'] }),
-      queryClient.invalidateQueries({ queryKey: ['navigation-hints'] }),
-    ])
+    await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
   }, [queryClient])
 
   const applyAcceptedOpenTarget = useCallback((target: Pick<StartupOpenTarget, 'rootPath' | 'selectedPath' | 'selectedPathType' | 'message'>): void => {
@@ -750,45 +727,30 @@ export default function App() {
     return window.confirm('Discard your unsaved file changes?')
   }
 
-  function handleSelectFile(path: string, localOnly = false): boolean {
+  function selectPath(path: string, type: 'file' | 'dir', localOnly = false): boolean {
     if (!confirmDiscardChanges()) return false
     setSelectedPath(path)
-    setSelectedPathType(path ? 'file' : 'none')
+    setSelectedPathType(path ? type : 'none')
     setSelectedPathLocalOnly(path ? localOnly : false)
     setStatusMessage('')
     setShowRaw(false)
     if (path) {
       setRecentItems(rememberRecentItem({
         path,
-        type: 'file',
+        type: type === 'file' ? 'file' : 'folder',
         label: path.split('/').pop() || path,
         available: true,
       }))
     }
     return true
+  }
+
+  function handleSelectFile(path: string, localOnly = false): boolean {
+    return selectPath(path, 'file', localOnly)
   }
 
   function handleSelectFolder(path: string, localOnly = false): boolean {
-    if (!confirmDiscardChanges()) return false
-    setSelectedPath(path)
-    setSelectedPathType(path ? 'dir' : 'none')
-    setSelectedPathLocalOnly(path ? localOnly : false)
-    setStatusMessage('')
-    setShowRaw(false)
-    if (path) {
-      setRecentItems(rememberRecentItem({
-        path,
-        type: 'folder',
-        label: path.split('/').pop() || path,
-        available: true,
-      }))
-    }
-    return true
-  }
-
-  function parentPathOf(path: string): string {
-    const boundary = path.lastIndexOf('/')
-    return boundary >= 0 ? path.slice(0, boundary) : ''
+    return selectPath(path, 'dir', localOnly)
   }
 
   async function openChangedFiles(): Promise<void> {
@@ -1031,13 +993,7 @@ export default function App() {
       setShowRaw(false)
       setStatusMessage(result.message)
       setTreeRefreshToken((value) => value + 1)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['tree'] }),
-        queryClient.invalidateQueries({ queryKey: ['file'] }),
-        queryClient.invalidateQueries({ queryKey: ['readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-        queryClient.invalidateQueries({ queryKey: ['sync'] }),
-      ])
+      await invalidateQueryKeys(queryClient, ['tree', 'file', 'readme', 'directory-readme', 'sync'])
     } catch (error) {
       setFolderDeleteError(getErrorMessage(error, 'Could not delete the folder.'))
     } finally {
@@ -1107,15 +1063,7 @@ export default function App() {
     setStatusMessage(nextStatusMessage)
     setTreeRefreshToken((value) => value + 1)
 
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['info'] }),
-      queryClient.invalidateQueries({ queryKey: ['branches'] }),
-      queryClient.invalidateQueries({ queryKey: ['tree'] }),
-      queryClient.invalidateQueries({ queryKey: ['file'] }),
-      queryClient.invalidateQueries({ queryKey: ['readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['directory-readme'] }),
-      queryClient.invalidateQueries({ queryKey: ['sync'] }),
-    ])
+    await invalidateQueryKeys(queryClient, ['info', 'branches', 'tree', 'file', 'readme', 'directory-readme', 'sync'])
   }
 
   async function submitBranchSwitch(resolution: 'commit' | 'discard'): Promise<void> {
@@ -1235,26 +1183,17 @@ export default function App() {
   const visibleShowRaw = hasRepoMismatch ? false : showRaw
   const isWorkingTreeBranchSelected = !info?.currentBranch || currentBranch === info.currentBranch
 
-  let emptyStateTitle: string | undefined
-  let emptyStateDetail: string | undefined
-  let emptyStateActions: LandingAction[] | undefined
-
-  if (!visibleSelectedPath && !hasRepoMismatch) {
-    if (isWorkingTreeBranchSelected && info?.rootEntryCount === 0) {
-      emptyStateTitle = info?.isGitRepo
-        ? 'This repository is ready for a first file'
-        : 'This folder is ready for a first file'
-      emptyStateDetail = info?.isGitRepo
-        ? 'This repository looks newly initialized or empty, so GitLocal is showing a guided landing state instead of an empty document view.'
-        : 'This folder does not have any visible files or folders yet, so GitLocal is showing a guided landing state instead of an empty document view.'
-      emptyStateActions = canMutateFiles
-        ? [{ label: 'Create first file', action: 'create-file' }]
-        : undefined
-    } else if (!isWorkingTreeBranchSelected) {
-      emptyStateTitle = 'Browsing a non-current branch'
-      emptyStateDetail = 'This branch opens in read-only mode so you can compare tree contents without changing your working tree.'
-    }
-  }
+  const emptyState = computeEmptyState({
+    visibleSelectedPath,
+    hasRepoMismatch,
+    isWorkingTreeBranchSelected,
+    isGitRepo: info?.isGitRepo,
+    rootEntryCount: info?.rootEntryCount,
+    canMutateFiles,
+  })
+  const emptyStateTitle = emptyState?.title
+  const emptyStateDetail = emptyState?.detail
+  const emptyStateActions = emptyState?.actions
 
   // Clicking Parent Folder usually just browses to the containing folder within this repository
   // (handleNavigateParent -> handleSelectFolder), but from the repository root it instead leaves
@@ -1443,7 +1382,6 @@ export default function App() {
                 onCloseChangedFiles={() => setChangedFiles(null)}
                 onOpenChangedFile={handleOpenChangedFile}
                 branchDisabled={branchSwitchPending}
-                syncActionLabel={getRepoSyncActionLabel(repoSync)}
                 onNavigateHome={info?.isGitRepo ? handleNavigateHome : undefined}
                 repoLocation={repoLocation}
                 onNavigateReadme={info?.isGitRepo ? handleNavigateReadme : undefined}

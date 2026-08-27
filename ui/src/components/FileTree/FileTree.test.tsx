@@ -486,6 +486,113 @@ describe('FileTree', () => {
     })
   })
 
+  it('supports roving tabindex with ArrowDown/ArrowUp keyboard navigation', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+    ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    const srcItem = await screen.findByRole('treeitem', { name: /src/i })
+    const readmeItem = screen.getByRole('treeitem', { name: /README\.md/i })
+
+    // Only the first visible node starts as part of the tab order.
+    expect(srcItem).toHaveAttribute('tabindex', '0')
+    expect(readmeItem).toHaveAttribute('tabindex', '-1')
+
+    srcItem.focus()
+    fireEvent.keyDown(srcItem, { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      expect(readmeItem).toHaveFocus()
+    })
+    expect(readmeItem).toHaveAttribute('tabindex', '0')
+    expect(srcItem).toHaveAttribute('tabindex', '-1')
+
+    fireEvent.keyDown(readmeItem, { key: 'ArrowUp' })
+
+    await waitFor(() => {
+      expect(srcItem).toHaveFocus()
+    })
+
+    // An unhandled key (e.g. Tab) is a no-op: focus and tab order stay put.
+    fireEvent.keyDown(srcItem, { key: 'Tab' })
+    expect(srcItem).toHaveFocus()
+    expect(srcItem).toHaveAttribute('tabindex', '0')
+    expect(readmeItem).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('expands a directory and moves focus to its first child via ArrowRight', async () => {
+    mockedApi.getTree
+      .mockResolvedValueOnce([
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false },
+      ])
+
+    renderWithClient(<FileTree {...defaultProps} />)
+
+    const srcItem = await screen.findByRole('treeitem', { name: /src/i })
+    srcItem.focus()
+
+    // First ArrowRight expands the collapsed directory but keeps focus on it.
+    fireEvent.keyDown(srcItem, { key: 'ArrowRight' })
+    await waitFor(() => {
+      expect(srcItem).toHaveAttribute('aria-expanded', 'true')
+    })
+    expect(srcItem).toHaveFocus()
+
+    // Second ArrowRight (now expanded) moves focus to the first child.
+    fireEvent.keyDown(srcItem, { key: 'ArrowRight' })
+    const mainGoItem = await screen.findByRole('treeitem', { name: /main\.go/i })
+    await waitFor(() => {
+      expect(mainGoItem).toHaveFocus()
+    })
+
+    // ArrowLeft on the child moves focus back up to the parent directory.
+    fireEvent.keyDown(mainGoItem, { key: 'ArrowLeft' })
+    await waitFor(() => {
+      expect(srcItem).toHaveFocus()
+    })
+
+    // ArrowLeft on the expanded parent collapses it.
+    fireEvent.keyDown(srcItem, { key: 'ArrowLeft' })
+    await waitFor(() => {
+      expect(srcItem).toHaveAttribute('aria-expanded', 'false')
+    })
+    expect(screen.queryByText('main.go')).not.toBeInTheDocument()
+  })
+
+  it('activates a file via Enter and a directory via Space, mirroring onClick', async () => {
+    const onSelect = vi.fn()
+    mockedApi.getTree
+      .mockResolvedValueOnce([
+        { name: 'src', path: 'src', type: 'dir', localOnly: false },
+        { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: 'main.go', path: 'src/main.go', type: 'file', localOnly: false },
+      ])
+
+    renderWithClient(<FileTree {...defaultProps} onSelect={onSelect} />)
+
+    const readmeItem = await screen.findByRole('treeitem', { name: /README\.md/i })
+    readmeItem.focus()
+    fireEvent.keyDown(readmeItem, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith('README.md', 'file', false)
+
+    const srcItem = screen.getByRole('treeitem', { name: /src/i })
+    srcItem.focus()
+    fireEvent.keyDown(srcItem, { key: ' ' })
+
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith('src', 'dir', false)
+      expect(screen.getByText('main.go')).toBeInTheDocument()
+    })
+  })
+
   it('auto-expands a saved selected directory path on first load', async () => {
     mockedApi.getTree
       .mockResolvedValueOnce([{ name: 'src', path: 'src', type: 'dir', localOnly: false }])

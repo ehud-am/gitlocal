@@ -1,6 +1,6 @@
-export type FrontMatterStatus = 'none' | 'recognized' | 'empty' | 'malformed' | 'incomplete'
+type FrontMatterStatus = 'none' | 'recognized' | 'empty' | 'malformed' | 'incomplete'
 
-export type MetadataEntryKind = 'field' | 'group' | 'list-item' | 'raw'
+type MetadataEntryKind = 'field' | 'group' | 'list-item' | 'raw'
 
 export interface MetadataEntry {
   kind: MetadataEntryKind
@@ -9,7 +9,7 @@ export interface MetadataEntry {
   children?: MetadataEntry[]
 }
 
-export interface FrontMatterMetadata {
+interface FrontMatterMetadata {
   rawText: string
   startLine: number
   endLine: number

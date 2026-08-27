@@ -3,7 +3,12 @@ import type { Context } from 'hono'
 import { classifyLocalPath, resolveSafeRepoPath } from '../git/repo.js'
 import { detectCapabilities } from '../terminal/cli-detection.js'
 import { sessionManager } from '../terminal/session-manager.js'
-import type { CreateTerminalSessionRequest, TerminalContextType, TerminalKind } from '../terminal/types.js'
+import type {
+  CreateTerminalSessionRequest,
+  TerminalContextType,
+  TerminalKind,
+  TerminalUnavailableResponse,
+} from '../terminal/types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
 
@@ -44,6 +49,9 @@ function resolveSessionCwd(repoPath: string, contextPath?: string, contextType?:
   }
 
   let candidate = contextType === 'file' ? dirname(safePath) : safePath
+  // The `candidate !== repoPath` comparison is a plain string equality check, which only
+  // terminates correctly because both sides are canonicalPath values from classifyLocalPath —
+  // if either were passed in un-normalized, this loop could walk past repoPath undetected.
   while (candidate !== repoPath) {
     const classification = classifyLocalPath(candidate)
     if (classification.exists && classification.pathType === 'directory') {
@@ -75,7 +83,8 @@ export async function createTerminalSessionHandler(c: Context<{ Variables: Varia
     const capabilities = detectCapabilities()
     const found = payload.kind === 'claude' ? capabilities.claudeCliFound : capabilities.codexCliFound
     if (!found) {
-      return c.json({ error: 'cli_not_found', message: cliUnavailableMessage(payload.kind) }, 503)
+      const body: TerminalUnavailableResponse = { error: 'cli_not_found', message: cliUnavailableMessage(payload.kind) }
+      return c.json(body, 503)
     }
   }
 
@@ -83,7 +92,8 @@ export async function createTerminalSessionHandler(c: Context<{ Variables: Varia
   const result = await sessionManager.createSession({ kind: payload.kind, cwd })
 
   if (!result.ok) {
-    return c.json({ error: result.error, message: result.message }, 503)
+    const body: TerminalUnavailableResponse = { error: result.error, message: result.message }
+    return c.json(body, 503)
   }
 
   return c.json(result.session, 201)

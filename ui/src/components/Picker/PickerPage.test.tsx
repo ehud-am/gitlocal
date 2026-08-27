@@ -222,6 +222,17 @@ describe('PickerPage', () => {
     })
   })
 
+  it('double-clicking the parent row in the folder table browses to the parent path', async () => {
+    render(<PickerPage />)
+
+    fireEvent.doubleClick(await screen.findByRole('button', { name: /^Open parent folder$/i }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users')
+    })
+    expect(vi.mocked(api.openRepository)).not.toHaveBeenCalled()
+  })
+
   it('double-clicking a repository folder opens it as a repository', async () => {
     vi.mocked(api.openRepository).mockResolvedValue({
       ok: true,
@@ -450,8 +461,8 @@ describe('PickerPage', () => {
   it('uses the sidebar tree to select and browse folders', async () => {
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
-    const projectsItem = within(tree).getByText('projects').closest('[role="treeitem"]')
+    const tree = await screen.findByRole('group', { name: /folder contents navigation/i })
+    const projectsItem = within(tree).getByText('projects').closest('button')
     expect(projectsItem).not.toBeNull()
     fireEvent.click(projectsItem as HTMLElement)
 
@@ -462,13 +473,26 @@ describe('PickerPage', () => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users/example/projects')
     })
 
-    const parentItem = within(tree).getByText('..').closest('[role="treeitem"]')
+    const parentItem = within(tree).getByText('..').closest('button')
     expect(parentItem).not.toBeNull()
     fireEvent.doubleClick(parentItem as HTMLElement)
 
     await waitFor(() => {
       expect(vi.mocked(api.getFolderBrowse)).toHaveBeenCalledWith('/Users')
     })
+  })
+
+  it('does not render a stale aria-expanded on sidebar directory rows (PickerPage has no in-place expand/collapse state)', async () => {
+    render(<PickerPage />)
+
+    const tree = await screen.findByRole('group', { name: /folder contents navigation/i })
+    const projectsItem = within(tree).getByText('projects').closest('button')
+    expect(projectsItem).not.toBeNull()
+    expect(projectsItem as HTMLElement).not.toHaveAttribute('aria-expanded')
+
+    const gitlocalItem = within(tree).getByText('gitlocal').closest('button')
+    expect(gitlocalItem).not.toBeNull()
+    expect(gitlocalItem as HTMLElement).not.toHaveAttribute('aria-expanded')
   })
 
   it('does not show local badges for plain folder entries in the picker tree', async () => {
@@ -491,7 +515,7 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    const tree = await screen.findByRole('group', { name: /folder contents navigation/i })
     expect(within(tree).queryByText(/^local$/i)).not.toBeInTheDocument()
     expect(within(tree).getByText(/^git$/i)).toBeInTheDocument()
   })
@@ -525,7 +549,7 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    const tree = await screen.findByRole('tree', { name: /folder contents navigation/i })
+    const tree = await screen.findByRole('group', { name: /folder contents navigation/i })
     expect(within(tree).queryByText(/^git$/i)).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /^docs folder$/i })).toBeInTheDocument()
   })

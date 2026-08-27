@@ -4,15 +4,12 @@ import type {
   TerminalSession,
   TerminalUnavailableResponse,
 } from '../types'
+import { getJson } from './httpClient'
 
 const BASE = ''
 
 async function requestJson<T>(path: string): Promise<T> {
-  const res = await fetch(BASE + path)
-  if (!res.ok) {
-    throw await res.json().catch(() => ({ error: 'pty_unavailable', message: res.statusText }))
-  }
-  return res.json() as Promise<T>
+  return getJson<T>(BASE + path, (res) => ({ error: 'pty_unavailable', message: res.statusText }))
 }
 
 export interface TerminalIoOutboundFrame {

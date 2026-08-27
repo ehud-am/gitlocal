@@ -59,23 +59,23 @@ export function validateSshPrivateKeyPath(inputPath: string): SshKeyValidationRe
   }
 }
 
+function noConventionalDirectoryResponse(path: string): SshKeyListResponse {
+  return {
+    directory: { path, exists: false, readable: false },
+    keys: [],
+    message: 'No conventional SSH key folder was found. Enter a key path manually.',
+  }
+}
+
 export function listSshPrivateKeys(): SshKeyListResponse {
   const directoryPath = getConventionalSshDirectory()
-  /* v8 ignore next 7 -- os.homedir is expected to resolve in supported local runtime environments */
+  /* v8 ignore next 3 -- os.homedir is expected to resolve in supported local runtime environments */
   if (!directoryPath) {
-    return {
-      directory: { path: '', exists: false, readable: false },
-      keys: [],
-      message: 'No conventional SSH key folder was found. Enter a key path manually.',
-    }
+    return noConventionalDirectoryResponse('')
   }
 
   if (!existsSync(directoryPath)) {
-    return {
-      directory: { path: directoryPath, exists: false, readable: false },
-      keys: [],
-      message: 'No conventional SSH key folder was found. Enter a key path manually.',
-    }
+    return noConventionalDirectoryResponse(directoryPath)
   }
 
   try {

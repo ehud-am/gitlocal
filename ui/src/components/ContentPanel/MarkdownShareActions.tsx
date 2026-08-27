@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { MarkdownShareAction } from '../../types'
 import type { NativeAppCommandEvent } from '../../types'
 import { Button } from '../ui/button'
@@ -88,6 +88,9 @@ export default function MarkdownShareActions({
   const details = buildMarkdownOutputDetails(path, content, hasUnsavedChanges)
   const enabledActions = requestedActions ?? ['save-pdf', 'system-share', 'copy-rendered']
 
+  const handleActionRef = useRef(handleAction)
+  handleActionRef.current = handleAction
+
   useEffect(() => {
     if (!listenToNativeCommands) return undefined
 
@@ -95,17 +98,17 @@ export default function MarkdownShareActions({
       const command = (event as NativeAppCommandEvent).detail?.command
       if (command === 'print-markdown') {
         event.preventDefault()
-        void handleAction('save-pdf')
+        void handleActionRef.current('save-pdf')
       }
       if (command === 'share-markdown') {
         event.preventDefault()
-        void handleAction('system-share')
+        void handleActionRef.current('system-share')
       }
     }
 
     window.addEventListener('gitlocal:native-command', handleNativeCommand)
     return () => window.removeEventListener('gitlocal:native-command', handleNativeCommand)
-  })
+  }, [listenToNativeCommands])
 
   async function handleAction(action: MarkdownShareAction): Promise<void> {
     switch (action) {

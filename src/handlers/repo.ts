@@ -137,26 +137,49 @@ export async function defaultReaderPreferenceUpdateHandler(c: Context<{ Variable
   }
 }
 
+function repoOpenBlocked(error: string): LocalActionResponse {
+  return { ok: false, error }
+}
+
+function repoOpenResult(params: {
+  path: string
+  rootPath: string
+  selectedPath: string
+  selectedPathType: LocalActionResponse['selectedPathType']
+  openMode: LocalActionResponse['openMode']
+  gitState: LocalActionResponse['gitState']
+  repositoryRootPath?: string
+}): LocalActionResponse {
+  return {
+    ok: true,
+    error: '',
+    path: params.path,
+    rootPath: params.rootPath,
+    selectedPath: params.selectedPath,
+    selectedPathType: params.selectedPathType,
+    openMode: params.openMode,
+    gitState: params.gitState,
+    ...(params.repositoryRootPath ? { repositoryRootPath: params.repositoryRootPath } : {}),
+  }
+}
+
 export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   let body: RepositoryOpenRequest
   try {
     body = await c.req.json<RepositoryOpenRequest>()
   } catch {
-    const res: LocalActionResponse = { ok: false, error: 'Invalid JSON body' }
-    return c.json(res)
+    return c.json(repoOpenBlocked('Invalid JSON body'))
   }
 
   const { path } = body
   const classification = classifyLocalPath(path ?? '')
 
   if (!path) {
-    const res: LocalActionResponse = { ok: false, error: 'path is required' }
-    return c.json(res)
+    return c.json(repoOpenBlocked('path is required'))
   }
 
   if (!classification.exists || classification.openMode === 'blocked') {
-    const res: LocalActionResponse = { ok: false, error: classification.message ?? `Path does not exist: ${path}` }
-    return c.json(res)
+    return c.json(repoOpenBlocked(classification.message ?? `Path does not exist: ${path}`))
   }
 
   const resolvedInputPath = classification.canonicalPath
@@ -164,7 +187,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   if (stats.isFile()) {
     const parentPath = dirname(resolvedInputPath)
     let rootPath = parentPath
-    let selectedPath = basename(path)
+    let selectedPath = basename(resolvedInputPath)
 
     if (classification.repositoryRootPath) {
       rootPath = classification.repositoryRootPath
@@ -174,24 +197,20 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
     setRepoPath(rootPath)
     setPickerPath('')
     rememberStartupFolder(rootPath, 'repo-open')
-    const res: LocalActionResponse = {
-      ok: true,
-      error: '',
+    return c.json(repoOpenResult({
       path: resolvedInputPath,
       rootPath,
       selectedPath,
       selectedPathType: 'file',
       openMode: 'file',
       gitState: classification.gitState,
-      ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
-    }
-    return c.json(res)
+      repositoryRootPath: classification.repositoryRootPath,
+    }))
   }
 
   /* v8 ignore next 4 -- classifyLocalPath blocks unsupported existing paths before this point */
   if (!stats.isDirectory()) {
-    const res: LocalActionResponse = { ok: false, error: `Not a folder or file: ${path}` }
-    return c.json(res)
+    return c.json(repoOpenBlocked(`Not a folder or file: ${path}`))
   }
 
   const rootPath = classification.gitState === 'repository-root'
@@ -200,18 +219,15 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   setRepoPath(rootPath)
   setPickerPath('')
   rememberStartupFolder(rootPath, 'repo-open')
-  const res: LocalActionResponse = {
-    ok: true,
-    error: '',
+  return c.json(repoOpenResult({
     path: rootPath,
     rootPath,
     selectedPath: '',
     selectedPathType: 'none',
     openMode: classification.openMode,
     gitState: classification.gitState,
-    ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
-  }
-  return c.json(res)
+    repositoryRootPath: classification.repositoryRootPath,
+  }))
 }
 
 export async function repositoryParentFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

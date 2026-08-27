@@ -113,7 +113,7 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 
 ## What GitLocal Helps With
 
-- **Browse local projects** with a lazy-loading file tree for regular folders and git repositories.
+- **Browse local projects** with a lazy-loading, keyboard-navigable file tree (arrow keys, Enter/Space) for regular folders and git repositories.
 - **Read Markdown clearly** in the normal repository viewer with GitHub-like rendering, relative links, heading anchors, rendered find highlights, and share/copy actions.
 - **Start from useful repository context** with a root dashboard for status, key documents, recent files, recently changed files, and raw directory browsing.
 - **Review background changes** with active-file refresh/deletion notices and a changed-files panel for modified, deleted, untracked, generated, and local-only paths.

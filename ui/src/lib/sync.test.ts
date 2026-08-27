@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeFileSyncState, describeRepoSyncState, getRepoSyncActionLabel } from './sync'
+import { describeFileSyncState, describeRepoSyncState } from './sync'
 
 describe('sync helpers', () => {
   it('describes every file sync state', () => {
@@ -102,14 +102,5 @@ describe('sync helpers', () => {
       remoteName: '',
     })).toBeNull()
     expect(describeRepoSyncState()).toBeNull()
-  })
-
-  it('chooses the right sync action labels', () => {
-    expect(getRepoSyncActionLabel({ mode: 'ahead', aheadCount: 1, behindCount: 0, hasUpstream: true, upstreamRef: 'origin/main', remoteName: 'origin' })).toBe('Push to remote')
-    expect(getRepoSyncActionLabel({ mode: 'behind', aheadCount: 0, behindCount: 1, hasUpstream: true, upstreamRef: 'origin/main', remoteName: 'origin' })).toBe('Pull from remote')
-    expect(getRepoSyncActionLabel({ mode: 'diverged', aheadCount: 1, behindCount: 1, hasUpstream: true, upstreamRef: 'origin/main', remoteName: 'origin' })).toBe('Sync with remote')
-    expect(getRepoSyncActionLabel({ mode: 'up-to-date', aheadCount: 0, behindCount: 0, hasUpstream: true, upstreamRef: 'origin/main', remoteName: 'origin' })).toBe('Check remote sync')
-    expect(getRepoSyncActionLabel({ mode: 'local-only', aheadCount: 0, behindCount: 0, hasUpstream: false, upstreamRef: '', remoteName: '' })).toBe('Sync with remote')
-    expect(getRepoSyncActionLabel()).toBe('Sync with remote')
   })
 })

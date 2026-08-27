@@ -3,10 +3,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from '../../services/terminalApi'
-import type { TerminalSession } from '../../types'
 
 interface TerminalViewProps {
-  session: TerminalSession
+  sessionId: string
   onExit: (code: number | null, signal: string | null) => void
   onToggleShortcut?: () => void
 }
@@ -15,12 +14,12 @@ export interface TerminalViewHandle {
   focus: () => void
 }
 
-// Mounts one xterm.js instance bound to one session's WebSocket. Keyed by session.id in the
+// Mounts one xterm.js instance bound to one session's WebSocket. Keyed by sessionId in the
 // parent (TerminalPanel) so switching tabs never tears this down — only closing a tab does.
 // Exposes focus() via ref so the panel can move keyboard focus into the terminal whenever it
 // becomes the visible/active tab, since opening the panel otherwise leaves focus wherever it was.
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
-  { session, onExit, onToggleShortcut }: TerminalViewProps,
+  { sessionId, onExit, onToggleShortcut }: TerminalViewProps,
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -55,7 +54,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       return false
     })
 
-    const socket = terminalApi.connectSessionSocket(session.id)
+    const socket = terminalApi.connectSessionSocket(sessionId)
 
     const handleOpen = () => terminalApi.sendResize(socket, terminal.cols, terminal.rows)
     const handleMessage = (event: MessageEvent) => {
@@ -94,7 +93,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       terminal.dispose()
       terminalRef.current = null
     }
-  }, [session.id])
+  }, [sessionId])
 
   return <div ref={containerRef} className="h-full w-full" data-testid="terminal-view" />
 })

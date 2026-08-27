@@ -17,7 +17,7 @@ export interface PtyLike {
   kill(): void
 }
 
-export interface SpawnPtyOptions {
+interface SpawnPtyOptions {
   shell: string
   cwd: string
   cols: number
@@ -31,7 +31,7 @@ export type PtyFactory = (options: SpawnPtyOptions) => Promise<PtyLike>
 // every consumer of this module — including unit tests that inject a fake PtyFactory — to load
 // the native binary. The dynamic import here confines that requirement to real PTY spawns only.
 /* v8 ignore start -- native node-pty binary is not loadable in unit tests by design; only exercised via a real shell in integration tests */
-export const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
+const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
   const nodePty = await import('node-pty')
   return nodePty.spawn(shell, [], {
     name: 'xterm-color',
@@ -86,7 +86,7 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
   function appendBuffered(session: ManagedSession, chunk: string): void {
     session.outputBuffer += chunk
     if (session.outputBuffer.length > MAX_BUFFERED_OUTPUT_CHARS) {
-      session.outputBuffer = session.outputBuffer.slice(session.outputBuffer.length - MAX_BUFFERED_OUTPUT_CHARS)
+      session.outputBuffer = session.outputBuffer.slice(-MAX_BUFFERED_OUTPUT_CHARS)
     }
   }
 

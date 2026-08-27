@@ -7,7 +7,7 @@ function labelFor(kind: TerminalKind, regularOrdinal: number): string {
   return `Terminal ${regularOrdinal}`
 }
 
-export interface NewTerminalTab {
+interface NewTerminalTab {
   id: string
   kind: TerminalKind
   cwd: string

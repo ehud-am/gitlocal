@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
 import { describeFileSyncState } from '../../lib/sync'
+import { basenameOf, parentPathOf } from '../../lib/utils'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 import CopyButton from './CopyButton'
 import { parseJsonTree } from './json-tree'
@@ -116,18 +117,6 @@ function BackToFolderIcon() {
       <path d="M9.5 3L4.5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
-}
-
-function parentPathOf(path: string): string {
-  const boundary = path.lastIndexOf('/')
-  return boundary >= 0 ? path.slice(0, boundary) : ''
-}
-
-function basenameOf(path: string): string {
-  if (!path) return ''
-  const normalized = path.replace(/\/+$/, '')
-  const boundary = normalized.lastIndexOf('/')
-  return boundary >= 0 ? normalized.slice(boundary + 1) : normalized
 }
 
 function buildSuggestedFilename(entries: TreeNode[]): string {
@@ -330,7 +319,7 @@ export default function ContentPanel({
     [canSearchCurrentFile, data?.content, fileFindCaseSensitive, trimmedFileFindQuery],
   )
   const activeFileFindMatch = fileFindMatches[activeFileFindIndex] ?? null
-  const visibleFileFindMatches = fileFindMatches.slice(0, 12)
+  const visibleFileFindMatches = useMemo(() => fileFindMatches.slice(0, 12), [fileFindMatches])
 
   useEffect(() => {
     onDirtyChange?.(dirty)
@@ -994,6 +983,7 @@ export default function ContentPanel({
   const showSourceCopyAction = mode === 'view' && canSearchCurrentFile && !showMarkdownShareActions
   const activeContentPanelClass = [
     'content-panel',
+    'content-panel-file',
     mode === 'edit' ? 'content-panel-editing' : '',
   ].filter(Boolean).join(' ')
 
@@ -1031,10 +1021,13 @@ export default function ContentPanel({
                 variant="secondary"
                 size="sm"
                 onClick={() => {
-                  setFileFindOpen((currentValue) => !currentValue)
-                  setFileFindQuery('')
-                  setFileFindCaseSensitive(false)
-                  setActiveFileFindIndex(0)
+                  const next = !fileFindOpen
+                  setFileFindOpen(next)
+                  if (!next) {
+                    setFileFindQuery('')
+                    setFileFindCaseSensitive(false)
+                    setActiveFileFindIndex(0)
+                  }
                 }}
                 aria-pressed={fileFindOpen}
               >
