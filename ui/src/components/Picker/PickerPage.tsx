@@ -298,7 +298,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
               <PanelToggleIcon collapsed={false} />
             </button>
             <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-3">
-              <div className="file-tree picker-file-tree" role="listbox" aria-label="folder contents navigation">
+              <div className="file-tree picker-file-tree" role="group" aria-label="folder contents navigation">
                 {browseLoading ? (
                   <div className="file-tree-skeleton border-0 bg-transparent" aria-label="loading">
                     {[70, 90, 65, 80, 55].map((width, index) => (
@@ -309,12 +309,12 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                   <p className="picker-helper px-3 py-2">This folder is empty.</p>
                 ) : (
                   rows.map((entry) => (
-                    <div
+                    <button
                       key={`sidebar:${entry.isParent ? 'parent:' : ''}${entry.path}`}
+                      type="button"
                       className={`file-tree-node${path === entry.path ? ' selected' : ''}`}
                       style={{ paddingLeft: '8px' }}
-                      role="option"
-                      aria-selected={path === entry.path}
+                      aria-current={path === entry.path ? 'true' : undefined}
                       onClick={() => setPath(entry.path)}
                       onDoubleClick={() => handleEntryActivate(entry)}
                     >
@@ -330,7 +330,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                         <span className="file-tree-node-name" title={entry.name}>{entry.name}</span>
                         {entry.isParent || !entry.isGitRepo ? null : <MetaTag label="git" icon="git" tone="neutral" compact />}
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>

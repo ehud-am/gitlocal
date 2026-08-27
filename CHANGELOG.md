@@ -1,16 +1,22 @@
 # Changelog
 
-## 0.10.3 - 2026-08-23
+## 0.10.3 - 2026-08-26
 
 - Fixed the file view's name/action-button header (Back to folder, Find in file, Copy, etc.) scrolling out of view on large files; it now stays pinned at the top in both view and edit mode.
 - Added full keyboard navigation to the file tree (arrow keys, Enter/Space, roving tab focus), matching standard tree-widget behavior.
+- Made the folder picker's directory list keyboard-accessible (Tab to move focus, Enter/Space to activate), matching the file tree's interaction model.
 - Fixed the folder picker's directory rows always announcing "collapsed" to screen readers regardless of actual state.
 - Fixed the sync status incorrectly reporting a directory or missing path as a file when viewing a non-current branch.
 - Fixed the file name shown after opening a file outside a git repository sometimes not matching the actual opened file (symlinks, path casing).
+- Fixed a failed file-tree subdirectory fetch showing no error indicator; it now shows an inline "Failed to load — click to retry" message.
+- Fixed "Find in file" clearing its search query every time the panel was reopened, instead of only when closed.
+- Fixed search "Load more" pagination potentially reissuing a stale result page against the wrong branch after a branch switch.
 - Fixed a potential JavaScript-injection issue in the macOS app when opening a file whose name contains a quote or other special character via Finder.
 - Fixed a race condition and missing forced-termination step in the macOS app's local server process lifecycle that could leave a wedged process running after quit.
 - Fixed the macOS app resolving an incorrect fallback path when its app bundle's resource location can't be determined.
 - Fixed a startup crash risk when the user's home directory is unreadable and no other startup folder preference is available.
+- Fixed a macOS bug where setting GitLocal as the default Markdown reader could leave one file type unregistered if a prior registration was partial.
+- Internal: full architecture and code review of all 15 reviewable units (110 findings), with dead-code removal, duplicate-code consolidation, and efficiency/readability improvements across the server, UI, and macOS app — no behavior change beyond the fixes listed above.
 
 ## 0.10.2 - 2026-08-15
 

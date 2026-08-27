@@ -651,6 +651,11 @@ pre {
   padding-bottom: 0.28rem;
   cursor: pointer;
   color: var(--foreground);
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
 }
 
 .file-tree-node:hover {

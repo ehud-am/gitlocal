@@ -192,7 +192,8 @@ export default function FileTree({
         })
       }
     }, Promise.resolve())
-  }, [selectedPath, selectedPathType, branch, nodeStates])
+    // nodeStates intentionally omitted: the body reads nodeStatesRef.current, not this reactive value
+  }, [selectedPath, selectedPathType, branch])
 
   const activateNode = useCallback((node: TreeNode) => {
     if (node.type === 'dir') {
