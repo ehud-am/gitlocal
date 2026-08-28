@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitLocal — A local, GitHub-style viewer for the AI coding era</title>
+<meta name="description" content="GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse, read Markdown, review changes, and hand off to your terminal, without opening a full IDE.">
+<link rel="icon" type="image/svg+xml" href="assets/site/logo.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <img src="assets/site/logo.svg" alt="" width="32" height="32">
+      <span>GitLocal</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero" id="top">
+    <div class="wrap hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">GITLOCAL</p>
+        <h1>Designed for builders.<br><span class="accent">Not just developers.</span></h1>
+        <p class="lede">A local, GitHub-style viewer for the code your AI agent wrote. Browse the repo, read Markdown clearly, review what changed, and hand off to a terminal — without opening a full IDE.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#install">Get started — it's free</a>
+          <a class="btn btn-ghost" href="https://github.com/ehud-am/gitlocal">View on GitHub</a>
+        </div>
+        <div class="install-chip">
+          <code id="install-cmd">npx gitlocal</code>
+          <button type="button" class="copy-btn" data-copy="npx gitlocal" aria-label="Copy install command">Copy</button>
+        </div>
+      </div>
+      <div class="hero-media">
+        <img src="assets/site/screenshot-readme.jpg" alt="GitLocal showing a rendered README.md next to the file tree" width="1280" height="895" loading="eager">
+      </div>
+    </div>
+  </section>
+
+  <section class="demo">
+    <div class="wrap">
+      <h2 class="section-title center">See it in action</h2>
+      <img class="demo-gif" src="assets/gitlocal-demo.gif" alt="GitLocal demo: browsing a repo, reading the README, using the terminal, and viewing code" width="800">
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="wrap">
+      <h2 class="section-title center">What GitLocal helps with</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h3>Browse like GitHub</h3>
+          <p>A lazy-loading, keyboard-navigable file tree for regular folders and git repositories, right on your machine.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Read Markdown clearly</h3>
+          <p>GitHub-like rendering with relative links, heading anchors, find highlights, and share/copy actions. No IDE required.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Review what changed</h3>
+          <p>A changed-files panel for modified, deleted, untracked, generated, and local-only paths, plus active-file refresh notices.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Search intentionally</h3>
+          <p>Repository-wide search with current-folder and Markdown-focused scopes, plus file-level find inside the current file.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Understand git state</h3>
+          <p>A plain-language repository summary — branch, remote, sync, and local changes — backed by technical detail when you need it.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Hand off to your agent</h3>
+          <p>A built-in terminal docked at the bottom of the window, wired for Claude, Codex, or a plain shell, with cross-page session persistence.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="install" id="install">
+    <div class="wrap">
+      <h2 class="section-title center">Get started now. It is free.</h2>
+      <p class="lede center">Choose the npm package for any OS, or the native macOS app if you'd rather skip the terminal.</p>
+      <div class="install-grid">
+        <article class="install-card">
+          <h3>npm package</h3>
+          <p class="install-meta">macOS, Windows, Linux &middot; Node.js 22+</p>
+          <div class="code-block">
+            <code>npm install -g gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="npm install -g gitlocal" aria-label="Copy npm install command">Copy</button>
+          </div>
+          <div class="code-block">
+            <code>gitlocal .</code>
+            <button type="button" class="copy-btn" data-copy="gitlocal ." aria-label="Copy gitlocal run command">Copy</button>
+          </div>
+          <p class="install-note">Opens in your default browser. Keep the terminal window open while you use it.</p>
+        </article>
+        <article class="install-card">
+          <h3>macOS app <span class="badge">beta</span></h3>
+          <p class="install-meta">Native GitLocal.app via Homebrew</p>
+          <div class="code-block">
+            <code>brew tap ehud-am/gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="brew tap ehud-am/gitlocal" aria-label="Copy brew tap command">Copy</button>
+          </div>
+          <div class="code-block">
+            <code>brew install --cask gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="brew install --cask gitlocal" aria-label="Copy brew install command">Copy</button>
+          </div>
+          <p class="install-note">No terminal needed after install. Currently unsigned, so macOS shows a security warning on first launch.</p>
+        </article>
+      </div>
+      <p class="center install-more">Full setup and troubleshooting notes are in the <a href="https://github.com/ehud-am/gitlocal#readme">README</a>.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="brand">
+      <img src="assets/site/logo.svg" alt="" width="24" height="24">
+      <span>GitLocal</span>
+    </div>
+    <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+    <div class="footer-links">
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+      <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+      <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
