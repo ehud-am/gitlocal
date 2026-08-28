@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.4 - 2026-08-27
+
+- Replaced the README demo animation with a sharper, shorter promo GIF.
+
 ## 0.10.3 - 2026-08-26
 
 - Fixed the file view's name/action-button header (Back to folder, Find in file, Copy, etc.) scrolling out of view on large files; it now stays pinned at the top in both view and edit mode.

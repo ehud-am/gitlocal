@@ -140,3 +140,10 @@ tramp
 *.bak
 *.orig
 *.rej
+
+# ── Promo asset build scratch ─────────────────────────────────────────────────
+
+docs/assets/promo-src/clips/
+docs/assets/promo-src/txt/
+docs/assets/promo-src/preview/
+docs/assets/promo-src/concat_list.txt
