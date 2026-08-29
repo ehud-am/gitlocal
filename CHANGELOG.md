@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 - 2026-08-29
+
+- Added PDF preview (read-only, rendered locally with no network fetch) and SVG preview (rendered as an inert image so embedded scripts never execute).
+- Introduced a registry-based file preview framework so new preview types can be added without touching the shared content panel, and fixed a gap where a file type's own editability flag could override the registry's read-only setting.
+- Fixed two GitHub code-scanning alerts: incomplete HTML-comment stripping in Markdown rendering, and missing least-privilege permissions on a CI workflow.
+- Linked gitlocal.dev from the npm and GitHub READMEs, and optimized the gitlocal.dev site for AI answer engines and search engines (structured data, a visible FAQ section, robots.txt, sitemap.xml, and llms.txt).
+
 ## 0.10.4 - 2026-08-27
 
 - Replaced the README demo animation with a sharper, shorter promo GIF.
