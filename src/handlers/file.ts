@@ -127,6 +127,32 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json(response)
   }
 
+  if (type === 'svg') {
+    const response: FileContent = {
+      path,
+      content: rawBytes.toString('utf-8'),
+      encoding: 'utf-8',
+      type: 'svg',
+      language: 'xml',
+      editable: false,
+      revisionToken: editableState.revisionToken,
+    }
+    return c.json(response)
+  }
+
+  if (type === 'pdf') {
+    const response: FileContent = {
+      path,
+      content: rawBytes.toString('base64'),
+      encoding: 'base64',
+      type: 'pdf',
+      language: '',
+      editable: false,
+      revisionToken: editableState.revisionToken,
+    }
+    return c.json(response)
+  }
+
   const response: FileContent = {
     path,
     content: rawBytes.toString('utf-8'),

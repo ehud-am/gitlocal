@@ -1796,10 +1796,12 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     })
 }
 
-export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary'; language: string } {
+export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf'; language: string } {
   /* v8 ignore next */
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
-  const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff'])
+  if (ext === 'svg') return { type: 'svg', language: 'xml' }
+
+  const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'tiff'])
   if (imageExts.has(ext)) return { type: 'image', language: '' }
 
   const markdownExts = new Set(['md', 'markdown', 'mdx', 'mdown'])
@@ -1823,10 +1825,12 @@ export function detectFileType(filename: string): { type: 'markdown' | 'json' | 
   }
   if (ext in langMap) return { type: 'text', language: langMap[ext] }
 
+  if (ext === 'pdf') return { type: 'pdf', language: '' }
+
   const binaryExts = new Set([
     'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'o', 'a',
     'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
     'mp3', 'mp4', 'wav', 'mov', 'avi', 'mkv',
     'ttf', 'woff', 'woff2', 'eot',
     'pyc', 'class', 'jar', 'war',

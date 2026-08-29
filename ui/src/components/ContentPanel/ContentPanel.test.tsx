@@ -1520,6 +1520,38 @@ describe('ContentPanel', () => {
     expect(screen.queryByRole('menuitem', { name: /^new file$/i })).not.toBeInTheDocument()
   })
 
+  it('disables Edit file for a type the registry never allows editing, even if the server reports editable', async () => {
+    // pdf/svg are always non-editable per the preview registry (data-model.md), regardless of
+    // what an individual file's server response says — the registry entry is the source of truth
+    // for whether a *type* can ever be edited, combined with (not replaced by) the server's flag.
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'diagram.svg',
+      type: 'svg',
+      content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      language: 'xml',
+      encoding: 'utf-8',
+      editable: true,
+      revisionToken: 'rev-svg',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="diagram.svg"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await openFileActionsMenu()
+
+    const editItem = screen.getByRole('menuitem', { name: /edit file/i })
+    expect(editItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('shows binary and image presentations without inline editing', async () => {
     vi.mocked(api.getFile)
       .mockResolvedValueOnce({
