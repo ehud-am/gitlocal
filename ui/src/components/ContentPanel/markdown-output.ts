@@ -1,4 +1,4 @@
-import { basenameOf } from '../../lib/utils'
+import { basenameOf, stripHtmlComments } from '../../lib/utils'
 
 export interface MarkdownOutputDetails {
   sourcePath: string
@@ -29,8 +29,7 @@ export function titleFromMarkdown(content: string, path: string): string {
 }
 
 export function markdownToPlainText(content: string): string {
-  return content
-    .replace(/<!--[\s\S]*?-->/g, '')
+  return stripHtmlComments(content)
     .replace(/```[\s\S]*?```/g, (block) => block.replace(/```[a-zA-Z0-9_-]*\n?|\n?```/g, ''))
     .replace(/`([^`]+)`/g, '$1')
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
