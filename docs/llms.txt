@@ -1,0 +1,17 @@
+# GitLocal
+
+> GitLocal is a free, local-first, GitHub-style viewer for local folders and git repositories. It is built for browsing codebases, reading Markdown, reviewing changes, and making small edits without opening a full IDE.
+
+GitLocal runs entirely on the user's machine, with no accounts or telemetry. Clone, fetch, pull, and push actions go through the user's locally installed `git` only, and only when the user chooses to run them. It ships as a cross-platform npm package (macOS, Windows, Linux) and a native macOS app (beta, via Homebrew).
+
+Core features: a lazy-loading keyboard-navigable file tree, GitHub-like Markdown rendering with relative links and heading anchors, a changed-files review panel, repository-wide search, a plain-language git status summary, safe local file/folder editing with revision-token conflict protection, and an integrated terminal docked at the bottom of the window for handing work back to an AI coding agent.
+
+## Docs
+- [README](https://github.com/ehud-am/gitlocal#readme): Full documentation, architecture, and API reference
+- [npm package](https://www.npmjs.com/package/gitlocal): Install instructions and release history
+- [Changelog](https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md): Version history
+- [License](https://github.com/ehud-am/gitlocal/blob/main/LICENSE): MIT
+
+## Install
+- npm (macOS, Windows, Linux): `npm install -g gitlocal` then `gitlocal .`, or `npx gitlocal` to try without installing
+- Homebrew (macOS app, beta): `brew tap ehud-am/gitlocal && brew install --cask gitlocal`

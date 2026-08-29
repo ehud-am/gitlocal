@@ -1,6 +1,12 @@
 # GitLocal
 
+[![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
+[![Website](https://img.shields.io/badge/website-gitlocal.dev-34d67a)](https://gitlocal.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ehud-am/gitlocal/blob/main/LICENSE)
+
 GitLocal is a local folder and git repository viewer that opens in your browser. It is built for browsing codebases, reading Markdown, reviewing changes, and making small local edits without needing a full IDE.
+
+**Website:** https://gitlocal.dev
 
 Everything runs locally. There are no accounts or telemetry.
 
@@ -47,9 +53,8 @@ Rendered Markdown views include local print, Save as PDF through print, email/sh
 
 ## More Documentation
 
-For native macOS app instructions, source builds, development setup, architecture notes, and troubleshooting, see the GitHub README:
-
-https://github.com/ehud-am/gitlocal#readme
+- Product overview, screenshots, and features: https://gitlocal.dev
+- Native macOS app instructions, source builds, development setup, architecture notes, and troubleshooting: https://github.com/ehud-am/gitlocal#readme
 
 ## License
 

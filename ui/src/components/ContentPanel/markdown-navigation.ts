@@ -1,8 +1,7 @@
-import { parentPathOf } from '../../lib/utils'
+import { parentPathOf, stripHtmlComments } from '../../lib/utils'
 
 export function stripHiddenMarkdownComments(content: string): string {
-  return content
-    .replace(/<!--[\s\S]*?-->/g, '')
+  return stripHtmlComments(content)
     .replace(/^\[\/\/\]:\s*#\s*\(.*\)\s*$/gm, '')
     .replace(/^\[comment\]:\s*#\s*\(.*\)\s*$/gim, '')
 }

@@ -8,8 +8,11 @@
 
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
+[![Website](https://img.shields.io/badge/website-gitlocal.dev-34d67a)](https://gitlocal.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
+
+**Website:** [gitlocal.dev](https://gitlocal.dev) — screenshots, feature overview, and one-line install.
 
 When AI agents do most of the code generation, direct hand-editing of source files becomes the exception rather than the default. A full IDE can be overkill for that. GitLocal focuses on the work humans still need to do constantly: browse the codebase, understand structure, read Markdown documents clearly, inspect changes, and make small edits when needed. Editing remains possible, but the product is optimized first for navigation, reading, review, and lightweight intervention — plus an integrated terminal for when you need to hand something back to an agent.
 

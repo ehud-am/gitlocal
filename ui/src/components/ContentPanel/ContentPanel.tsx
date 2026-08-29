@@ -23,9 +23,9 @@ import { basenameOf, parentPathOf } from '../../lib/utils'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 import CopyButton from './CopyButton'
 import { parseJsonTree } from './json-tree'
+import { previewRegistry } from './preview-registry'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
-const JSONViewer = lazy(() => import('./JSONViewer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
@@ -311,7 +311,7 @@ export default function ContentPanel({
   const jsonIsValid = jsonParseResult?.ok ?? false
   const effectiveShowRaw = data?.type === 'json' && !jsonIsValid ? true : showRaw
 
-  const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image')
+  const canSearchCurrentFile = Boolean(data && data.type !== 'binary' && data.type !== 'image' && data.type !== 'pdf')
   const canDeleteCurrentFolder = canMutateFiles && selectedPathType === 'dir' && Boolean(selectedPath)
   const trimmedFileFindQuery = fileFindQuery.trim()
   const fileFindMatches = useMemo(
@@ -528,7 +528,14 @@ export default function ContentPanel({
     setMode('confirm-delete')
   }
 
-  const canToggleRaw = data?.type === 'markdown' || data?.type === 'text' || (data?.type === 'json' && jsonIsValid)
+  const canToggleRaw = Boolean(
+    data
+    && previewRegistry[data.type].supportsRawToggle
+    && (data.type !== 'json' || jsonIsValid),
+  )
+  // The edit affordance requires both: the registry saying this file *type* is ever editable,
+  // and the server's own per-file editable flag (working-tree branch, path-type, revision state).
+  const canEditFile = Boolean(data && previewRegistry[data.type].editable && data.editable)
   const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
   const visibleDirectoryEntries = directoryEntries ?? []
   const showDirectorySkeleton = isDirectoryLoading || (isDirectoryFetching && visibleDirectoryEntries.length === 0)
@@ -1089,7 +1096,7 @@ export default function ContentPanel({
                   ) : null}
                   {canMutateFiles ? (
                     <DropdownMenuItem
-                      disabled={!data.editable}
+                      disabled={!canEditFile}
                       onSelect={() => {
                         setDraftContent(data.content)
                         setFormError('')
@@ -1269,48 +1276,25 @@ export default function ContentPanel({
               }}
             />
           </div>
-        ) : data.type === 'binary' ? (
-          <p ref={setSelectionRoot} className="binary-placeholder">Binary file — preview not available.</p>
-        ) : data.type === 'image' ? (
-          <img
-            ref={setSelectionRoot}
-            className="content-image"
-            src={`data:image/*;base64,${data.content}`}
-            alt={selectedPath}
-          />
-        ) : data.type === 'markdown' && !showRaw ? (
-          <div
-            ref={setSelectionRoot}
-            className="markdown-print-surface"
-            data-markdown-title={selectedFileName || selectedPath}
-            data-content-selection-target
-          >
-            <Suspense fallback={loadingFallback}>
-              <MarkdownRenderer
-                content={data.content}
-                currentPath={selectedPath}
+        ) : (
+          (() => {
+            const PreviewComponent = previewRegistry[data.type].Component
+            return (
+              <PreviewComponent
+                data={data}
+                selectedPath={selectedPath}
+                selectedFileName={selectedFileName}
                 branch={branch}
+                showRaw={effectiveShowRaw}
+                jsonRoot={!effectiveShowRaw && jsonParseResult?.ok ? jsonParseResult.root : null}
+                jsonError={jsonParseResult && !jsonParseResult.ok ? jsonParseResult.message : null}
                 findQuery={fileFindOpen ? fileFindQuery : ''}
                 findCaseSensitive={fileFindCaseSensitive}
                 onNavigate={onNavigate}
+                setSelectionRoot={setSelectionRoot}
               />
-            </Suspense>
-          </div>
-        ) : data.type === 'json' && !effectiveShowRaw && jsonParseResult?.ok ? (
-          <div ref={setSelectionRoot}>
-            <Suspense fallback={loadingFallback}>
-              <JSONViewer root={jsonParseResult.root} />
-            </Suspense>
-          </div>
-        ) : (
-          <div ref={setSelectionRoot}>
-            {data.type === 'json' && jsonParseResult && !jsonParseResult.ok ? (
-              <p className="json-parse-notice">{jsonParseResult.message} Showing raw content.</p>
-            ) : null}
-            <Suspense fallback={loadingFallback}>
-              <CodeViewer content={data.content} language={effectiveShowRaw ? '' : data.language} />
-            </Suspense>
-          </div>
+            )
+          })()
         )}
       </div>
     </div>

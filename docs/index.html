@@ -5,8 +5,101 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GitLocal — A local, GitHub-style viewer for the AI coding era</title>
 <meta name="description" content="GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse, read Markdown, review changes, and hand off to your terminal, without opening a full IDE.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://gitlocal.dev/">
 <link rel="icon" type="image/svg+xml" href="assets/site/logo.svg">
 <link rel="stylesheet" href="styles.css">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gitlocal.dev/">
+<meta property="og:site_name" content="GitLocal">
+<meta property="og:title" content="GitLocal — A local, GitHub-style viewer for the AI coding era">
+<meta property="og:description" content="GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse, read Markdown, review changes, and hand off to your terminal, without opening a full IDE.">
+<meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="GitLocal — A local, GitHub-style viewer for the AI coding era">
+<meta name="twitter:description" content="GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse, read Markdown, review changes, and hand off to your terminal, without opening a full IDE.">
+<meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "GitLocal",
+      "url": "https://gitlocal.dev",
+      "description": "GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse the repo, read Markdown clearly, review what changed, and hand off to a terminal, without opening a full IDE.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Windows, Linux",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "downloadUrl": "https://www.npmjs.com/package/gitlocal",
+      "sameAs": [
+        "https://github.com/ehud-am/gitlocal",
+        "https://www.npmjs.com/package/gitlocal"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is GitLocal?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is GitLocal free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does GitLocal send my code anywhere?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed git only, and only when you choose to run them."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What operating systems does GitLocal support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The npm package runs on macOS, Windows, and Linux with Node.js 22 or later. A native macOS app is also available in beta via Homebrew."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is GitLocal different from an IDE like VS Code?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits, the tasks people still do by hand when an AI agent generates most of the code, plus an integrated terminal for handing work back to that agent."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I install GitLocal?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Run npm install -g gitlocal, then gitlocal . in any folder, or npx gitlocal to try it without installing. A macOS app is available via brew install --cask gitlocal after running brew tap ehud-am/gitlocal."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -19,6 +112,7 @@
     <nav class="nav-links">
       <a href="#features">Features</a>
       <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
       <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
     </nav>
   </div>
@@ -119,6 +213,38 @@
         </article>
       </div>
       <p class="center install-more">Full setup and troubleshooting notes are in the <a href="https://github.com/ehud-am/gitlocal#readme">README</a>.</p>
+    </div>
+  </section>
+
+  <section class="faq" id="faq">
+    <div class="wrap">
+      <h2 class="section-title center">Frequently asked questions</h2>
+      <div class="faq-list">
+        <article class="faq-item">
+          <h3>What is GitLocal?</h3>
+          <p>GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required.</p>
+        </article>
+        <article class="faq-item">
+          <h3>Is GitLocal free?</h3>
+          <p>Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry.</p>
+        </article>
+        <article class="faq-item">
+          <h3>Does GitLocal send my code anywhere?</h3>
+          <p>No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed <code>git</code> only, and only when you choose to run them.</p>
+        </article>
+        <article class="faq-item">
+          <h3>What operating systems does GitLocal support?</h3>
+          <p>The npm package runs on macOS, Windows, and Linux with Node.js 22+. A native macOS app is also available in beta via Homebrew.</p>
+        </article>
+        <article class="faq-item">
+          <h3>How is GitLocal different from an IDE like VS Code?</h3>
+          <p>GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits — the tasks people still do by hand when an AI agent generates most of the code — plus an integrated terminal for handing work back to that agent.</p>
+        </article>
+        <article class="faq-item">
+          <h3>How do I install GitLocal?</h3>
+          <p>Run <code>npm install -g gitlocal</code>, then <code>gitlocal .</code> in any folder, or <code>npx gitlocal</code> to try it without installing. A macOS app is available via <code>brew install --cask gitlocal</code> after <code>brew tap ehud-am/gitlocal</code>.</p>
+        </article>
+      </div>
     </div>
   </section>
 

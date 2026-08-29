@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.10.4",
+  "version": "0.11.0",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -80,7 +80,7 @@
     "type": "git",
     "url": "https://github.com/ehud-am/gitlocal"
   },
-  "homepage": "https://github.com/ehud-am/gitlocal#readme",
+  "homepage": "https://gitlocal.dev",
   "bugs": {
     "url": "https://github.com/ehud-am/gitlocal/issues"
   },

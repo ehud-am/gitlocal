@@ -21,6 +21,8 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
     'hex',
   )
   writeFileSync(join(dir, 'logo.png'), pngBytes)
+  writeFileSync(join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg>')
+  writeFileSync(join(dir, 'spec.pdf'), Buffer.from('%PDF-1.4\n%fake binary pdf bytes\n', 'utf-8'))
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
@@ -245,6 +247,36 @@ describe('manual file operation handlers', () => {
     expect(updateRes.status).toBe(200)
     const updateBody = await updateRes.json()
     expect(updateBody.status).toBe('updated')
+  })
+
+  it('rejects updates to svg and pdf files through PUT /api/file', async () => {
+    const app = createApp(dir)
+
+    const svgRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'icon.svg',
+        content: '<svg></svg>',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(svgRes.status).toBe(400)
+    const svgBody = await svgRes.json()
+    expect(svgBody.message).toContain('Only text files can be edited inline.')
+
+    const pdfRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'spec.pdf',
+        content: 'not a pdf',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(pdfRes.status).toBe(400)
+    const pdfBody = await pdfRes.json()
+    expect(pdfBody.message).toContain('Only text files can be edited inline.')
   })
 
   it('rejects stale updates through PUT /api/file', async () => {
@@ -605,6 +637,32 @@ describe('fileHandler', () => {
     expect(body.type).toBe('image')
     expect(body.encoding).toBe('base64')
     expect(body.content.length).toBeGreaterThan(0)
+  })
+
+  it('returns svg type with utf-8 text content and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'icon.svg', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('svg')
+    expect(body.encoding).toBe('utf-8')
+    expect(body.language).toBe('xml')
+    expect(body.content).toContain('<svg')
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns pdf type with base64 encoding and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'spec.pdf', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('pdf')
+    expect(body.encoding).toBe('base64')
+    expect(body.language).toBe('')
+    expect(body.content.length).toBeGreaterThan(0)
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
   })
 
   it('reads file content from a non-current branch through git cat-file', async () => {

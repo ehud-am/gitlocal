@@ -870,6 +870,18 @@ describe('detectFileType', () => {
     expect(detectFileType('photo.jpg').type).toBe('image')
   })
 
+  it('detects svg as its own type, not image', () => {
+    const result = detectFileType('icon.svg')
+    expect(result.type).toBe('svg')
+    expect(result.language).toBe('xml')
+  })
+
+  it('detects pdf as its own type, not binary', () => {
+    const result = detectFileType('spec.pdf')
+    expect(result.type).toBe('pdf')
+    expect(result.language).toBe('')
+  })
+
   it('detects json', () => {
     const result = detectFileType('package.json')
     expect(result.type).toBe('json')
