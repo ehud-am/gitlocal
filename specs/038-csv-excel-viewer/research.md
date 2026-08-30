@@ -37,6 +37,12 @@
 - Exposing the chart's cached data as a table is the closest license-compliant approximation of "show the chart" available today: it surfaces the same underlying numbers the chart was built from, with zero execution/recalculation/network risk, satisfying the "not refresh data from external links and other more dynamic or content changing functions" half of the original request exactly, while being transparent that a rendered chart *graphic* is not being delivered in v1.
 - This tradeoff should be confirmed with the feature requester before implementation begins (see spec.md Assumptions) — it is a scope decision driven by the project's own license policy, not a technical limitation this team could code around.
 
+**Phase 5 implementation update (confirmed empirically)**: the actual constraint is narrower than "no graphics, but cached data is available" — SheetJS CE exposes **no chart title and no cached series data at all**, for either shape of chart. Concretely, tested against real `.xlsx` fixtures with `XLSX.read()`:
+- A chart *embedded* inside a normal worksheet (a chart object floating over cells, the shape described in spec.md's User Story 3 scenarios) leaves **zero trace** in the parsed sheet object — no `!type`, no chart key, nothing distinguishes it from a worksheet with no chart.
+- A dedicated **chartsheet** (a workbook tab that is itself nothing but a chart) is flagged via `sheet['!type'] === 'chart'`, but the parsed object carries only `!type`, `!drawel`, `!rel` — no title, no series values, under any tested read option.
+
+Per the user-confirmed decision, Phase 5 ships the minimal honest signal available: a static "this sheet contains a chart" label shown only on chartsheet-flagged sheets, no title, no series-data reveal. `chart.xlsx`'s fixture was built as a data sheet plus a separate dedicated chartsheet (rather than an embedded chart) to match the one shape SheetJS CE can actually detect.
+
 ## 4. Registry and delivery integration
 
 **Decision**: Follow the exact pattern established in `specs/036-file-preview-framework/`: two new `FileContentType` values (`csv`, `excel`) in `detectFileType` and `previewRegistry`, both `editable: false`; CSV delivered as `utf-8` text (like markdown/json/text today) and Excel delivered as `base64` (like PDF today, since `.xlsx`/`.xls` are binary container formats — `xlsx.read()` accepts a `Uint8Array`/array-buffer directly, so the client decodes the same way `PdfViewer.tsx` already does via `base64ToUint8Array`).

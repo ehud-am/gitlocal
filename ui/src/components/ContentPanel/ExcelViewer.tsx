@@ -9,6 +9,13 @@ interface Props {
 interface Worksheet {
   name: string
   rows: string[][]
+  /**
+   * True when SheetJS Community Edition flags this sheet as chart-typed (`!type === 'chart'`).
+   * CE exposes no chart title or cached series data (verified empirically — a chartsheet's
+   * parsed object carries only `!type`/`!drawel`/`!rel`, and embedded charts inside a normal
+   * worksheet leave no trace at all), so this is a bare presence flag, not a renderable chart.
+   */
+  hasChart: boolean
 }
 
 interface ExcelWorkbook {
@@ -24,12 +31,9 @@ function parseWorkbook(content: string): ExcelWorkbook {
       // header: 1 keeps rows as arrays instead of objects keyed by the first row; raw: false
       // reads each cell's formatted/cached display value, never a formula (FR-006).
       const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '', raw: false })
-      return { name, rows: rows.map((row) => row.map((cell) => String(cell))) }
+      const hasChart = worksheet['!type'] === 'chart'
+      return { name, rows: rows.map((row) => row.map((cell) => String(cell))), hasChart }
     })
-
-    if (sheets.length === 0) {
-      return { sheets: [], parseError: "This file can't be previewed as an Excel workbook." }
-    }
 
     return { sheets, parseError: null }
   } catch {
@@ -72,6 +76,12 @@ export default function ExcelViewer({ content }: Props) {
           </button>
         ))}
       </div>
+      {activeSheet.hasChart && (
+        <p className="excel-viewer-chart-indicator">
+          This sheet contains a chart. Chart title and data aren't available in this preview
+          (not supported by the available reader).
+        </p>
+      )}
       {headerRow === undefined ? (
         <p className="binary-placeholder">This worksheet is empty.</p>
       ) : (

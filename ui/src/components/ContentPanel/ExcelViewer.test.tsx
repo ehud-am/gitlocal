@@ -14,6 +14,7 @@ function fixtureBase64(name: string): string {
 
 const sampleXlsx = fixtureBase64('sample.xlsx')
 const brokenXlsx = fixtureBase64('broken.xlsx')
+const chartXlsx = fixtureBase64('chart.xlsx')
 
 function inMemoryWorkbookBase64(sheetName: string, rows: unknown[][]): string {
   const workbook = XLSX.utils.book_new()
@@ -68,6 +69,37 @@ describe('ExcelViewer', () => {
   it('never issues a network request while parsing', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     render(<ExcelViewer content={sampleXlsx} />)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
+  it('shows a chart indicator only on the sheet SheetJS flags as chart-typed, and no indicator elsewhere', () => {
+    render(<ExcelViewer content={chartXlsx} />)
+    // Active (first) sheet has no chart.
+    expect(screen.queryByText(/contains a chart/)).not.toBeInTheDocument()
+
+    const tabs = screen.getAllByRole('tab')
+    const chartTabIndex = tabs.findIndex((tab) => tab.textContent === 'ChartSheet')
+    expect(chartTabIndex).toBeGreaterThan(-1)
+    fireEvent.click(tabs[chartTabIndex])
+
+    expect(screen.getByText(/contains a chart/)).toBeInTheDocument()
+  })
+
+  it('shows no chart indicator on any sheet of a chart-free workbook', () => {
+    render(<ExcelViewer content={sampleXlsx} />)
+    const tabs = screen.getAllByRole('tab')
+    for (const tab of tabs) {
+      fireEvent.click(tab)
+      expect(screen.queryByText(/contains a chart/)).not.toBeInTheDocument()
+    }
+  })
+
+  it('never issues a network request while rendering the chart indicator', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    render(<ExcelViewer content={chartXlsx} />)
+    const tabs = screen.getAllByRole('tab')
+    fireEvent.click(tabs[tabs.findIndex((tab) => tab.textContent === 'ChartSheet')])
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
   })

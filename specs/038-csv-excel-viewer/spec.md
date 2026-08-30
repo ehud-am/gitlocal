@@ -53,8 +53,8 @@ A user opens a workbook that includes an embedded chart (e.g., a bar chart summa
 
 **Acceptance Scenarios**:
 
-1. **Given** a worksheet with one or more embedded charts, **When** the user views that sheet, **Then** each chart is represented by a labeled indicator (not a rendered chart graphic) showing at least the chart's title if the file provides one.
-2. **Given** a chart indicator, **When** the user interacts with it, **Then** they can view the chart's cached series data as a plain table.
+1. **Given** a worksheet with one or more embedded charts, **When** the user views that sheet, **Then** each chart is represented by a labeled indicator (not a rendered chart graphic) showing at least the chart's title if the file provides one. **(Revised during Phase 5 implementation — see note below)**: the chosen library exposes no title and no per-worksheet embedded-chart signal at all; the indicator instead appears only on a sheet that is itself a dedicated chart tab, with generic wording rather than a title.
+2. **Given** a chart indicator, **When** the user interacts with it, **Then** they can view the chart's cached series data as a plain table. **(Descoped)**: no cached series data is available from the chosen library, so no interaction/reveal is offered — the indicator is a static label.
 3. **Given** a worksheet with no embedded charts, **When** the user views that sheet, **Then** no chart indicator is shown.
 4. **Given** any chart present in the file, **When** it is shown to the user in any form, **Then** GitLocal never re-fetches, recalculates, or re-renders it as a live/interactive chart, and never contacts an external data source on its behalf.
 
@@ -92,7 +92,7 @@ A user opens a workbook that includes an embedded chart (e.g., a bar chart summa
 - **CSV Preview Type**: A new preview-type classification for `.csv` files, extending `detectFileType`'s output alongside the existing `markdown`/`json`/`text`/`image`/`binary`/`svg`/`pdf` types.
 - **Excel Preview Type**: A new preview-type classification for `.xlsx`/`.xls` files, split out of the current `binary` bucket.
 - **Worksheet**: A named, ordered sheet within a workbook; has a display name (the tab label) and a grid of cell values. A workbook has one or more worksheets.
-- **Chart Indicator**: A record, derived from a worksheet's embedded chart metadata, carrying an optional chart title and its cached series data (categories/values), used only to display the "a chart exists here, and here is its data" affordance from User Story 3 — not a renderable chart object.
+- **Chart Indicator**: A record, derived from a worksheet's chart metadata, used only to display the "a chart exists here" affordance from User Story 3 — not a renderable chart object. **Scope reduced during Phase 5 implementation**: empirical testing of the chosen library (SheetJS Community Edition) found it exposes no chart title or cached series data whatsoever, and gives no detectable signal at all for a chart embedded inside a normal worksheet — only a bare type flag on a sheet that is *itself* a dedicated chart tab (a "chartsheet"). The indicator therefore only appears on such chartsheets, carries no title, and offers no series-data table; see `research.md` §3 and `data-model.md` for the confirmed constraint.
 
 ## Success Criteria *(mandatory)*
 

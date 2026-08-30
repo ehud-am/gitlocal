@@ -19,8 +19,8 @@
 2. Expected: the content panel renders the first worksheet's cell values as a table instead of "Binary file — preview not available."
 3. Confirm a tab strip lists every worksheet by name, in workbook order; click a non-active tab → the table switches to that sheet's data.
 4. Open a workbook containing a formula cell → confirm it shows the last-saved calculated value, not `#REF!`/live recalculation, and confirm no visible "recalculating" state ever appears.
-5. Open a workbook containing an embedded chart → confirm the sheet shows a labeled chart indicator (title if present) rather than a rendered chart image; interact with the indicator → confirm the chart's cached series data appears as a plain table.
-6. Open a workbook with no charts → confirm no chart indicator appears anywhere on that sheet.
+5. Open `chart.xlsx` (a data sheet plus a dedicated chart-only tab) → switch to the chart tab, confirm it shows a static "this sheet contains a chart" label rather than a rendered chart image. **Scope note**: SheetJS Community Edition exposes no chart title and no cached series data for any chart shape (embedded or dedicated tab), so no title and no data-reveal interaction is offered — see research.md §3.
+6. Open a workbook with no charts (e.g. `sample.xlsx`) → confirm no chart indicator appears on any sheet.
 7. Open a corrupted or password-protected `.xlsx` file → confirm a clear non-preview fallback message appears instead of a crash, blank panel, or hang.
 8. Open browser DevTools → Network tab, confirm no request beyond the local `/api/file` fetch occurs while the file is open, including for workbooks that reference external data connections (FR-010, FR-006).
 

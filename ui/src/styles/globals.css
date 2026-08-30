@@ -1616,6 +1616,16 @@ pre {
   font-weight: 600;
 }
 
+.excel-viewer-chart-indicator {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
 .manual-editor-card {
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -60,14 +60,11 @@ Produced by `ExcelViewer.tsx` from `xlsx`'s output; not persisted or sent over t
 |---|---|---|
 | `name` | `string` | Sheet name, used as the tab label (FR-005) |
 | `rows` | `string[][]` | Cell values as displayed by Excel (cached formula results, not formulas — FR-006), read via `xlsx`'s formatted-cell API |
-| `charts` | `ChartIndicator[]` | Zero or more; empty array when the sheet has no embedded charts (Edge Cases) |
+| `hasChart` | `boolean` | **Revised from the original `charts: ChartIndicator[]` shape during Phase 5 implementation.** `true` when SheetJS CE flags this sheet's parsed object with `!type === 'chart'` (i.e. this sheet is itself a dedicated chart tab, not a normal data worksheet). Verified empirically: CE gives **no signal whatsoever** for a chart embedded inside a normal data worksheet (the parsed sheet object is indistinguishable from one with no chart), and even a flagged chartsheet exposes only `!type`/`!drawel`/`!rel` — no title, no series data. |
 
 ### ChartIndicator
 
-| Field | Type | Description |
-|---|---|---|
-| `title` | `string \| null` | Chart's own title if the file provides one (User Story 3 Scenario 1) |
-| `seriesData` | `{ categories: string[]; series: { name: string; values: (string \| number)[] }[] }` | Cached series data extracted from the chart's backing range, shown as a plain table on request (User Story 3 Scenario 2) — never a rendered chart graphic |
+Originally specified as a `{ title, seriesData }` record per detected chart. **Descoped during Phase 5 implementation**: neither field is obtainable from SheetJS Community Edition for any chart shape actually encountered (embedded or chartsheet), so no such record is constructed. The UI instead renders a single static label wherever `Worksheet.hasChart` is `true` — see `ExcelViewer.tsx` and `research.md` §3.
 
 ## Relationships
 
