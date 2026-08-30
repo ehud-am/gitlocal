@@ -23,6 +23,8 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   writeFileSync(join(dir, 'logo.png'), pngBytes)
   writeFileSync(join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg>')
   writeFileSync(join(dir, 'spec.pdf'), Buffer.from('%PDF-1.4\n%fake binary pdf bytes\n', 'utf-8'))
+  writeFileSync(join(dir, 'data.csv'), 'Name,Role\nAda,Engineer\n')
+  writeFileSync(join(dir, 'report.xlsx'), Buffer.from('PK\x03\x04fake xlsx bytes', 'utf-8'))
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
@@ -249,7 +251,7 @@ describe('manual file operation handlers', () => {
     expect(updateBody.status).toBe('updated')
   })
 
-  it('rejects updates to svg and pdf files through PUT /api/file', async () => {
+  it('rejects updates to svg, pdf, csv, and excel files through PUT /api/file', async () => {
     const app = createApp(dir)
 
     const svgRes = await app.fetch(new Request('http://localhost/api/file', {
@@ -277,6 +279,32 @@ describe('manual file operation handlers', () => {
     expect(pdfRes.status).toBe(400)
     const pdfBody = await pdfRes.json()
     expect(pdfBody.message).toContain('Only text files can be edited inline.')
+
+    const csvRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'data.csv',
+        content: 'a,b\n1,2\n',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(csvRes.status).toBe(400)
+    const csvBody = await csvRes.json()
+    expect(csvBody.message).toContain('Only text files can be edited inline.')
+
+    const excelRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'report.xlsx',
+        content: 'not an xlsx',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(excelRes.status).toBe(400)
+    const excelBody = await excelRes.json()
+    expect(excelBody.message).toContain('Only text files can be edited inline.')
   })
 
   it('rejects stale updates through PUT /api/file', async () => {
@@ -658,6 +686,32 @@ describe('fileHandler', () => {
     const res = await client.api.file.$get({ query: { path: 'spec.pdf', branch } })
     const body = await res.json()
     expect(body.type).toBe('pdf')
+    expect(body.encoding).toBe('base64')
+    expect(body.language).toBe('')
+    expect(body.content.length).toBeGreaterThan(0)
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns csv type with utf-8 text content and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'data.csv', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('csv')
+    expect(body.encoding).toBe('utf-8')
+    expect(body.language).toBe('')
+    expect(body.content).toContain('Ada,Engineer')
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns excel type with base64 encoding and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'report.xlsx', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('excel')
     expect(body.encoding).toBe('base64')
     expect(body.language).toBe('')
     expect(body.content.length).toBeGreaterThan(0)

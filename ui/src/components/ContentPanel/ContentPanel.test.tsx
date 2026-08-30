@@ -1612,6 +1612,39 @@ describe('ContentPanel', () => {
     expect(screen.queryByRole('button', { name: /find in file/i })).not.toBeInTheDocument()
   })
 
+  it('renders CsvViewer as a table for csv files and disables Edit file', async () => {
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'data.csv',
+      type: 'csv',
+      content: 'Name,Role\nAda,Engineer\n',
+      language: '',
+      encoding: 'utf-8',
+      editable: false,
+      revisionToken: 'rev-csv',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="data.csv"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: 'Ada' })).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    const editItem = screen.getByRole('menuitem', { name: /edit file/i })
+    expect(editItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('hides the file actions menu when no file commands are available', async () => {
     vi.mocked(api.getFile).mockResolvedValue({
       path: 'image.bin',

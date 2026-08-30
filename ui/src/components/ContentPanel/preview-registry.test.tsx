@@ -48,6 +48,8 @@ describe('previewRegistry', () => {
       binary: { supportsRawToggle: false, editable: false },
       pdf: { supportsRawToggle: false, editable: false },
       svg: { supportsRawToggle: true, editable: false },
+      csv: { supportsRawToggle: true, editable: false },
+      excel: { supportsRawToggle: false, editable: false },
     }
 
     for (const [type, flags] of Object.entries(expectedFlags) as [FileContentType, { supportsRawToggle: boolean; editable: boolean }][]) {
@@ -174,5 +176,34 @@ describe('previewRegistry', () => {
           && element.textContent?.includes('<svg') === true),
       ).toBeInTheDocument()
     }, { timeout: 5000 })
+  })
+
+  it('renders CsvViewer as a table for csv when showRaw is false', async () => {
+    const data = makeFileContent('csv', { content: 'a,b\n1,2\n' })
+    const Component = previewRegistry.csv.Component
+    render(<Component {...baseProps(data, { showRaw: false })} />)
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'a' })).toBeInTheDocument()
+    }, { timeout: 5000 })
+  })
+
+  it('renders raw CSV source via CodeViewer for csv when showRaw is true', async () => {
+    const data = makeFileContent('csv', { content: 'a,b\n1,2\n' })
+    const Component = previewRegistry.csv.Component
+    render(<Component {...baseProps(data, { showRaw: true })} />)
+    await waitFor(() => {
+      expect(
+        screen.getByText((_, element) => element?.tagName.toLowerCase() === 'code'
+          && element.textContent?.includes('a,b') === true),
+      ).toBeInTheDocument()
+    }, { timeout: 5000 })
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
+  })
+
+  it('renders the binary fallback message for type excel (interim, pending Phase 4)', () => {
+    const data = makeFileContent('excel', { content: 'abc123', encoding: 'base64' })
+    const Component = previewRegistry.excel.Component
+    render(<Component {...baseProps(data)} />)
+    expect(screen.getByText(/Binary file/i)).toBeInTheDocument()
   })
 })

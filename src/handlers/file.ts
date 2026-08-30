@@ -153,6 +153,32 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json(response)
   }
 
+  if (type === 'csv') {
+    const response: FileContent = {
+      path,
+      content: rawBytes.toString('utf-8'),
+      encoding: 'utf-8',
+      type: 'csv',
+      language: '',
+      editable: false,
+      revisionToken: editableState.revisionToken,
+    }
+    return c.json(response)
+  }
+
+  if (type === 'excel') {
+    const response: FileContent = {
+      path,
+      content: rawBytes.toString('base64'),
+      encoding: 'base64',
+      type: 'excel',
+      language: '',
+      editable: false,
+      revisionToken: editableState.revisionToken,
+    }
+    return c.json(response)
+  }
+
   const response: FileContent = {
     path,
     content: rawBytes.toString('utf-8'),

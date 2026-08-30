@@ -1553,6 +1553,41 @@ pre {
   color: var(--muted-foreground);
 }
 
+.csv-viewer-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.csv-viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.csv-viewer-table th,
+.csv-viewer-table td {
+  padding: 0.5rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.csv-viewer-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-subtle);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.csv-viewer-table tr:last-child td {
+  border-bottom: none;
+}
+
 .manual-editor-card {
   border: 1px solid var(--border);
   border-radius: 8px;
