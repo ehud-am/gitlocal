@@ -1,0 +1,4 @@
+Sample plain text file demonstrating GitLocal's unhighlighted text preview.
+
+No syntax highlighting is applied to this file — it falls back to the
+default text renderer since ".txt" has no associated language mapping.
