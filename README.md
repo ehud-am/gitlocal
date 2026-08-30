@@ -35,14 +35,12 @@ Everything runs locally, there are no accounts or telemetry, and any clone, fetc
 
 ## Choose an Install
 
-GitLocal has two ways to install the same product. The npm package is the mature cross-platform option. The macOS app is newer, easier to launch on a Mac, and currently unsigned.
+Choose the npm package for any OS, or the native macOS app if you'd rather skip the terminal. Both run the same GitLocal server and React viewer — the Mac app is a native wrapper around the same code, not a separate fork.
 
 | Option | Best for | What you get | Tradeoff |
 |--------|----------|--------------|----------|
 | npm package | macOS, Windows, and Linux users who are comfortable with a terminal | One-command install, opens in your browser, mature distribution | The terminal process must stay open while GitLocal is running |
-| macOS app beta | Mac users who want GitLocal to behave like an app | Homebrew install, opens as `GitLocal.app`, no terminal needed after install | Unsigned beta app, so macOS shows security warnings on first launch |
-
-Both options use the same GitLocal server and React viewer for a given release. The Mac app is a native wrapper around the same local app code, not a separate fork.
+| macOS app beta | Mac users who want GitLocal to behave like an app | Homebrew install, opens as `GitLocal.app`, no terminal needed after install | Unsigned beta app — one extra command is required or macOS Gatekeeper blocks it from opening |
 
 ### Option 1: npm Package
 
@@ -85,7 +83,7 @@ The macOS app starts the same local GitLocal service in the background for the a
 
 On first launch, the app asks before setting GitLocal as the default Markdown reader. If you accept, double-clicking `.md` and `.markdown` files in Finder opens GitLocal, activates the file's local folder or repository, and selects the Markdown file in the preview. If you decline, GitLocal leaves your current Markdown default unchanged. You can also choose **GitLocal > Set as Default Markdown Reader** later from the macOS app menu.
 
-**Unsigned beta notice:** the current Mac app is not signed or notarized with an Apple Developer ID. macOS will show security warnings the first time you open it. After installing, approve the app with:
+**Unsigned beta notice:** the current Mac app is not signed or notarized with an Apple Developer ID. Without the command below, macOS Gatekeeper blocks it from opening at all — this isn't just a dismissible warning. After installing, run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/GitLocal.app
@@ -110,7 +108,7 @@ brew uninstall --cask gitlocal
 
 Use the npm package if you want the most mature and portable install path, especially on Windows or Linux.
 
-Use the macOS app beta if you are on a Mac and want a normal app experience without a running terminal. It is aligned with the npm version, but the first-launch security warnings are expected until the app is signed and notarized.
+Use the macOS app beta if you are on a Mac and want a normal app experience without a running terminal. It is aligned with the npm version, but the one-time `xattr` step above is required until the app is signed and notarized.
 
 ---
 
@@ -118,6 +116,7 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 
 - **Browse local projects** with a lazy-loading, keyboard-navigable file tree (arrow keys, Enter/Space) for regular folders and git repositories.
 - **Read Markdown clearly** in the normal repository viewer with GitHub-like rendering, relative links, heading anchors, rendered find highlights, and share/copy actions.
+- **Preview beyond code, locally** with built-in PDF and SVG viewers alongside Markdown and images — files GitHub's web UI often can't render inline and falls back to a raw download for.
 - **Start from useful repository context** with a root dashboard for status, key documents, recent files, recently changed files, and raw directory browsing.
 - **Review background changes** with active-file refresh/deletion notices and a changed-files panel for modified, deleted, untracked, generated, and local-only paths.
 - **Search intentionally** with a separate repository search surface, current-folder and Markdown-focused scopes, generated/local controls, result counts, and file-level find inside the current file.
