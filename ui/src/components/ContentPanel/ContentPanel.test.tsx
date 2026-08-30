@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { axe } from 'jest-axe'
+import * as XLSX from 'xlsx'
 import ContentPanel from './ContentPanel'
 
 vi.mock('../../services/api', () => ({
@@ -1628,6 +1629,43 @@ describe('ContentPanel', () => {
         canMutateFiles
         refreshToken={0}
         selectedPath="data.csv"
+        selectedPathType="file"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: 'Ada' })).toBeInTheDocument()
+    })
+
+    await openFileActionsMenu()
+    const editItem = screen.getByRole('menuitem', { name: /edit file/i })
+    expect(editItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('renders ExcelViewer as a table for excel files and disables Edit file', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Name', 'Role'], ['Ada', 'Engineer']]), 'Sheet1')
+    const content = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' })
+
+    vi.mocked(api.getFile).mockResolvedValue({
+      path: 'data.xlsx',
+      type: 'excel',
+      content,
+      language: '',
+      encoding: 'base64',
+      editable: false,
+      revisionToken: 'rev-excel',
+    })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath="data.xlsx"
         selectedPathType="file"
         branch="main"
         onNavigate={vi.fn()}

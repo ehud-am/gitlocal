@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import * as XLSX from 'xlsx'
 import { previewRegistry, type PreviewComponentProps } from './preview-registry'
 import { parseJsonTree } from './json-tree'
 import type { FileContent, FileContentType } from '../../types'
@@ -200,10 +201,15 @@ describe('previewRegistry', () => {
     expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
   })
 
-  it('renders the binary fallback message for type excel (interim, pending Phase 4)', () => {
-    const data = makeFileContent('excel', { content: 'abc123', encoding: 'base64' })
+  it('renders ExcelViewer as a table for excel', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['a', 'b'], [1, 2]]), 'Sheet1')
+    const content = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' })
+    const data = makeFileContent('excel', { content, encoding: 'base64' })
     const Component = previewRegistry.excel.Component
     render(<Component {...baseProps(data)} />)
-    expect(screen.getByText(/Binary file/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'a' })).toBeInTheDocument()
+    }, { timeout: 5000 })
   })
 })

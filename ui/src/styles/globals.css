@@ -1588,6 +1588,34 @@ pre {
   border-bottom: none;
 }
 
+.excel-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.excel-viewer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.excel-viewer-tab {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.excel-viewer-tab-active {
+  background: var(--surface-subtle);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
 .manual-editor-card {
   border: 1px solid var(--border);
   border-radius: 8px;
