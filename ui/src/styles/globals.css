@@ -1553,6 +1553,79 @@ pre {
   color: var(--muted-foreground);
 }
 
+.csv-viewer-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.csv-viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.csv-viewer-table th,
+.csv-viewer-table td {
+  padding: 0.5rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.csv-viewer-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-subtle);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.csv-viewer-table tr:last-child td {
+  border-bottom: none;
+}
+
+.excel-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.excel-viewer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.excel-viewer-tab {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.excel-viewer-tab-active {
+  background: var(--surface-subtle);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.excel-viewer-chart-indicator {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
 .manual-editor-card {
   border: 1px solid var(--border);
   border-radius: 8px;

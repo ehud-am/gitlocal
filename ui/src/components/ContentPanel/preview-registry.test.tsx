@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import * as XLSX from 'xlsx'
 import { previewRegistry, type PreviewComponentProps } from './preview-registry'
 import { parseJsonTree } from './json-tree'
 import type { FileContent, FileContentType } from '../../types'
@@ -48,6 +49,8 @@ describe('previewRegistry', () => {
       binary: { supportsRawToggle: false, editable: false },
       pdf: { supportsRawToggle: false, editable: false },
       svg: { supportsRawToggle: true, editable: false },
+      csv: { supportsRawToggle: true, editable: false },
+      excel: { supportsRawToggle: false, editable: false },
     }
 
     for (const [type, flags] of Object.entries(expectedFlags) as [FileContentType, { supportsRawToggle: boolean; editable: boolean }][]) {
@@ -173,6 +176,40 @@ describe('previewRegistry', () => {
         screen.getByText((_, element) => element?.tagName.toLowerCase() === 'code'
           && element.textContent?.includes('<svg') === true),
       ).toBeInTheDocument()
+    }, { timeout: 5000 })
+  })
+
+  it('renders CsvViewer as a table for csv when showRaw is false', async () => {
+    const data = makeFileContent('csv', { content: 'a,b\n1,2\n' })
+    const Component = previewRegistry.csv.Component
+    render(<Component {...baseProps(data, { showRaw: false })} />)
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'a' })).toBeInTheDocument()
+    }, { timeout: 5000 })
+  })
+
+  it('renders raw CSV source via CodeViewer for csv when showRaw is true', async () => {
+    const data = makeFileContent('csv', { content: 'a,b\n1,2\n' })
+    const Component = previewRegistry.csv.Component
+    render(<Component {...baseProps(data, { showRaw: true })} />)
+    await waitFor(() => {
+      expect(
+        screen.getByText((_, element) => element?.tagName.toLowerCase() === 'code'
+          && element.textContent?.includes('a,b') === true),
+      ).toBeInTheDocument()
+    }, { timeout: 5000 })
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
+  })
+
+  it('renders ExcelViewer as a table for excel', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['a', 'b'], [1, 2]]), 'Sheet1')
+    const content = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' })
+    const data = makeFileContent('excel', { content, encoding: 'base64' })
+    const Component = previewRegistry.excel.Component
+    render(<Component {...baseProps(data)} />)
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: 'a' })).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 })

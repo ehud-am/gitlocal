@@ -882,6 +882,21 @@ describe('detectFileType', () => {
     expect(result.language).toBe('')
   })
 
+  it('detects csv as its own type, not text', () => {
+    const result = detectFileType('data.csv')
+    expect(result.type).toBe('csv')
+    expect(result.language).toBe('')
+  })
+
+  it('detects xlsx and xls as their own type, not binary', () => {
+    const xlsx = detectFileType('report.xlsx')
+    expect(xlsx.type).toBe('excel')
+    expect(xlsx.language).toBe('')
+    const xls = detectFileType('legacy.xls')
+    expect(xls.type).toBe('excel')
+    expect(xls.language).toBe('')
+  })
+
   it('detects json', () => {
     const result = detectFileType('package.json')
     expect(result.type).toBe('json')

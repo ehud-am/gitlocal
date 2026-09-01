@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-08-09
+Auto-generated from all feature plans. Last updated: 2026-08-30
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -11,6 +11,7 @@ Auto-generated from all feature plans. Last updated: 2026-08-09
 - **State**: All state in-process or derived from filesystem/git at request time
 - **Terminal (032)**: `node-pty` (server PTY sessions), `ws` (per-tab WebSocket I/O), `@xterm/xterm` + `@xterm/addon-fit` (UI rendering) — see `specs/032-integrated-terminal-panel/research.md`
 - **File preview (036)**: `pdfjs-dist` (PDF rendering, lazy-loaded, worker bundled locally via Vite `?url` import — never a CDN URL) — see `specs/036-file-preview-framework/research.md`
+- **CSV/Excel preview (038)**: `papaparse` (CSV parsing, MIT), `xlsx` (SheetJS Community Edition, Apache-2.0, pinned to the SheetJS-published CDN tarball rather than the stale npm registry copy) — both lazy-loaded — see `specs/038-csv-excel-viewer/research.md`
 
 ## Project Structure
 
@@ -45,6 +46,7 @@ Measured on the current branch, 90.7% of implementation lines are shared between
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 038-csv-excel-viewer: Extended the preview registry with `.csv` (`CsvViewer.tsx`, lazily-loaded `papaparse`, rendered as a scrollable table with raw/pretty toggle) and `.xlsx`/`.xls` (`ExcelViewer.tsx`, lazily-loaded `xlsx`/SheetJS CE, per-sheet tab strip, cached cell values only — never formula recalculation) preview support, both `editable: false`, with zero changes to `ContentPanel.tsx`'s core dispatch logic (SC-006, matching spec 036's pattern). User Story 3 (chart indicators) shipped at reduced scope after empirically confirming SheetJS Community Edition exposes no chart title or cached series data for any chart shape and gives no detectable signal at all for a chart embedded inside a normal worksheet — only a static "this sheet contains a chart" label is shown, and only on a sheet that is itself a dedicated chart tab; confirmed with the feature requester before implementation. Also fixed a pre-existing gap where `ui/vitest.config.ts`'s coverage `include` list omitted the preview-framework's own viewer components. See `specs/038-csv-excel-viewer/`.
 - 0.11.0: Linked gitlocal.dev from the npm and GitHub READMEs (website badge, homepage field) and optimized the gitlocal.dev site for AI answer engines and search engines (canonical/OG/Twitter meta tags, JSON-LD `SoftwareApplication`/`FAQPage` structured data, a matching visible FAQ section, `robots.txt`, `sitemap.xml`, `llms.txt`) — see `releases/0.11.0-release-review.md`.
 - 036-file-preview-framework: Introduced a registry-pattern preview framework (`ui/src/components/ContentPanel/preview-registry.tsx`) mapping each file content type to its preview component, migrating all existing preview behavior (markdown, json, text, image, binary) onto it with zero behavioral change, and extended it with read-only PDF preview (`PdfViewer.tsx`, via lazily-loaded `pdfjs-dist` with a locally-bundled worker) and read-only SVG preview (`SvgViewer.tsx`, rendered as an inert `<img>` data URI to prevent script execution) — see `specs/036-file-preview-framework/`.
 - 035-quality-hardening (0.10.3): Full architecture/code review of all 15 reviewable units (110 findings logged) and disposition of all of them — bug fixes (sync-status path-type misreporting on non-current branches, an opened-file name mismatch outside git repos, macOS app JS-injection and process-lifecycle races, missing file-tree keyboard navigation, incorrect picker `aria-expanded` state, a silent failed-subdirectory-fetch with no retry indicator, "Find in file" losing its query on reopen, stale search pagination across a branch switch, a macOS default-Markdown-reader partial-registration gap), plus dead-code removal, duplicate-code consolidation, and efficiency/readability polish across the server, UI, and macOS app (Phases 5-8). A pre-release contrarian QA pass found and fixed two additional issues: a non-keyboard-accessible folder-picker sidebar (converted to native buttons) and an unfixed effect-dependency inefficiency in the file tree. See `specs/035-quality-hardening/` and `releases/0.10.3-release-review.md`.

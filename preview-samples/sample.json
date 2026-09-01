@@ -1,0 +1,10 @@
+{
+  "name": "preview-samples",
+  "description": "Sample file demonstrating GitLocal's JSON preview",
+  "supportedTypes": ["markdown", "json", "text", "image", "svg", "pdf", "csv", "excel", "binary"],
+  "nested": {
+    "count": 3,
+    "enabled": true,
+    "tags": ["demo", "preview", "gitlocal"]
+  }
+}

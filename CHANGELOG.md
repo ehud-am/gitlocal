@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 - 2026-08-31
+
+- Added CSV file preview: `.csv` files render as a scrollable table with the first row as headers (via lazily-loaded parsing), with a raw/pretty toggle matching Markdown/JSON/SVG, correct handling of quoted fields and embedded commas/newlines, and a clear fallback for malformed or empty files.
+- Added Excel workbook preview: `.xlsx`/`.xls` files render the active worksheet as a table with a per-sheet tab strip, replacing the previous binary-file fallback. Cell values are the file's last-saved cached values only — formulas are never recalculated, external data links are never refreshed, and macros/dynamic content are never executed.
+- Added a chart indicator for Excel sheets that are themselves dedicated chart tabs (a static "this sheet contains a chart" label); charts embedded inside a normal worksheet aren't flagged, since the underlying library exposes no reliable signal for that case.
+- Fixed a gap where the UI test coverage gate wasn't actually checking the file-preview framework's own viewer components.
+
 ## 0.11.0 - 2026-08-29
 
 - Added PDF preview (read-only, rendered locally with no network fetch) and SVG preview (rendered as an inert image so embedded scripts never execute).

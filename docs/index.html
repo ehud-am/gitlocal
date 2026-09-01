@@ -176,6 +176,10 @@
           <h3>Hand off to your agent</h3>
           <p>A built-in terminal docked at the bottom of the window, wired for Claude, Codex, or a plain shell, with cross-page session persistence.</p>
         </article>
+        <article class="feature-card">
+          <h3>Preview beyond code</h3>
+          <p>Built-in viewers for PDF, SVG, and image files alongside Markdown — growing steadily, and rendered locally where GitHub's web UI often falls back to a raw download link.</p>
+        </article>
       </div>
     </div>
   </section>
@@ -209,7 +213,11 @@
             <code>brew install --cask gitlocal</code>
             <button type="button" class="copy-btn" data-copy="brew install --cask gitlocal" aria-label="Copy brew install command">Copy</button>
           </div>
-          <p class="install-note">No terminal needed after install. Currently unsigned, so macOS shows a security warning on first launch.</p>
+          <div class="code-block">
+            <code>xattr -dr com.apple.quarantine /Applications/GitLocal.app</code>
+            <button type="button" class="copy-btn" data-copy="xattr -dr com.apple.quarantine /Applications/GitLocal.app" aria-label="Copy xattr command">Copy</button>
+          </div>
+          <p class="install-note">No terminal needed after install. This beta build is unsigned, so run the command above once — without it, Gatekeeper blocks the app from opening at all.</p>
         </article>
       </div>
       <p class="center install-more">Full setup and troubleshooting notes are in the <a href="https://github.com/ehud-am/gitlocal#readme">README</a>.</p>

@@ -15,46 +15,31 @@ Everything runs locally. There are no accounts or telemetry.
 - Node.js 22+
 - git 2.22+
 
-## Install
+## Install and run
 
 ```sh
 npm install -g gitlocal
-```
-
-## Run
-
-Open the current folder or repository:
-
-```sh
 gitlocal .
 ```
 
-Open a specific folder or repository:
+`gitlocal .` opens the current folder; pass any path (`gitlocal ~/projects/my-app`) to open a different one, or run `gitlocal` with no argument to reopen the last used folder. GitLocal starts a local server, opens your default browser, and prints the local URL — keep that terminal window open while you use it.
 
-```sh
-gitlocal ~/projects/my-app
-```
-
-Open the last used folder, or your platform Documents folder on first launch:
-
-```sh
-gitlocal
-```
-
-Run without installing:
+Prefer not to install anything first? Run it once with:
 
 ```sh
 npx gitlocal
 ```
 
-GitLocal starts a local server, opens your browser, and prints the local URL. Keep the terminal process open while using the npm version.
+## What you get
 
-Rendered Markdown views include local print, Save as PDF through print, email/share, copy, and download fallback actions. The viewer also includes a Refresh button, focused undo/redo support while editing files, and panel-scoped Select All for the currently viewed content.
+- GitHub-style Markdown rendering, plus built-in PDF and SVG preview — file types GitHub's web UI often can't render inline.
+- Local print, Save as PDF, email/share, copy, and download fallback actions on rendered Markdown.
+- A Refresh button, focused undo/redo while editing, and panel-scoped Select All.
 
-## More Documentation
+## More documentation
 
-- Product overview, screenshots, and features: https://gitlocal.dev
-- Native macOS app instructions, source builds, development setup, architecture notes, and troubleshooting: https://github.com/ehud-am/gitlocal#readme
+- Product overview, screenshots, and full feature list: https://gitlocal.dev
+- Native macOS app (beta), source builds, development setup, architecture notes, and troubleshooting: https://github.com/ehud-am/gitlocal#readme
 
 ## License
 

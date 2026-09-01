@@ -13,6 +13,8 @@ const JSONViewer = lazy(() => import('./JSONViewer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const PdfViewer = lazy(() => import('./PdfViewer'))
 const SvgViewer = lazy(() => import('./SvgViewer'))
+const CsvViewer = lazy(() => import('./CsvViewer'))
+const ExcelViewer = lazy(() => import('./ExcelViewer'))
 
 const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
 
@@ -138,6 +140,26 @@ function SvgPreview({ data, showRaw, setSelectionRoot }: PreviewComponentProps) 
   )
 }
 
+function CsvPreview({ data, showRaw, setSelectionRoot }: PreviewComponentProps) {
+  return (
+    <div ref={setSelectionRoot}>
+      <Suspense fallback={loadingFallback}>
+        {showRaw ? <CodeViewer content={data.content} language="" /> : <CsvViewer content={data.content} />}
+      </Suspense>
+    </div>
+  )
+}
+
+function ExcelPreview({ data, setSelectionRoot }: PreviewComponentProps) {
+  return (
+    <div ref={setSelectionRoot}>
+      <Suspense fallback={loadingFallback}>
+        <ExcelViewer content={data.content} />
+      </Suspense>
+    </div>
+  )
+}
+
 export const previewRegistry: Record<FileContentType, PreviewRegistryEntry> = {
   binary: { Component: BinaryPreview, supportsRawToggle: false, editable: false },
   image: { Component: ImagePreview, supportsRawToggle: false, editable: false },
@@ -149,4 +171,6 @@ export const previewRegistry: Record<FileContentType, PreviewRegistryEntry> = {
   text: { Component: TextPreview, supportsRawToggle: true, editable: true },
   pdf: { Component: PdfPreview, supportsRawToggle: false, editable: false },
   svg: { Component: SvgPreview, supportsRawToggle: true, editable: false },
+  csv: { Component: CsvPreview, supportsRawToggle: true, editable: false },
+  excel: { Component: ExcelPreview, supportsRawToggle: false, editable: false },
 }

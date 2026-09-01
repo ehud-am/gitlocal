@@ -1796,10 +1796,11 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     })
 }
 
-export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf'; language: string } {
+export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel'; language: string } {
   /* v8 ignore next */
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   if (ext === 'svg') return { type: 'svg', language: 'xml' }
+  if (ext === 'csv') return { type: 'csv', language: '' }
 
   const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'tiff'])
   if (imageExts.has(ext)) return { type: 'image', language: '' }
@@ -1826,11 +1827,12 @@ export function detectFileType(filename: string): { type: 'markdown' | 'json' | 
   if (ext in langMap) return { type: 'text', language: langMap[ext] }
 
   if (ext === 'pdf') return { type: 'pdf', language: '' }
+  if (ext === 'xlsx' || ext === 'xls') return { type: 'excel', language: '' }
 
   const binaryExts = new Set([
     'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'o', 'a',
     'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
-    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'doc', 'docx', 'ppt', 'pptx',
     'mp3', 'mp4', 'wav', 'mov', 'avi', 'mkv',
     'ttf', 'woff', 'woff2', 'eot',
     'pyc', 'class', 'jar', 'war',
