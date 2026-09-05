@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0 - 2026-09-04
+
+- Added PowerPoint preview: `.pptx` files render each slide as a best-effort formatted view (positioned text, background fill, embedded images) with next/previous navigation and a speaker-notes panel, replacing the previous binary-file fallback. Pixel-faithful rendering is not attempted — no free, license-compatible renderer exists for that.
+- Fixed a repository write-path containment gap where a symlink placed at an intermediate path segment could let a file write escape the repository root; the containment check now re-verifies every intermediate segment, not just the final path.
+- Fixed branch-search file-path parsing so filenames containing a colon are no longer misparsed as a branch delimiter.
+- Fixed the changed-files review panel to correctly display renamed files whose paths contain spaces, non-ASCII characters, or quote characters.
+- Fixed the integrated terminal to close non-terminal WebSocket upgrade attempts immediately instead of leaving them open.
+
 ## 0.12.0 - 2026-08-31
 
 - Added CSV file preview: `.csv` files render as a scrollable table with the first row as headers (via lazily-loaded parsing), with a raw/pretty toggle matching Markdown/JSON/SVG, correct handling of quoted fields and embedded commas/newlines, and a clear fallback for malformed or empty files.

@@ -314,6 +314,40 @@ describe('viewer usability repo helpers', () => {
     }
   })
 
+  it('preserves whitespace in renamed changed-file paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      spawnSync('git', ['mv', 'main.ts', 'renamed main.ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      expect(buildChangedFileItems(dir, true)).toContainEqual(expect.objectContaining({
+        path: 'renamed main.ts',
+        sourcePath: 'main.ts',
+        type: 'file',
+        changeState: 'renamed',
+        canOpen: true,
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('preserves non-ASCII and quote characters in renamed changed-file paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      spawnSync('git', ['mv', 'main.ts', 'café "quoted" renamed.ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      expect(buildChangedFileItems(dir, true)).toContainEqual(expect.objectContaining({
+        path: 'café "quoted" renamed.ts',
+        sourcePath: 'main.ts',
+        type: 'file',
+        changeState: 'renamed',
+        canOpen: true,
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
   it('builds a plain-language local-only repository summary', () => {
     const { dir, cleanup } = makeGitRepo()
     try {
@@ -897,6 +931,15 @@ describe('detectFileType', () => {
     expect(xls.language).toBe('')
   })
 
+  it('detects pptx as its own type, not binary, while legacy ppt remains binary', () => {
+    const pptx = detectFileType('deck.pptx')
+    expect(pptx.type).toBe('pptx')
+    expect(pptx.language).toBe('')
+    const ppt = detectFileType('legacy.ppt')
+    expect(ppt.type).toBe('binary')
+    expect(ppt.language).toBe('')
+  })
+
   it('detects json', () => {
     const result = detectFileType('package.json')
     expect(result.type).toBe('json')
@@ -1052,6 +1095,23 @@ describe('working tree helpers', () => {
       expect(() => writeWorkingTreeTextFile(dir, '../escape.txt', 'x')).toThrow(/inside the opened repository/i)
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
     } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects symlinked paths that resolve outside the repository', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const outside = mkdtempSync(join(tmpdir(), 'gitlocal-outside-'))
+    try {
+      symlinkSync(outside, join(dir, 'escape'))
+
+      expect(resolveSafeRepoPath(dir, 'escape/proof.txt')).toBeNull()
+      expect(() => writeWorkingTreeTextFile(dir, 'escape/proof.txt', 'x')).toThrow(/inside the opened repository/i)
+      expect(() => createWorkingTreeFolder(dir, 'escape', 'proof-folder')).toThrow(/inside the repository/i)
+      expect(existsSync(join(outside, 'proof.txt'))).toBe(false)
+      expect(existsSync(join(outside, 'proof-folder'))).toBe(false)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
       cleanup()
     }
   })

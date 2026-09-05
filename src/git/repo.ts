@@ -599,7 +599,25 @@ export function isPathInsideRepo(repoPath: string, filePath: string): boolean {
 export function resolveSafeRepoPath(repoPath: string, filePath: string): string | null {
   if (!filePath) return repoPath
   if (!isPathInsideRepo(repoPath, filePath)) return null
-  return resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
+
+  const fullPath = resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
+  let existingAncestor = fullPath
+  while (!existsSync(existingAncestor)) {
+    const parent = dirname(existingAncestor)
+    if (parent === existingAncestor) return null
+    existingAncestor = parent
+  }
+
+  try {
+    const canonicalRepoPath = realpathSync(repoPath)
+    const canonicalAncestor = realpathSync(existingAncestor)
+    const ancestorRelativePath = relative(canonicalRepoPath, canonicalAncestor)
+    if (ancestorRelativePath.startsWith('..') || isAbsolute(ancestorRelativePath)) return null
+  } catch {
+    return null
+  }
+
+  return fullPath
 }
 
 export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
@@ -1038,14 +1056,15 @@ export function classifyGeneratedLocalState(repoPath: string, filePath: string, 
   return getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only'
 }
 
-function parsePorcelainChangeState(line: string): { path: string; sourcePath: string; changeState: ChangedFileState } {
-  const indexStatus = line[0] ?? ' '
-  const worktreeStatus = line[1] ?? ' '
-  const rawPath = line.slice(3).trim()
-  const [sourcePath = '', destinationPath = ''] = rawPath.split(' -> ')
-  const path = normalizeRepoRelativePath(destinationPath || sourcePath)
+function parsePorcelainChangeState(
+  record: string,
+  sourcePath = '',
+): { path: string; sourcePath: string; changeState: ChangedFileState } {
+  const indexStatus = record[0] ?? ' '
+  const worktreeStatus = record[1] ?? ' '
+  const path = normalizeRepoRelativePath(record.slice(3))
 
-  if (line.startsWith('?? ')) {
+  if (record.startsWith('?? ')) {
     return { path, sourcePath: '', changeState: 'untracked' }
   }
 
@@ -1073,13 +1092,21 @@ function getWorkingTreeChangeDetails(repoPath: string): Array<{
   sourcePath: string
   changeState: ChangedFileState
 }> {
-  const result = runGitCapture(repoPath, 'status', '--porcelain=v1', '-uall')
+  const result = runGitCapture(repoPath, 'status', '--porcelain=v1', '-z', '-uall')
   if (result.status !== 0 || !result.stdout) return []
-  return result.stdout
-    .split('\n')
-    .filter(Boolean)
-    .map(parsePorcelainChangeState)
-    .filter((entry) => Boolean(entry.path))
+  const records = result.stdout.split('\0')
+  const changes: Array<{ path: string; sourcePath: string; changeState: ChangedFileState }> = []
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index]
+    if (!record) continue
+    const renamedOrCopied = record[0] === 'R' || record[1] === 'R' || record[0] === 'C' || record[1] === 'C'
+    const sourcePath = renamedOrCopied ? records[++index] ?? '' : ''
+    const entry = parsePorcelainChangeState(record, sourcePath)
+    if (entry.path) changes.push(entry)
+  }
+
+  return changes
 }
 
 function mapPathTypeForReview(pathType: ReturnType<typeof getPathType>): ChangedFileItem['type'] {
@@ -1796,7 +1823,7 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     })
 }
 
-export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel'; language: string } {
+export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel' | 'pptx'; language: string } {
   /* v8 ignore next */
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   if (ext === 'svg') return { type: 'svg', language: 'xml' }
@@ -1828,11 +1855,12 @@ export function detectFileType(filename: string): { type: 'markdown' | 'json' | 
 
   if (ext === 'pdf') return { type: 'pdf', language: '' }
   if (ext === 'xlsx' || ext === 'xls') return { type: 'excel', language: '' }
+  if (ext === 'pptx') return { type: 'pptx', language: '' }
 
   const binaryExts = new Set([
     'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'o', 'a',
     'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
-    'doc', 'docx', 'ppt', 'pptx',
+    'doc', 'docx', 'ppt',
     'mp3', 'mp4', 'wav', 'mov', 'avi', 'mkv',
     'ttf', 'woff', 'woff2', 'eot',
     'pyc', 'class', 'jar', 'war',

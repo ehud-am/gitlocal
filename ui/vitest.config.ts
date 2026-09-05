@@ -29,6 +29,7 @@ export default defineConfig({
         'src/components/ContentPanel/SvgViewer.tsx',
         'src/components/ContentPanel/CsvViewer.tsx',
         'src/components/ContentPanel/ExcelViewer.tsx',
+        'src/components/ContentPanel/PptxViewer.tsx',
         'src/components/RepoContext/**/*.tsx',
         'src/components/Search/**/*.tsx',
         'src/components/Picker/**/*.tsx',
