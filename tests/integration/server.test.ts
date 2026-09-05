@@ -230,14 +230,24 @@ describe('Server integration', () => {
     })
   })
 
-  it('keeps unresolved explicit launch paths as the requested workspace path', () => {
+  it('falls back to the picker with a safe folder instead of opening a nonexistent workspace path', async () => {
     const missingPath = join(tmpdir(), `gitlocal-missing-workspace-${process.pid}`)
 
-    createApp(missingPath)
+    const app = createApp(missingPath)
 
-    expect(getRepoPath()).toBe(missingPath)
-    expect(getPickerPath()).toBe('')
+    expect(getRepoPath()).toBe('')
+    expect(getPickerPath()).not.toBe('')
+    expect(existsSync(getPickerPath())).toBe(true)
     expect(getStartupOpenTarget()).toBeNull()
+
+    const res = await app.fetch(new Request('http://localhost/api/info'))
+    const body = await res.json() as { pickerMode: boolean }
+    expect(body.pickerMode).toBe(true)
+
+    const startupRes = await app.fetch(new Request('http://localhost/api/startup-folder'))
+    const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
+    expect(startupBody.source).toBe('safe-fallback')
+    expect(startupBody.fallbackReason).toMatch(/no longer exists/i)
   })
 
   it('keeps repository child classification consistent between parent browse and open', async () => {
@@ -921,13 +931,31 @@ describe('Server integration', () => {
     })
   })
 
-  it('GET /api/tree returns the structured PERMISSION_DENIED envelope when the folder cannot be read', async () => {
+  it('createApp falls back to the picker instead of opening a folder that is unreadable from the start', () => {
     if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
 
     const unreadableDir = mkdtempSync(join(tmpdir(), 'gitlocal-unreadable-'))
     chmodSync(unreadableDir, 0o000)
     try {
+      createApp(unreadableDir)
+      expect(getRepoPath()).toBe('')
+      expect(getPickerPath()).not.toBe(unreadableDir)
+    } finally {
+      chmodSync(unreadableDir, 0o755)
+      rmSync(unreadableDir, { recursive: true, force: true })
+    }
+  })
+
+  it('GET /api/tree returns the structured PERMISSION_DENIED envelope when the open folder becomes unreadable mid-session', async () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const unreadableDir = mkdtempSync(join(tmpdir(), 'gitlocal-unreadable-'))
+    try {
+      // Becomes unreadable only *after* createApp already committed to it — simulating a
+      // permission change or drive disconnect during a long-running session, which the
+      // startup-time safe-fallback check (see the test above) cannot catch in advance.
       const app = createApp(unreadableDir)
+      chmodSync(unreadableDir, 0o000)
       const res = await app.fetch(new Request('http://localhost/api/tree'))
       expect(res.status).toBe(500)
       const body = await res.json() as { error: string; code: string }

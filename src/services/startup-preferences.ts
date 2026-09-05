@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { homedir, platform } from 'node:os'
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join, parse as parsePath, resolve } from 'node:path'
+import { homedir, platform, tmpdir } from 'node:os'
 import type {
   DefaultReaderPreference,
   DefaultReaderPreferenceStatus,
@@ -31,10 +31,26 @@ function normalizeDefaultReaderStatus(status: unknown): DefaultReaderPreferenceS
     : 'not-asked'
 }
 
-function isReadableDirectory(path: string): boolean {
+export function isReadableDirectory(path: string): boolean {
   try {
     if (!existsSync(path) || !statSync(path).isDirectory()) return false
     readdirSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// A cheaper liveness probe for a hot path (checked on every /api/info request) that only
+// needs to know "is this still a directory I can access" — not an actual listing. `accessSync`
+// checks the read+execute permission bits without reading directory contents, unlike
+// `isReadableDirectory`'s `readdirSync`, which is unnecessary work to repeat on every request
+// for what's usually a perfectly healthy, unchanged folder. Still correctly reports "gone" or
+// "permission denied" — the two failure modes that actually matter for this check.
+export function isAccessibleDirectory(path: string): boolean {
+  try {
+    if (!statSync(path).isDirectory()) return false
+    accessSync(path, constants.R_OK | constants.X_OK)
     return true
   } catch {
     return false
@@ -49,6 +65,7 @@ function describeUnreadableFolder(path: string): string {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException | undefined)?.code
     if (code === 'EACCES' || code === 'EPERM') return 'Last used folder is no longer accessible (permission denied).'
+    /* v8 ignore next -- other errno codes (e.g. a disconnected network drive) are not practical to simulate in tests */
     return 'Last used folder is currently unreachable — it may be on a disconnected drive.'
   }
 }
@@ -68,6 +85,58 @@ export function getLinuxDocumentsPath(homePath = homedir(), env = process.env): 
 function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
   if (platform() === 'linux') return getLinuxDocumentsPath(homePath, env)
   return join(homePath, 'Documents')
+}
+
+// A directory that is always present and listable regardless of the user's own folder
+// choices — the drive/filesystem root (`/` on macOS and Linux, `C:\` on Windows). Used only
+// as the last resort after Documents, home, cwd, and the OS temp dir have all failed, so that
+// GitLocal can never end up with no readable folder at all to fall back to.
+function filesystemRootPath(fromPath: string): string {
+  return parsePath(resolve(fromPath)).root
+}
+
+// Walks a chain of increasingly platform-guaranteed locations — Documents, home, the process's
+// current working directory, the OS temp directory, and finally the filesystem root — returning
+// the first one that is actually verified readable right now. Every step past "home" is chosen
+// specifically because Node itself depends on it being available (cwd to have started at all,
+// tmpdir for its own temp-file needs), so in practice this only fails in a wholly broken
+// environment, and even then it returns the filesystem root path rather than nothing.
+export function resolveGuaranteedFallbackPath(
+  homePath = homedir(),
+  env = process.env,
+): { path: string; readable: boolean } {
+  const candidates = [getPlatformDocumentsPath(homePath, env), homePath, process.cwd(), tmpdir(), filesystemRootPath(homePath)]
+
+  for (const candidate of candidates) {
+    if (candidate && isReadableDirectory(candidate)) {
+      return { path: canonicalDirectory(candidate), readable: true }
+    }
+  }
+
+  /* v8 ignore next 2 -- every candidate failing (including the filesystem root itself) is not practical to simulate in tests */
+  const last = candidates[candidates.length - 1] ?? resolve('.')
+  return { path: last, readable: false }
+}
+
+// Every "landed on a safe fallback location" call site (initial startup, a mid-session
+// self-heal, or a parent-folder walk that ran out of readable ancestors) builds the same
+// StartupFolderResolution shape — only the fallback location, the explanatory reason, and
+// which prior resolution's platformDefaultPath/lastUsedPath to carry forward differ. Sharing
+// this in one place means a future change to the shape only needs to happen once.
+export function buildSafeFallbackResolution(
+  fallback: { path: string; readable: boolean },
+  fallbackReason: string,
+  carryForward: { platformDefaultPath: string; lastUsedPath: string },
+): StartupFolderResolution {
+  return {
+    path: fallback.path,
+    source: 'safe-fallback',
+    exists: fallback.readable,
+    readable: fallback.readable,
+    platformDefaultPath: carryForward.platformDefaultPath,
+    lastUsedPath: carryForward.lastUsedPath,
+    fallbackReason,
+  }
 }
 
 export function readStartupFolderPreference(path = defaultPreferencePath()): StartupFolderPreference | null {
@@ -186,15 +255,30 @@ export function resolveStartupFolder(options: {
     }
   }
 
-  const homeReadable = isReadableDirectory(homePath)
+  if (isReadableDirectory(homePath)) {
+    return {
+      path: canonicalDirectory(homePath),
+      source: 'home-fallback',
+      exists: true,
+      readable: true,
+      platformDefaultPath,
+      lastUsedPath: preference?.path ?? '',
+      fallbackReason: 'Platform Documents folder is unavailable.',
+    }
+  }
+
+  // Both the platform Documents folder and the home directory have failed — fall further back
+  // to a location that is virtually guaranteed to exist and be readable on every platform,
+  // rather than returning an unreadable path with nowhere left to go (see resolveGuaranteedFallbackPath).
+  const guaranteed = resolveGuaranteedFallbackPath(homePath, options.env ?? process.env)
   return {
-    path: homeReadable ? canonicalDirectory(homePath) : resolve(homePath),
-    source: 'home-fallback',
-    exists: homeReadable,
-    readable: homeReadable,
+    path: guaranteed.path,
+    source: 'safe-fallback',
+    exists: guaranteed.readable,
+    readable: guaranteed.readable,
     platformDefaultPath,
     lastUsedPath: preference?.path ?? '',
-    fallbackReason: homeReadable ? 'Platform Documents folder is unavailable.' : 'Home folder is unavailable.',
+    fallbackReason: 'Home folder is unavailable — opened a safe fallback location instead.',
   }
 }
 

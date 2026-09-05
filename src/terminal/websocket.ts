@@ -24,6 +24,8 @@ export function attachTerminalWebSocketServer(httpServer: HttpServer): WebSocket
     const pathname = new URL(request.url ?? '', 'http://localhost').pathname
     const match = TERMINAL_IO_PATH.exec(pathname)
     if (!match) {
+      socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+      socket.destroy()
       return
     }
 

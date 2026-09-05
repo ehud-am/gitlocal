@@ -74,6 +74,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
     if (startupSource === 'last-used') return 'GitLocal reopened your last used folder.'
     if (startupSource === 'platform-default') return startupFallbackReason || 'GitLocal started from your Documents folder.'
     if (startupSource === 'home-fallback') return startupFallbackReason || 'GitLocal started from your home folder.'
+    if (startupSource === 'safe-fallback') return startupFallbackReason || 'GitLocal opened a safe fallback location.'
     return ''
   }, [startupFallbackReason, startupSource])
 

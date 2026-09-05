@@ -86,7 +86,7 @@ export interface LocalPathClassification {
   message?: string
 }
 
-export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
+export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback' | 'safe-fallback'
 export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
 export type StartupOpenSource = 'explicit-launch' | 'native-file-open' | 'picker-open' | 'repo-open'
 export type StartupOpenStatus = 'pending' | 'accepted' | 'blocked' | 'failed'
@@ -259,7 +259,7 @@ export interface TreeNode {
 }
 
 export type FileEncoding = 'utf-8' | 'base64' | 'none'
-export type FileContentType = 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel'
+export type FileContentType = 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel' | 'pptx'
 
 export interface FileContent {
   path: string

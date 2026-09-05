@@ -124,7 +124,7 @@ function searchGitTreeByName(repoPath: string, branch: string, query: string, ca
 }
 
 function searchGitTreeByContent(repoPath: string, branch: string, query: string, caseSensitive: boolean): SearchResult[] {
-  const args = ['grep', '-n']
+  const args = ['grep', '-n', '-z']
   if (!caseSensitive) args.push('-i')
   args.push(query, branch)
 
@@ -135,15 +135,33 @@ function searchGitTreeByContent(repoPath: string, branch: string, query: string,
     return []
   }
 
-  return output
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [, path, lineNoText, ...snippetParts] = line.split(':')
-      const snippet = snippetParts.join(':').trim()
-      const lineNo = Number(lineNoText)
-      return { path, type: 'file', matchType: 'content' as const, line: lineNo, snippet, localOnly: false }
-    })
+  const results: SearchResult[] = []
+  let remaining = output
+  while (remaining) {
+    const pathEnd = remaining.indexOf('\0')
+    if (pathEnd === -1) break
+    const lineEnd = remaining.indexOf('\0', pathEnd + 1)
+    if (lineEnd === -1) break
+    const newlineIndex = remaining.indexOf('\n', lineEnd + 1)
+    const snippetEnd = newlineIndex === -1 ? remaining.length : newlineIndex
+
+    const treeishPath = remaining.slice(0, pathEnd)
+    const lineNo = Number(remaining.slice(pathEnd + 1, lineEnd))
+    const snippet = remaining.slice(lineEnd + 1, snippetEnd).trim()
+    const prefix = `${branch}:`
+    if (treeishPath.startsWith(prefix) && Number.isFinite(lineNo)) {
+      results.push({
+        path: treeishPath.slice(prefix.length),
+        type: 'file',
+        matchType: 'content',
+        line: lineNo,
+        snippet,
+        localOnly: false,
+      })
+    }
+    remaining = newlineIndex === -1 ? '' : remaining.slice(snippetEnd + 1)
+  }
+  return results
 }
 
 export async function searchHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

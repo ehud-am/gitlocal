@@ -126,21 +126,65 @@ describe('infoHandler', () => {
     }
   })
 
-  it('returns a structured error instead of a fake zero rootEntryCount when a plain folder root cannot be read', async () => {
+  it('recovers into picker mode with a clear message on the second consecutive check, tolerating one transient read failure first', async () => {
     if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
 
     const folder = mkdtempSync(join(tmpdir(), 'gitlocal-info-unreadable-'))
-    chmodSync(folder, 0o000)
+    try {
+      // Becomes unreadable only *after* createApp already committed to it — simulating a
+      // permission change during a long-running session. (An unreadable folder passed directly
+      // to createApp is now caught even earlier, at startup — see server.test.ts.)
+      const app = createApp(folder)
+      chmodSync(folder, 0o000)
+      const client = testClient(app)
+
+      // First check: the directory still exists, so a single failed readability check is
+      // treated as possibly transient and does not yet self-heal — this preserves the
+      // pre-existing FR-004 guard (a real read failure surfaces as a request failure, never a
+      // fake rootEntryCount: 0) for exactly one blip.
+      const firstRes = await client.api.info.$get()
+      expect(firstRes.status).toBe(500)
+      const firstBody = await firstRes.json() as { code: string }
+      expect(firstBody.code).toBe('PERMISSION_DENIED')
+
+      // Second consecutive check against the same still-unreadable path: now recovers into
+      // picker mode instead of failing (or faking) forever. The explanation lives in the
+      // startup-folder resolution snapshot (read via GET /api/startup-folder, same channel
+      // every other fallback path in this feature uses), not an inline field on this response.
+      const secondRes = await client.api.info.$get()
+      expect(secondRes.status).toBe(200)
+      const secondBody = await secondRes.json() as { pickerMode: boolean }
+      expect(secondBody.pickerMode).toBe(true)
+
+      const startupRes = await client.api['startup-folder'].$get()
+      const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
+      expect(startupBody.source).toBe('safe-fallback')
+      expect(startupBody.fallbackReason).toMatch(/no longer readable/i)
+    } finally {
+      chmodSync(folder, 0o755)
+      rmSync(folder, { recursive: true, force: true })
+    }
+  })
+
+  it('resets the unreadable-path streak once the folder becomes readable again', async () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const folder = mkdtempSync(join(tmpdir(), 'gitlocal-info-flaky-'))
     try {
       const app = createApp(folder)
+      chmodSync(folder, 0o000)
       const client = testClient(app)
-      const res = await client.api.info.$get()
 
-      // Regression guard for FR-004: a real read failure must surface as a request failure,
-      // never as a successful response reporting rootEntryCount: 0 indistinguishable from empty.
-      expect(res.status).toBe(500)
-      const body = await res.json() as { error: string; code: string }
-      expect(body.code).toBe('PERMISSION_DENIED')
+      // One transient failure, then recovery before a second consecutive failure — should not
+      // trip the self-heal, and a later unrelated failure should require two fresh consecutive
+      // hits again rather than inheriting the earlier, now-stale count.
+      expect((await client.api.info.$get()).status).toBe(500)
+      chmodSync(folder, 0o755)
+      expect((await client.api.info.$get()).status).toBe(200)
+
+      chmodSync(folder, 0o000)
+      const secondBlipRes = await client.api.info.$get()
+      expect(secondBlipRes.status).toBe(500)
     } finally {
       chmodSync(folder, 0o755)
       rmSync(folder, { recursive: true, force: true })
@@ -457,6 +501,33 @@ describe('repositoryParentFolderHandler', () => {
       ok: false,
       error: 'GitLocal is already at the root of the file system.',
     })
+  })
+
+  it('walks past an unreadable immediate parent to the nearest readable ancestor', async () => {
+    if (platform() === 'win32') return // chmod-based permission denial is not meaningful on Windows
+
+    const grandparent = mkdtempSync(join(tmpdir(), 'gitlocal-parent-walk-'))
+    const middle = join(grandparent, 'middle')
+    const child = join(middle, 'child')
+    mkdirSync(child, { recursive: true })
+    // Execute-only: traversal into `child` still works, but `middle` itself can't be listed —
+    // unlike 0o000, which would also block traversal and make `child` itself unreachable.
+    chmodSync(middle, 0o111)
+
+    try {
+      const app = createApp(child)
+      const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true, error: '' })
+
+      const infoRes = await app.fetch(new Request('http://localhost/api/info'))
+      const infoBody = await infoRes.json() as { pickerMode: boolean; path: string }
+      expect(infoBody.pickerMode).toBe(true)
+      expect(infoBody.path).toBe(realpathSync(grandparent))
+    } finally {
+      chmodSync(middle, 0o755)
+      rmSync(grandparent, { recursive: true, force: true })
+    }
   })
 })
 

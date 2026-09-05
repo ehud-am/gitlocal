@@ -51,7 +51,7 @@ import {
   terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
 import { classifyLocalPath } from './git/repo.js'
-import { resolveStartupFolder } from './services/startup-preferences.js'
+import { buildSafeFallbackResolution, isReadableDirectory, resolveGuaranteedFallbackPath, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
@@ -99,6 +99,13 @@ export function getStartupOpenTarget(): StartupOpenTarget | null {
 // fresh when no snapshot was captured (e.g. direct handler/unit tests).
 export function getStartupFolderResolution(): StartupFolderResolution {
   return currentStartupFolderResolution ?? resolveStartupFolder()
+}
+
+// Lets a request-time recovery (e.g. infoHandler discovering the open folder vanished mid-
+// session) update the same resolution snapshot the picker's "why am I here" banner reads from,
+// without duplicating that banner logic against a second source of truth.
+export function setStartupFolderResolution(resolution: StartupFolderResolution): void {
+  currentStartupFolderResolution = resolution
 }
 
 const FS_ERROR_CODE_MAP: Record<string, string> = {
@@ -226,8 +233,22 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
       return
     }
     if (options.initialOpenSource) {
+      // process.cwd() is virtually always readable, but not guaranteed (e.g. it was deleted
+      // out from under the running process) — fall further back rather than repeating the
+      // same "landed on something unreadable" problem this whole function exists to avoid.
+      const cwdFallback = isReadableDirectory(process.cwd()) ? { path: process.cwd(), readable: true } : resolveGuaranteedFallbackPath()
       currentRepoPath = ''
-      currentPickerPath = process.cwd()
+      currentPickerPath = cwdFallback.path
+      // Reaching this branch already means the requested open target was rejected above
+      // (not `status === 'accepted'` with a `rootPath`), so it's always worth explaining why.
+      currentStartupFolderResolution = buildSafeFallbackResolution(
+        cwdFallback,
+        target.message || 'The requested path could not be opened — opened a safe fallback location instead.',
+        {
+          platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
+          lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+        },
+      )
       return
     }
   }
@@ -238,8 +259,30 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
     return
   }
 
-  currentRepoPath = classification.canonicalPath || resolvedPath
-  currentPickerPath = ''
+  const candidatePath = classification.canonicalPath || resolvedPath
+  if (classification.exists && classification.pathType === 'directory' && isReadableDirectory(candidatePath)) {
+    currentRepoPath = candidatePath
+    currentPickerPath = ''
+    return
+  }
+
+  // The requested folder is gone, was renamed, became a file, or is no longer readable
+  // (a deleted/renamed "last used" folder, an unmounted drive, a permission change) — landing
+  // on it anyway would silently render as an empty, non-git folder with no explanation. Fall
+  // back to a location that is always readable instead, and record why for the picker's banner.
+  const fallback = resolveGuaranteedFallbackPath()
+  currentRepoPath = ''
+  currentPickerPath = fallback.path
+  currentStartupFolderResolution = buildSafeFallbackResolution(
+    fallback,
+    classification.exists
+      ? 'The requested folder is no longer readable — opened a safe fallback location instead.'
+      : 'The requested folder no longer exists — opened a safe fallback location instead.',
+    {
+      platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
+      lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+    },
+  )
 }
 
 export function createApp(initialRepoPath: string, options: CreateAppOptions = {}): Hono<{ Variables: AppVariables }> {
