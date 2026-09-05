@@ -1,9 +1,17 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import * as XLSX from 'xlsx'
 import { previewRegistry, type PreviewComponentProps } from './preview-registry'
 import { parseJsonTree } from './json-tree'
 import type { FileContent, FileContentType } from '../../types'
+
+// See ExcelViewer.test.tsx: `new URL('...', import.meta.url)` is rewritten by Vite's import
+// analysis, breaking a plain Node fs read at test time — resolve against the Vitest cwd instead.
+function fixtureBase64(name: string): string {
+  return readFileSync(join(process.cwd(), 'src/test-fixtures', name)).toString('base64')
+}
 
 vi.mock('./PdfViewer', () => ({
   default: () => <div data-testid="pdf-viewer-stub" />,
@@ -51,6 +59,7 @@ describe('previewRegistry', () => {
       svg: { supportsRawToggle: true, editable: false },
       csv: { supportsRawToggle: true, editable: false },
       excel: { supportsRawToggle: false, editable: false },
+      pptx: { supportsRawToggle: false, editable: false },
     }
 
     for (const [type, flags] of Object.entries(expectedFlags) as [FileContentType, { supportsRawToggle: boolean; editable: boolean }][]) {
@@ -210,6 +219,15 @@ describe('previewRegistry', () => {
     render(<Component {...baseProps(data)} />)
     await waitFor(() => {
       expect(screen.getByRole('columnheader', { name: 'a' })).toBeInTheDocument()
+    }, { timeout: 5000 })
+  })
+
+  it('renders PptxViewer as a formatted slide view for pptx', async () => {
+    const data = makeFileContent('pptx', { content: fixtureBase64('sample.pptx'), encoding: 'base64' })
+    const Component = previewRegistry.pptx.Component
+    render(<Component {...baseProps(data)} />)
+    await waitFor(() => {
+      expect(screen.getByText('Slide One Title')).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 })

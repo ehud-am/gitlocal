@@ -1109,6 +1109,23 @@ describe('App', () => {
     })
   })
 
+  it('also refetches the startup-folder resolution on a manual Refresh', async () => {
+    // Window-refocus refetching is disabled globally (main.tsx), so a manual Refresh is the
+    // only realistic trigger that can pick up a startup-folder resolution change caused by a
+    // mid-session self-heal (recoverIfRepoPathUnavailable) — this guards that it actually does.
+    window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
+    renderWithClient()
+
+    await screen.findByText('guide content')
+    vi.mocked(api.getStartupFolder).mockClear()
+
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, altKey: true })
+
+    await waitFor(() => {
+      expect(api.getStartupFolder).toHaveBeenCalled()
+    })
+  })
+
   it('toggles the theme and persists the preference', async () => {
     renderWithClient()
 

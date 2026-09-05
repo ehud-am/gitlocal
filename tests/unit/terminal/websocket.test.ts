@@ -58,8 +58,8 @@ function fakeHttpServer() {
   return new EventEmitter() as EventEmitter & { on: EventEmitter['on'] }
 }
 
-function emitUpgrade(httpServer: EventEmitter, path: string) {
-  httpServer.emit('upgrade', { url: path }, {}, Buffer.alloc(0))
+function emitUpgrade(httpServer: EventEmitter, path: string, socket: object = {}) {
+  httpServer.emit('upgrade', { url: path }, socket, Buffer.alloc(0))
 }
 
 describe('attachTerminalWebSocketServer', () => {
@@ -77,22 +77,27 @@ describe('attachTerminalWebSocketServer', () => {
     expect(serverConstructorOptions).toEqual([{ noServer: true, maxPayload: 64 * 1024 }])
   })
 
-  it('ignores upgrade requests whose path does not match the terminal io route', () => {
+  it('rejects upgrade requests whose path does not match the terminal io route', () => {
     const httpServer = fakeHttpServer()
     attachTerminalWebSocketServer(httpServer as never)
+    const socket = { write: vi.fn(), destroy: vi.fn() }
 
-    emitUpgrade(httpServer, '/api/other')
+    emitUpgrade(httpServer, '/api/other', socket)
 
     expect(createdSockets).toHaveLength(0)
+    expect(socket.write).toHaveBeenCalledWith('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+    expect(socket.destroy).toHaveBeenCalledOnce()
   })
 
   it('treats a missing request url as the root path and finds no route match', () => {
     const httpServer = fakeHttpServer()
     attachTerminalWebSocketServer(httpServer as never)
+    const socket = { write: vi.fn(), destroy: vi.fn() }
 
-    httpServer.emit('upgrade', {}, {}, Buffer.alloc(0))
+    httpServer.emit('upgrade', {}, socket, Buffer.alloc(0))
 
     expect(createdSockets).toHaveLength(0)
+    expect(socket.destroy).toHaveBeenCalledOnce()
   })
 
   it('closes the socket with 1011 when the session id is unknown', () => {

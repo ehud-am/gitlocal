@@ -25,6 +25,7 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   writeFileSync(join(dir, 'spec.pdf'), Buffer.from('%PDF-1.4\n%fake binary pdf bytes\n', 'utf-8'))
   writeFileSync(join(dir, 'data.csv'), 'Name,Role\nAda,Engineer\n')
   writeFileSync(join(dir, 'report.xlsx'), Buffer.from('PK\x03\x04fake xlsx bytes', 'utf-8'))
+  writeFileSync(join(dir, 'deck.pptx'), Buffer.from('PK\x03\x04fake pptx bytes', 'utf-8'))
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
@@ -305,6 +306,19 @@ describe('manual file operation handlers', () => {
     expect(excelRes.status).toBe(400)
     const excelBody = await excelRes.json()
     expect(excelBody.message).toContain('Only text files can be edited inline.')
+
+    const pptxRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'deck.pptx',
+        content: 'not a pptx',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(pptxRes.status).toBe(400)
+    const pptxBody = await pptxRes.json()
+    expect(pptxBody.message).toContain('Only text files can be edited inline.')
   })
 
   it('rejects stale updates through PUT /api/file', async () => {
@@ -712,6 +726,19 @@ describe('fileHandler', () => {
     const res = await client.api.file.$get({ query: { path: 'report.xlsx', branch } })
     const body = await res.json()
     expect(body.type).toBe('excel')
+    expect(body.encoding).toBe('base64')
+    expect(body.language).toBe('')
+    expect(body.content.length).toBeGreaterThan(0)
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns pptx type with base64 encoding and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'deck.pptx', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('pptx')
     expect(body.encoding).toBe('base64')
     expect(body.language).toBe('')
     expect(body.content.length).toBeGreaterThan(0)

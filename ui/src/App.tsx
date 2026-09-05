@@ -479,7 +479,12 @@ export default function App() {
     setTreeRefreshToken((value) => value + 1)
 
     try {
-      await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
+      // 'startup-folder' isn't part of WORKSPACE_QUERY_KEYS (kept separate from the open-target
+      // acceptance flow that also uses that list) because a manual Refresh is the only realistic
+      // trigger for it — window refocus refetching is disabled globally (see main.tsx), and this
+      // query only changes as a side effect of a self-heal (recoverIfRepoPathUnavailable) that a
+      // Refresh may have just caused by re-fetching 'info'.
+      await Promise.all([invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS), queryClient.invalidateQueries({ queryKey: ['startup-folder'] })])
       setStatusMessage('Current view refreshed.')
     } finally {
       nativeRefreshPendingRef.current = false

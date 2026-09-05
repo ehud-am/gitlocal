@@ -179,6 +179,19 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json(response)
   }
 
+  if (type === 'pptx') {
+    const response: FileContent = {
+      path,
+      content: rawBytes.toString('base64'),
+      encoding: 'base64',
+      type: 'pptx',
+      language: '',
+      editable: false,
+      revisionToken: editableState.revisionToken,
+    }
+    return c.json(response)
+  }
+
   const response: FileContent = {
     path,
     content: rawBytes.toString('utf-8'),

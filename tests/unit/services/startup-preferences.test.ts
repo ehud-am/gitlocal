@@ -7,6 +7,7 @@ import {
   readDefaultReaderPreference,
   readStartupFolderPreference,
   rememberStartupFolder,
+  resolveGuaranteedFallbackPath,
   resolveStartupFolder,
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
@@ -182,11 +183,27 @@ describe('startup preferences', () => {
         homePath: missingHome,
         env: { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') },
       })
-      expect(resolution.source).toBe('home-fallback')
-      expect(resolution.path).toBe(missingHome)
-      expect(resolution.exists).toBe(false)
-      expect(resolution.readable).toBe(false)
-      expect(resolution.fallbackReason).toBe('Home folder is unavailable.')
+      // Documents and home both fail, so the guaranteed-fallback chain continues further —
+      // to the process's own cwd, which is readable in this test environment — rather than
+      // stopping at an unreadable home folder with nowhere left to go.
+      expect(resolution.source).toBe('safe-fallback')
+      expect(resolution.path).toBe(realpathSync(process.cwd()))
+      expect(resolution.exists).toBe(true)
+      expect(resolution.readable).toBe(true)
+      expect(resolution.fallbackReason).toBe('Home folder is unavailable — opened a safe fallback location instead.')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('resolveGuaranteedFallbackPath skips unreadable Documents and home folders, landing on a readable one further down the chain', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-guaranteed-fallback-'))
+    const missingHome = join(home, 'no-such-home')
+
+    try {
+      const fallback = resolveGuaranteedFallbackPath(missingHome, { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') })
+      expect(fallback.readable).toBe(true)
+      expect(fallback.path).toBe(realpathSync(process.cwd()))
     } finally {
       rmSync(home, { recursive: true, force: true })
     }

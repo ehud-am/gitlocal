@@ -314,6 +314,40 @@ describe('viewer usability repo helpers', () => {
     }
   })
 
+  it('preserves whitespace in renamed changed-file paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      spawnSync('git', ['mv', 'main.ts', 'renamed main.ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      expect(buildChangedFileItems(dir, true)).toContainEqual(expect.objectContaining({
+        path: 'renamed main.ts',
+        sourcePath: 'main.ts',
+        type: 'file',
+        changeState: 'renamed',
+        canOpen: true,
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('preserves non-ASCII and quote characters in renamed changed-file paths', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      spawnSync('git', ['mv', 'main.ts', 'café "quoted" renamed.ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      expect(buildChangedFileItems(dir, true)).toContainEqual(expect.objectContaining({
+        path: 'café "quoted" renamed.ts',
+        sourcePath: 'main.ts',
+        type: 'file',
+        changeState: 'renamed',
+        canOpen: true,
+      }))
+    } finally {
+      cleanup()
+    }
+  })
+
   it('builds a plain-language local-only repository summary', () => {
     const { dir, cleanup } = makeGitRepo()
     try {
@@ -897,6 +931,15 @@ describe('detectFileType', () => {
     expect(xls.language).toBe('')
   })
 
+  it('detects pptx as its own type, not binary, while legacy ppt remains binary', () => {
+    const pptx = detectFileType('deck.pptx')
+    expect(pptx.type).toBe('pptx')
+    expect(pptx.language).toBe('')
+    const ppt = detectFileType('legacy.ppt')
+    expect(ppt.type).toBe('binary')
+    expect(ppt.language).toBe('')
+  })
+
   it('detects json', () => {
     const result = detectFileType('package.json')
     expect(result.type).toBe('json')
@@ -967,6 +1010,7 @@ describe('working tree helpers', () => {
       expect(getPathType(dir, 'docs')).toBe('dir')
       expect(getPathType(dir, 'README.md')).toBe('file')
       expect(getPathType(dir, 'missing/file.md')).toBe('missing')
+      expect(getPathType(dir, '../escape.txt')).toBe('missing')
       expect(nearestExistingRepoPath(dir, 'docs/missing/file.md')).toBe('docs')
       expect(nearestExistingRepoPath(dir, 'README.md')).toBe('README.md')
       expect(nearestExistingRepoPath(dir, 'missing/file.md')).toBe('')
@@ -1052,6 +1096,47 @@ describe('working tree helpers', () => {
       expect(() => writeWorkingTreeTextFile(dir, '../escape.txt', 'x')).toThrow(/inside the opened repository/i)
       expect(() => deleteWorkingTreeFile(dir, '../escape.txt')).toThrow(/inside the opened repository/i)
     } finally {
+      cleanup()
+    }
+  })
+
+  it('rejects symlinked paths that resolve outside the repository', () => {
+    const { dir, cleanup } = makeGitRepo()
+    const outside = mkdtempSync(join(tmpdir(), 'gitlocal-outside-'))
+    try {
+      symlinkSync(outside, join(dir, 'escape'))
+
+      expect(resolveSafeRepoPath(dir, 'escape/proof.txt')).toBeNull()
+      expect(() => writeWorkingTreeTextFile(dir, 'escape/proof.txt', 'x')).toThrow(/inside the opened repository/i)
+      expect(() => createWorkingTreeFolder(dir, 'escape', 'proof-folder')).toThrow(/inside the repository/i)
+      expect(existsSync(join(outside, 'proof.txt'))).toBe(false)
+      expect(existsSync(join(outside, 'proof-folder'))).toBe(false)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+      cleanup()
+    }
+  })
+
+  it('getPathType classifies through a symlinked ancestor without the write-path escape re-check, since it never mutates anything', () => {
+    // getPathType (used by buildChangedFileItems' per-changed-file classification, among
+    // others) intentionally skips resolveSafeRepoPath's per-segment symlink-escape re-check for
+    // performance — it's read-only, and every actual write (writeWorkingTreeTextFile,
+    // createWorkingTreeFolder, deleteWorkingTreeFile) independently re-resolves and re-checks
+    // containment right before mutating, so this can't be used to bypass the write-path guard
+    // the previous test above ("rejects symlinked paths that resolve outside the repository")
+    // covers. This test documents that getPathType simply reports what a symlink resolves to
+    // rather than rejecting it — a deliberate, scoped difference from resolveSafeRepoPath.
+    const { dir, cleanup } = makeGitRepo()
+    const outside = mkdtempSync(join(tmpdir(), 'gitlocal-outside-'))
+    try {
+      writeFileSync(join(outside, 'proof.txt'), 'x')
+      symlinkSync(outside, join(dir, 'escape'))
+
+      expect(resolveSafeRepoPath(dir, 'escape/proof.txt')).toBeNull()
+      expect(getPathType(dir, 'escape/proof.txt')).toBe('file')
+      expect(() => writeWorkingTreeTextFile(dir, 'escape/proof.txt', 'y')).toThrow(/inside the opened repository/i)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
       cleanup()
     }
   })
@@ -1912,6 +1997,21 @@ describe('working tree helpers', () => {
       expect(getWorkingTreeChanges(dir)).toEqual({
         trackedPaths: ['main.ts'],
         untrackedPaths: ['scratch.txt'],
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('reports the destination path (not a mangled rename-arrow split) for a renamed file with a non-ASCII, quote-containing name', () => {
+    const { dir, cleanup } = makeGitRepo()
+
+    try {
+      spawnSync('git', ['mv', 'main.ts', 'café "renamed".ts'], { cwd: dir, env: isolatedGitEnv() })
+
+      expect(getWorkingTreeChanges(dir)).toEqual({
+        trackedPaths: ['café "renamed".ts'],
+        untrackedPaths: [],
       })
     } finally {
       cleanup()

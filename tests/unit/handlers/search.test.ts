@@ -15,8 +15,9 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   mkdirSync(join(dir, 'docs'))
   writeFileSync(join(dir, 'README.md'), '# Hello Search')
   writeFileSync(join(dir, 'docs', 'guide.md'), 'Searchable line\nAnother Line')
-  writeFileSync(join(dir, 'docs', 'plain.txt'), 'scope-token in plain text')
-  writeFileSync(join(dir, 'docs', 'scoped.md'), 'scope-token in markdown')
+    writeFileSync(join(dir, 'docs', 'plain.txt'), 'scope-token in plain text')
+    writeFileSync(join(dir, 'docs', 'scoped.md'), 'scope-token in markdown')
+    writeFileSync(join(dir, 'docs', 'a:b.md'), 'colon filename content')
   mkdirSync(join(dir, 'src'))
   writeFileSync(join(dir, 'src', 'scoped.ts'), 'scope-token in source')
   writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
@@ -147,6 +148,19 @@ describe('searchHandler', () => {
 
     expect((await nameRes.json()).results.some((result: { path: string }) => result.path === 'docs/feature.md')).toBe(true)
     expect((await contentRes.json()).results[0].path).toBe('docs/feature.md')
+  })
+
+  it('preserves colons in non-current branch content-search paths', async () => {
+    const client = testClient(createApp(dir))
+    const res = await client.api.search.$get({
+      query: { query: 'colon filename content', branch: 'feature-search', mode: 'content' },
+    })
+
+    expect((await res.json()).results).toContainEqual(expect.objectContaining({
+      path: 'docs/a:b.md',
+      line: 1,
+      snippet: 'colon filename content',
+    }))
   })
 
   it('returns matching directories for non-current branch name searches', async () => {
