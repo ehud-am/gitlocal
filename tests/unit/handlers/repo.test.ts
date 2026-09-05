@@ -148,12 +148,18 @@ describe('infoHandler', () => {
       expect(firstBody.code).toBe('PERMISSION_DENIED')
 
       // Second consecutive check against the same still-unreadable path: now recovers into
-      // picker mode with an explanatory message instead of failing (or faking) forever.
+      // picker mode instead of failing (or faking) forever. The explanation lives in the
+      // startup-folder resolution snapshot (read via GET /api/startup-folder, same channel
+      // every other fallback path in this feature uses), not an inline field on this response.
       const secondRes = await client.api.info.$get()
       expect(secondRes.status).toBe(200)
-      const secondBody = await secondRes.json() as { pickerMode: boolean; message?: string }
+      const secondBody = await secondRes.json() as { pickerMode: boolean }
       expect(secondBody.pickerMode).toBe(true)
-      expect(secondBody.message).toMatch(/no longer readable/i)
+
+      const startupRes = await client.api['startup-folder'].$get()
+      const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
+      expect(startupBody.source).toBe('safe-fallback')
+      expect(startupBody.fallbackReason).toMatch(/no longer readable/i)
     } finally {
       chmodSync(folder, 0o755)
       rmSync(folder, { recursive: true, force: true })

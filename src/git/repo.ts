@@ -620,9 +620,24 @@ export function resolveSafeRepoPath(repoPath: string, filePath: string): string 
   return fullPath
 }
 
+// A cheaper resolution for read-only path classification: keeps resolveSafeRepoPath's lexical
+// `../`-escape guard (isPathInsideRepo, pure string comparison) but skips its per-segment
+// existsSync-walk + realpathSync symlink-escape re-check — the check that actually matters for
+// write operations (see writeWorkingTreeTextFile/createWorkingTreeFolder/deleteWorkingTreeFile,
+// which each re-resolve via the full resolveSafeRepoPath independently right before mutating
+// anything). getPathType is read-only classification only, so a symlinked ancestor at worst
+// changes what "type" gets reported for a path GitLocal never writes through this call — it
+// does not weaken the write-path containment guarantee, which is re-checked at write time
+// regardless of what any earlier getPathType call returned.
+function resolveClassificationPath(repoPath: string, filePath: string): string | null {
+  if (!filePath) return repoPath
+  if (!isPathInsideRepo(repoPath, filePath)) return null
+  return resolveRepoPath(repoPath, normalizeRepoRelativePath(filePath))
+}
+
 export function getPathType(repoPath: string, filePath: string): 'file' | 'dir' | 'missing' | 'none' {
   if (!filePath) return 'none'
-  const fullPath = resolveSafeRepoPath(repoPath, filePath)
+  const fullPath = resolveClassificationPath(repoPath, filePath)
   if (!fullPath) return 'missing'
   if (!existsSync(fullPath)) return 'missing'
   const stats = statSync(fullPath)
@@ -865,27 +880,21 @@ export function getWorkingTreeRevision(repoPath: string): string {
   return hash.digest('hex')
 }
 
-function extractPorcelainPath(line: string): string {
-  const candidate = line.slice(3).trim().split(' -> ').at(-1) ?? ''
-  return candidate.replace(/^"/, '').replace(/"$/, '')
-}
-
 export function getWorkingTreeChanges(repoPath: string): WorkingTreeChangeSummary {
-  const result = runGitCapture(repoPath, 'status', '--porcelain=v1', '-uall')
-  if (result.status !== 0 || !result.stdout) {
-    return { trackedPaths: [], untrackedPaths: [] }
-  }
-
+  // Shares getWorkingTreeChangeDetails's NUL-delimited (`-z`) git status parsing rather than
+  // its own newline/`' -> '`-splitting logic — the latter mis-parses a renamed, non-ASCII, or
+  // quote-containing filename the same way getWorkingTreeChangeDetails used to before that was
+  // fixed, silently corrupting this function's contribution to getWorkingTreeRevision's cache
+  // key for any such filename.
   const trackedPaths: string[] = []
   const untrackedPaths: string[] = []
 
-  for (const line of result.stdout.split('\n').filter(Boolean)) {
-    if (line.startsWith('?? ')) {
-      untrackedPaths.push(extractPorcelainPath(line))
-      continue
+  for (const change of getWorkingTreeChangeDetails(repoPath)) {
+    if (change.changeState === 'untracked') {
+      untrackedPaths.push(change.path)
+    } else {
+      trackedPaths.push(change.path)
     }
-
-    trackedPaths.push(extractPorcelainPath(line))
   }
 
   return {

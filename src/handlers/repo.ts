@@ -27,6 +27,8 @@ import {
 } from '../git/repo.js'
 import { getStartupFolderResolution, getStartupOpenTarget, setPickerPath, setRepoPath, setStartupFolderResolution } from '../server.js'
 import {
+  buildSafeFallbackResolution,
+  isAccessibleDirectory,
   isReadableDirectory,
   readDefaultReaderPreference,
   rememberStartupFolder,
@@ -51,7 +53,7 @@ import type {
 
 type Variables = { repoPath: string; pickerPath: string }
 
-function pickerModeResponse(path: string, message?: string): Record<string, unknown> {
+function pickerModeResponse(path: string): Record<string, unknown> {
   return {
     name: '',
     path,
@@ -62,7 +64,6 @@ function pickerModeResponse(path: string, message?: string): Record<string, unkn
     hasCommits: false,
     rootEntryCount: 0,
     gitContext: null,
-    ...(message ? { message } : {}),
   }
 }
 
@@ -89,7 +90,7 @@ let unreadableRepoPathStreak = { path: '', count: 0 }
 function recoverIfRepoPathUnavailable(repoPath: string): string {
   if (!repoPath) return ''
   const classification = classifyLocalPath(repoPath)
-  if (classification.exists && classification.pathType === 'directory' && isReadableDirectory(repoPath)) {
+  if (classification.exists && classification.pathType === 'directory' && isAccessibleDirectory(repoPath)) {
     unreadableRepoPathStreak = { path: '', count: 0 }
     return ''
   }
@@ -105,17 +106,13 @@ function recoverIfRepoPathUnavailable(repoPath: string): string {
   setRepoPath('')
   setPickerPath(fallback.path)
   const previous = getStartupFolderResolution()
-  setStartupFolderResolution({
-    path: fallback.path,
-    source: 'safe-fallback',
-    exists: fallback.readable,
-    readable: fallback.readable,
-    platformDefaultPath: previous.platformDefaultPath,
-    lastUsedPath: previous.lastUsedPath,
-    fallbackReason: classification.exists
+  setStartupFolderResolution(buildSafeFallbackResolution(
+    fallback,
+    classification.exists
       ? 'The folder you had open is no longer readable — opened a safe fallback location instead.'
       : 'The folder you had open no longer exists — opened a safe fallback location instead.',
-  })
+    { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
+  ))
   return fallback.path
 }
 
@@ -128,7 +125,11 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
 
   const recoveredPickerPath = recoverIfRepoPathUnavailable(repoPath)
   if (recoveredPickerPath) {
-    return c.json(pickerModeResponse(recoveredPickerPath, getStartupFolderResolution().fallbackReason))
+    // The explanation lives in the startup-folder resolution snapshot (set just above, inside
+    // recoverIfRepoPathUnavailable) rather than an inline field here — the picker page already
+    // reads that same snapshot via GET /api/startup-folder for every other fallback path in
+    // this feature, and duplicating the message onto this response too had no reader.
+    return c.json(pickerModeResponse(recoveredPickerPath))
   }
 
   const info = getInfo(repoPath)
@@ -296,6 +297,18 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   }))
 }
 
+// A single failed readability check on a directory that otherwise looks fine could be a
+// one-off scheduling hiccup (e.g. a network mount taking a moment to respond) rather than
+// genuine unavailability. recoverIfRepoPathUnavailable protects against this by requiring the
+// SAME path to fail across two separate /api/info requests — but a parent-folder walk only
+// gets one shot per click, with no later request to lean on instead, so the closest practical
+// equivalent here is an immediate same-request double-check rather than persisted state.
+// This doesn't protect against a stall lasting longer than the gap between these two syscalls,
+// but it does rule out the cheapest, most common false positive (a single unlucky read).
+function isConfirmedUnreadable(path: string): boolean {
+  return !isReadableDirectory(path) && !isReadableDirectory(path)
+}
+
 export async function repositoryParentFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   if (!repoPath) {
@@ -312,12 +325,12 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
   // folder, no explanation" problem one level up — the very case this navigation is often used
   // to escape from.
   let candidate = immediateParent
-  while (!isReadableDirectory(candidate) && dirname(candidate) !== candidate) {
+  while (isConfirmedUnreadable(candidate) && dirname(candidate) !== candidate) {
     candidate = dirname(candidate)
   }
 
   /* v8 ignore start -- reaching the filesystem root and finding it still unreadable is not practical to simulate in tests */
-  if (!isReadableDirectory(candidate)) {
+  if (isConfirmedUnreadable(candidate)) {
     const fallback = resolveGuaranteedFallbackPath()
     setRepoPath('')
     setPickerPath(fallback.path)
@@ -327,15 +340,11 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
     // page already looks for it — the same startup-folder resolution snapshot every other
     // fallback path in this feature writes to — rather than an ad hoc response field no
     // client ever reads.
-    setStartupFolderResolution({
-      path: fallback.path,
-      source: 'safe-fallback',
-      exists: fallback.readable,
-      readable: fallback.readable,
-      platformDefaultPath: previous.platformDefaultPath,
-      lastUsedPath: previous.lastUsedPath,
-      fallbackReason: 'No readable parent folder was found — opened a safe fallback location instead.',
-    })
+    setStartupFolderResolution(buildSafeFallbackResolution(
+      fallback,
+      'No readable parent folder was found — opened a safe fallback location instead.',
+      { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
+    ))
     return c.json({ ok: true, error: '' })
   }
   /* v8 ignore stop */
@@ -535,6 +544,7 @@ export async function gitIdentityUpdateHandler(c: Context<{ Variables: Variables
   } catch (error) {
     return c.json({
       ok: false,
+      /* v8 ignore next -- setRepoGitIdentity only ever throws real Error instances in practice; the fallback message has no realistic trigger to test */
       message: error instanceof Error ? error.message : 'Could not update the repository-local Git identity.',
     }, 400)
   }

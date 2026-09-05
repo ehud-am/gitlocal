@@ -51,7 +51,7 @@ import {
   terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
 import { classifyLocalPath } from './git/repo.js'
-import { isReadableDirectory, resolveGuaranteedFallbackPath, resolveStartupFolder } from './services/startup-preferences.js'
+import { buildSafeFallbackResolution, isReadableDirectory, resolveGuaranteedFallbackPath, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
@@ -241,15 +241,14 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
       currentPickerPath = cwdFallback.path
       // Reaching this branch already means the requested open target was rejected above
       // (not `status === 'accepted'` with a `rootPath`), so it's always worth explaining why.
-      currentStartupFolderResolution = {
-        path: cwdFallback.path,
-        source: 'safe-fallback',
-        exists: cwdFallback.readable,
-        readable: cwdFallback.readable,
-        platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-        lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-        fallbackReason: target.message || 'The requested path could not be opened — opened a safe fallback location instead.',
-      }
+      currentStartupFolderResolution = buildSafeFallbackResolution(
+        cwdFallback,
+        target.message || 'The requested path could not be opened — opened a safe fallback location instead.',
+        {
+          platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
+          lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+        },
+      )
       return
     }
   }
@@ -274,17 +273,16 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
   const fallback = resolveGuaranteedFallbackPath()
   currentRepoPath = ''
   currentPickerPath = fallback.path
-  currentStartupFolderResolution = {
-    path: fallback.path,
-    source: 'safe-fallback',
-    exists: fallback.readable,
-    readable: fallback.readable,
-    platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-    lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-    fallbackReason: classification.exists
+  currentStartupFolderResolution = buildSafeFallbackResolution(
+    fallback,
+    classification.exists
       ? 'The requested folder is no longer readable — opened a safe fallback location instead.'
       : 'The requested folder no longer exists — opened a safe fallback location instead.',
-  }
+    {
+      platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
+      lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+    },
+  )
 }
 
 export function createApp(initialRepoPath: string, options: CreateAppOptions = {}): Hono<{ Variables: AppVariables }> {

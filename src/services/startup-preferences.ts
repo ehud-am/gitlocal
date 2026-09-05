@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, parse as parsePath, resolve } from 'node:path'
 import { homedir, platform, tmpdir } from 'node:os'
 import type {
@@ -35,6 +35,22 @@ export function isReadableDirectory(path: string): boolean {
   try {
     if (!existsSync(path) || !statSync(path).isDirectory()) return false
     readdirSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// A cheaper liveness probe for a hot path (checked on every /api/info request) that only
+// needs to know "is this still a directory I can access" — not an actual listing. `accessSync`
+// checks the read+execute permission bits without reading directory contents, unlike
+// `isReadableDirectory`'s `readdirSync`, which is unnecessary work to repeat on every request
+// for what's usually a perfectly healthy, unchanged folder. Still correctly reports "gone" or
+// "permission denied" — the two failure modes that actually matter for this check.
+export function isAccessibleDirectory(path: string): boolean {
+  try {
+    if (!statSync(path).isDirectory()) return false
+    accessSync(path, constants.R_OK | constants.X_OK)
     return true
   } catch {
     return false
@@ -100,6 +116,27 @@ export function resolveGuaranteedFallbackPath(
   /* v8 ignore next 2 -- every candidate failing (including the filesystem root itself) is not practical to simulate in tests */
   const last = candidates[candidates.length - 1] ?? resolve('.')
   return { path: last, readable: false }
+}
+
+// Every "landed on a safe fallback location" call site (initial startup, a mid-session
+// self-heal, or a parent-folder walk that ran out of readable ancestors) builds the same
+// StartupFolderResolution shape — only the fallback location, the explanatory reason, and
+// which prior resolution's platformDefaultPath/lastUsedPath to carry forward differ. Sharing
+// this in one place means a future change to the shape only needs to happen once.
+export function buildSafeFallbackResolution(
+  fallback: { path: string; readable: boolean },
+  fallbackReason: string,
+  carryForward: { platformDefaultPath: string; lastUsedPath: string },
+): StartupFolderResolution {
+  return {
+    path: fallback.path,
+    source: 'safe-fallback',
+    exists: fallback.readable,
+    readable: fallback.readable,
+    platformDefaultPath: carryForward.platformDefaultPath,
+    lastUsedPath: carryForward.lastUsedPath,
+    fallbackReason,
+  }
 }
 
 export function readStartupFolderPreference(path = defaultPreferencePath()): StartupFolderPreference | null {
