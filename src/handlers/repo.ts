@@ -75,8 +75,8 @@ function pickerModeResponse(path: string): Record<string, unknown> {
 // itself be a regression (a surprising "my repo suddenly became the picker" flicker), so this
 // case alone requires the SAME repo path to fail readability on two consecutive /api/info
 // checks before recovering — cheap insurance against a one-off glitch, while still recovering
-// within one more natural request (the next window refocus or manual Refresh) if the problem
-// is real and persists. A confirmed-nonexistent path skips this entirely and heals immediately,
+// within one more /api/info fetch (a manual Refresh, or any other action that refetches it) if
+// the problem is real and persists. A confirmed-nonexistent path skips this entirely and heals immediately,
 // since "the folder is gone" doesn't flicker the way a permission/mount glitch can.
 let unreadableRepoPathStreak = { path: '', count: 0 }
 
@@ -85,8 +85,9 @@ let unreadableRepoPathStreak = { path: '', count: 0 }
 // Left unchecked, the currently-open (now-missing) path would silently read back as an empty,
 // non-git folder with no explanation (see getInfo's classification-based branch), which is
 // exactly the "why is my file list empty" report this checks for. Recovering here, on every
-// /api/info fetch, means the very next natural refetch (window refocus, a manual Refresh) heals
-// it instead of leaving the user stuck until they notice and navigate away manually.
+// /api/info fetch, means the next refetch (the UI disables window-refocus refetching globally,
+// so in practice this is a manual Refresh or another action that refetches 'info') heals it
+// instead of leaving the user stuck until they notice and navigate away manually.
 function recoverIfRepoPathUnavailable(repoPath: string): string {
   if (!repoPath) return ''
   const classification = classifyLocalPath(repoPath)
