@@ -25,10 +25,12 @@ import {
   syncCurrentBranchWithRemote,
   validateRepo,
 } from '../git/repo.js'
-import { getStartupFolderResolution, getStartupOpenTarget, setPickerPath, setRepoPath } from '../server.js'
+import { getStartupFolderResolution, getStartupOpenTarget, setPickerPath, setRepoPath, setStartupFolderResolution } from '../server.js'
 import {
+  isReadableDirectory,
   readDefaultReaderPreference,
   rememberStartupFolder,
+  resolveGuaranteedFallbackPath,
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
@@ -49,22 +51,86 @@ import type {
 
 type Variables = { repoPath: string; pickerPath: string }
 
+function pickerModeResponse(path: string, message?: string): Record<string, unknown> {
+  return {
+    name: '',
+    path,
+    currentBranch: '',
+    isGitRepo: false,
+    pickerMode: true,
+    version: getAppVersion(),
+    hasCommits: false,
+    rootEntryCount: 0,
+    gitContext: null,
+    ...(message ? { message } : {}),
+  }
+}
+
+// A directory that still exists but fails the readdir-based readability check (permission
+// change, or a network/removable drive stalling rather than cleanly disconnecting) is a
+// genuinely ambiguous signal — unlike a path that no longer exists at all (ENOENT is
+// unambiguous), a single failed readdir here could just as easily be a momentary hiccup on a
+// network mount. Self-healing away from a healthy, currently-open repo on one such blip would
+// itself be a regression (a surprising "my repo suddenly became the picker" flicker), so this
+// case alone requires the SAME repo path to fail readability on two consecutive /api/info
+// checks before recovering — cheap insurance against a one-off glitch, while still recovering
+// within one more natural request (the next window refocus or manual Refresh) if the problem
+// is real and persists. A confirmed-nonexistent path skips this entirely and heals immediately,
+// since "the folder is gone" doesn't flicker the way a permission/mount glitch can.
+let unreadableRepoPathStreak = { path: '', count: 0 }
+
+// The folder GitLocal has open can disappear at any point during a long-running session —
+// deleted, renamed, or an external/network drive unmounted — not just at process startup.
+// Left unchecked, the currently-open (now-missing) path would silently read back as an empty,
+// non-git folder with no explanation (see getInfo's classification-based branch), which is
+// exactly the "why is my file list empty" report this checks for. Recovering here, on every
+// /api/info fetch, means the very next natural refetch (window refocus, a manual Refresh) heals
+// it instead of leaving the user stuck until they notice and navigate away manually.
+function recoverIfRepoPathUnavailable(repoPath: string): string {
+  if (!repoPath) return ''
+  const classification = classifyLocalPath(repoPath)
+  if (classification.exists && classification.pathType === 'directory' && isReadableDirectory(repoPath)) {
+    unreadableRepoPathStreak = { path: '', count: 0 }
+    return ''
+  }
+
+  if (classification.exists) {
+    const streak = unreadableRepoPathStreak.path === repoPath ? unreadableRepoPathStreak.count + 1 : 1
+    unreadableRepoPathStreak = { path: repoPath, count: streak }
+    if (streak < 2) return ''
+  }
+  unreadableRepoPathStreak = { path: '', count: 0 }
+
+  const fallback = resolveGuaranteedFallbackPath()
+  setRepoPath('')
+  setPickerPath(fallback.path)
+  const previous = getStartupFolderResolution()
+  setStartupFolderResolution({
+    path: fallback.path,
+    source: 'safe-fallback',
+    exists: fallback.readable,
+    readable: fallback.readable,
+    platformDefaultPath: previous.platformDefaultPath,
+    lastUsedPath: previous.lastUsedPath,
+    fallbackReason: classification.exists
+      ? 'The folder you had open is no longer readable — opened a safe fallback location instead.'
+      : 'The folder you had open no longer exists — opened a safe fallback location instead.',
+  })
+  return fallback.path
+}
+
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   const repoPath = c.get('repoPath')
   const pickerPath = c.get('pickerPath')
   if (pickerPath) {
-    return c.json({
-      name: '',
-      path: pickerPath,
-      currentBranch: '',
-      isGitRepo: false,
-      pickerMode: true,
-      version: getAppVersion(),
-      hasCommits: false,
-      rootEntryCount: 0,
-      gitContext: null,
-    })
+    return c.json(pickerModeResponse(pickerPath))
   }
+
+  const recoveredPickerPath = recoverIfRepoPathUnavailable(repoPath)
+  if (recoveredPickerPath) {
+    return c.json(pickerModeResponse(recoveredPickerPath, getStartupFolderResolution().fallbackReason))
+  }
+
   const info = getInfo(repoPath)
   return c.json(info)
 }
@@ -236,13 +302,47 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
     return c.json({ ok: false, error: 'No repository is currently open' })
   }
 
-  const parentPath = dirname(repoPath)
-  if (parentPath === repoPath) {
+  const immediateParent = dirname(repoPath)
+  if (immediateParent === repoPath) {
     return c.json({ ok: false, error: 'GitLocal is already at the root of the file system.' })
   }
+
+  // Walk up past any unreadable ancestor (permission changed, or the parent itself sits on an
+  // unmounted/disconnected drive) rather than landing on it and reproducing the same "empty
+  // folder, no explanation" problem one level up — the very case this navigation is often used
+  // to escape from.
+  let candidate = immediateParent
+  while (!isReadableDirectory(candidate) && dirname(candidate) !== candidate) {
+    candidate = dirname(candidate)
+  }
+
+  /* v8 ignore start -- reaching the filesystem root and finding it still unreadable is not practical to simulate in tests */
+  if (!isReadableDirectory(candidate)) {
+    const fallback = resolveGuaranteedFallbackPath()
+    setRepoPath('')
+    setPickerPath(fallback.path)
+    const previous = getStartupFolderResolution()
+    // The caller (App.tsx's handleBrowseParentFolder) reloads the page on `ok: true` without
+    // reading any inline message, so the explanation has to live where the reloaded picker
+    // page already looks for it — the same startup-folder resolution snapshot every other
+    // fallback path in this feature writes to — rather than an ad hoc response field no
+    // client ever reads.
+    setStartupFolderResolution({
+      path: fallback.path,
+      source: 'safe-fallback',
+      exists: fallback.readable,
+      readable: fallback.readable,
+      platformDefaultPath: previous.platformDefaultPath,
+      lastUsedPath: previous.lastUsedPath,
+      fallbackReason: 'No readable parent folder was found — opened a safe fallback location instead.',
+    })
+    return c.json({ ok: true, error: '' })
+  }
+  /* v8 ignore stop */
+
   setRepoPath('')
-  setPickerPath(parentPath)
-  rememberStartupFolder(parentPath, 'picker-open')
+  setPickerPath(candidate)
+  rememberStartupFolder(candidate, 'picker-open')
   return c.json({ ok: true, error: '' })
 }
 

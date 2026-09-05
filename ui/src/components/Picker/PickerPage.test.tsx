@@ -204,6 +204,21 @@ describe('PickerPage', () => {
     expect(screen.queryByText(/last used folder is unavailable/i)).not.toBeInTheDocument()
   })
 
+  it('shows the safe fallback startup message when even the home folder was unavailable', async () => {
+    vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
+      path: '/tmp',
+      source: 'safe-fallback',
+      exists: true,
+      readable: true,
+      platformDefaultPath: '/Users/example/Documents',
+      lastUsedPath: '/Users/example/missing',
+      fallbackReason: 'The folder you had open no longer exists — opened a safe fallback location instead.',
+    })
+
+    render(<PickerPage />)
+    expect(await screen.findByText(/no longer exists — opened a safe fallback location/i)).toBeInTheDocument()
+  })
+
   it('selects a folder when clicked', async () => {
     render(<PickerPage />)
 

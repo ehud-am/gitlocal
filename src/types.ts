@@ -86,7 +86,7 @@ export interface LocalPathClassification {
   message?: string
 }
 
-export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback'
+export type StartupFolderSource = 'explicit' | 'last-used' | 'platform-default' | 'home-fallback' | 'safe-fallback'
 export type StartupFolderUpdateSource = 'explicit-launch' | 'picker-open' | 'repo-open' | 'native-open'
 export type StartupOpenSource = 'explicit-launch' | 'native-file-open' | 'picker-open' | 'repo-open'
 export type StartupOpenStatus = 'pending' | 'accepted' | 'blocked' | 'failed'
