@@ -239,5 +239,54 @@ describe('PdfViewer', () => {
       expect(canvas?.width).toBe(300)
       expect(canvas?.height).toBe(150)
     })
+
+    it('scales the canvas backing store by devicePixelRatio while keeping CSS size at the logical scale', async () => {
+      const dprSpy = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(2)
+      mockGetDocument.mockReturnValue(makeLoadingTask(Promise.resolve({
+        numPages: 1,
+        getPage: () => new Promise((resolve) => {
+          setTimeout(() => resolve({
+            // Mirrors pdfjs-dist: viewport dimensions scale linearly with the requested scale.
+            getViewport: ({ scale }: { scale: number }) => ({ width: 100 * scale, height: 100 * scale }),
+            render: renderSpy,
+          }), 0)
+        }),
+      })))
+      const { container } = render(<PdfViewer content="dGVzdA==" />)
+      await waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledTimes(1)
+      }, { timeout: 5000 })
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas[data-pdf-page="1"]')
+      // Logical scale is 1.5, so at devicePixelRatio 2 the backing store is 1.5*2 = 3x the base size.
+      expect(canvas?.width).toBe(300)
+      expect(canvas?.height).toBe(300)
+      expect(canvas?.style.width).toBe('150px')
+      expect(canvas?.style.height).toBe('150px')
+      dprSpy.mockRestore()
+    })
+
+    it('falls back to a devicePixelRatio of 1 when window.devicePixelRatio is unavailable', async () => {
+      const dprSpy = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(NaN)
+      mockGetDocument.mockReturnValue(makeLoadingTask(Promise.resolve({
+        numPages: 1,
+        getPage: () => new Promise((resolve) => {
+          setTimeout(() => resolve({
+            getViewport: ({ scale }: { scale: number }) => ({ width: 100 * scale, height: 100 * scale }),
+            render: renderSpy,
+          }), 0)
+        }),
+      })))
+      const { container } = render(<PdfViewer content="dGVzdA==" />)
+      await waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledTimes(1)
+      }, { timeout: 5000 })
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas[data-pdf-page="1"]')
+      // devicePixelRatio 1 fallback: backing store equals the logical (1.5x) scale, no extra scaling.
+      expect(canvas?.width).toBe(150)
+      expect(canvas?.height).toBe(150)
+      expect(canvas?.style.width).toBe('150px')
+      expect(canvas?.style.height).toBe('150px')
+      dprSpy.mockRestore()
+    })
   })
 })

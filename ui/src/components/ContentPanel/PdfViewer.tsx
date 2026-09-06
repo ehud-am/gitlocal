@@ -17,6 +17,11 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes
 }
 
+function getEffectiveDevicePixelRatio(): number {
+  const dpr = window.devicePixelRatio
+  return Number.isFinite(dpr) && dpr > 0 ? dpr : 1
+}
+
 export default function PdfViewer({ content }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [pages, setPages] = useState<PageRenderState[] | null>(null)
@@ -53,7 +58,8 @@ export default function PdfViewer({ content }: Props) {
           const page = await pdfDocument.getPage(pageNumber)
           if (cancelled) return
 
-          const viewport = page.getViewport({ scale: 1.5 })
+          const effectiveDevicePixelRatio = getEffectiveDevicePixelRatio()
+          const viewport = page.getViewport({ scale: 1.5 * effectiveDevicePixelRatio })
           const canvas = container.querySelector<HTMLCanvasElement>(`canvas[data-pdf-page="${pageNumber}"]`)
           if (!canvas) continue
 
@@ -62,6 +68,8 @@ export default function PdfViewer({ content }: Props) {
 
           canvas.width = viewport.width
           canvas.height = viewport.height
+          canvas.style.width = `${viewport.width / effectiveDevicePixelRatio}px`
+          canvas.style.height = `${viewport.height / effectiveDevicePixelRatio}px`
 
           // eslint-disable-next-line no-await-in-loop -- see above
           await page.render({ canvasContext, viewport, canvas }).promise

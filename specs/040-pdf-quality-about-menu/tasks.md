@@ -45,17 +45,17 @@ Not needed. US1 and US2 share no code, data model, or infrastructure — there i
 
 > Write/extend these tests first; confirm the new assertions fail against the current `scale: 1.5`-only implementation before making the implementation change.
 
-- [ ] T001 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting that, for a mocked `window.devicePixelRatio` of `2`, a rendered page's `canvas.width`/`canvas.height` equal the PDF.js viewport size at scale `1.5` multiplied by `2` (per `contracts/pdf-viewer-render-contract.md` rule 1)
-- [ ] T002 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting the canvas's CSS-facing layout size (style width/height or equivalent) stays equal to the unscaled logical-scale viewport size regardless of `devicePixelRatio` (contract rule 2)
-- [ ] T003 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting that when `window.devicePixelRatio` is `undefined`/non-finite, rendering falls back to a device pixel ratio of `1` (contract rule 4)
+- [X] T001 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting that, for a mocked `window.devicePixelRatio` of `2`, a rendered page's `canvas.width`/`canvas.height` equal the PDF.js viewport size at scale `1.5` multiplied by `2` (per `contracts/pdf-viewer-render-contract.md` rule 1)
+- [X] T002 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting the canvas's CSS-facing layout size (style width/height or equivalent) stays equal to the unscaled logical-scale viewport size regardless of `devicePixelRatio` (contract rule 2)
+- [X] T003 [P] [US1] Add a test in `ui/src/components/ContentPanel/PdfViewer.test.tsx` asserting that when `window.devicePixelRatio` is `undefined`/non-finite, rendering falls back to a device pixel ratio of `1` (contract rule 4)
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, compute an effective device pixel ratio (`window.devicePixelRatio` if a positive finite number, else `1`) inside the per-page render loop (depends on T001-T003 existing as failing tests)
-- [ ] T005 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, derive a scaled render viewport (logical `scale: 1.5` viewport dimensions × effective device pixel ratio) and set `canvas.width`/`canvas.height` from it instead of the unscaled viewport (depends on T004)
-- [ ] T006 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, constrain the canvas element's CSS layout size (e.g. `canvas.style.width`/`canvas.style.height`) to the original unscaled logical viewport size so on-page appearance is unchanged (depends on T005)
-- [ ] T007 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, pass the scaled render viewport to `page.render({ canvasContext, viewport, canvas })` so rendered content matches the higher-resolution backing store (depends on T005)
-- [ ] T008 [US1] Run `npm test` (Vitest + coverage) scoped to `PdfViewer.test.tsx` and confirm ≥90% branch coverage on `PdfViewer.tsx` per constitution Principle II, and that all tests from T001-T003 now pass (depends on T004-T007)
+- [X] T004 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, compute an effective device pixel ratio (`window.devicePixelRatio` if a positive finite number, else `1`) inside the per-page render loop (depends on T001-T003 existing as failing tests)
+- [X] T005 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, derive a scaled render viewport (logical `scale: 1.5` viewport dimensions × effective device pixel ratio) and set `canvas.width`/`canvas.height` from it instead of the unscaled viewport (depends on T004)
+- [X] T006 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, constrain the canvas element's CSS layout size (e.g. `canvas.style.width`/`canvas.style.height`) to the original unscaled logical viewport size so on-page appearance is unchanged (depends on T005)
+- [X] T007 [US1] In `ui/src/components/ContentPanel/PdfViewer.tsx`, pass the scaled render viewport to `page.render({ canvasContext, viewport, canvas })` so rendered content matches the higher-resolution backing store (depends on T005)
+- [X] T008 [US1] Run `npm test` (Vitest + coverage) scoped to `PdfViewer.test.tsx` and confirm ≥90% branch coverage on `PdfViewer.tsx` per constitution Principle II, and that all tests from T001-T003 now pass (depends on T004-T007)
 
 **Checkpoint**: PDF previews are sharp on HiDPI displays and after zoom, per `quickstart.md` §1, with no layout or existing-behavior regression. Independently shippable as v0.13.1's first fix.
 
