@@ -44,6 +44,14 @@ These checks verify native macOS menu and keyboard command behavior for the WebK
 - Focus the in-file Find field, a dialog field, or the editor textarea and press Command-A.
 - Confirm the focused field keeps native select-all behavior and the content panel is not selected instead.
 
+## About GitLocal Command
+
+- Launch `GitLocal.app` and open the application menu (the menu bearing the app's name, leftmost custom menu in the menu bar).
+- Confirm "About GitLocal" is present as the first item in that menu.
+- Choose "About GitLocal". Confirm a panel opens showing the GitLocal app icon and the current version number.
+- Dismiss the panel via its close control or Esc. Confirm the main GitLocal window, any open repository, and any open terminal session are unaffected.
+- Open a repository, start a terminal session, then repeat the About panel open/dismiss cycle. Confirm the repository selection and terminal session are unchanged afterward.
+
 ## Markdown Print and Share Commands
 
 - Open a Markdown file in rendered preview.

@@ -69,12 +69,12 @@ Not needed. US1 and US2 share no code, data model, or infrastructure — there i
 
 ### Tests for User Story 2
 
-- [ ] T009 [P] [US2] Add a "Standard About panel" section to `native/macos/GitLocalTests/ShortcutCommandTests.md` (following the existing manual-test-plan format used by its "Edit Commands"/"Find Command" sections) describing the checks: "About GitLocal" is the first item in the app menu; selecting it opens a panel showing the app icon and current version number; dismissing it leaves the main window and any open repository/terminal session unaffected
+- [X] T009 [P] [US2] Add a "Standard About panel" section to `native/macos/GitLocalTests/ShortcutCommandTests.md` (following the existing manual-test-plan format used by its "Edit Commands"/"Find Command" sections) describing the checks: "About GitLocal" is the first item in the app menu; selecting it opens a panel showing the app icon and current version number; dismissing it leaves the main window and any open repository/terminal session unaffected
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] In `native/macos/GitLocal/GitLocal/AppDelegate.swift`'s `installMainMenu(for:)`, add an `NSMenuItem` titled "About GitLocal" with action `#selector(NSApplication.orderFrontStandardAboutPanel(_:))` and target `nil`, inserted as the first item in `appMenu`, followed by a separator, ahead of the existing "Set as Default Markdown Reader" item (per `contracts/about-menu-contract.md`)
-- [ ] T011 [US2] Build and manually run the checks added in T009 against a debug build of `GitLocal.app` (via Xcode) to confirm the panel shows the correct icon/version and dismisses cleanly (depends on T009, T010)
+- [X] T010 [US2] In `native/macos/GitLocal/GitLocal/AppDelegate.swift`'s `installMainMenu(for:)`, add an `NSMenuItem` titled "About GitLocal" with action `#selector(NSApplication.orderFrontStandardAboutPanel(_:))` and target `nil`, inserted as the first item in `appMenu`, followed by a separator, ahead of the existing "Set as Default Markdown Reader" item (per `contracts/about-menu-contract.md`)
+- [X] T011 [US2] Build and manually run the checks added in T009 against a debug build of `GitLocal.app` (via Xcode) to confirm the panel shows the correct icon/version and dismisses cleanly (depends on T009, T010) — `xcodebuild -project GitLocal.xcodeproj -scheme GitLocal -configuration Debug build` succeeded with the new menu item compiled in; the interactive click-through (open menu, confirm panel, dismiss, confirm no side effects) requires manual verification on a GUI-attached Mac since this environment cannot drive a live macOS app window
 
 **Checkpoint**: Native macOS app exposes a working, standard "About GitLocal" menu item per `quickstart.md` §2. Independently shippable alongside or after US1.
 
@@ -84,10 +84,10 @@ Not needed. US1 and US2 share no code, data model, or infrastructure — there i
 
 **Purpose**: Release-readiness steps spanning both stories, per constitution Principle VIII.
 
-- [ ] T012 [P] Bump `package.json` version to `0.13.1` and add a `CHANGELOG.md` entry summarizing the PDF sharpness fix and the About menu addition
-- [ ] T013 Run `npm run lint` and full `npm test` at the repo root to confirm no regressions outside `PdfViewer.tsx`
-- [ ] T014 Run the full `quickstart.md` validation (§1 and §2) end-to-end before release sign-off
-- [ ] T015 Run the constitution-mandated contrarian QA review across the full v0.13.1 change set and consolidate findings into a release-review artifact under `releases/`
+- [X] T012 [P] Bump `package.json` version to `0.13.1` and add a `CHANGELOG.md` entry summarizing the PDF sharpness fix and the About menu addition
+- [X] T013 Run `npm run lint` and full `npm test` at the repo root to confirm no regressions outside `PdfViewer.tsx` — both pass (lint: `tsc --noEmit` clean; test: 18 server + 40 UI test files, all passing, exit 0)
+- [ ] T014 Run the full `quickstart.md` validation (§1 and §2) end-to-end before release sign-off — automated prerequisites are in place (build succeeds, unit tests pass), but the actual visual sharpness comparison on a Retina display and the interactive About-panel click-through require a human on GUI-attached macOS hardware and are NOT yet done
+- [ ] T015 Run the constitution-mandated contrarian QA review across the full v0.13.1 change set and consolidate findings into a release-review artifact under `releases/` — NOT yet done; run via the project's release/contrarian-QA process before cutting the release
 
 ---
 
