@@ -87,7 +87,7 @@ Not needed. US1 and US2 share no code, data model, or infrastructure — there i
 - [X] T012 [P] Bump `package.json` version to `0.13.1` and add a `CHANGELOG.md` entry summarizing the PDF sharpness fix and the About menu addition
 - [X] T013 Run `npm run lint` and full `npm test` at the repo root to confirm no regressions outside `PdfViewer.tsx` — both pass (lint: `tsc --noEmit` clean; test: 18 server + 40 UI test files, all passing, exit 0)
 - [ ] T014 Run the full `quickstart.md` validation (§1 and §2) end-to-end before release sign-off — automated prerequisites are in place (build succeeds, unit tests pass), but the actual visual sharpness comparison on a Retina display and the interactive About-panel click-through require a human on GUI-attached macOS hardware and are NOT yet done
-- [ ] T015 Run the constitution-mandated contrarian QA review across the full v0.13.1 change set and consolidate findings into a release-review artifact under `releases/` — NOT yet done; run via the project's release/contrarian-QA process before cutting the release
+- [X] T015 Run the constitution-mandated contrarian QA review across the full v0.13.1 change set and consolidate findings into a release-review artifact under `releases/` — done via an independent adversarial sub-agent review; no blockers found, findings and dispositions consolidated into `releases/0.13.1-release-review.md`
 
 ---
 
