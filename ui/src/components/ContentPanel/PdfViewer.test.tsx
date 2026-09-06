@@ -288,5 +288,69 @@ describe('PdfViewer', () => {
       expect(canvas?.style.height).toBe('150px')
       dprSpy.mockRestore()
     })
+
+    it('handles a fractional devicePixelRatio', async () => {
+      const dprSpy = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(1.5)
+      mockGetDocument.mockReturnValue(makeLoadingTask(Promise.resolve({
+        numPages: 1,
+        getPage: () => new Promise((resolve) => {
+          setTimeout(() => resolve({
+            getViewport: ({ scale }: { scale: number }) => ({ width: 100 * scale, height: 100 * scale }),
+            render: renderSpy,
+          }), 0)
+        }),
+      })))
+      const { container } = render(<PdfViewer content="dGVzdA==" />)
+      await waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledTimes(1)
+      }, { timeout: 5000 })
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas[data-pdf-page="1"]')
+      // Logical scale is 1.5, so at devicePixelRatio 1.5 the backing store is 1.5*1.5 = 2.25x the base size.
+      expect(canvas?.width).toBe(225)
+      expect(canvas?.height).toBe(225)
+      expect(canvas?.style.width).toBe('150px')
+      expect(canvas?.style.height).toBe('150px')
+      dprSpy.mockRestore()
+    })
+
+    it('caps the backing store at a safe maximum canvas dimension for an oversized page at high devicePixelRatio', async () => {
+      const dprSpy = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(100)
+      mockGetDocument.mockReturnValue(makeLoadingTask(Promise.resolve({
+        numPages: 1,
+        getPage: () => new Promise((resolve) => {
+          setTimeout(() => resolve({
+            // A large poster-sized page: 4000x3000 at scale 1 (6000x4500 at the logical 1.5 scale).
+            getViewport: ({ scale }: { scale: number }) => ({ width: 4000 * scale, height: 3000 * scale }),
+            render: renderSpy,
+          }), 0)
+        }),
+      })))
+      const { container } = render(<PdfViewer content="dGVzdA==" />)
+      await waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledTimes(1)
+      }, { timeout: 5000 })
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas[data-pdf-page="1"]')
+      // Uncapped, devicePixelRatio 100 would demand a 600000x450000 canvas. The backing store must
+      // stay within the safe maximum canvas dimension on both axes, while the on-page CSS size
+      // remains the unclamped logical (1.5x) size.
+      expect(canvas!.width).toBeLessThanOrEqual(8192)
+      expect(canvas!.height).toBeLessThanOrEqual(8192)
+      expect(canvas?.style.width).toBe('6000px')
+      expect(canvas?.style.height).toBe('4500px')
+      dprSpy.mockRestore()
+    })
+
+    it('renders no page canvases for a zero-page document', async () => {
+      mockGetDocument.mockReturnValue(makeLoadingTask(Promise.resolve({
+        numPages: 0,
+        getPage: () => new Promise(() => {}),
+      })))
+      const { container } = render(<PdfViewer content="dGVzdA==" />)
+      await waitFor(() => {
+        expect(screen.queryByLabelText('loading pdf')).not.toBeInTheDocument()
+      }, { timeout: 5000 })
+      expect(container.querySelectorAll('canvas.pdf-viewer-page')).toHaveLength(0)
+      expect(renderSpy).not.toHaveBeenCalled()
+    })
   })
 })

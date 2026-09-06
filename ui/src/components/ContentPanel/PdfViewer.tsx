@@ -22,6 +22,16 @@ function getEffectiveDevicePixelRatio(): number {
   return Number.isFinite(dpr) && dpr > 0 ? dpr : 1
 }
 
+// Conservative canvas backing-store cap: browsers (and WebKit, which the native macOS app embeds)
+// impose per-dimension canvas size limits well below this on some configurations. Scaling by
+// devicePixelRatio without a cap risks a blank/failed render on an unusually large PDF page.
+const MAX_CANVAS_DIMENSION_PX = 8192
+
+function clampDevicePixelRatioToCanvasLimit(devicePixelRatio: number, baseWidth: number, baseHeight: number): number {
+  const maxRatio = Math.min(MAX_CANVAS_DIMENSION_PX / baseWidth, MAX_CANVAS_DIMENSION_PX / baseHeight)
+  return Math.min(devicePixelRatio, maxRatio)
+}
+
 export default function PdfViewer({ content }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [pages, setPages] = useState<PageRenderState[] | null>(null)
@@ -58,8 +68,13 @@ export default function PdfViewer({ content }: Props) {
           const page = await pdfDocument.getPage(pageNumber)
           if (cancelled) return
 
-          const effectiveDevicePixelRatio = getEffectiveDevicePixelRatio()
-          const viewport = page.getViewport({ scale: 1.5 * effectiveDevicePixelRatio })
+          const baseViewport = page.getViewport({ scale: 1.5 })
+          const effectiveDevicePixelRatio = clampDevicePixelRatioToCanvasLimit(
+            getEffectiveDevicePixelRatio(),
+            baseViewport.width,
+            baseViewport.height,
+          )
+          const viewport = effectiveDevicePixelRatio === 1 ? baseViewport : page.getViewport({ scale: 1.5 * effectiveDevicePixelRatio })
           const canvas = container.querySelector<HTMLCanvasElement>(`canvas[data-pdf-page="${pageNumber}"]`)
           if (!canvas) continue
 
@@ -68,8 +83,8 @@ export default function PdfViewer({ content }: Props) {
 
           canvas.width = viewport.width
           canvas.height = viewport.height
-          canvas.style.width = `${viewport.width / effectiveDevicePixelRatio}px`
-          canvas.style.height = `${viewport.height / effectiveDevicePixelRatio}px`
+          canvas.style.width = `${baseViewport.width}px`
+          canvas.style.height = `${baseViewport.height}px`
 
           // eslint-disable-next-line no-await-in-loop -- see above
           await page.render({ canvasContext, viewport, canvas }).promise
