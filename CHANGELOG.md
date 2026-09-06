@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.1 - 2026-09-05
+
+- Fixed PDF preview looking fuzzy on Retina/HiDPI displays: pages now render at a resolution that accounts for the display's device pixel ratio, so text and line art stay sharp at the default zoom level and while zooming in, with no change to page layout size or load performance on standard-density displays.
+- Added an "About GitLocal" item to the native macOS app's menu, showing the app icon and current version number via the standard macOS About panel.
+
 ## 0.13.0 - 2026-09-04
 
 - Added PowerPoint preview: `.pptx` files render each slide as a best-effort formatted view (positioned text, background fill, embedded images) with next/previous navigation and a speaker-notes panel, replacing the previous binary-file fallback. Pixel-faithful rendering is not attempted — no free, license-compatible renderer exists for that.

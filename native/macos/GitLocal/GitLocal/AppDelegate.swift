@@ -90,6 +90,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu(title: "GitLocal")
+        appMenu.addItem(
+            NSMenuItem(
+                title: "About GitLocal",
+                action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+                keyEquivalent: ""
+            )
+        )
+        appMenu.addItem(NSMenuItem.separator())
         let defaultMarkdownReaderItem = NSMenuItem(
             title: "Set as Default Markdown Reader",
             action: #selector(ViewerWindowController.setDefaultMarkdownReader(_:)),
