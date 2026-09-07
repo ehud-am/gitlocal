@@ -17,6 +17,7 @@ import {
   convertGitRemoteToWebUrl,
   createChildFolder,
   classifyLocalPath,
+  resolveDirectOpenTarget,
   spawnGit,
   validateRepo,
   getInfo,
@@ -635,6 +636,61 @@ describe('classifyLocalPath', () => {
         expect.objectContaining({ code: 'ENOENT' }),
       )
       expect(realpathSyncMock).toHaveBeenCalled()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('resolveDirectOpenTarget', () => {
+  it('roots a file inside a repository at the repository, selecting its relative path', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const filePath = join(dir, 'docs', 'guide.md')
+      const classification = classifyLocalPath(filePath)
+      const target = resolveDirectOpenTarget(classification.canonicalPath, classification.repositoryRootPath)
+      expect(target).toEqual({
+        rootPath: realpathSync(dir),
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+        isGitRepo: true,
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('roots a file at a repository root at the repository, with an empty relative selection base', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const filePath = join(dir, 'README.md')
+      const classification = classifyLocalPath(filePath)
+      const target = resolveDirectOpenTarget(classification.canonicalPath, classification.repositoryRootPath)
+      expect(target).toEqual({
+        rootPath: realpathSync(dir),
+        selectedPath: 'README.md',
+        selectedPathType: 'file',
+        isGitRepo: true,
+      })
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('roots a file outside any repository at its own containing folder, with no git context', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-independent-file-'))
+    try {
+      const filePath = join(dir, 'notes.md')
+      writeFileSync(filePath, '# Notes')
+      const classification = classifyLocalPath(filePath)
+      expect(classification.repositoryRootPath).toBeUndefined()
+      const target = resolveDirectOpenTarget(classification.canonicalPath, classification.repositoryRootPath)
+      expect(target).toEqual({
+        rootPath: realpathSync(dir),
+        selectedPath: 'notes.md',
+        selectedPathType: 'file',
+        isGitRepo: false,
+      })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

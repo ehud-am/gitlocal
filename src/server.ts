@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import {
   infoHandler,
   branchesHandler,
@@ -50,9 +50,9 @@ import {
   listTerminalSessionsHandler,
   terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
-import { classifyLocalPath } from './git/repo.js'
+import { classifyLocalPath, resolveDirectOpenTarget } from './git/repo.js'
 import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
-import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
+import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
 type CreateAppOptions = {
@@ -184,11 +184,7 @@ export function resolveOpenTarget(inputPath: string, source: StartupOpenSource):
     )
   }
 
-  const rootPath = classification.repositoryRootPath ?? dirname(classification.canonicalPath)
-  const selectedPath = classification.repositoryRootPath
-    ? relative(rootPath, classification.canonicalPath).split('\\').join('/')
-    : basename(classification.canonicalPath)
-  const selectedPathType: ViewerPathType = 'file'
+  const { rootPath, selectedPath, selectedPathType } = resolveDirectOpenTarget(classification.canonicalPath, classification.repositoryRootPath)
 
   return {
     source,

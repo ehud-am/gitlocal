@@ -98,22 +98,22 @@ confirm the tree roots at that folder with no git context.
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Add unit tests in `tests/unit/git/repo.test.ts` for the new shared classifier: a file inside a repository (root/selection relative to repo root, `isGitRepo: true`), a file in an independent folder (root = containing folder, `isGitRepo: false`), and a file at a repository's own root
+- [X] T013 [P] [US2] Add unit tests in `tests/unit/git/repo.test.ts` for the new shared classifier: a file inside a repository (root/selection relative to repo root, `isGitRepo: true`), a file in an independent folder (root = containing folder, `isGitRepo: false`), and a file at a repository's own root
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] In `src/git/repo.ts`, extract a new exported function `resolveDirectOpenTarget(canonicalPath: string, pathType: 'file' | 'directory')` that calls the existing `classifyLocalPath()` once and returns `{ rootPath, selectedPath, selectedPathType, isGitRepo }`, encoding the rule currently duplicated in `resolveOpenTarget()` and `repositoryOpenHandler()` (depends on T013 existing as the target contract)
-- [ ] T015 [US2] In `src/server.ts`, update `resolveOpenTarget()` to compute `rootPath`/`selectedPath` by calling `resolveDirectOpenTarget()` from T014 instead of its own inline `dirname`/`relative` computation, keeping its existing status/message wrapping around that result (depends on T014)
-- [ ] T016 [P] [US2] In `src/handlers/repo.ts`, update `repositoryOpenHandler()`'s file-open branch to call `resolveDirectOpenTarget()` from T014 instead of its own inline duplicate computation (depends on T014)
+- [X] T014 [US2] In `src/git/repo.ts`, extract a new exported function `resolveDirectOpenTarget(canonicalPath: string, pathType: 'file' | 'directory')` that calls the existing `classifyLocalPath()` once and returns `{ rootPath, selectedPath, selectedPathType, isGitRepo }`, encoding the rule currently duplicated in `resolveOpenTarget()` and `repositoryOpenHandler()` (depends on T013 existing as the target contract)
+- [X] T015 [US2] In `src/server.ts`, update `resolveOpenTarget()` to compute `rootPath`/`selectedPath` by calling `resolveDirectOpenTarget()` from T014 instead of its own inline `dirname`/`relative` computation, keeping its existing status/message wrapping around that result (depends on T014)
+- [X] T016 [P] [US2] In `src/handlers/repo.ts`, update `repositoryOpenHandler()`'s file-open branch to call `resolveDirectOpenTarget()` from T014 instead of its own inline duplicate computation (depends on T014)
 
 ### Test Updates for User Story 2
 
-- [ ] T017 [US2] Update `tests/unit/handlers/repo.test.ts` for `repositoryOpenHandler()` to confirm identical response shape/values after switching to the shared classifier (no behavior change expected — this test proves it) (depends on T016)
-- [ ] T018 [US2] Update `tests/integration/server.test.ts`'s native-file-open startup scenarios to confirm identical `rootPath`/`selectedPath`/`isGitRepo` results after `resolveOpenTarget()`'s switch to the shared classifier (depends on T015)
+- [X] T017 [US2] Update `tests/unit/handlers/repo.test.ts` for `repositoryOpenHandler()` to confirm identical response shape/values after switching to the shared classifier (no behavior change expected — this test proves it) (depends on T016)
+- [X] T018 [US2] Update `tests/integration/server.test.ts`'s native-file-open startup scenarios to confirm identical `rootPath`/`selectedPath`/`isGitRepo` results after `resolveOpenTarget()`'s switch to the shared classifier (depends on T015)
 
 ### Validation
 
-- [ ] T019 [US2] Run `npm run test:server` and confirm ≥90% branch coverage on `src/git/repo.ts`, `src/server.ts`, `src/handlers/repo.ts`
+- [X] T019 [US2] Run `npm run test:server` and confirm ≥90% branch coverage on `src/git/repo.ts`, `src/server.ts`, `src/handlers/repo.ts`
 
 **Checkpoint**: User Stories 1 AND 2 both work independently — quickstart.md steps 1-7 pass, and the repo-vs-folder rule now has exactly one implementation.
 

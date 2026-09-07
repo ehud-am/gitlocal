@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { statSync } from 'node:fs'
-import { basename, dirname, relative } from 'node:path'
+import { dirname } from 'node:path'
 import {
   listSshPrivateKeys,
   validateSshPrivateKeyPath,
@@ -18,6 +18,7 @@ import {
   getInfo,
   findReadme,
   findKeyDocuments,
+  resolveDirectOpenTarget,
   resolveRepoPath,
   summarizeChangedFiles,
   setRepoGitIdentity,
@@ -253,14 +254,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   const resolvedInputPath = classification.canonicalPath
   const stats = statSync(resolvedInputPath)
   if (stats.isFile()) {
-    const parentPath = dirname(resolvedInputPath)
-    let rootPath = parentPath
-    let selectedPath = basename(resolvedInputPath)
-
-    if (classification.repositoryRootPath) {
-      rootPath = classification.repositoryRootPath
-      selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
-    }
+    const { rootPath, selectedPath } = resolveDirectOpenTarget(resolvedInputPath, classification.repositoryRootPath)
 
     setRepoPath(rootPath)
     setPickerPath('')
