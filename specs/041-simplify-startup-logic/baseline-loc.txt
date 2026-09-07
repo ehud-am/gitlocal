@@ -4,3 +4,56 @@
      570 src/types.ts
     1881 src/git/repo.ts
     3737 total
+
+=== Post-implementation (whole-file) ===
+     253 src/services/startup-preferences.ts
+     351 src/server.ts
+     594 src/handlers/repo.ts
+     558 src/types.ts
+    1908 src/git/repo.ts
+    3664 total
+
+Whole-file reduction: 3737 -> 3664 = -73 lines (-2.0%)
+
+NOTE: whole-file counts understate the actual simplification because these five files hold
+substantial code unrelated to startup resolution (branch switching, git identity, commit/sync
+handling, the unrelated "default Markdown reader" preference, hundreds of unrelated type
+definitions, etc.). A scoped count of only the functions this feature actually touches or
+removed (resolveStartupFolder/resolveOsDefaultLocation/buildSafeFallbackResolution/
+writeStartupFolderPreference in startup-preferences.ts; resolveOpenTarget/initializePaths/
+applyOsDefaultFallback in server.ts; the startup-folder handlers, repositoryOpenHandler, and
+repositoryParentFolderHandler in handlers/repo.ts; the Startup*-prefixed types in types.ts; plus
+the new resolveDirectOpenTarget in git/repo.ts) gives a more honest signal:
+
+=== Post-implementation (scoped to startup-resolution functions only) ===
+  startup-preferences.ts (startup-only, excluding unrelated default-reader preference code):
+    before 245 -> after 207  (-38, -15.5%)
+  server.ts (resolveOpenTarget + initializePaths + isSupportedMarkdownPath + new applyOsDefaultFallback):
+    before 137 -> after 124  (-13, -9.5%)
+  handlers/repo.ts (startup-folder handlers, repositoryOpenHandler, repositoryParentFolderHandler,
+  including the now-removed startupFolderUpdateHandler, plus new fallBackToOsDefault):
+    before 278 -> after 244  (-34, -12.2%)
+  types.ts (Startup*-prefixed type block):
+    before 50 -> after 38    (-12, -24.0%)
+  git/repo.ts (new resolveDirectOpenTarget; nothing removed here, since the duplicate logic it
+  replaces lived in the two files above, not in this one):
+    before 0 -> after 27     (+27)
+
+  Scoped total: before 710 -> after 640  (-70, -9.9%)
+
+CONCLUSION: The measured reduction (~2% whole-file, ~10% scoped-to-startup-logic) falls well
+short of the ~30% aspirational target in SC-005. Per spec.md's Assumptions section, this
+metric is "a validation signal rather than a hard functional requirement — correctness and
+simplification quality take precedence if a conflict arises." A second pass (extracting
+`applyOsDefaultFallback` in server.ts and `fallBackToOsDefault` in handlers/repo.ts) was made
+specifically to close this gap before accepting the shortfall, per research.md's guidance to
+look for more redundant code first. The remaining size reflects genuinely distinct concerns
+that further merging would conflate rather than simplify: a directly-opened file vs. a folder
+path are different classification paths (User Story 2's whole point), and a startup-time
+fallback vs. a mid-session self-heal fire from different trigger points with different
+call-site context. The qualitative goals were met in full: exactly one OS-default location
+function (`resolveOsDefaultLocation`) and one fallback-resolution-building helper per module,
+in place of 5 named tiers and 4+ independently-computed fallback constructions; the
+repo-vs-independent-folder rule now has exactly one implementation instead of two; the one
+unvalidated persistence surface (`PUT /api/startup-folder`) is gone. See spec.md FR-001
+through FR-013 — all verified satisfied in quickstart.md, independent of the LOC metric.

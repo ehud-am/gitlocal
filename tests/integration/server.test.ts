@@ -955,7 +955,7 @@ describe('Server integration', () => {
     try {
       // Becomes unreadable only *after* createApp already committed to it — simulating a
       // permission change or drive disconnect during a long-running session, which the
-      // startup-time safe-fallback check (see the test above) cannot catch in advance.
+      // startup-time os-default fallback check (see the test above) cannot catch in advance.
       const app = createApp(unreadableDir)
       chmodSync(unreadableDir, 0o000)
       const res = await app.fetch(new Request('http://localhost/api/tree'))

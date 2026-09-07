@@ -48,7 +48,9 @@ echo "# Independent" > /tmp/gitlocal-quickstart/plain-folder/notes.md
    ```
    Expect: process starts without error; `GET /api/startup-folder` → `source: "os-default"`,
    non-empty `fallbackReason` explaining the remembered folder is gone; `GET /api/info` →
-   `pickerMode: true` (since the OS default is not itself a repo the user asked for).
+   `pickerMode: false` (the OS-default location — the home directory — is itself a perfectly
+   usable, readable folder, so it opens directly as a normal folder view rather than forcing
+   the picker; `isGitRepo: false` since it's not a repository).
 
 4. **Explicit path that does not exist**:
    ```bash

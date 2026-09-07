@@ -79,6 +79,18 @@ function pickerModeResponse(path: string): Record<string, unknown> {
 // since "the folder is gone" doesn't flicker the way a permission/mount glitch can.
 let unreadableRepoPathStreak = { path: '', count: 0 }
 
+// Every mid-session self-heal converges here: leave the current path, land on the single
+// OS-default location, and record why — sharing this means a future change to that shape only
+// needs to happen once, instead of at each call site that discovers its path is unusable.
+function fallBackToOsDefault(reason: string): string {
+  const fallback = resolveOsDefaultLocation()
+  setRepoPath('')
+  setPickerPath(fallback.path)
+  const previous = getStartupFolderResolution()
+  setStartupFolderResolution(buildSafeFallbackResolution(fallback, reason, { lastUsedPath: previous.lastUsedPath }))
+  return fallback.path
+}
+
 // The folder GitLocal has open can disappear at any point during a long-running session —
 // deleted, renamed, or an external/network drive unmounted — not just at process startup.
 // Left unchecked, the currently-open (now-missing) path would silently read back as an empty,
@@ -102,18 +114,11 @@ function recoverIfRepoPathUnavailable(repoPath: string): string {
   }
   unreadableRepoPathStreak = { path: '', count: 0 }
 
-  const fallback = resolveOsDefaultLocation()
-  setRepoPath('')
-  setPickerPath(fallback.path)
-  const previous = getStartupFolderResolution()
-  setStartupFolderResolution(buildSafeFallbackResolution(
-    fallback,
+  return fallBackToOsDefault(
     classification.exists
       ? 'The folder you had open is no longer readable — opened a default location instead.'
       : 'The folder you had open no longer exists — opened a default location instead.',
-    { lastUsedPath: previous.lastUsedPath },
-  ))
-  return fallback.path
+  )
 }
 
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -300,20 +305,12 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
 
   /* v8 ignore start -- reaching the filesystem root and finding it still unreadable is not practical to simulate in tests */
   if (isConfirmedUnreadable(candidate)) {
-    const fallback = resolveOsDefaultLocation()
-    setRepoPath('')
-    setPickerPath(fallback.path)
-    const previous = getStartupFolderResolution()
     // The caller (App.tsx's handleBrowseParentFolder) reloads the page on `ok: true` without
     // reading any inline message, so the explanation has to live where the reloaded picker
     // page already looks for it — the same startup-folder resolution snapshot every other
     // fallback path in this feature writes to — rather than an ad hoc response field no
     // client ever reads.
-    setStartupFolderResolution(buildSafeFallbackResolution(
-      fallback,
-      'No readable parent folder was found — opened a default location instead.',
-      { lastUsedPath: previous.lastUsedPath },
-    ))
+    fallBackToOsDefault('No readable parent folder was found — opened a default location instead.')
     return c.json({ ok: true, error: '' })
   }
   /* v8 ignore stop */

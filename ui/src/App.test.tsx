@@ -1797,7 +1797,7 @@ describe('App', () => {
     })
     vi.mocked(api.getStartupFolder).mockResolvedValue({
       path: '/tmp/Documents',
-      source: 'platform-default',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/tmp/gone',
@@ -1816,7 +1816,7 @@ describe('App', () => {
   it('shows why the startup folder fell back to a default when the remembered folder is unavailable (US2)', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
       path: '/tmp/Documents',
-      source: 'platform-default',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/tmp/gone',

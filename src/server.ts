@@ -200,6 +200,18 @@ export function resolveOpenTarget(inputPath: string, source: StartupOpenSource):
   }
 }
 
+// Every startup failure this function detects — a blocked file-open target, or a requested
+// folder that isn't a usable directory — converges here: land on the single OS-default
+// location and record why, rather than each caller re-deriving both.
+function applyOsDefaultFallback(reason: string, resolvedPath: string): void {
+  const fallback = resolveOsDefaultLocation()
+  currentRepoPath = ''
+  currentPickerPath = fallback.path
+  currentStartupFolderResolution = buildSafeFallbackResolution(fallback, reason, {
+    lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+  })
+}
+
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
   currentStartupOpenTarget = null
   currentStartupFolderResolution = options.startupFolderResolution ?? null
@@ -230,16 +242,7 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
     if (options.initialOpenSource) {
       // Reaching this branch already means the requested open target was rejected above
       // (not `status === 'accepted'` with a `rootPath`), so it's always worth explaining why.
-      // Converges on the same single OS-default location every other startup failure uses,
-      // rather than a separate cwd-based fallback specific to file-open failures.
-      const fallback = resolveOsDefaultLocation()
-      currentRepoPath = ''
-      currentPickerPath = fallback.path
-      currentStartupFolderResolution = buildSafeFallbackResolution(
-        fallback,
-        target.message || 'The requested path could not be opened — opened a default location instead.',
-        { lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath },
-      )
+      applyOsDefaultFallback(target.message || 'The requested path could not be opened — opened a default location instead.', resolvedPath)
       return
     }
   }
@@ -259,17 +262,12 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
 
   // The requested folder is gone, was renamed, became a file, or is no longer readable
   // (a deleted/renamed "last used" folder, an unmounted drive, a permission change) — landing
-  // on it anyway would silently render as an empty, non-git folder with no explanation. Falls
-  // back to the same single OS-default location every other startup failure converges on.
-  const fallback = resolveOsDefaultLocation()
-  currentRepoPath = ''
-  currentPickerPath = fallback.path
-  currentStartupFolderResolution = buildSafeFallbackResolution(
-    fallback,
+  // on it anyway would silently render as an empty, non-git folder with no explanation.
+  applyOsDefaultFallback(
     classification.exists
       ? 'The requested folder is no longer readable — opened a default location instead.'
       : 'The requested folder no longer exists — opened a default location instead.',
-    { lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath },
+    resolvedPath,
   )
 }
 

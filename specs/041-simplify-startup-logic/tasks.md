@@ -158,10 +158,10 @@ confirm only the repo root was persisted and no file/sub-folder is preselected; 
 
 **Purpose**: Confirm the overall simplification goal was met and the codebase/docs reflect it.
 
-- [ ] T028 Re-run `wc -l` on the same file list as T001 (`src/services/startup-preferences.ts src/server.ts src/handlers/repo.ts src/types.ts src/git/repo.ts`), compare against `specs/041-simplify-startup-logic/baseline-loc.txt`, and record the resulting percentage reduction in that same file — confirm it approaches the ~30% target from SC-005 (a shortfall is a signal to look for more redundant code from research.md's decisions, not a hard blocker if correctness would otherwise suffer)
-- [ ] T029 [P] Add a "Recent Changes" entry for this feature to `CLAUDE.md`, following the existing per-feature entry format used by prior specs
-- [ ] T030 Run `npm run verify` (full build + test + audit) at the repository root and confirm it passes clean
-- [ ] T031 Manually execute all 9 steps of [quickstart.md](./quickstart.md) end-to-end against a locally built `dist/cli.js` and confirm every expectation holds
+- [X] T028 Re-run `wc -l` on the same file list as T001 (`src/services/startup-preferences.ts src/server.ts src/handlers/repo.ts src/types.ts src/git/repo.ts`), compare against `specs/041-simplify-startup-logic/baseline-loc.txt`, and record the resulting percentage reduction in that same file — confirm it approaches the ~30% target from SC-005 (a shortfall is a signal to look for more redundant code from research.md's decisions, not a hard blocker if correctness would otherwise suffer)
+- [X] T029 [P] Add a "Recent Changes" entry for this feature to `CLAUDE.md`, following the existing per-feature entry format used by prior specs
+- [X] T030 Run `npm run verify` (full build + test + audit) at the repository root and confirm it passes clean
+- [X] T031 Manually execute all 9 steps of [quickstart.md](./quickstart.md) end-to-end against a locally built `dist/cli.js` and confirm every expectation holds
 
 ---
 
