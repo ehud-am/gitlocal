@@ -132,23 +132,23 @@ confirm only the repo root was persisted and no file/sub-folder is preselected; 
 
 ### Tests for User Story 3
 
-- [ ] T020 [P] [US3] Add unit tests in `tests/unit/services/startup-preferences.test.ts` for `writeStartupFolderPreference()`'s new guard: writing a repository root succeeds; writing an independent folder root succeeds; writing a sub-path inside a repository (not the root) throws
-- [ ] T021 [P] [US3] Add an integration test in `tests/integration/server.test.ts` confirming `PUT /api/startup-folder` returns a 404 (route no longer registered)
+- [X] T020 [P] [US3] Add unit tests in `tests/unit/services/startup-preferences.test.ts` for `writeStartupFolderPreference()`'s new guard: writing a repository root succeeds; writing an independent folder root succeeds; writing a sub-path inside a repository (not the root) throws
+- [X] T021 [P] [US3] Add an integration test in `tests/integration/server.test.ts` confirming `PUT /api/startup-folder` returns a 404 (route no longer registered)
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] In `src/services/startup-preferences.ts`, add a top-level-only guard inside `writeStartupFolderPreference()`: use `classifyLocalPath()` to reject (throw) a path that is inside a git repository but is not that repository's root, in addition to the existing `isReadableDirectory` check (depends on T020 defining the expected behavior)
-- [ ] T023 [US3] Remove the `PUT /api/startup-folder` route registration in `src/server.ts` and the `startupFolderUpdateHandler` function plus its `StartupFolderUpdateRequest` import in `src/handlers/repo.ts`
-- [ ] T024 [P] [US3] Remove the now-unused `StartupFolderUpdateRequest` and `StartupFolderUpdateResponse` types from `src/types.ts` and their mirrors from `ui/src/types/index.ts`
-- [ ] T025 [P] [US3] Remove the dead `updateStartupFolder` function from `ui/src/services/api.ts` (confirmed to have zero call sites)
+- [X] T022 [US3] In `src/services/startup-preferences.ts`, add a top-level-only guard inside `writeStartupFolderPreference()`: use `classifyLocalPath()` to reject (throw) a path that is inside a git repository but is not that repository's root, in addition to the existing `isReadableDirectory` check (depends on T020 defining the expected behavior)
+- [X] T023 [US3] Remove the `PUT /api/startup-folder` route registration in `src/server.ts` and the `startupFolderUpdateHandler` function plus its `StartupFolderUpdateRequest` import in `src/handlers/repo.ts`
+- [X] T024 [P] [US3] Remove the now-unused `StartupFolderUpdateRequest` and `StartupFolderUpdateResponse` types from `src/types.ts` and their mirrors from `ui/src/types/index.ts`
+- [X] T025 [P] [US3] Remove the dead `updateStartupFolder` function from `ui/src/services/api.ts` (confirmed to have zero call sites)
 
 ### Test Updates for User Story 3
 
-- [ ] T026 [US3] Remove the obsolete `PUT /api/startup-folder` handler tests from `tests/unit/handlers/repo.test.ts` (superseded by T021's 404 integration test) and confirm no remaining reference to `startupFolderUpdateHandler` (depends on T023)
+- [X] T026 [US3] Remove the obsolete `PUT /api/startup-folder` handler tests from `tests/unit/handlers/repo.test.ts` (superseded by T021's 404 integration test) and confirm no remaining reference to `startupFolderUpdateHandler` (depends on T023)
 
 ### Validation
 
-- [ ] T027 [US3] Run `npm run test:server` and confirm ≥90% branch coverage on `src/services/startup-preferences.ts`, `src/server.ts`, `src/handlers/repo.ts`, `src/types.ts`; run `npm run test:ui` (or `npm test`) for `ui/src/services/api.ts` and `ui/src/types/index.ts` coverage
+- [X] T027 [US3] Run `npm run test:server` and confirm ≥90% branch coverage on `src/services/startup-preferences.ts`, `src/server.ts`, `src/handlers/repo.ts`, `src/types.ts`; run `npm run test:ui` (or `npm test`) for `ui/src/services/api.ts` and `ui/src/types/index.ts` coverage
 
 **Checkpoint**: All three user stories are independently functional — quickstart.md steps 1-9 all pass.
 

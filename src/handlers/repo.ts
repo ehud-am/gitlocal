@@ -35,7 +35,6 @@ import {
   rememberStartupFolder,
   resolveOsDefaultLocation,
   writeDefaultReaderPreference,
-  writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
 import type {
   BranchSwitchRequest,
@@ -49,7 +48,6 @@ import type {
   RepoSummaryResponse,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
-  StartupFolderUpdateRequest,
 } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
@@ -140,30 +138,6 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
 
 export async function startupFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   return c.json(getStartupFolderResolution())
-}
-
-export async function startupFolderUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  let payload: StartupFolderUpdateRequest
-  try {
-    payload = await c.req.json<StartupFolderUpdateRequest>()
-  } catch {
-    return c.json({ ok: false, path: '', message: 'Invalid JSON body.' }, 400)
-  }
-
-  try {
-    const preference = writeStartupFolderPreference(payload.path ?? '', payload.source ?? 'picker-open')
-    return c.json({
-      ok: true,
-      path: preference.path,
-      message: 'Startup folder preference updated.',
-    })
-  } catch (error) {
-    return c.json({
-      ok: false,
-      path: payload.path ?? '',
-      message: error instanceof Error ? error.message : 'Could not update startup folder preference.',
-    }, 400)
-  }
 }
 
 export async function startupOpenTargetHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

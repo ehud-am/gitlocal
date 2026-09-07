@@ -36,8 +36,6 @@ import type {
   SshKeyListResponse,
   SshKeyValidationResponse,
   StartupFolderResponse,
-  StartupFolderUpdateRequest,
-  StartupFolderUpdateResponse,
   StartupOpenTargetResponse,
   TreeNode,
 } from '../types'
@@ -108,9 +106,6 @@ export const api = {
 
   getStartupFolder: (): Promise<StartupFolderResponse> =>
     request<StartupFolderResponse>('/api/startup-folder'),
-
-  updateStartupFolder: (payload: StartupFolderUpdateRequest): Promise<StartupFolderUpdateResponse> =>
-    mutate('/api/startup-folder', 'PUT', payload),
 
   getStartupOpenTarget: (): Promise<StartupOpenTargetResponse> =>
     request<StartupOpenTargetResponse>('/api/startup-open-target'),

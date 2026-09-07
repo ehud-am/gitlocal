@@ -1,6 +1,7 @@
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, parse as parsePath, resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { classifyLocalPath } from '../git/repo.js'
 import type {
   DefaultReaderPreference,
   DefaultReaderPreferenceStatus,
@@ -174,6 +175,14 @@ export function writeStartupFolderPreference(
     throw new Error(`Startup folder is not available: ${folderPath}`)
   }
   const canonicalPath = canonicalDirectory(folderPath)
+
+  // Defense-in-depth: "last viewed" must always be a top-level location (a repository root, or
+  // an independent folder's own root), never a sub-path inside a repository — every real call
+  // site already only ever passes such a path, but this guard makes that a structural
+  // guarantee rather than a convention every future caller must independently uphold (FR-010).
+  if (classifyLocalPath(canonicalPath).gitState === 'inside-repository') {
+    throw new Error(`Startup folder must be a repository root, not a path inside one: ${canonicalPath}`)
+  }
 
   const preference: StartupFolderPreference = {
     path: canonicalPath,

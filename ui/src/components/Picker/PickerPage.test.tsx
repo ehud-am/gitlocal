@@ -115,10 +115,10 @@ describe('PickerPage', () => {
     expect(screen.getAllByText('gitlocal').length).toBeGreaterThan(0)
   })
 
-  it('shows the Documents startup message when using the platform default folder', async () => {
+  it('shows a generic default-location startup message when no fallback reason is given', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
-      path: '/Users/example/Documents',
-      source: 'platform-default',
+      path: '/Users/example',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '',
@@ -127,36 +127,34 @@ describe('PickerPage', () => {
 
     render(<PickerPage />)
 
-    expect(await screen.findByText(/started from your documents folder/i)).toBeInTheDocument()
+    expect(await screen.findByText(/opened a default location/i)).toBeInTheDocument()
   })
 
-  it('surfaces why the remembered folder was skipped when falling back to the platform default folder', async () => {
+  it('surfaces why the remembered folder was skipped when falling back to the OS default', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
-      path: '/Users/example/Documents',
-      source: 'platform-default',
+      path: '/Users/example',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/Users/example/gone',
-      fallbackReason: 'Last used folder no longer exists.',
+      fallbackReason: 'Last used folder no longer exists. Opened a default location instead.',
     })
 
     render(<PickerPage />)
 
-    // Regression guard: this combination (platform-default source with a non-empty
-    // fallbackReason) previously fell through to the generic "started from your Documents
-    // folder" message, silently discarding the more specific reason the app already knew.
+    // Regression guard: an os-default source with a non-empty fallbackReason must show that
+    // specific reason, not a generic message that silently discards it.
     expect(await screen.findByText(/last used folder no longer exists/i)).toBeInTheDocument()
-    expect(screen.queryByText(/^gitlocal started from your documents folder\.?$/i)).not.toBeInTheDocument()
   })
 
   it('recovers a previously-unavailable remembered folder by reopening the same path once it is reachable again (FR-008)', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
-      path: '/Users/example/Documents',
-      source: 'platform-default',
+      path: '/Users/example',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/Volumes/external-drive/project',
-      fallbackReason: 'Last used folder is currently unreachable — it may be on a disconnected drive.',
+      fallbackReason: 'Last used folder is currently unreachable — it may be on a disconnected drive. Opened a default location instead.',
     })
     vi.mocked(api.openRepository).mockResolvedValue({ ok: true, error: '' })
 
@@ -176,14 +174,14 @@ describe('PickerPage', () => {
     expect(window.location.reload).toHaveBeenCalled()
   })
 
-  it('shows the home fallback startup message and tolerates startup lookup failures', async () => {
+  it('shows the os-default startup message and tolerates startup lookup failures', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
       path: '/Users/example',
-      source: 'home-fallback',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/Users/example/missing',
-      fallbackReason: 'Last used folder is unavailable.',
+      fallbackReason: 'Last used folder is unavailable. Opened a default location instead.',
     })
 
     const { unmount } = render(<PickerPage />)
@@ -199,18 +197,18 @@ describe('PickerPage', () => {
     expect(screen.queryByText(/last used folder is unavailable/i)).not.toBeInTheDocument()
   })
 
-  it('shows the safe fallback startup message when even the home folder was unavailable', async () => {
+  it('shows the os-default startup message when the previously open folder became unavailable', async () => {
     vi.mocked(api.getStartupFolder).mockResolvedValueOnce({
-      path: '/tmp',
-      source: 'safe-fallback',
+      path: '/Users/example',
+      source: 'os-default',
       exists: true,
       readable: true,
       lastUsedPath: '/Users/example/missing',
-      fallbackReason: 'The folder you had open no longer exists — opened a safe fallback location instead.',
+      fallbackReason: 'The folder you had open no longer exists — opened a default location instead.',
     })
 
     render(<PickerPage />)
-    expect(await screen.findByText(/no longer exists — opened a safe fallback location/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no longer exists — opened a default location/i)).toBeInTheDocument()
   })
 
   it('selects a folder when clicked', async () => {

@@ -107,17 +107,6 @@ export interface StartupFolderPreference {
   source: StartupFolderUpdateSource
 }
 
-export interface StartupFolderUpdateRequest {
-  path: string
-  source: StartupFolderUpdateSource
-}
-
-export interface StartupFolderUpdateResponse {
-  ok: boolean
-  path: string
-  message: string
-}
-
 export interface StartupOpenTarget {
   source: StartupOpenSource
   inputPath: string

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { platform, tmpdir } from 'node:os'
+import { spawnSync } from 'node:child_process'
 import {
   readDefaultReaderPreference,
   readStartupFolderPreference,
@@ -11,6 +12,14 @@ import {
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../../../src/services/startup-preferences.js'
+
+function makeGitRepoWithSubfolder(): { repoDir: string; subDir: string; cleanup: () => void } {
+  const repoDir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-guard-repo-'))
+  spawnSync('git', ['init'], { cwd: repoDir })
+  const subDir = join(repoDir, 'sub')
+  mkdirSync(subDir)
+  return { repoDir, subDir, cleanup: () => rmSync(repoDir, { recursive: true, force: true }) }
+}
 
 describe('startup preferences', () => {
   it('prefers explicit paths over remembered paths and defaults', () => {
@@ -206,6 +215,37 @@ describe('startup preferences', () => {
         .toThrow(/startup folder is not available/i)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts a repository root as a startup folder', () => {
+    const { repoDir, cleanup } = makeGitRepoWithSubfolder()
+    try {
+      const prefPath = join(repoDir, 'pref.json')
+      const preference = writeStartupFolderPreference(repoDir, 'repo-open', prefPath)
+      expect(preference.path).toBe(realpathSync(repoDir))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('accepts an independent (non-repository) folder as a startup folder', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-independent-'))
+    try {
+      const preference = writeStartupFolderPreference(dir, 'picker-open', join(dir, 'pref.json'))
+      expect(preference.path).toBe(realpathSync(dir))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a sub-path inside a repository as a startup folder (FR-010/FR-011)', () => {
+    const { repoDir, subDir, cleanup } = makeGitRepoWithSubfolder()
+    try {
+      expect(() => writeStartupFolderPreference(subDir, 'repo-open', join(repoDir, 'pref.json')))
+        .toThrow(/must be a repository root/i)
+    } finally {
+      cleanup()
     }
   })
 
