@@ -166,6 +166,24 @@ describe('FileTree', () => {
     expect(screen.queryByText('scratch.md')).not.toBeInTheDocument()
   })
 
+  it('does not hide local-only entries outside a git repository, where tracked-vs-generated is meaningless', async () => {
+    mockedApi.getTree.mockResolvedValue([
+      { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false },
+      { name: 'downloads', path: 'downloads', type: 'dir', localOnly: true },
+    ])
+
+    renderWithClient(
+      <FileTree
+        {...defaultProps}
+        isGitRepo={false}
+        generatedLocalVisibility="hide"
+      />,
+    )
+
+    expect(await screen.findByText('notes.txt')).toBeInTheDocument()
+    expect(screen.getByText('downloads')).toBeInTheDocument()
+  })
+
   it('can show only generated and local-only entries with clear labels', async () => {
     mockedApi.getTree.mockResolvedValue([
       { name: 'README.md', path: 'README.md', type: 'file', localOnly: false, generatedLocalState: 'tracked' },
