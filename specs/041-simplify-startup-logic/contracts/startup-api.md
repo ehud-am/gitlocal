@@ -45,12 +45,15 @@ Changes: `source` is now one of `explicit | last-used | os-default` (was 5 value
 *purpose* (explain what happened and why) so the picker banner continues to render a meaningful
 message with no UI code change required beyond the type update.
 
-**Consumer impact**: `ui/src/types/index.ts`'s `StartupFolderResolution` type is updated to match
-(narrower `source` union, `platformDefaultPath` removed). `ui/src/App.tsx` and
-`ui/src/components/Picker/PickerPage.tsx` only ever read `fallbackReason` (a string) for display —
-no consumer branches on the specific `source` value today (verified by repo-wide search), so this
-is a non-breaking shape narrowing from the UI's perspective, requiring only a type update and a
-fixture update in tests that construct a full mock response.
+**Consumer impact**: `ui/src/types/index.ts`'s `StartupFolderResponse` type is updated to match
+(narrower `source` union, `platformDefaultPath` removed). `ui/src/components/Picker/PickerPage.tsx`
+*does* branch on `source` (a `startupMessage` banner with per-tier copy for
+`platform-default`/`home-fallback`/`safe-fallback`) — this branch is consolidated to a single
+`os-default` case using `fallbackReason` (already present and populated for every fallback), with
+a plain "GitLocal opened a default location." default when `fallbackReason` is empty. `ui/src/App.tsx`
+only reads `fallbackReason` for its own status message and does not branch on `source`. This is a
+small, deliberate behavior change (3 banner variants collapse to 1) consistent with the spec's
+"exactly one OS-default fallback" requirement (FR-007) — not a silent regression.
 
 ## `PUT /api/startup-folder` — REMOVED
 

@@ -44,7 +44,6 @@ beforeEach(() => {
     source: 'last-used',
     exists: true,
     readable: true,
-    platformDefaultPath: '/Users/example/Documents',
     lastUsedPath: '/Users/example',
     fallbackReason: '',
   })
@@ -122,7 +121,6 @@ describe('PickerPage', () => {
       source: 'platform-default',
       exists: true,
       readable: true,
-      platformDefaultPath: '/Users/example/Documents',
       lastUsedPath: '',
       fallbackReason: '',
     })
@@ -138,7 +136,6 @@ describe('PickerPage', () => {
       source: 'platform-default',
       exists: true,
       readable: true,
-      platformDefaultPath: '/Users/example/Documents',
       lastUsedPath: '/Users/example/gone',
       fallbackReason: 'Last used folder no longer exists.',
     })
@@ -158,7 +155,6 @@ describe('PickerPage', () => {
       source: 'platform-default',
       exists: true,
       readable: true,
-      platformDefaultPath: '/Users/example/Documents',
       lastUsedPath: '/Volumes/external-drive/project',
       fallbackReason: 'Last used folder is currently unreachable — it may be on a disconnected drive.',
     })
@@ -186,7 +182,6 @@ describe('PickerPage', () => {
       source: 'home-fallback',
       exists: true,
       readable: true,
-      platformDefaultPath: '/Users/example/Documents',
       lastUsedPath: '/Users/example/missing',
       fallbackReason: 'Last used folder is unavailable.',
     })
@@ -210,7 +205,6 @@ describe('PickerPage', () => {
       source: 'safe-fallback',
       exists: true,
       readable: true,
-      platformDefaultPath: '/Users/example/Documents',
       lastUsedPath: '/Users/example/missing',
       fallbackReason: 'The folder you had open no longer exists — opened a safe fallback location instead.',
     })

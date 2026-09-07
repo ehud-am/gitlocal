@@ -1,0 +1,6 @@
+     291 src/services/startup-preferences.ts
+     366 src/server.ts
+     629 src/handlers/repo.ts
+     570 src/types.ts
+    1881 src/git/repo.ts
+    3737 total

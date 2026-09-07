@@ -51,7 +51,7 @@ import {
   terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
 import { classifyLocalPath } from './git/repo.js'
-import { buildSafeFallbackResolution, isReadableDirectory, resolveGuaranteedFallbackPath, resolveStartupFolder } from './services/startup-preferences.js'
+import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
@@ -233,21 +233,17 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
       return
     }
     if (options.initialOpenSource) {
-      // process.cwd() is virtually always readable, but not guaranteed (e.g. it was deleted
-      // out from under the running process) — fall further back rather than repeating the
-      // same "landed on something unreadable" problem this whole function exists to avoid.
-      const cwdFallback = isReadableDirectory(process.cwd()) ? { path: process.cwd(), readable: true } : resolveGuaranteedFallbackPath()
-      currentRepoPath = ''
-      currentPickerPath = cwdFallback.path
       // Reaching this branch already means the requested open target was rejected above
       // (not `status === 'accepted'` with a `rootPath`), so it's always worth explaining why.
+      // Converges on the same single OS-default location every other startup failure uses,
+      // rather than a separate cwd-based fallback specific to file-open failures.
+      const fallback = resolveOsDefaultLocation()
+      currentRepoPath = ''
+      currentPickerPath = fallback.path
       currentStartupFolderResolution = buildSafeFallbackResolution(
-        cwdFallback,
-        target.message || 'The requested path could not be opened — opened a safe fallback location instead.',
-        {
-          platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-          lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-        },
+        fallback,
+        target.message || 'The requested path could not be opened — opened a default location instead.',
+        { lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath },
       )
       return
     }
@@ -268,20 +264,17 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
 
   // The requested folder is gone, was renamed, became a file, or is no longer readable
   // (a deleted/renamed "last used" folder, an unmounted drive, a permission change) — landing
-  // on it anyway would silently render as an empty, non-git folder with no explanation. Fall
-  // back to a location that is always readable instead, and record why for the picker's banner.
-  const fallback = resolveGuaranteedFallbackPath()
+  // on it anyway would silently render as an empty, non-git folder with no explanation. Falls
+  // back to the same single OS-default location every other startup failure converges on.
+  const fallback = resolveOsDefaultLocation()
   currentRepoPath = ''
   currentPickerPath = fallback.path
   currentStartupFolderResolution = buildSafeFallbackResolution(
     fallback,
     classification.exists
-      ? 'The requested folder is no longer readable — opened a safe fallback location instead.'
-      : 'The requested folder no longer exists — opened a safe fallback location instead.',
-    {
-      platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-      lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-    },
+      ? 'The requested folder is no longer readable — opened a default location instead.'
+      : 'The requested folder no longer exists — opened a default location instead.',
+    { lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath },
   )
 }
 

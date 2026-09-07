@@ -1,27 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { platform, tmpdir } from 'node:os'
 import {
-  getLinuxDocumentsPath,
   readDefaultReaderPreference,
   readStartupFolderPreference,
   rememberStartupFolder,
-  resolveGuaranteedFallbackPath,
+  resolveOsDefaultLocation,
   resolveStartupFolder,
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../../../src/services/startup-preferences.js'
 
 describe('startup preferences', () => {
-  it('uses a configured Linux documents path when provided', () => {
-    expect(getLinuxDocumentsPath('/home/user', { XDG_DOCUMENTS_DIR: '~/Docs' })).toBe('/home/user/Docs')
-  })
-
-  it('uses the home Documents folder when no Linux XDG path is configured', () => {
-    expect(getLinuxDocumentsPath('/home/user', {})).toBe('/home/user/Documents')
-  })
-
   it('prefers explicit paths over remembered paths and defaults', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-explicit-'))
     const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-remembered-'))
@@ -51,10 +42,8 @@ describe('startup preferences', () => {
     }
   })
 
-  it('distinguishes why a remembered folder is unavailable when falling back to the platform default (deleted vs. permission-denied vs. disconnected)', () => {
+  it('distinguishes why a remembered folder is unavailable when falling back to the OS default (deleted vs. permission-denied)', () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-last-used-gone-'))
-    const documents = join(home, 'Documents')
-    mkdirSync(documents)
     const prefPath = join(home, 'pref.json')
 
     // Case 1: remembered folder was deleted entirely.
@@ -64,8 +53,9 @@ describe('startup preferences', () => {
 
     try {
       const resolution = resolveStartupFolder({ preferencePath: prefPath, homePath: home })
-      expect(resolution.source).toBe('platform-default')
-      expect(resolution.fallbackReason).toBe('Last used folder no longer exists.')
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.path).toBe(realpathSync(home))
+      expect(resolution.fallbackReason).toBe('Last used folder no longer exists. Opened a default location instead.')
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
@@ -75,8 +65,6 @@ describe('startup preferences', () => {
     if (process.platform === 'win32') return // chmod-based permission denial is not meaningful on Windows
 
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-last-used-denied-'))
-    const documents = join(home, 'Documents')
-    mkdirSync(documents)
     const prefPath = join(home, 'pref.json')
     const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-denied-'))
     writeStartupFolderPreference(remembered, 'repo-open', prefPath)
@@ -84,8 +72,8 @@ describe('startup preferences', () => {
 
     try {
       const resolution = resolveStartupFolder({ preferencePath: prefPath, homePath: home })
-      expect(resolution.source).toBe('platform-default')
-      expect(resolution.fallbackReason).toBe('Last used folder is no longer accessible (permission denied).')
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.fallbackReason).toBe('Last used folder is no longer accessible (permission denied). Opened a default location instead.')
     } finally {
       chmodSync(remembered, 0o755)
       rmSync(home, { recursive: true, force: true })
@@ -93,7 +81,7 @@ describe('startup preferences', () => {
     }
   })
 
-  it('reports an unavailable explicit path without falling back to remembered state', () => {
+  it('falls back to the OS default when an explicit path does not exist, without reporting the remembered folder as the problem', () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-explicit-missing-home-'))
     const remembered = mkdtempSync(join(tmpdir(), 'gitlocal-startup-explicit-missing-remembered-'))
     const prefPath = join(home, 'pref.json')
@@ -102,10 +90,11 @@ describe('startup preferences', () => {
 
     try {
       const resolution = resolveStartupFolder({ explicitPath: missing, preferencePath: prefPath, homePath: home })
-      expect(resolution.source).toBe('explicit')
-      expect(resolution.path).toBe(missing)
-      expect(resolution.exists).toBe(false)
-      expect(resolution.fallbackReason).toBe('Explicit folder is unavailable.')
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.path).toBe(realpathSync(home))
+      expect(resolution.exists).toBe(true)
+      expect(resolution.lastUsedPath).toBe(realpathSync(remembered))
+      expect(resolution.fallbackReason).toBe('Explicit folder is unavailable — opened a default location instead.')
     } finally {
       rmSync(home, { recursive: true, force: true })
       rmSync(remembered, { recursive: true, force: true })
@@ -123,8 +112,8 @@ describe('startup preferences', () => {
       const resolution = resolveStartupFolder({ explicitPath: unreadable, preferencePath: join(home, 'missing-pref.json'), homePath: home })
       // Passes existsSync + statSync().isDirectory() but fails an actual read attempt —
       // FR-006 requires this to be rejected as unreadable, not silently accepted.
-      expect(resolution.readable).toBe(false)
-      expect(resolution.fallbackReason).toBe('Explicit folder is unavailable.')
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.fallbackReason).toBe('Explicit folder is unavailable — opened a default location instead.')
     } finally {
       chmodSync(unreadable, 0o755)
       rmSync(home, { recursive: true, force: true })
@@ -132,78 +121,55 @@ describe('startup preferences', () => {
     }
   })
 
-  it('uses the platform Documents folder when there is no remembered folder', () => {
-    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-documents-home-'))
-    const documents = join(home, 'Documents')
-    mkdirSync(documents)
+  it('uses the home directory when there is no remembered folder', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-home-only-'))
 
     try {
       const resolution = resolveStartupFolder({ preferencePath: join(home, 'missing-pref.json'), homePath: home })
-      expect(resolution.source).toBe('platform-default')
-      expect(resolution.path).toBe(realpathSync(documents))
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.path).toBe(realpathSync(home))
       expect(resolution.fallbackReason).toBe('')
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
   })
 
-  it('falls back to home when remembered and documents folders are unavailable', () => {
-    const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-home-'))
-    const prefPath = join(home, 'pref.json')
-    writeFileSync(prefPath, JSON.stringify({ path: join(home, 'missing'), openedAt: new Date().toISOString(), source: 'repo-open' }))
-
-    try {
-      const resolution = resolveStartupFolder({
-        preferencePath: prefPath,
-        homePath: home,
-        env: { XDG_DOCUMENTS_DIR: join(home, 'missing-documents') },
-      })
-      expect(resolution.source).toBe('home-fallback')
-      expect(resolution.path).toBe(realpathSync(home))
-    } finally {
-      rmSync(home, { recursive: true, force: true })
-    }
-  })
-
-  it('falls back gracefully when remembered, documents, and home folders are all unavailable', () => {
+  it('falls back to the filesystem root when the home directory itself is unavailable', () => {
     const home = mkdtempSync(join(tmpdir(), 'gitlocal-startup-home-missing-'))
     const missingHome = join(home, 'no-such-home')
 
-    expect(() =>
-      resolveStartupFolder({
-        preferencePath: join(home, 'missing-pref.json'),
-        homePath: missingHome,
-        env: { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') },
-      }),
-    ).not.toThrow()
-
     try {
-      const resolution = resolveStartupFolder({
-        preferencePath: join(home, 'missing-pref.json'),
-        homePath: missingHome,
-        env: { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') },
-      })
-      // Documents and home both fail, so the guaranteed-fallback chain continues further —
-      // to the process's own cwd, which is readable in this test environment — rather than
-      // stopping at an unreadable home folder with nowhere left to go.
-      expect(resolution.source).toBe('safe-fallback')
-      expect(resolution.path).toBe(realpathSync(process.cwd()))
-      expect(resolution.exists).toBe(true)
-      expect(resolution.readable).toBe(true)
-      expect(resolution.fallbackReason).toBe('Home folder is unavailable — opened a safe fallback location instead.')
+      const resolution = resolveStartupFolder({ preferencePath: join(home, 'missing-pref.json'), homePath: missingHome })
+      // Home is unavailable, so resolution falls through to the filesystem root — the single
+      // remaining rung of the OS-default fallback — rather than trying Documents/cwd/tmp first.
+      const fallback = resolveOsDefaultLocation(missingHome)
+      expect(resolution.source).toBe('os-default')
+      expect(resolution.path).toBe(fallback.path)
+      expect(resolution.exists).toBe(fallback.readable)
+      expect(resolution.readable).toBe(fallback.readable)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
   })
 
-  it('resolveGuaranteedFallbackPath skips unreadable Documents and home folders, landing on a readable one further down the chain', () => {
-    const home = mkdtempSync(join(tmpdir(), 'gitlocal-guaranteed-fallback-'))
+  it('resolveOsDefaultLocation returns the home directory when it is readable', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-os-default-home-'))
+    try {
+      const fallback = resolveOsDefaultLocation(home)
+      expect(fallback).toEqual({ path: realpathSync(home), readable: true })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('resolveOsDefaultLocation falls through to the filesystem root when home is unreadable', () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-os-default-missing-'))
     const missingHome = join(home, 'no-such-home')
 
     try {
-      const fallback = resolveGuaranteedFallbackPath(missingHome, { XDG_DOCUMENTS_DIR: join(missingHome, 'missing-documents') })
+      const fallback = resolveOsDefaultLocation(missingHome)
       expect(fallback.readable).toBe(true)
-      expect(fallback.path).toBe(realpathSync(process.cwd()))
+      expect(fallback.path).not.toBe(missingHome)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }

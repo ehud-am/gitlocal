@@ -158,7 +158,7 @@ describe('infoHandler', () => {
 
       const startupRes = await client.api['startup-folder'].$get()
       const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
-      expect(startupBody.source).toBe('safe-fallback')
+      expect(startupBody.source).toBe('os-default')
       expect(startupBody.fallbackReason).toMatch(/no longer readable/i)
     } finally {
       chmodSync(folder, 0o755)

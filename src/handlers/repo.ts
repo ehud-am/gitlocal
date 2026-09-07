@@ -32,7 +32,7 @@ import {
   isReadableDirectory,
   readDefaultReaderPreference,
   rememberStartupFolder,
-  resolveGuaranteedFallbackPath,
+  resolveOsDefaultLocation,
   writeDefaultReaderPreference,
   writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
@@ -103,16 +103,16 @@ function recoverIfRepoPathUnavailable(repoPath: string): string {
   }
   unreadableRepoPathStreak = { path: '', count: 0 }
 
-  const fallback = resolveGuaranteedFallbackPath()
+  const fallback = resolveOsDefaultLocation()
   setRepoPath('')
   setPickerPath(fallback.path)
   const previous = getStartupFolderResolution()
   setStartupFolderResolution(buildSafeFallbackResolution(
     fallback,
     classification.exists
-      ? 'The folder you had open is no longer readable — opened a safe fallback location instead.'
-      : 'The folder you had open no longer exists — opened a safe fallback location instead.',
-    { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
+      ? 'The folder you had open is no longer readable — opened a default location instead.'
+      : 'The folder you had open no longer exists — opened a default location instead.',
+    { lastUsedPath: previous.lastUsedPath },
   ))
   return fallback.path
 }
@@ -332,7 +332,7 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
 
   /* v8 ignore start -- reaching the filesystem root and finding it still unreadable is not practical to simulate in tests */
   if (isConfirmedUnreadable(candidate)) {
-    const fallback = resolveGuaranteedFallbackPath()
+    const fallback = resolveOsDefaultLocation()
     setRepoPath('')
     setPickerPath(fallback.path)
     const previous = getStartupFolderResolution()
@@ -343,8 +343,8 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
     // client ever reads.
     setStartupFolderResolution(buildSafeFallbackResolution(
       fallback,
-      'No readable parent folder was found — opened a safe fallback location instead.',
-      { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
+      'No readable parent folder was found — opened a default location instead.',
+      { lastUsedPath: previous.lastUsedPath },
     ))
     return c.json({ ok: true, error: '' })
   }

@@ -187,7 +187,6 @@ describe('App', () => {
       source: 'last-used',
       exists: true,
       readable: true,
-      platformDefaultPath: '/tmp/Documents',
       lastUsedPath: '/tmp/repo',
       fallbackReason: '',
     })
@@ -1801,7 +1800,6 @@ describe('App', () => {
       source: 'platform-default',
       exists: true,
       readable: true,
-      platformDefaultPath: '/tmp/Documents',
       lastUsedPath: '/tmp/gone',
       fallbackReason: 'Last used folder no longer exists.',
     })
@@ -1821,7 +1819,6 @@ describe('App', () => {
       source: 'platform-default',
       exists: true,
       readable: true,
-      platformDefaultPath: '/tmp/Documents',
       lastUsedPath: '/tmp/gone',
       fallbackReason: 'Last used folder no longer exists.',
     })

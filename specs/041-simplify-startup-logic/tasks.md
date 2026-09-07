@@ -28,7 +28,7 @@ Existing single-project layout: `src/` (backend), `ui/src/` (frontend, minimal t
 **Purpose**: Establish the baseline this feature's size-reduction validation (SC-005) is measured
 against, before any code changes.
 
-- [ ] T001 Record a line-count baseline for every file this feature will touch — run
+- [X] T001 Record a line-count baseline for every file this feature will touch — run
   `wc -l src/services/startup-preferences.ts src/server.ts src/handlers/repo.ts src/types.ts src/git/repo.ts` — and save the output to `specs/041-simplify-startup-logic/baseline-loc.txt`
 
 **Checkpoint**: Baseline captured; ready for foundational work.
@@ -43,9 +43,9 @@ Decision 4 in [research.md](./research.md)).
 
 **⚠️ CRITICAL**: No user story work below can begin until this phase is complete.
 
-- [ ] T002 [P] In `src/types.ts`, narrow `StartupFolderSource` to `'explicit' | 'last-used' | 'os-default'` and remove the `platformDefaultPath` field from the `StartupFolderResolution` interface (confirmed dead in data-model.md — no production reader)
-- [ ] T003 [P] In `ui/src/types/index.ts`, mirror the same `StartupFolderSource` narrowing and `platformDefaultPath` removal on the UI-side `StartupFolderResolution` type
-- [ ] T004 In `src/services/startup-preferences.ts`, replace `resolveGuaranteedFallbackPath()`'s multi-candidate chain (Documents → home → cwd → tmp dir → filesystem root) with a single `resolveOsDefaultLocation()` function that tries only the home directory, falling through exactly once to the filesystem root if home itself is unreadable, returning `{ path, readable }` (depends on T002 for the type it will be used with)
+- [X] T002 [P] In `src/types.ts`, narrow `StartupFolderSource` to `'explicit' | 'last-used' | 'os-default'` and remove the `platformDefaultPath` field from the `StartupFolderResolution` interface (confirmed dead in data-model.md — no production reader)
+- [X] T003 [P] In `ui/src/types/index.ts`, mirror the same `StartupFolderSource` narrowing and `platformDefaultPath` removal on the UI-side `StartupFolderResolution` type
+- [X] T004 In `src/services/startup-preferences.ts`, replace `resolveGuaranteedFallbackPath()`'s multi-candidate chain (Documents → home → cwd → tmp dir → filesystem root) with a single `resolveOsDefaultLocation()` function that tries only the home directory, falling through exactly once to the filesystem root if home itself is unreadable, returning `{ path, readable }` (depends on T002 for the type it will be used with)
 
 **Checkpoint**: Foundation ready — `resolveOsDefaultLocation()` exists and is unit-testable in isolation; all three user stories can now proceed.
 
@@ -64,23 +64,23 @@ land on the identical `os-default` location and message shape.
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Update `tests/unit/services/startup-preferences.test.ts`: rewrite the tests asserting on `'platform-default'` / `'home-fallback'` / `'safe-fallback'` sources to assert on the single `'os-default'` source, preserving the underlying scenarios (deleted vs. permission-denied vs. disconnected remembered folder all produce `os-default` with a distinct `fallbackReason` string, per FR-009)
-- [ ] T006 [P] [US1] Add new unit tests for `resolveOsDefaultLocation()` in `tests/unit/services/startup-preferences.test.ts` covering: home directory readable (returns home); home unreadable, filesystem root readable (returns root, `readable: true`); both unreadable (returns root path with `readable: false`, never throws)
+- [X] T005 [P] [US1] Update `tests/unit/services/startup-preferences.test.ts`: rewrite the tests asserting on `'platform-default'` / `'home-fallback'` / `'safe-fallback'` sources to assert on the single `'os-default'` source, preserving the underlying scenarios (deleted vs. permission-denied vs. disconnected remembered folder all produce `os-default` with a distinct `fallbackReason` string, per FR-009)
+- [X] T006 [P] [US1] Add new unit tests for `resolveOsDefaultLocation()` in `tests/unit/services/startup-preferences.test.ts` covering: home directory readable (returns home); home unreadable, filesystem root readable (returns root, `readable: true`); both unreadable (returns root path with `readable: false`, never throws)
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] In `src/services/startup-preferences.ts`, rewrite `resolveStartupFolder()` to the 3-stage flow — explicit (valid/invalid) → last-used (valid/invalid) → `resolveOsDefaultLocation()` — removing the separate `platform-default`/`home-fallback` branches now superseded by T004's single helper (depends on T004)
-- [ ] T008 [US1] In `src/server.ts`'s `initializePaths()`, replace the two inline `resolveGuaranteedFallbackPath()` + hand-built `buildSafeFallbackResolution(...)` call sites (explicit-path-failure branch, and the not-a-readable-directory branch) with calls to the same `resolveOsDefaultLocation()` from T004, so both converge on one shape and one set of computed values instead of two independently-constructed ones (depends on T004, T007)
-- [ ] T009 [US1] In `src/handlers/repo.ts`, update the two remaining `resolveGuaranteedFallbackPath()` call sites (`recoverIfRepoPathUnavailable`'s caller and `repositoryParentFolderHandler`) to call `resolveOsDefaultLocation()` instead, keeping `buildSafeFallbackResolution()` as the shared shape-builder around it (depends on T004)
-- [ ] T010 [US1] In `src/cli.ts`, verify `main()` still passes the (now 3-tier) `resolveStartupFolder()` result straight through to `createApp()` unchanged, and update any log-message logic that referenced the removed tiers (depends on T007)
+- [X] T007 [US1] In `src/services/startup-preferences.ts`, rewrite `resolveStartupFolder()` to the 3-stage flow — explicit (valid/invalid) → last-used (valid/invalid) → `resolveOsDefaultLocation()` — removing the separate `platform-default`/`home-fallback` branches now superseded by T004's single helper (depends on T004)
+- [X] T008 [US1] In `src/server.ts`'s `initializePaths()`, replace the two inline `resolveGuaranteedFallbackPath()` + hand-built `buildSafeFallbackResolution(...)` call sites (explicit-path-failure branch, and the not-a-readable-directory branch) with calls to the same `resolveOsDefaultLocation()` from T004, so both converge on one shape and one set of computed values instead of two independently-constructed ones (depends on T004, T007)
+- [X] T009 [US1] In `src/handlers/repo.ts`, update the two remaining `resolveGuaranteedFallbackPath()` call sites (`recoverIfRepoPathUnavailable`'s caller and `repositoryParentFolderHandler`) to call `resolveOsDefaultLocation()` instead, keeping `buildSafeFallbackResolution()` as the shared shape-builder around it (depends on T004)
+- [X] T010 [US1] In `src/cli.ts`, verify `main()` still passes the (now 3-tier) `resolveStartupFolder()` result straight through to `createApp()` unchanged, and update any log-message logic that referenced the removed tiers (depends on T007)
 
 ### Test Updates for User Story 1 (integration)
 
-- [ ] T011 [US1] Update `tests/integration/server.test.ts`: rewrite startup-resolution scenarios so an explicit-path failure and a remembered-folder failure are both asserted to produce the same `os-default` `source` and a location identical to `resolveOsDefaultLocation()`'s own output (depends on T008, T009)
+- [X] T011 [US1] Update `tests/integration/server.test.ts`: rewrite startup-resolution scenarios so an explicit-path failure and a remembered-folder failure are both asserted to produce the same `os-default` `source` and a location identical to `resolveOsDefaultLocation()`'s own output (depends on T008, T009)
 
 ### Validation
 
-- [ ] T012 [US1] Run `npm run test:server` and confirm ≥90% branch coverage on `src/services/startup-preferences.ts`, `src/server.ts`, `src/cli.ts`, `src/handlers/repo.ts`; fix any gap before proceeding
+- [X] T012 [US1] Run `npm run test:server` and confirm ≥90% branch coverage on `src/services/startup-preferences.ts`, `src/server.ts`, `src/cli.ts`, `src/handlers/repo.ts`; fix any gap before proceeding
 
 **Checkpoint**: User Story 1 is fully functional and independently testable — quickstart.md steps 1-5 pass.
 

@@ -218,12 +218,14 @@ describe('Server integration', () => {
   })
 
   it('falls back to picker mode for blocked native file-open folder requests', () => {
-    const cwd = process.cwd()
-
     createApp(dir, { initialOpenSource: 'native-file-open' })
 
     expect(getRepoPath()).toBe('')
-    expect(getPickerPath()).toBe(cwd)
+    // Converges on the single OS-default location (the home directory, or its own guaranteed
+    // fallback) rather than a cwd-specific fallback — the same location every other startup
+    // failure lands on.
+    expect(getPickerPath()).not.toBe('')
+    expect(existsSync(getPickerPath())).toBe(true)
     expect(getStartupOpenTarget()).toMatchObject({
       status: 'blocked',
       selectedPathType: 'none',
@@ -246,7 +248,7 @@ describe('Server integration', () => {
 
     const startupRes = await app.fetch(new Request('http://localhost/api/startup-folder'))
     const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
-    expect(startupBody.source).toBe('safe-fallback')
+    expect(startupBody.source).toBe('os-default')
     expect(startupBody.fallbackReason).toMatch(/no longer exists/i)
   })
 
