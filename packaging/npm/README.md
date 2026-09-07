@@ -32,7 +32,7 @@ npx gitlocal
 
 ## What you get
 
-- GitHub-style Markdown rendering, plus built-in PDF and SVG preview — file types GitHub's web UI often can't render inline.
+- GitHub-style Markdown rendering, plus built-in preview for PDF, SVG, CSV, Excel (`.xlsx`/`.xls`), and PowerPoint (`.pptx`) files alongside images — file types GitHub's web UI often can't render inline and falls back to a raw download for.
 - Local print, Save as PDF, email/share, copy, and download fallback actions on rendered Markdown.
 - A Refresh button, focused undo/redo while editing, and panel-scoped Select All.
 
