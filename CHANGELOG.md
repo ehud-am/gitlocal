@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.2 - 2026-09-07
+
+- Simplified and hardened startup: GitLocal now converges on a single, predictable fallback location (your home folder) whenever it can't open an explicitly requested folder, a remembered folder, or a directly-opened file — replacing several previously separate fallback paths (Documents folder, home folder, current working directory, temp folder, drive root) that could each behave slightly differently. Every fallback still shows a clear on-screen explanation of what happened and why.
+- Fixed a display bug where opening any plain folder that isn't a git repository — including the new home-folder fallback above — could show "0 visible items" even when the folder had real files and folders in it. The "hide generated/local files" view option (meant for reviewing untracked changes inside a repository) no longer applies outside a repository, where that distinction doesn't make sense.
+- Fixed startup so that opening a specific file always determines up front whether it's inside a git repository or an independent folder, keeping the sidebar and repository-aware controls consistent with that folder from the moment the file loads.
+- Fixed "last opened folder" memory so it only ever remembers a repository's or folder's top-level location, never a specific file or sub-folder — reopening GitLocal with no folder specified now always starts at that top level with nothing preselected.
+- Removed an unused internal endpoint that could have been used to save an invalid "last opened folder" location; it had no effect on the app's UI.
+
 ## 0.13.1 - 2026-09-05
 
 - Fixed PDF preview looking fuzzy on Retina/HiDPI displays: pages now render at a resolution that accounts for the display's device pixel ratio, so text and line art stay sharp at the default zoom level and while zooming in, with no change to page layout size or load performance on standard-density displays.

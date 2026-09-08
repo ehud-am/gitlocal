@@ -549,7 +549,11 @@ export default function ContentPanel({
   }
 
   function filterVisibleEntries(entries: TreeNode[]): TreeNode[] {
-    const generatedFilteredEntries = generatedLocalVisibility === 'show'
+    // Tracked-vs-generated/local visibility is a git-tracking concept — outside a repository
+    // nothing is ever git-tracked, so applying it there would hide every entry regardless of
+    // the folder's actual content. A plain OS folder should just show its files and folders
+    // like an ordinary folder browser, not be filtered through repo-review semantics.
+    const generatedFilteredEntries = !isGitRepo || generatedLocalVisibility === 'show'
       ? entries
       : entries.filter((entry) => {
       const activeException = Boolean(selectedPath && (entry.path === selectedPath || selectedPath.startsWith(`${entry.path}/`) || entry.path.startsWith(`${selectedPath}/`)))

@@ -54,8 +54,6 @@ import type {
   StartupOpenSource,
   StartupOpenStatus,
   DefaultReaderPreferenceStatus,
-  StartupFolderUpdateRequest,
-  StartupFolderUpdateResponse,
   StartupOpenTarget,
   StartupOpenTargetResponse,
   DefaultReaderPreference,
@@ -144,8 +142,6 @@ export type {
   StartupOpenSource,
   StartupOpenStatus,
   DefaultReaderPreferenceStatus,
-  StartupFolderUpdateRequest,
-  StartupFolderUpdateResponse,
   StartupOpenTarget,
   StartupOpenTargetResponse,
   DefaultReaderPreference,
@@ -239,7 +235,6 @@ export interface StartupFolderResponse {
   source: StartupFolderSource
   exists: boolean
   readable: boolean
-  platformDefaultPath: string
   lastUsedPath: string
   fallbackReason: string
 }

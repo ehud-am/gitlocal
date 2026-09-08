@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import {
   infoHandler,
   branchesHandler,
@@ -24,7 +24,6 @@ import {
   defaultReaderPreferenceUpdateHandler,
   startupOpenTargetHandler,
   startupFolderHandler,
-  startupFolderUpdateHandler,
 } from './handlers/repo.js'
 import {
   treeHandler,
@@ -50,9 +49,9 @@ import {
   listTerminalSessionsHandler,
   terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
-import { classifyLocalPath } from './git/repo.js'
-import { buildSafeFallbackResolution, isReadableDirectory, resolveGuaranteedFallbackPath, resolveStartupFolder } from './services/startup-preferences.js'
-import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget, ViewerPathType } from './types.js'
+import { classifyLocalPath, resolveDirectOpenTarget } from './git/repo.js'
+import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
+import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget } from './types.js'
 
 type AppVariables = { repoPath: string; pickerPath: string }
 type CreateAppOptions = {
@@ -184,11 +183,7 @@ export function resolveOpenTarget(inputPath: string, source: StartupOpenSource):
     )
   }
 
-  const rootPath = classification.repositoryRootPath ?? dirname(classification.canonicalPath)
-  const selectedPath = classification.repositoryRootPath
-    ? relative(rootPath, classification.canonicalPath).split('\\').join('/')
-    : basename(classification.canonicalPath)
-  const selectedPathType: ViewerPathType = 'file'
+  const { rootPath, selectedPath, selectedPathType } = resolveDirectOpenTarget(classification.canonicalPath, classification.repositoryRootPath)
 
   return {
     source,
@@ -203,6 +198,18 @@ export function resolveOpenTarget(inputPath: string, source: StartupOpenSource):
     openMode: classification.openMode,
     ...(classification.repositoryRootPath ? { repositoryRootPath: classification.repositoryRootPath } : {}),
   }
+}
+
+// Every startup failure this function detects — a blocked file-open target, or a requested
+// folder that isn't a usable directory — converges here: land on the single OS-default
+// location and record why, rather than each caller re-deriving both.
+function applyOsDefaultFallback(reason: string, resolvedPath: string): void {
+  const fallback = resolveOsDefaultLocation()
+  currentRepoPath = ''
+  currentPickerPath = fallback.path
+  currentStartupFolderResolution = buildSafeFallbackResolution(fallback, reason, {
+    lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
+  })
 }
 
 function initializePaths(initialPath: string, options: CreateAppOptions = {}): void {
@@ -233,22 +240,9 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
       return
     }
     if (options.initialOpenSource) {
-      // process.cwd() is virtually always readable, but not guaranteed (e.g. it was deleted
-      // out from under the running process) — fall further back rather than repeating the
-      // same "landed on something unreadable" problem this whole function exists to avoid.
-      const cwdFallback = isReadableDirectory(process.cwd()) ? { path: process.cwd(), readable: true } : resolveGuaranteedFallbackPath()
-      currentRepoPath = ''
-      currentPickerPath = cwdFallback.path
       // Reaching this branch already means the requested open target was rejected above
       // (not `status === 'accepted'` with a `rootPath`), so it's always worth explaining why.
-      currentStartupFolderResolution = buildSafeFallbackResolution(
-        cwdFallback,
-        target.message || 'The requested path could not be opened — opened a safe fallback location instead.',
-        {
-          platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-          lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-        },
-      )
+      applyOsDefaultFallback(target.message || 'The requested path could not be opened — opened a default location instead.', resolvedPath)
       return
     }
   }
@@ -268,20 +262,12 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
 
   // The requested folder is gone, was renamed, became a file, or is no longer readable
   // (a deleted/renamed "last used" folder, an unmounted drive, a permission change) — landing
-  // on it anyway would silently render as an empty, non-git folder with no explanation. Fall
-  // back to a location that is always readable instead, and record why for the picker's banner.
-  const fallback = resolveGuaranteedFallbackPath()
-  currentRepoPath = ''
-  currentPickerPath = fallback.path
-  currentStartupFolderResolution = buildSafeFallbackResolution(
-    fallback,
+  // on it anyway would silently render as an empty, non-git folder with no explanation.
+  applyOsDefaultFallback(
     classification.exists
-      ? 'The requested folder is no longer readable — opened a safe fallback location instead.'
-      : 'The requested folder no longer exists — opened a safe fallback location instead.',
-    {
-      platformDefaultPath: currentStartupFolderResolution?.platformDefaultPath ?? '',
-      lastUsedPath: currentStartupFolderResolution?.lastUsedPath ?? resolvedPath,
-    },
+      ? 'The requested folder is no longer readable — opened a default location instead.'
+      : 'The requested folder no longer exists — opened a default location instead.',
+    resolvedPath,
   )
 }
 
@@ -305,7 +291,6 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   // API routes
   app.get('/api/info', infoHandler)
   app.get('/api/startup-folder', startupFolderHandler)
-  app.put('/api/startup-folder', startupFolderUpdateHandler)
   app.get('/api/startup-open-target', startupOpenTargetHandler)
   app.get('/api/default-reader-preference', defaultReaderPreferenceHandler)
   app.put('/api/default-reader-preference', defaultReaderPreferenceUpdateHandler)

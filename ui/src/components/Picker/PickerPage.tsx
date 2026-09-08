@@ -72,9 +72,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
   const startupMessage = useMemo(() => {
     if (!startupSource) return ''
     if (startupSource === 'last-used') return 'GitLocal reopened your last used folder.'
-    if (startupSource === 'platform-default') return startupFallbackReason || 'GitLocal started from your Documents folder.'
-    if (startupSource === 'home-fallback') return startupFallbackReason || 'GitLocal started from your home folder.'
-    if (startupSource === 'safe-fallback') return startupFallbackReason || 'GitLocal opened a safe fallback location.'
+    if (startupSource === 'os-default') return startupFallbackReason || 'GitLocal opened a default location.'
     return ''
   }, [startupFallbackReason, startupSource])
 

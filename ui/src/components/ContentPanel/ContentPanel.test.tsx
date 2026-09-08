@@ -293,6 +293,7 @@ describe('ContentPanel', () => {
         selectedPath=""
         selectedPathType="none"
         branch="main"
+        isGitRepo
         generatedLocalVisibility="hide"
         onNavigate={vi.fn()}
         onOpenPath={vi.fn()}
@@ -302,6 +303,32 @@ describe('ContentPanel', () => {
     const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
     expect(within(directoryTable).getAllByText('guide.md')).not.toHaveLength(0)
     expect(screen.queryByText('dist')).not.toBeInTheDocument()
+  })
+
+  it('does not hide generated/local-only entries outside a git repository, where tracked-vs-generated is meaningless', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([
+      { name: 'notes.txt', path: 'notes.txt', type: 'file', localOnly: false },
+      { name: 'downloads', path: 'downloads', type: 'dir', localOnly: true },
+    ])
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch=""
+        isGitRepo={false}
+        generatedLocalVisibility="hide"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+      />,
+    )
+
+    const directoryTable = await screen.findByRole('table', { name: /current folder contents/i })
+    expect(within(directoryTable).getAllByText('notes.txt')).not.toHaveLength(0)
+    expect(within(directoryTable).getAllByText('downloads')).not.toHaveLength(0)
   })
 
   it('offers a create action from the empty state when mutation is allowed', async () => {

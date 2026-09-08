@@ -27,8 +27,12 @@ function isTrackedNode(node: TreeNode): boolean {
   return resolveGeneratedLocalState(node) === 'tracked'
 }
 
-function filterNodes(nodes: TreeNode[], visibility: GeneratedLocalVisibility, activePath: string): TreeNode[] {
-  if (visibility === 'show') return nodes
+// Tracked-vs-generated/local visibility is a git-tracking concept — outside a repository
+// nothing is ever git-tracked, so applying it there would hide every node regardless of the
+// folder's actual content. A plain OS folder should just show its files and folders like an
+// ordinary folder browser, not be filtered through repo-review semantics.
+function filterNodes(nodes: TreeNode[], visibility: GeneratedLocalVisibility, activePath: string, isGitRepo: boolean): TreeNode[] {
+  if (!isGitRepo || visibility === 'show') return nodes
   return nodes.filter((node) => {
     const activeException = Boolean(activePath && (node.path === activePath || activePath.startsWith(`${node.path}/`) || node.path.startsWith(`${activePath}/`)))
     const tracked = isTrackedNode(node)
@@ -271,7 +275,7 @@ export default function FileTree({
     const parents = new Map<string, string>()
 
     const walk = (nodes: TreeNode[], ancestorPaths = new Set<string>(), parentPath?: string): void => {
-      for (const node of filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)) {
+      for (const node of filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath, isGitRepo), !hideDotfiles, selectedPath)) {
         if (ancestorPaths.has(node.path)) continue
         order.push(node.path)
         if (parentPath) parents.set(node.path, parentPath)
@@ -287,7 +291,7 @@ export default function FileTree({
 
     if (roots) walk(roots)
     return { order, parents }
-  }, [roots, nodeStates, generatedLocalVisibility, hideDotfiles, selectedPath])
+  }, [roots, nodeStates, generatedLocalVisibility, hideDotfiles, selectedPath, isGitRepo])
 
   visibleOrder.current = visibleOrderState.order
   parentOf.current = visibleOrderState.parents
@@ -295,7 +299,7 @@ export default function FileTree({
 
   const renderNodes = useCallback((nodes: TreeNode[], depth: number, ancestorPaths = new Set<string>()): React.ReactNode => (
     <>
-      {filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath), !hideDotfiles, selectedPath)
+      {filterDotfiles(filterNodes(nodes, generatedLocalVisibility, selectedPath, isGitRepo), !hideDotfiles, selectedPath)
         .filter((node) => !ancestorPaths.has(node.path))
         .map(node => {
         const state = nodeStates.get(node.path)

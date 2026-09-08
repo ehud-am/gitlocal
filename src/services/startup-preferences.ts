@@ -1,6 +1,7 @@
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, parse as parsePath, resolve } from 'node:path'
-import { homedir, platform, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
+import { classifyLocalPath } from '../git/repo.js'
 import type {
   DefaultReaderPreference,
   DefaultReaderPreferenceStatus,
@@ -74,66 +75,44 @@ function canonicalDirectory(path: string): string {
   return realpathSync(resolve(path))
 }
 
-export function getLinuxDocumentsPath(homePath = homedir(), env = process.env): string {
-  const configured = env.XDG_DOCUMENTS_DIR
-  if (configured) {
-    return configured.replace(/^~(?=\/|$)/, homePath)
-  }
-  return join(homePath, 'Documents')
-}
-
-function getPlatformDocumentsPath(homePath = homedir(), env = process.env): string {
-  if (platform() === 'linux') return getLinuxDocumentsPath(homePath, env)
-  return join(homePath, 'Documents')
-}
-
 // A directory that is always present and listable regardless of the user's own folder
 // choices — the drive/filesystem root (`/` on macOS and Linux, `C:\` on Windows). Used only
-// as the last resort after Documents, home, cwd, and the OS temp dir have all failed, so that
-// GitLocal can never end up with no readable folder at all to fall back to.
+// as the last resort when the home directory itself is unreadable, so GitLocal can never end
+// up with no readable folder at all to fall back to.
 function filesystemRootPath(fromPath: string): string {
   return parsePath(resolve(fromPath)).root
 }
 
-// Walks a chain of increasingly platform-guaranteed locations — Documents, home, the process's
-// current working directory, the OS temp directory, and finally the filesystem root — returning
-// the first one that is actually verified readable right now. Every step past "home" is chosen
-// specifically because Node itself depends on it being available (cwd to have started at all,
-// tmpdir for its own temp-file needs), so in practice this only fails in a wholly broken
-// environment, and even then it returns the filesystem root path rather than nothing.
-export function resolveGuaranteedFallbackPath(
-  homePath = homedir(),
-  env = process.env,
-): { path: string; readable: boolean } {
-  const candidates = [getPlatformDocumentsPath(homePath, env), homePath, process.cwd(), tmpdir(), filesystemRootPath(homePath)]
-
-  for (const candidate of candidates) {
-    if (candidate && isReadableDirectory(candidate)) {
-      return { path: canonicalDirectory(candidate), readable: true }
-    }
+// The single OS-default fallback location, used whenever explicit-path resolution, last-used
+// resolution, or a direct file-open all fail for any reason — so there is exactly one safe
+// outcome for every kind of startup failure, not several differently-named fallback tiers that
+// can each drift out of sync. Tries the home directory first; if that is itself unreadable
+// (a wholly broken environment), falls through exactly once to the filesystem root, which Node
+// itself depends on being listable, rather than returning nothing.
+export function resolveOsDefaultLocation(homePath = homedir()): { path: string; readable: boolean } {
+  if (isReadableDirectory(homePath)) {
+    return { path: canonicalDirectory(homePath), readable: true }
   }
-
-  /* v8 ignore next 2 -- every candidate failing (including the filesystem root itself) is not practical to simulate in tests */
-  const last = candidates[candidates.length - 1] ?? resolve('.')
-  return { path: last, readable: false }
+  const root = filesystemRootPath(homePath)
+  /* v8 ignore next -- the filesystem root itself being unreadable is not practical to simulate in tests */
+  return isReadableDirectory(root) ? { path: canonicalDirectory(root), readable: true } : { path: root, readable: false }
 }
 
-// Every "landed on a safe fallback location" call site (initial startup, a mid-session
-// self-heal, or a parent-folder walk that ran out of readable ancestors) builds the same
-// StartupFolderResolution shape — only the fallback location, the explanatory reason, and
-// which prior resolution's platformDefaultPath/lastUsedPath to carry forward differ. Sharing
-// this in one place means a future change to the shape only needs to happen once.
+// Every "landed on the OS default" call site (initial startup, a mid-session self-heal, or a
+// parent-folder walk that ran out of readable ancestors) builds the same StartupFolderResolution
+// shape — only the fallback location, the explanatory reason, and the last-used path to carry
+// forward differ. Sharing this in one place means a future change to the shape only needs to
+// happen once.
 export function buildSafeFallbackResolution(
   fallback: { path: string; readable: boolean },
   fallbackReason: string,
-  carryForward: { platformDefaultPath: string; lastUsedPath: string },
+  carryForward: { lastUsedPath: string },
 ): StartupFolderResolution {
   return {
     path: fallback.path,
-    source: 'safe-fallback',
+    source: 'os-default',
     exists: fallback.readable,
     readable: fallback.readable,
-    platformDefaultPath: carryForward.platformDefaultPath,
     lastUsedPath: carryForward.lastUsedPath,
     fallbackReason,
   }
@@ -197,6 +176,14 @@ export function writeStartupFolderPreference(
   }
   const canonicalPath = canonicalDirectory(folderPath)
 
+  // Defense-in-depth: "last viewed" must always be a top-level location (a repository root, or
+  // an independent folder's own root), never a sub-path inside a repository — every real call
+  // site already only ever passes such a path, but this guard makes that a structural
+  // guarantee rather than a convention every future caller must independently uphold (FR-010).
+  if (classifyLocalPath(canonicalPath).gitState === 'inside-repository') {
+    throw new Error(`Startup folder must be a repository root, not a path inside one: ${canonicalPath}`)
+  }
+
   const preference: StartupFolderPreference = {
     path: canonicalPath,
     openedAt: new Date().toISOString(),
@@ -211,74 +198,49 @@ export function resolveStartupFolder(options: {
   explicitPath?: string
   preferencePath?: string
   homePath?: string
-  env?: NodeJS.ProcessEnv
 } = {}): StartupFolderResolution {
   const homePath = options.homePath ?? homedir()
-  const platformDefaultPath = getPlatformDocumentsPath(homePath, options.env ?? process.env)
   const preference = readStartupFolderPreference(options.preferencePath ?? defaultPreferencePath())
   const explicitPath = options.explicitPath?.trim()
 
-  if (explicitPath) {
-    const exists = isReadableDirectory(explicitPath)
+  if (explicitPath && isReadableDirectory(explicitPath)) {
     return {
-      path: exists ? canonicalDirectory(explicitPath) : resolve(explicitPath),
+      path: canonicalDirectory(explicitPath),
       source: 'explicit',
-      exists,
-      readable: exists,
-      platformDefaultPath,
+      exists: true,
+      readable: true,
       lastUsedPath: preference?.path ?? '',
-      fallbackReason: exists ? '' : 'Explicit folder is unavailable.',
+      fallbackReason: '',
     }
   }
 
-  if (preference?.path && isReadableDirectory(preference.path)) {
+  if (!explicitPath && preference?.path && isReadableDirectory(preference.path)) {
     return {
       path: canonicalDirectory(preference.path),
       source: 'last-used',
       exists: true,
       readable: true,
-      platformDefaultPath,
       lastUsedPath: preference.path,
       fallbackReason: '',
     }
   }
 
-  if (isReadableDirectory(platformDefaultPath)) {
-    return {
-      path: canonicalDirectory(platformDefaultPath),
-      source: 'platform-default',
-      exists: true,
-      readable: true,
-      platformDefaultPath,
-      lastUsedPath: preference?.path ?? '',
-      fallbackReason: preference?.path ? describeUnreadableFolder(preference.path) : '',
-    }
-  }
-
-  if (isReadableDirectory(homePath)) {
-    return {
-      path: canonicalDirectory(homePath),
-      source: 'home-fallback',
-      exists: true,
-      readable: true,
-      platformDefaultPath,
-      lastUsedPath: preference?.path ?? '',
-      fallbackReason: 'Platform Documents folder is unavailable.',
-    }
-  }
-
-  // Both the platform Documents folder and the home directory have failed — fall further back
-  // to a location that is virtually guaranteed to exist and be readable on every platform,
-  // rather than returning an unreadable path with nowhere left to go (see resolveGuaranteedFallbackPath).
-  const guaranteed = resolveGuaranteedFallbackPath(homePath, options.env ?? process.env)
+  // Every other case — an explicit path that doesn't exist or isn't readable, no remembered
+  // folder, or a remembered folder that is itself no longer readable — converges here on the
+  // single OS-default location (FR-007), rather than each failure computing its own fallback.
+  const fallback = resolveOsDefaultLocation(homePath)
+  const fallbackReason = explicitPath
+    ? 'Explicit folder is unavailable — opened a default location instead.'
+    : preference?.path
+      ? `${describeUnreadableFolder(preference.path)} Opened a default location instead.`
+      : ''
   return {
-    path: guaranteed.path,
-    source: 'safe-fallback',
-    exists: guaranteed.readable,
-    readable: guaranteed.readable,
-    platformDefaultPath,
+    path: fallback.path,
+    source: 'os-default',
+    exists: fallback.readable,
+    readable: fallback.readable,
     lastUsedPath: preference?.path ?? '',
-    fallbackReason: 'Home folder is unavailable — opened a safe fallback location instead.',
+    fallbackReason,
   }
 }
 

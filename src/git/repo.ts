@@ -24,6 +24,7 @@ import type {
   RepositoryStatusSummary,
   RepositoryStatusTone,
   TreeNode,
+  ViewerPathType,
 } from '../types.js'
 import {
   validateSshPrivateKeyPath,
@@ -366,6 +367,32 @@ export function classifyLocalPath(inputPath: string): LocalPathClassification {
     gitState,
     openMode,
     ...(repositoryRootPath ? { repositoryRootPath } : {}),
+  }
+}
+
+export interface DirectOpenTarget {
+  rootPath: string
+  selectedPath: string
+  selectedPathType: ViewerPathType
+  isGitRepo: boolean
+}
+
+// The single rule for turning a directly-opened file's canonical path into a file-tree root
+// and a selection relative to that root: a file inside a git repository roots at the
+// repository and selects the file's path relative to it; a file outside any repository roots
+// at the file's own containing folder and selects just its name. Used by both the native
+// "open with" startup path and the runtime "open this file" API, so this determination is
+// made in exactly one place instead of two independently-computed copies of the same rule.
+export function resolveDirectOpenTarget(canonicalFilePath: string, repositoryRootPath?: string): DirectOpenTarget {
+  const rootPath = repositoryRootPath ?? dirname(canonicalFilePath)
+  const selectedPath = repositoryRootPath
+    ? relative(rootPath, canonicalFilePath).split('\\').join('/')
+    : basename(canonicalFilePath)
+  return {
+    rootPath,
+    selectedPath,
+    selectedPathType: 'file',
+    isGitRepo: Boolean(repositoryRootPath),
   }
 }
 

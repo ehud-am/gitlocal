@@ -158,7 +158,7 @@ describe('infoHandler', () => {
 
       const startupRes = await client.api['startup-folder'].$get()
       const startupBody = await startupRes.json() as { source: string; fallbackReason: string }
-      expect(startupBody.source).toBe('safe-fallback')
+      expect(startupBody.source).toBe('os-default')
       expect(startupBody.fallbackReason).toMatch(/no longer readable/i)
     } finally {
       chmodSync(folder, 0o755)
@@ -696,65 +696,14 @@ describe('startup folder handlers', () => {
     }
   })
 
-  it('updates the remembered startup folder', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-folder-'))
-    const prefPath = join(dir, 'preference.json')
-    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
-
-    try {
-      const app = createApp('')
-      const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: dir, source: 'repo-open' }),
-      }))
-      expect(res.status).toBe(200)
-      const body = await res.json() as { ok: boolean; path: string }
-      expect(body.ok).toBe(true)
-      expect(body.path).toBe(realpathSync(dir))
-      expect(existsSync(prefPath)).toBe(true)
-    } finally {
-      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('rejects invalid startup folder JSON', async () => {
+  it('no longer exposes PUT /api/startup-folder (unused, unvalidated surface removed per FR-010/FR-011)', async () => {
     const app = createApp('')
     const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: '{bad-json',
+      body: JSON.stringify({ path: '/tmp', source: 'repo-open' }),
     }))
-
-    expect(res.status).toBe(400)
-    const body = await res.json() as { ok: boolean; message: string }
-    expect(body.ok).toBe(false)
-    expect(body.message).toBe('Invalid JSON body.')
-  })
-
-  it('rejects unavailable startup folder updates', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-startup-handler-missing-'))
-    const prefPath = join(dir, 'preference.json')
-    process.env.GITLOCAL_STARTUP_PREFERENCE_PATH = prefPath
-
-    try {
-      const app = createApp('')
-      const missing = join(dir, 'missing')
-      const res = await app.fetch(new Request('http://localhost/api/startup-folder', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: missing, source: 'picker-open' }),
-      }))
-      expect(res.status).toBe(400)
-      const body = await res.json() as { ok: boolean; path: string; message: string }
-      expect(body.ok).toBe(false)
-      expect(body.path).toBe(missing)
-      expect(body.message).toMatch(/startup folder is not available/i)
-    } finally {
-      delete process.env.GITLOCAL_STARTUP_PREFERENCE_PATH
-      rmSync(dir, { recursive: true, force: true })
-    }
+    expect(res.status).toBe(404)
   })
 })
 

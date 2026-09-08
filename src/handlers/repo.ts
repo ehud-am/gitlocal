@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { statSync } from 'node:fs'
-import { basename, dirname, relative } from 'node:path'
+import { dirname } from 'node:path'
 import {
   listSshPrivateKeys,
   validateSshPrivateKeyPath,
@@ -18,6 +18,7 @@ import {
   getInfo,
   findReadme,
   findKeyDocuments,
+  resolveDirectOpenTarget,
   resolveRepoPath,
   summarizeChangedFiles,
   setRepoGitIdentity,
@@ -32,9 +33,8 @@ import {
   isReadableDirectory,
   readDefaultReaderPreference,
   rememberStartupFolder,
-  resolveGuaranteedFallbackPath,
+  resolveOsDefaultLocation,
   writeDefaultReaderPreference,
-  writeStartupFolderPreference,
 } from '../services/startup-preferences.js'
 import type {
   BranchSwitchRequest,
@@ -48,7 +48,6 @@ import type {
   RepoSummaryResponse,
   RepositoryOpenRequest,
   SshKeyValidationRequest,
-  StartupFolderUpdateRequest,
 } from '../types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
@@ -80,6 +79,18 @@ function pickerModeResponse(path: string): Record<string, unknown> {
 // since "the folder is gone" doesn't flicker the way a permission/mount glitch can.
 let unreadableRepoPathStreak = { path: '', count: 0 }
 
+// Every mid-session self-heal converges here: leave the current path, land on the single
+// OS-default location, and record why — sharing this means a future change to that shape only
+// needs to happen once, instead of at each call site that discovers its path is unusable.
+function fallBackToOsDefault(reason: string): string {
+  const fallback = resolveOsDefaultLocation()
+  setRepoPath('')
+  setPickerPath(fallback.path)
+  const previous = getStartupFolderResolution()
+  setStartupFolderResolution(buildSafeFallbackResolution(fallback, reason, { lastUsedPath: previous.lastUsedPath }))
+  return fallback.path
+}
+
 // The folder GitLocal has open can disappear at any point during a long-running session —
 // deleted, renamed, or an external/network drive unmounted — not just at process startup.
 // Left unchecked, the currently-open (now-missing) path would silently read back as an empty,
@@ -103,18 +114,11 @@ function recoverIfRepoPathUnavailable(repoPath: string): string {
   }
   unreadableRepoPathStreak = { path: '', count: 0 }
 
-  const fallback = resolveGuaranteedFallbackPath()
-  setRepoPath('')
-  setPickerPath(fallback.path)
-  const previous = getStartupFolderResolution()
-  setStartupFolderResolution(buildSafeFallbackResolution(
-    fallback,
+  return fallBackToOsDefault(
     classification.exists
-      ? 'The folder you had open is no longer readable — opened a safe fallback location instead.'
-      : 'The folder you had open no longer exists — opened a safe fallback location instead.',
-    { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
-  ))
-  return fallback.path
+      ? 'The folder you had open is no longer readable — opened a default location instead.'
+      : 'The folder you had open no longer exists — opened a default location instead.',
+  )
 }
 
 export async function infoHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -139,30 +143,6 @@ export async function infoHandler(c: Context<{ Variables: Variables }>): Promise
 
 export async function startupFolderHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   return c.json(getStartupFolderResolution())
-}
-
-export async function startupFolderUpdateHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
-  let payload: StartupFolderUpdateRequest
-  try {
-    payload = await c.req.json<StartupFolderUpdateRequest>()
-  } catch {
-    return c.json({ ok: false, path: '', message: 'Invalid JSON body.' }, 400)
-  }
-
-  try {
-    const preference = writeStartupFolderPreference(payload.path ?? '', payload.source ?? 'picker-open')
-    return c.json({
-      ok: true,
-      path: preference.path,
-      message: 'Startup folder preference updated.',
-    })
-  } catch (error) {
-    return c.json({
-      ok: false,
-      path: payload.path ?? '',
-      message: error instanceof Error ? error.message : 'Could not update startup folder preference.',
-    }, 400)
-  }
 }
 
 export async function startupOpenTargetHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -253,14 +233,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
   const resolvedInputPath = classification.canonicalPath
   const stats = statSync(resolvedInputPath)
   if (stats.isFile()) {
-    const parentPath = dirname(resolvedInputPath)
-    let rootPath = parentPath
-    let selectedPath = basename(resolvedInputPath)
-
-    if (classification.repositoryRootPath) {
-      rootPath = classification.repositoryRootPath
-      selectedPath = relative(rootPath, resolvedInputPath).split('\\').join('/')
-    }
+    const { rootPath, selectedPath } = resolveDirectOpenTarget(resolvedInputPath, classification.repositoryRootPath)
 
     setRepoPath(rootPath)
     setPickerPath('')
@@ -332,20 +305,12 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
 
   /* v8 ignore start -- reaching the filesystem root and finding it still unreadable is not practical to simulate in tests */
   if (isConfirmedUnreadable(candidate)) {
-    const fallback = resolveGuaranteedFallbackPath()
-    setRepoPath('')
-    setPickerPath(fallback.path)
-    const previous = getStartupFolderResolution()
     // The caller (App.tsx's handleBrowseParentFolder) reloads the page on `ok: true` without
     // reading any inline message, so the explanation has to live where the reloaded picker
     // page already looks for it — the same startup-folder resolution snapshot every other
     // fallback path in this feature writes to — rather than an ad hoc response field no
     // client ever reads.
-    setStartupFolderResolution(buildSafeFallbackResolution(
-      fallback,
-      'No readable parent folder was found — opened a safe fallback location instead.',
-      { platformDefaultPath: previous.platformDefaultPath, lastUsedPath: previous.lastUsedPath },
-    ))
+    fallBackToOsDefault('No readable parent folder was found — opened a default location instead.')
     return c.json({ ok: true, error: '' })
   }
   /* v8 ignore stop */
