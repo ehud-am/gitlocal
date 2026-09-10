@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.3 - 2026-09-10
+
+- Added a `gitlocal.dev` link to the web app footer, alongside the existing GitHub project link.
+- Added `gitlocal.dev` and GitHub project links to the native macOS app's "About GitLocal" panel.
+- Migrated the `gitlocal.dev`/`www.gitlocal.dev` public website hosting to Cloudflare; the repository no longer declares a GitHub Pages custom domain (`docs/CNAME` removed).
+- Bumped `hono` and `vitest`/`@vitest/coverage-v8` to resolve four moderate-severity dependency advisories (no behavior changes).
+
 ## 0.13.2 - 2026-09-07
 
 - Simplified and hardened startup: GitLocal now converges on a single, predictable fallback location (your home folder) whenever it can't open an explicitly requested folder, a remembered folder, or a directly-opened file — replacing several previously separate fallback paths (Documents folder, home folder, current working directory, temp folder, drive root) that could each behave slightly differently. Every fallback still shows a clear on-screen explanation of what happened and why.
