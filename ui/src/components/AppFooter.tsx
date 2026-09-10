@@ -17,6 +17,14 @@ export default function AppFooter({ version }: Props) {
       >
         GitLocal
       </a>
+      <a
+        href="https://gitlocal.dev"
+        className="app-footer-link"
+        target="_blank"
+        rel="noreferrer"
+      >
+        gitlocal.dev
+      </a>
       {normalizedVersion ? <span>{`v${normalizedVersion}`}</span> : null}
     </footer>
   )

@@ -21,6 +21,7 @@ export default defineConfig({
       //     server-side integration test (tests/integration/terminal.test.ts)
       include: [
         'src/App.tsx',
+        'src/components/AppFooter.tsx',
         'src/components/FileTree/**/*.tsx',
         'src/components/Breadcrumb/**/*.tsx',
         'src/components/ContentPanel/ContentPanel.tsx',

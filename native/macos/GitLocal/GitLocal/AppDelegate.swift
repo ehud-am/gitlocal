@@ -85,18 +85,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func showAboutPanel(_ sender: Any?) {
+        let credits = NSMutableAttributedString()
+        let linkFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        let linksParagraphStyle = NSMutableParagraphStyle()
+        linksParagraphStyle.alignment = .center
+
+        func appendLink(_ title: String, url: String) {
+            if credits.length > 0 {
+                credits.append(NSAttributedString(string: "\n"))
+            }
+            credits.append(
+                NSAttributedString(
+                    string: title,
+                    attributes: [
+                        .link: URL(string: url) as Any,
+                        .font: linkFont,
+                        .paragraphStyle: linksParagraphStyle,
+                    ]
+                )
+            )
+        }
+
+        appendLink("gitlocal.dev", url: "https://gitlocal.dev")
+        appendLink("GitHub: ehud-am/gitlocal", url: "https://github.com/ehud-am/gitlocal")
+
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [.credits: credits])
+    }
+
     private func installMainMenu(for controller: ViewerWindowController) {
         let mainMenu = NSMenu()
 
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu(title: "GitLocal")
-        appMenu.addItem(
-            NSMenuItem(
-                title: "About GitLocal",
-                action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
-                keyEquivalent: ""
-            )
+        let aboutItem = NSMenuItem(
+            title: "About GitLocal",
+            action: #selector(showAboutPanel(_:)),
+            keyEquivalent: ""
         )
+        aboutItem.target = self
+        appMenu.addItem(aboutItem)
         appMenu.addItem(NSMenuItem.separator())
         let defaultMarkdownReaderItem = NSMenuItem(
             title: "Set as Default Markdown Reader",
