@@ -31,6 +31,9 @@ const layoutEdgeCases = fixtureBase64('layout-edge-cases.pptx')
 const themeSchemeColors = fixtureBase64('theme-scheme-colors.pptx')
 const masterLoadFailures = fixtureBase64('master-load-failures.pptx')
 const layoutMasterDecorations = fixtureBase64('layout-master-decorations.pptx')
+const themeBgRef = fixtureBase64('theme-bgref.pptx')
+const groupedShapes = fixtureBase64('grouped-shapes.pptx')
+const layoutGroupDecoration = fixtureBase64('layout-group-decoration.pptx')
 const largeDeck = fixtureBase64('large-deck.pptx')
 
 // A minimal IntersectionObserver test double: records what was observed and with what options,
@@ -439,6 +442,101 @@ describe('PptxViewer', () => {
     // The layout's third decoration picture references an .emf target - shown as unavailable,
     // same as an unresolvable image reference, rather than a browser-broken-image icon.
     expect(screen.getByText('Image not available in this preview')).toBeInTheDocument()
+  })
+
+  it('resolves a p:bgRef themed background (an index into the theme\'s bgFillStyleLst)', async () => {
+    render(<PptxViewer content={themeBgRef} />)
+    await waitFor(() => expect(screen.getByText('BgRef Themed Background Slide')).toBeInTheDocument())
+    const slideEl = slideItem(0).querySelector('.pptx-viewer-slide') as HTMLElement
+    expect(slideEl.style.backgroundColor).toBe('rgb(51, 102, 204)') // theme accent1 = #3366CC
+  })
+
+  it('still resolves a direct p:bgPr background on a different slide in the same deck as bgRef', async () => {
+    render(<PptxViewer content={themeBgRef} />)
+    await waitFor(() => expect(screen.getByText('BgPr Still Works Slide')).toBeInTheDocument())
+    const slideEl = slideItem(1).querySelector('.pptx-viewer-slide') as HTMLElement
+    expect(slideEl.style.backgroundColor).toBe('rgb(0, 255, 0)')
+  })
+
+  it('flattens a group shape (p:grpSp) into slide coordinates via its group transform', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Group Child A')).toBeInTheDocument())
+
+    const childA = screen.getByText('Group Child A').closest('.pptx-viewer-shape') as HTMLElement
+    expect(childA.style.left).toBe(`${1000000 / 9525}px`)
+    expect(childA.style.top).toBe(`${1000000 / 9525}px`)
+    expect(childA.style.width).toBe(`${500000 / 9525}px`)
+    expect(childA.style.height).toBe(`${250000 / 9525}px`)
+
+    const childB = screen.getByText('Group Child B').closest('.pptx-viewer-shape') as HTMLElement
+    expect(childB.style.left).toBe(`${2000000 / 9525}px`)
+    expect(childB.style.top).toBe(`${1500000 / 9525}px`)
+  })
+
+  it('composes transforms through a nested group (group inside a group), including an image inside it', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Inner Group Text')).toBeInTheDocument())
+
+    // Outer group scale=2, inner group's own scale=0.5 -> composed scale=1 (exercises
+    // multiplication, not just one level passing through as an identity).
+    const innerText = screen.getByText('Inner Group Text').closest('.pptx-viewer-shape') as HTMLElement
+    expect(innerText.style.left).toBe(`${2000000 / 9525}px`)
+    expect(innerText.style.top).toBe(`${2000000 / 9525}px`)
+    expect(innerText.style.width).toBe(`${500000 / 9525}px`)
+
+    const image = slideItem(1).querySelector('.pptx-viewer-image') as HTMLElement
+    expect(image).not.toBeNull()
+    const imageShape = image.closest('.pptx-viewer-shape') as HTMLElement
+    expect(imageShape.style.left).toBe(`${2500000 / 9525}px`)
+    expect(imageShape.style.top).toBe(`${2000000 / 9525}px`)
+  })
+
+  it('renders nothing from inside a hidden (hidden="1") group', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Hidden Group Slide')).toBeInTheDocument())
+    expect(screen.queryByText('Should Not Render')).not.toBeInTheDocument()
+  })
+
+  it('treats a group with no a:xfrm as an identity transform (child keeps its own raw coordinates)', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Group Edge Cases Slide')).toBeInTheDocument())
+    const shapeEl = screen.getByText('No Xfrm Group Child').closest('.pptx-viewer-shape') as HTMLElement
+    expect(shapeEl.style.left).toBe(`${1000000 / 9525}px`)
+    expect(shapeEl.style.top).toBe(`${1000000 / 9525}px`)
+  })
+
+  it('falls back scale to the group\'s own a:ext when a:chExt is missing', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Group Edge Cases Slide')).toBeInTheDocument())
+    const shapeEl = screen.getByText('No ChExt Group Child').closest('.pptx-viewer-shape') as HTMLElement
+    expect(shapeEl.style.left).toBe(`${500000 / 9525}px`)
+    expect(shapeEl.style.top).toBe(`${500000 / 9525}px`)
+  })
+
+  it('skips a hidden shape and an empty-run shape inside a visible group, but keeps its other visible content', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Visible Child In Group')).toBeInTheDocument())
+    expect(screen.queryByText('Hidden Child In Group')).not.toBeInTheDocument()
+  })
+
+  it('skips a hidden group nested inside a visible group', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Visible Child In Group')).toBeInTheDocument())
+    expect(screen.queryByText('Should Not Render Nested')).not.toBeInTheDocument()
+  })
+
+  it('does not crash on a degenerate zero-size group (no a:chExt and a zero-size a:ext)', async () => {
+    render(<PptxViewer content={groupedShapes} />)
+    await waitFor(() => expect(screen.getByText('Zero Size Group Child')).toBeInTheDocument())
+    const shapeEl = screen.getByText('Zero Size Group Child').closest('.pptx-viewer-shape') as HTMLElement
+    expect(shapeEl.style.left).toBe(`${4500000 / 9525}px`)
+    expect(shapeEl.style.width).toBe('0px')
+  })
+
+  it('renders a group decoration on a layout, but not a hidden layout-level group', async () => {
+    render(<PptxViewer content={layoutGroupDecoration} />)
+    await waitFor(() => expect(screen.getByText('Layout Group Decoration')).toBeInTheDocument())
+    expect(screen.queryByText('Layout Hidden Group Should Not Render')).not.toBeInTheDocument()
   })
 
   it('scales the slide canvas to fill the available panel width via a responsive frame + transform', async () => {
