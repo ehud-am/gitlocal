@@ -27,4 +27,14 @@ describe('AppFooter', () => {
     rerender(<AppFooter version="" />)
     expect(screen.queryByText(/^v/)).not.toBeInTheDocument()
   })
+
+  it('pairs each link with a recognizable icon, per a developer-tool footer pattern', () => {
+    render(<AppFooter version="1.2.3" />)
+
+    const githubLink = screen.getByRole('link', { name: 'GitLocal' })
+    expect(githubLink.querySelector('svg.footer-link-icon')).not.toBeNull()
+
+    const websiteLink = screen.getByRole('link', { name: 'gitlocal.dev' })
+    expect(websiteLink.querySelector('svg.footer-link-icon')).not.toBeNull()
+  })
 })

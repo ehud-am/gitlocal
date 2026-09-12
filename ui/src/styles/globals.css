@@ -604,9 +604,10 @@ pre {
 .app-footer {
   display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.4rem 1rem;
   border-top: 1px solid var(--border);
   background: var(--card);
   padding: 0.6rem 1rem;
@@ -614,13 +615,33 @@ pre {
   font-size: 0.8125rem;
 }
 
-.app-footer-link {
-  color: var(--primary);
-  text-decoration: none;
+.app-footer-meta {
+  color: var(--muted-foreground);
 }
 
-.app-footer-link:hover {
-  text-decoration: underline;
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.app-footer-link .footer-link-icon {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+.app-footer-link:hover,
+.app-footer-link:focus-visible {
+  color: var(--foreground);
+}
+
+.app-footer-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .file-tree-shell {
@@ -1633,25 +1654,15 @@ pre {
 }
 
 .pptx-viewer-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.pptx-viewer-nav-button {
-  padding: 0.35rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
   background: var(--background);
-  color: var(--foreground);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.pptx-viewer-nav-button:disabled {
-  color: var(--muted-foreground);
-  cursor: not-allowed;
-  opacity: 0.6;
+  border-bottom: 1px solid var(--border);
 }
 
 .pptx-viewer-slide-counter {
@@ -1659,19 +1670,43 @@ pre {
   font-size: 0.85rem;
 }
 
-.pptx-viewer-body {
+.pptx-viewer-scroll-body {
+  /* Scrolling happens on the ancestor .content-panel-selection-root (ContentPanel's own scroll
+     wrapper, shared by every preview type) - this element intentionally does NOT set its own
+     overflow, so PptxViewer's IntersectionObserver root-lookup finds that real scroll container
+     instead of stopping here. */
   display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  overflow: auto;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 1rem;
+}
+
+.pptx-viewer-slide-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Sized to the slide's scaled-down height so the layout reserves the right amount of vertical
+   space; the slide itself is positioned inside at its natural size and scaled to fit via CSS
+   transform, so the preview stays responsive to the panel's width instead of a fixed px canvas. */
+.pptx-viewer-slide-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .pptx-viewer-slide {
-  position: relative;
-  flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+
+.pptx-viewer-slide-pending {
+  background: var(--surface-subtle);
 }
 
 .pptx-viewer-shape {

@@ -112,6 +112,25 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
         flushPendingOpenFiles()
     }
 
+    // A target="_blank" link (or any request for a new browsing context) has no target frame.
+    // WKWebView has no WKUIDelegate configured to open a second in-app window for these, so
+    // without this check they would silently do nothing; route them to the system browser instead.
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard navigationAction.targetFrame == nil,
+              let url = navigationAction.request.url,
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            decisionHandler(.allow)
+            return
+        }
+        NSWorkspace.shared.open(url)
+        decisionHandler(.cancel)
+    }
+
     func openMarkdownFile(_ path: String) {
         pendingOpenFilePaths.append(path)
         flushPendingOpenFiles()
