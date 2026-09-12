@@ -108,6 +108,18 @@ describe('PptxViewer', () => {
     expect(slideItem(2)).toHaveTextContent('Slide Three Title')
   })
 
+  it('makes every slide individually keyboard-focusable, so Tab-ing through reaches all of them', async () => {
+    render(<PptxViewer content={sample} />)
+    await waitFor(() => expect(screen.getByText('Slide One Title')).toBeInTheDocument())
+
+    for (let index = 0; index < 3; index += 1) {
+      const item = slideItem(index)
+      expect(item).toHaveAttribute('tabindex', '0')
+      expect(item).toHaveAttribute('role', 'group')
+      expect(item).toHaveAttribute('aria-label', `Slide ${index + 1} of 3`)
+    }
+  })
+
   it('updates the "Slide N of M" indicator to whichever slide the visibility observer reports as in view', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     FakeIntersectionObserver.instances = []

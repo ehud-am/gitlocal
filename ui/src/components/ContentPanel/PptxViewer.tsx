@@ -193,11 +193,15 @@ function isHiddenShape(sp: Record<string, unknown>, nvPrKey: 'p:nvSpPr' | 'p:nvP
 // Matches a slide placeholder to its layout's/master's corresponding placeholder: prefer the same
 // @idx when both specify one, otherwise fall back to the same @type (research.md §2). Best-effort -
 // an unmatched placeholder simply renders with no inherited geometry/background (FR-008).
+// The type fallback requires a non-null @type on both sides: two placeholders that both simply
+// omit @type are NOT necessarily the same placeholder (a layout can have more than one), and
+// matching them on "null === null" would silently borrow an unrelated placeholder's geometry.
 function matchPlaceholder(ref: PptxPlaceholderRef, candidates: PlaceholderCandidate[]): PlaceholderCandidate | undefined {
   if (ref.idx !== null) {
     const byIdx = candidates.find((candidate) => candidate.ref.idx === ref.idx)
     if (byIdx) return byIdx
   }
+  if (ref.type === null) return undefined
   return candidates.find((candidate) => candidate.ref.type === ref.type)
 }
 
@@ -350,6 +354,7 @@ async function loadPartIndex(
     const decorations: PptxShape[] = []
 
     for (const sp of asArray(spTree?.['p:sp'] as Record<string, unknown>[] | Record<string, unknown>)) {
+      if (isHiddenShape(sp, 'p:nvSpPr')) continue
       const ref = readPlaceholderRef(sp)
       if (ref) {
         placeholders.push({ ref, geometry: parseXfrmPartial(sp['p:spPr'] as Record<string, unknown> | undefined) })
@@ -357,7 +362,6 @@ async function loadPartIndex(
       }
       // A non-placeholder shape (a logo, a decorative line, static text) is part of the layout's
       // or master's fixed artwork - PowerPoint always shows it, on every slide using that part.
-      if (isHiddenShape(sp, 'p:nvSpPr')) continue
       const txBody = sp['p:txBody'] as Record<string, unknown> | undefined
       const runs = txBody ? parseRuns(txBody['a:p'], theme) : []
       if (runs.length === 0) continue
@@ -684,6 +688,7 @@ interface SlideItemProps {
   widthPx: number
   heightPx: number
   scale: number
+  totalSlides: number
   onVisibilityChange: (index: number, isVisible: boolean) => void
 }
 
@@ -691,19 +696,19 @@ interface SlideItemProps {
 // nears the viewport (so a large deck stays scroll-responsive, FR-013/SC-004); a second observer
 // reports which slide is currently in view to drive the "Slide N of M" position indicator.
 // IntersectionObserver's `root: null` means the top-level document viewport, NOT "whatever
-// scrolls" - the preview panel actually scrolls inside an ancestor div (ContentPanel's own
-// scroll wrapper), so without an explicit root here every slide reads as "always intersecting"
-// against the full page instead of the small visible panel.
+// scrolls" - the preview panel actually scrolls inside ContentPanel's own scroll wrapper
+// (`.content-panel-selection-root`, the one scroll container every preview type mounts inside -
+// see ui/src/components/ContentPanel/ContentPanel.tsx), so without an explicit root here every
+// slide reads as "always intersecting" against the full page instead of the small visible panel.
+// Looked up by that known class rather than by walking parents for a computed `overflow-y` -
+// generic overflow-sniffing would also match `.pptx-viewer-scroll-body` itself if this component's
+// own CSS ever regained an `overflow` rule, and doing a DOM+getComputedStyle walk per slide item
+// forces a style recalc on every mount for no benefit when the answer is already always the same node.
 function findScrollableAncestor(element: Element): HTMLElement | null {
-  let node = element.parentElement
-  while (node) {
-    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node
-    node = node.parentElement
-  }
-  return null
+  return element.closest<HTMLElement>('.content-panel-selection-root')
 }
 
-function PptxSlideItem({ slide, widthPx, heightPx, scale, onVisibilityChange }: SlideItemProps) {
+function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibilityChange }: SlideItemProps) {
   const elementRef = useRef<HTMLDivElement | null>(null)
   const [shouldRender, setShouldRender] = useState(false)
 
@@ -745,7 +750,14 @@ function PptxSlideItem({ slide, widthPx, heightPx, scale, onVisibilityChange }: 
   }, [slide.index, onVisibilityChange])
 
   return (
-    <div ref={elementRef} className="pptx-viewer-slide-item" data-slide-index={slide.index}>
+    <div
+      ref={elementRef}
+      className="pptx-viewer-slide-item"
+      data-slide-index={slide.index}
+      tabIndex={0}
+      role="group"
+      aria-label={`Slide ${slide.index + 1} of ${totalSlides}`}
+    >
       {shouldRender ? (
         <PptxSlideCanvas slide={slide} widthPx={widthPx} heightPx={heightPx} scale={scale} />
       ) : (
@@ -866,6 +878,7 @@ export default function PptxViewer({ content }: Props) {
           <PptxSlideItem
             key={slide.index}
             slide={slide}
+            totalSlides={presentation.slides.length}
             widthPx={canvasWidthPx}
             heightPx={canvasHeightPx}
             scale={scale}

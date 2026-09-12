@@ -1687,6 +1687,11 @@ pre {
   gap: 0.5rem;
 }
 
+.pptx-viewer-slide-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* Sized to the slide's scaled-down height so the layout reserves the right amount of vertical
    space; the slide itself is positioned inside at its natural size and scaled to fit via CSS
    transform, so the preview stays responsive to the panel's width instead of a fixed px canvas. */
