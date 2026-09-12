@@ -60,12 +60,55 @@ interface PptxPartIndex {
 interface PptxThemeContext {
   clrMap: Record<string, string>
   themeColors: Record<string, string>
+  // Best-effort approximation of the theme's background-fill-style list (<a:fmtScheme>
+  // <a:bgFillStyleLst>, referenced by a slide/layout/master's <p:bg><p:bgRef idx="N">) reduced to
+  // one representative color. OOXML positionally indexes this list by idx (1-1000 -> fillStyleLst,
+  // 1001+ -> bgFillStyleLst, using idx-1000), but a same-tag-name XML parse loses cross-tag-name
+  // ordering when a list mixes fill types - exact positional resolution would need an
+  // order-preserving parse pass. Since real-world (especially Office-derived) themes overwhelmingly
+  // use a:solidFill for the fill any bgRef in practice tends to reference, this favors the first
+  // solid color found in bgFillStyleLst (falling back to fillStyleLst, then a gradient's first
+  // stop), rather than the exact requested idx - see extractApproximateFillColor.
+  bgFillStyleColor: string | null
 }
 
 interface PptxLayoutIndex extends PptxPartIndex {
   master: PptxPartIndex | null
   theme: PptxThemeContext | null
 }
+
+// A slide master's own PptxPartIndex is always loaded together with its theme (both keyed by the
+// same master path), so they're cached as one unit rather than two separately-checked caches.
+interface PptxMasterEntry {
+  part: PptxPartIndex | null
+  theme: PptxThemeContext | null
+}
+
+// The two caches shared across a whole presentation's parse (bundled into one object rather than
+// threaded as separate function parameters).
+interface PptxCaches {
+  layouts: Map<string, PptxLayoutIndex | null>
+  masters: Map<string, PptxMasterEntry>
+}
+
+// A parsed OOXML relationship (one <Relationship> element from a .rels part).
+interface OoxmlRelationship {
+  id: string
+  type: string
+  target: string
+}
+
+// Maps a shape's own local geometry to slide-EMU coordinates: finalEmu = local * scale + offset.
+// Used to flatten arbitrarily-nested <p:grpSp> group shapes, whose children's own <a:xfrm> values
+// are expressed in the group's child coordinate space, not slide coordinates (research.md-adjacent
+// OOXML behavior - see groupChildTransform).
+interface AffineTransform {
+  offsetXEmu: number
+  offsetYEmu: number
+  scaleX: number
+  scaleY: number
+}
+const IDENTITY_TRANSFORM: AffineTransform = { offsetXEmu: 0, offsetYEmu: 0, scaleX: 1, scaleY: 1 }
 
 interface PptxPresentation {
   slides: PptxSlide[]
@@ -118,6 +161,23 @@ function extractSolidFillColor(
   return null
 }
 
+// Reduces one OOXML fill-style-list entry (a:solidFill or a:gradFill, as found directly under
+// a:fillStyleLst/a:bgFillStyleLst) to a single approximate CSS color. A gradient uses its first
+// color stop; pattern/picture fills and explicit "no fill" aren't representable as a flat color
+// and return null (graceful degradation, same philosophy as unresolvable images/shapes).
+function extractApproximateFillColor(
+  fillListEntry: Record<string, unknown> | undefined,
+  theme: PptxThemeContext | null,
+): string | null {
+  if (!fillListEntry) return null
+  const solid = extractSolidFillColor(fillListEntry['a:solidFill'] as Record<string, unknown> | undefined, theme)
+  if (solid) return solid
+  const gradFill = fillListEntry['a:gradFill'] as Record<string, unknown> | undefined
+  const gsLst = gradFill?.['a:gsLst'] as Record<string, unknown> | undefined
+  const firstStop = asArray(gsLst?.['a:gs'] as Record<string, unknown>[] | Record<string, unknown>)[0] as Record<string, unknown> | undefined
+  return firstStop ? extractSolidFillColor(firstStop, theme) : null
+}
+
 // A run's text lives at a:r > a:t; formatting lives on the sibling a:rPr.
 function parseRuns(paragraphs: unknown, theme: PptxThemeContext | null): PptxTextRun[] {
   const runs: PptxTextRun[] = []
@@ -167,6 +227,63 @@ function mergeGeometry(...layers: PartialGeometry[]): { xEmu: number; yEmu: numb
   return { xEmu: pick('xEmu'), yEmu: pick('yEmu'), widthEmu: pick('widthEmu'), heightEmu: pick('heightEmu') }
 }
 
+// Applies an accumulated group transform to a shape's own local geometry (already merged/defaulted
+// via mergeGeometry), producing final slide-EMU coordinates.
+function applyTransform(
+  transform: AffineTransform,
+  local: { xEmu: number; yEmu: number; widthEmu: number; heightEmu: number },
+): { xEmu: number; yEmu: number; widthEmu: number; heightEmu: number } {
+  return {
+    xEmu: local.xEmu * transform.scaleX + transform.offsetXEmu,
+    yEmu: local.yEmu * transform.scaleY + transform.offsetYEmu,
+    widthEmu: local.widthEmu * transform.scaleX,
+    heightEmu: local.heightEmu * transform.scaleY,
+  }
+}
+
+// A <p:grpSp>'s own <a:xfrm> carries both where the group sits (a:off/a:ext, in whatever coordinate
+// space the group itself lives in) and its children's coordinate space (a:chOff/a:chExt) - children's
+// own a:xfrm values are expressed in that child space, not the group's. This computes the transform
+// that maps a direct child's local coordinate into the space the group's own off/ext is expressed in.
+function groupChildTransform(grpSpPr: Record<string, unknown> | undefined): AffineTransform {
+  const xfrm = grpSpPr?.['a:xfrm'] as Record<string, unknown> | undefined
+  if (!xfrm) return IDENTITY_TRANSFORM
+  const off = xfrm['a:off'] as Record<string, unknown> | undefined
+  const ext = xfrm['a:ext'] as Record<string, unknown> | undefined
+  const chOff = xfrm['a:chOff'] as Record<string, unknown> | undefined
+  const chExt = xfrm['a:chExt'] as Record<string, unknown> | undefined
+  const num = (value: unknown): number => (typeof value === 'string' && Number.isFinite(Number(value)) ? Number(value) : 0)
+  const offX = num(off?.['@_x'])
+  const offY = num(off?.['@_y'])
+  const extCx = num(ext?.['@_cx'])
+  const extCy = num(ext?.['@_cy'])
+  const chOffX = num(chOff?.['@_x'])
+  const chOffY = num(chOff?.['@_y'])
+  // The || 1 fallback guarantees a non-zero divisor even when chExt (or ext) is missing/zero, so
+  // scale is always a well-defined division - no separate "avoid divide by zero" branch needed.
+  const chExtCx = num(chExt?.['@_cx']) || extCx || 1
+  const chExtCy = num(chExt?.['@_cy']) || extCy || 1
+  const scaleX = extCx / chExtCx
+  const scaleY = extCy / chExtCy
+  return {
+    scaleX,
+    scaleY,
+    offsetXEmu: offX - chOffX * scaleX,
+    offsetYEmu: offY - chOffY * scaleY,
+  }
+}
+
+// Composes two transforms so that applying the result equals applying `inner` then `outer`:
+// composed(local) === outer(inner(local)). Used to accumulate a transform through nested groups.
+function composeTransforms(outer: AffineTransform, inner: AffineTransform): AffineTransform {
+  return {
+    scaleX: outer.scaleX * inner.scaleX,
+    scaleY: outer.scaleY * inner.scaleY,
+    offsetXEmu: outer.scaleX * inner.offsetXEmu + outer.offsetXEmu,
+    offsetYEmu: outer.scaleY * inner.offsetYEmu + outer.offsetYEmu,
+  }
+}
+
 // A slide/layout/master shape's placeholder identity, or null if the shape isn't a placeholder
 // (in which case it never inherits geometry/background from a layout or master).
 function readPlaceholderRef(sp: Record<string, unknown>): PptxPlaceholderRef | null {
@@ -184,7 +301,7 @@ function readPlaceholderRef(sp: Record<string, unknown>): PptxPlaceholderRef | n
 
 // A shape hidden in PowerPoint (e.g. a design-grid guide layer) carries hidden="1" on its cNvPr -
 // it must never render, on a slide or on a layout/master's own decorative content alike.
-function isHiddenShape(sp: Record<string, unknown>, nvPrKey: 'p:nvSpPr' | 'p:nvPicPr'): boolean {
+function isHiddenShape(sp: Record<string, unknown>, nvPrKey: 'p:nvSpPr' | 'p:nvPicPr' | 'p:nvGrpSpPr'): boolean {
   const nv = sp[nvPrKey] as Record<string, unknown> | undefined
   const cNvPr = nv?.['p:cNvPr'] as Record<string, unknown> | undefined
   return cNvPr?.['@_hidden'] === '1'
@@ -205,10 +322,17 @@ function matchPlaceholder(ref: PptxPlaceholderRef, candidates: PlaceholderCandid
   return candidates.find((candidate) => candidate.ref.type === ref.type)
 }
 
+// <p:bg> has two mutually-exclusive forms: <p:bgPr> (direct fill properties) or <p:bgRef idx="N">
+// (an index into the theme's background-fill-style matrix - see PptxThemeContext.bgFillStyleColor
+// for how idx resolution is approximated). bgRef is what PowerPoint writes for a themed/"Design
+// Ideas" background, which bgPr-only resolution (the pre-existing behavior) never handled.
 function parseBgFill(cSld: Record<string, unknown> | undefined, theme: PptxThemeContext | null): string | null {
   const bg = cSld?.['p:bg'] as Record<string, unknown> | undefined
   const bgPr = bg?.['p:bgPr'] as Record<string, unknown> | undefined
-  return extractSolidFillColor(bgPr?.['a:solidFill'] as Record<string, unknown> | undefined, theme)
+  const direct = extractSolidFillColor(bgPr?.['a:solidFill'] as Record<string, unknown> | undefined, theme)
+  if (direct) return direct
+  const bgRef = bg?.['p:bgRef'] as Record<string, unknown> | undefined
+  return bgRef ? (theme?.bgFillStyleColor ?? null) : null
 }
 
 // Relationship targets are relative to the referencing part's own directory (e.g. ppt/slides/).
@@ -229,26 +353,38 @@ function relsPathFor(partPath: string): string {
   return `${dir}/_rels/${file}.rels`
 }
 
-// Finds the resolved target path of the first relationship of a part whose Type ends with
-// typeSuffix (e.g. "/slideMaster"), or null if the part has no rels file or no matching one.
-async function findRelTarget(
+// Reads and parses a part's own .rels file into a flat list of relationships - the one place this
+// preview walks a Relationships/Relationship XML structure (every call site used to duplicate this
+// walk independently: slide rels, layout/master rels, presentation rels, and the type-suffix lookup
+// below all read/parsed the same shape of XML separately).
+async function parseRelationships(
   zip: import('jszip'),
   parser: { parse: (xml: string) => unknown },
   partPath: string,
-  typeSuffix: string,
-): Promise<string | null> {
+): Promise<OoxmlRelationship[]> {
   const relsXml = await zip.file(relsPathFor(partPath))?.async('text')
-  if (!relsXml) return null
+  if (!relsXml) return []
   const parsed = parser.parse(relsXml) as Record<string, unknown>
   const relationships = parsed['Relationships'] as Record<string, unknown> | undefined
+  const result: OoxmlRelationship[] = []
   for (const rel of asArray(relationships?.['Relationship'] as Record<string, unknown>[] | Record<string, unknown>)) {
+    const id = rel['@_Id']
     const type = rel['@_Type']
     const target = rel['@_Target']
-    if (typeof type === 'string' && type.endsWith(typeSuffix) && typeof target === 'string') {
-      return resolveRelativePath(partPath, target)
+    if (typeof id === 'string' && typeof type === 'string' && typeof target === 'string') {
+      result.push({ id, type, target })
     }
   }
-  return null
+  return result
+}
+
+// Finds the resolved target path of the first relationship whose Type ends with typeSuffix (e.g.
+// "/slideMaster"), or null if none match. Operates on an already-parsed relationship list (from
+// parseRelationships) rather than reading the .rels file itself, so a caller that needs the same
+// part's relationships for more than one purpose only reads/parses that file once.
+function findRelTarget(relationships: OoxmlRelationship[], basePath: string, typeSuffix: string): string | null {
+  const match = relationships.find((rel) => rel.type.endsWith(typeSuffix))
+  return match ? resolveRelativePath(basePath, match.target) : null
 }
 
 // The content-level names (bg1/tx1/...) a schemeClr can reference, mapped by default to their
@@ -274,13 +410,17 @@ function extractDirectColor(container: Record<string, unknown> | undefined): str
   return null
 }
 
-// Resolves the color theme (clrMap + palette) for a slide master: <p:clrMap> lives on the master
-// itself, and the palette lives in a separate theme part reached via the master's own rels
-// (type ".../theme"). Every slide, its layout, and its master all share this one theme context.
+// Resolves the color theme (clrMap + palette + approximate background-fill-style color) for a
+// slide master: <p:clrMap> lives on the master itself, and the palette/fill styles live in a
+// separate theme part reached via the master's own rels (type ".../theme"). Every slide, its
+// layout, and its master all share this one theme context. `relationships` is the master's own
+// already-parsed .rels (see parseRelationships) - passed in rather than re-read here because
+// loadPartIndex needs that same file's contents too.
 async function loadThemeContext(
   zip: import('jszip'),
   parser: { parse: (xml: string) => unknown },
   masterPath: string,
+  relationships: OoxmlRelationship[],
 ): Promise<PptxThemeContext | null> {
   try {
     const masterXml = await zip.file(masterPath)?.async('text')
@@ -299,7 +439,8 @@ async function loadThemeContext(
     }
 
     const themeColors: Record<string, string> = {}
-    const themePath = await findRelTarget(zip, parser, masterPath, '/theme')
+    let bgFillStyleColor: string | null = null
+    const themePath = findRelTarget(relationships, masterPath, '/theme')
     const themeXml = themePath ? await zip.file(themePath)?.async('text') : undefined
     if (themeXml) {
       const themeParsed = parser.parse(themeXml) as Record<string, unknown>
@@ -310,22 +451,99 @@ async function loadThemeContext(
         const hex = extractDirectColor(clrScheme?.[`a:${slot}`] as Record<string, unknown> | undefined)
         if (hex) themeColors[slot] = hex
       }
+
+      // A partial theme (clrMap + themeColors only) is enough to resolve schemeClr references
+      // inside the fill-style lists themselves (very common - themed fills are usually expressed
+      // as a scheme color with a shade/tint, not a literal RGB value).
+      const partialTheme: PptxThemeContext = { clrMap, themeColors, bgFillStyleColor: null }
+      const fmtScheme = themeElements?.['a:fmtScheme'] as Record<string, unknown> | undefined
+      const bgFillStyleLst = fmtScheme?.['a:bgFillStyleLst'] as Record<string, unknown> | undefined
+      const fillStyleLst = fmtScheme?.['a:fillStyleLst'] as Record<string, unknown> | undefined
+      bgFillStyleColor = extractApproximateFillColor(bgFillStyleLst, partialTheme)
+        ?? extractApproximateFillColor(fillStyleLst, partialTheme)
     }
 
-    return { clrMap, themeColors }
+    return { clrMap, themeColors, bgFillStyleColor }
   } catch {
     return null
   }
 }
 
+// Resolves every non-hidden <p:pic> directly under spTree into an image shape, applying `transform`
+// (identity for a top-level slide/layout/master shape; a composed group transform for pics found
+// while recursing into a <p:grpSp> - see collectGroupedShapes). Images resolve independently, so
+// this parallelizes their (potentially disk/CPU-bound) decoding rather than awaiting one at a time.
+async function parsePictureShapes(
+  zip: import('jszip'),
+  spTree: Record<string, unknown> | undefined,
+  relTargets: Map<string, string>,
+  basePath: string,
+  transform: AffineTransform = IDENTITY_TRANSFORM,
+): Promise<PptxShape[]> {
+  const pics = asArray(spTree?.['p:pic'] as Record<string, unknown>[] | Record<string, unknown>)
+    .filter((pic) => !isHiddenShape(pic, 'p:nvPicPr'))
+  return Promise.all(pics.map(async (pic): Promise<PptxShape> => {
+    const spPr = pic['p:spPr'] as Record<string, unknown> | undefined
+    const local = mergeGeometry(parseXfrmPartial(spPr))
+    const { xEmu, yEmu, widthEmu, heightEmu } = applyTransform(transform, local)
+    const blipFill = pic['p:blipFill'] as Record<string, unknown> | undefined
+    const blip = blipFill?.['a:blip'] as Record<string, unknown> | undefined
+    const embedId = blip?.['@_r:embed']
+    const target = typeof embedId === 'string' ? relTargets.get(embedId) : undefined
+    const imageDataUri = target ? await resolveImageDataUri(zip, target, basePath) : null
+    return { kind: 'image', xEmu, yEmu, widthEmu, heightEmu, imageDataUri }
+  }))
+}
+
+// Recursively flattens a <p:grpSp>'s contents (text/image shapes, including further nested groups)
+// into slide-EMU-coordinate shapes, composing each level's group transform (research.md-adjacent:
+// a group's children live in a local coordinate space defined by the group's own a:xfrm - see
+// groupChildTransform). Placeholders are not resolved inside groups: OOXML doesn't define grouped
+// placeholders in practice (grouping a shape isn't compatible with layout/master placeholder
+// inheritance), so every shape found here is treated as plain content, matching a layout/master's
+// own non-placeholder decorations.
+async function collectGroupedShapes(
+  zip: import('jszip'),
+  spTree: Record<string, unknown> | undefined,
+  relTargets: Map<string, string>,
+  basePath: string,
+  theme: PptxThemeContext | null,
+  transform: AffineTransform,
+): Promise<PptxShape[]> {
+  const shapes: PptxShape[] = []
+
+  for (const sp of asArray(spTree?.['p:sp'] as Record<string, unknown>[] | Record<string, unknown>)) {
+    if (isHiddenShape(sp, 'p:nvSpPr')) continue
+    const txBody = sp['p:txBody'] as Record<string, unknown> | undefined
+    const runs = txBody ? parseRuns(txBody['a:p'], theme) : []
+    if (runs.length === 0) continue
+    const local = mergeGeometry(parseXfrmPartial(sp['p:spPr'] as Record<string, unknown> | undefined))
+    shapes.push({ kind: 'text', ...applyTransform(transform, local), runs })
+  }
+
+  shapes.push(...(await parsePictureShapes(zip, spTree, relTargets, basePath, transform)))
+
+  for (const group of asArray(spTree?.['p:grpSp'] as Record<string, unknown>[] | Record<string, unknown>)) {
+    if (isHiddenShape(group, 'p:nvGrpSpPr')) continue
+    const groupTransform = composeTransforms(transform, groupChildTransform(group['p:grpSpPr'] as Record<string, unknown> | undefined))
+    shapes.push(...(await collectGroupedShapes(zip, group, relTargets, basePath, theme, groupTransform)))
+  }
+
+  return shapes
+}
+
 // Reads a slideLayout or slideMaster part down to just its placeholder shapes (identity +
 // geometry) and background fill - everything this preview inherits from it. Returns null on any
 // read/parse failure so a missing/malformed layout or master degrades gracefully (FR-008).
+// `relationships` is this part's own already-parsed .rels (see parseRelationships) - passed in so
+// a caller that also needs it for another purpose (e.g. loadThemeContext's theme-part lookup) only
+// reads/parses that file once.
 async function loadPartIndex(
   zip: import('jszip'),
   parser: { parse: (xml: string) => unknown },
   partPath: string,
   theme: PptxThemeContext | null,
+  relationships: OoxmlRelationship[],
 ): Promise<PptxPartIndex | null> {
   try {
     const xml = await zip.file(partPath)?.async('text')
@@ -335,20 +553,7 @@ async function loadPartIndex(
     if (!root) return null
     const cSld = root['p:cSld'] as Record<string, unknown> | undefined
     const spTree = cSld?.['p:spTree'] as Record<string, unknown> | undefined
-
-    // This part's own rels are needed to resolve its own decorative pics' r:embed -> media path
-    // (independent of whatever rels the slide that ends up using this layout/master happens to have).
-    const relsXml = await zip.file(relsPathFor(partPath))?.async('text')
-    const relTargets = new Map<string, string>()
-    if (relsXml) {
-      const relsParsed = parser.parse(relsXml) as Record<string, unknown>
-      const relationships = relsParsed['Relationships'] as Record<string, unknown> | undefined
-      for (const rel of asArray(relationships?.['Relationship'] as Record<string, unknown>[] | Record<string, unknown>)) {
-        const id = rel['@_Id']
-        const target = rel['@_Target']
-        if (typeof id === 'string' && typeof target === 'string') relTargets.set(id, target)
-      }
-    }
+    const relTargets = new Map(relationships.map((rel) => [rel.id, rel.target]))
 
     const placeholders: PlaceholderCandidate[] = []
     const decorations: PptxShape[] = []
@@ -369,22 +574,38 @@ async function loadPartIndex(
       decorations.push({ kind: 'text', xEmu, yEmu, widthEmu, heightEmu, runs })
     }
 
-    for (const pic of asArray(spTree?.['p:pic'] as Record<string, unknown>[] | Record<string, unknown>)) {
-      if (isHiddenShape(pic, 'p:nvPicPr')) continue
-      const spPr = pic['p:spPr'] as Record<string, unknown> | undefined
-      const { xEmu, yEmu, widthEmu, heightEmu } = mergeGeometry(parseXfrmPartial(spPr))
-      const blipFill = pic['p:blipFill'] as Record<string, unknown> | undefined
-      const blip = blipFill?.['a:blip'] as Record<string, unknown> | undefined
-      const embedId = blip?.['@_r:embed']
-      const target = typeof embedId === 'string' ? relTargets.get(embedId) : undefined
-      const imageDataUri = target ? await resolveImageDataUri(zip, target, partPath) : null
-      decorations.push({ kind: 'image', xEmu, yEmu, widthEmu, heightEmu, imageDataUri })
+    decorations.push(...(await parsePictureShapes(zip, spTree, relTargets, partPath)))
+
+    for (const group of asArray(spTree?.['p:grpSp'] as Record<string, unknown>[] | Record<string, unknown>)) {
+      if (isHiddenShape(group, 'p:nvGrpSpPr')) continue
+      const groupTransform = groupChildTransform(group['p:grpSpPr'] as Record<string, unknown> | undefined)
+      decorations.push(...(await collectGroupedShapes(zip, group, relTargets, partPath, theme, groupTransform)))
     }
 
     return { placeholders, decorations, backgroundFill: parseBgFill(cSld, theme) }
   } catch {
     return null
   }
+}
+
+// Loads (and caches, per presentation load, in caches.masters) a slide master's part index
+// together with its theme - always needed as a pair, keyed by the same master path, so they're one
+// cache entry rather than two independently-checked caches.
+async function loadMasterEntry(
+  zip: import('jszip'),
+  parser: { parse: (xml: string) => unknown },
+  masterPath: string,
+  masterCache: Map<string, PptxMasterEntry>,
+): Promise<PptxMasterEntry> {
+  const cached = masterCache.get(masterPath)
+  if (cached) return cached
+
+  const relationships = await parseRelationships(zip, parser, masterPath)
+  const theme = await loadThemeContext(zip, parser, masterPath, relationships)
+  const part = await loadPartIndex(zip, parser, masterPath, theme, relationships)
+  const entry: PptxMasterEntry = { part, theme }
+  masterCache.set(masterPath, entry)
+  return entry
 }
 
 // Loads (and caches, per presentation load) a slide's layout together with that layout's own
@@ -394,50 +615,48 @@ async function loadLayoutIndex(
   zip: import('jszip'),
   parser: { parse: (xml: string) => unknown },
   layoutPath: string,
-  layoutCache: Map<string, PptxLayoutIndex | null>,
-  masterCache: Map<string, PptxPartIndex | null>,
-  themeCache: Map<string, PptxThemeContext | null>,
+  caches: PptxCaches,
 ): Promise<PptxLayoutIndex | null> {
-  const cached = layoutCache.get(layoutPath)
+  const cached = caches.layouts.get(layoutPath)
   if (cached !== undefined) return cached
+
+  const layoutRelationships = await parseRelationships(zip, parser, layoutPath)
 
   let master: PptxPartIndex | null = null
   let theme: PptxThemeContext | null = null
   try {
-    const masterPath = await findRelTarget(zip, parser, layoutPath, '/slideMaster')
+    const masterPath = findRelTarget(layoutRelationships, layoutPath, '/slideMaster')
     if (masterPath) {
-      if (!themeCache.has(masterPath)) {
-        themeCache.set(masterPath, await loadThemeContext(zip, parser, masterPath))
-      }
-      theme = themeCache.get(masterPath) ?? null
-      if (!masterCache.has(masterPath)) {
-        masterCache.set(masterPath, await loadPartIndex(zip, parser, masterPath, theme))
-      }
-      master = masterCache.get(masterPath) ?? null
+      const entry = await loadMasterEntry(zip, parser, masterPath, caches.masters)
+      master = entry.part
+      theme = entry.theme
     }
   } catch {
     master = null
   }
 
-  const layoutPart = await loadPartIndex(zip, parser, layoutPath, theme)
+  const layoutPart = await loadPartIndex(zip, parser, layoutPath, theme, layoutRelationships)
   if (!layoutPart) {
-    layoutCache.set(layoutPath, null)
+    caches.layouts.set(layoutPath, null)
     return null
   }
 
   const result: PptxLayoutIndex = { ...layoutPart, master, theme }
-  layoutCache.set(layoutPath, result)
+  caches.layouts.set(layoutPath, result)
   return result
 }
+
+// Raster formats every mainstream browser can decode in an <img> - an allowlist rather than a
+// blocklist of specific unsupported formats, so a format this preview has never seen before (or a
+// compressed vector metafile like .emz/.wmz, which extToMime doesn't even map) degrades to the
+// same graceful "not available" placeholder instead of a browser broken-image icon by default.
+const BROWSER_RENDERABLE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp'])
 
 async function resolveImageDataUri(zip: import('jszip'), relTarget: string, slidePath: string): Promise<string | null> {
   try {
     const mediaPath = resolveRelativePath(slidePath, relTarget)
     const mime = extToMime(mediaPath)
-    // EMF/WMF are vector metafile formats with no browser-native decoder - embedding them as an
-    // <img> data URI would just show a broken-image icon, so treat them as unavailable up front
-    // (same "not available in this preview" placeholder as an unresolvable image reference).
-    if (mime === 'image/x-emf' || mime === 'image/x-wmf') return null
+    if (!BROWSER_RENDERABLE_MIME_TYPES.has(mime)) return null
     const file = zip.file(mediaPath)
     if (!file) return null
     const base64 = await file.async('base64')
@@ -452,9 +671,7 @@ async function parseSlide(
   parser: { parse: (xml: string) => unknown },
   slidePath: string,
   slideIndex: number,
-  layoutCache: Map<string, PptxLayoutIndex | null>,
-  masterCache: Map<string, PptxPartIndex | null>,
-  themeCache: Map<string, PptxThemeContext | null>,
+  caches: PptxCaches,
 ): Promise<PptxSlide> {
   const slideXml = await zip.file(slidePath)?.async('text')
   if (slideXml === undefined) throw new Error(`Missing slide part: ${slidePath}`)
@@ -464,35 +681,22 @@ async function parseSlide(
   const cSld = sld['p:cSld'] as Record<string, unknown> | undefined
   const spTree = cSld?.['p:spTree'] as Record<string, unknown> | undefined
 
-  // Read the slide's relationship file up front: p:pic > a:blip r:embed resolves to media via it,
-  // and it's also how we find this slide's layout (which in turn points to its master).
-  const relsXml = await zip.file(relsPathFor(slidePath))?.async('text')
-  const relTargets = new Map<string, string>()
-  let notesTarget: string | null = null
-  let layoutTarget: string | null = null
-  if (relsXml) {
-    const relsParsed = parser.parse(relsXml) as Record<string, unknown>
-    const relationships = relsParsed['Relationships'] as Record<string, unknown> | undefined
-    for (const rel of asArray(relationships?.['Relationship'] as Record<string, unknown>[] | Record<string, unknown>)) {
-      const id = rel['@_Id']
-      const target = rel['@_Target']
-      const type = rel['@_Type']
-      if (typeof id === 'string' && typeof target === 'string') {
-        if (typeof type === 'string' && type.endsWith('/notesSlide')) {
-          notesTarget = target
-        } else if (typeof type === 'string' && type.endsWith('/slideLayout')) {
-          layoutTarget = resolveRelativePath(slidePath, target)
-        } else {
-          relTargets.set(id, target)
-        }
-      }
-    }
-  }
+  // The slide's own relationships resolve p:pic > a:blip r:embed to media, its notes part, and its
+  // layout (which in turn points to its master).
+  const relationships = await parseRelationships(zip, parser, slidePath)
+  const notesRelationship = relationships.find((rel) => rel.type.endsWith('/notesSlide'))
+  const notesTarget = notesRelationship?.target ?? null
+  const layoutTarget = findRelTarget(relationships, slidePath, '/slideLayout')
+  const relTargets = new Map(
+    relationships
+      .filter((rel) => rel !== notesRelationship && !rel.type.endsWith('/slideLayout'))
+      .map((rel) => [rel.id, rel.target]),
+  )
 
   let layoutIndex: PptxLayoutIndex | null = null
   if (layoutTarget) {
     try {
-      layoutIndex = await loadLayoutIndex(zip, parser, layoutTarget, layoutCache, masterCache, themeCache)
+      layoutIndex = await loadLayoutIndex(zip, parser, layoutTarget, caches)
     } catch {
       layoutIndex = null
     }
@@ -527,16 +731,12 @@ async function parseSlide(
     shapes.push({ kind: 'text', xEmu, yEmu, widthEmu, heightEmu, runs })
   }
 
-  for (const pic of asArray(spTree?.['p:pic'] as Record<string, unknown>[] | Record<string, unknown>)) {
-    if (isHiddenShape(pic, 'p:nvPicPr')) continue
-    const spPr = pic['p:spPr'] as Record<string, unknown> | undefined
-    const { xEmu, yEmu, widthEmu, heightEmu } = mergeGeometry(parseXfrmPartial(spPr))
-    const blipFill = pic['p:blipFill'] as Record<string, unknown> | undefined
-    const blip = blipFill?.['a:blip'] as Record<string, unknown> | undefined
-    const embedId = blip?.['@_r:embed']
-    const target = typeof embedId === 'string' ? relTargets.get(embedId) : undefined
-    const imageDataUri = target ? await resolveImageDataUri(zip, target, slidePath) : null
-    shapes.push({ kind: 'image', xEmu, yEmu, widthEmu, heightEmu, imageDataUri })
+  shapes.push(...(await parsePictureShapes(zip, spTree, relTargets, slidePath)))
+
+  for (const group of asArray(spTree?.['p:grpSp'] as Record<string, unknown>[] | Record<string, unknown>)) {
+    if (isHiddenShape(group, 'p:nvGrpSpPr')) continue
+    const groupTransform = groupChildTransform(group['p:grpSpPr'] as Record<string, unknown> | undefined)
+    shapes.push(...(await collectGroupedShapes(zip, group, relTargets, slidePath, theme, groupTransform)))
   }
 
   let notes: string | null = null
@@ -583,17 +783,8 @@ async function parsePresentation(bytes: Uint8Array): Promise<PptxPresentation> {
   const sldIds = asArray(sldIdLst?.['p:sldId'] as Record<string, unknown>[] | Record<string, unknown>)
   const relIds = sldIds.map((sldId) => sldId['@_r:id']).filter((id): id is string => typeof id === 'string')
 
-  const relsXml = await zip.file('ppt/_rels/presentation.xml.rels')?.async('text')
-  const relTargets = new Map<string, string>()
-  if (relsXml) {
-    const relsParsed = parser.parse(relsXml) as Record<string, unknown>
-    const relationships = relsParsed['Relationships'] as Record<string, unknown> | undefined
-    for (const rel of asArray(relationships?.['Relationship'] as Record<string, unknown>[] | Record<string, unknown>)) {
-      const id = rel['@_Id']
-      const target = rel['@_Target']
-      if (typeof id === 'string' && typeof target === 'string') relTargets.set(id, target)
-    }
-  }
+  const presentationRelationships = await parseRelationships(zip, parser, 'ppt/presentation.xml')
+  const relTargets = new Map(presentationRelationships.map((rel) => [rel.id, rel.target]))
 
   const slidePaths = relIds
     .map((id) => relTargets.get(id))
@@ -601,13 +792,11 @@ async function parsePresentation(bytes: Uint8Array): Promise<PptxPresentation> {
     .map((target) => `ppt/${target}`)
 
   const slides: PptxSlide[] = []
-  const layoutCache = new Map<string, PptxLayoutIndex | null>()
-  const masterCache = new Map<string, PptxPartIndex | null>()
-  const themeCache = new Map<string, PptxThemeContext | null>()
+  const caches: PptxCaches = { layouts: new Map(), masters: new Map() }
   // Parse one slide at a time, yielding to the event loop, so a large deck doesn't block the UI thread.
   for (let index = 0; index < slidePaths.length; index += 1) {
     // eslint-disable-next-line no-await-in-loop -- intentional: sequential + yielding for large decks
-    const slide = await parseSlide(zip, parser, slidePaths[index], index, layoutCache, masterCache, themeCache)
+    const slide = await parseSlide(zip, parser, slidePaths[index], index, caches)
     slides.push(slide)
     if (index % 3 === 2) {
       // eslint-disable-next-line no-await-in-loop -- yield point, not a data dependency
