@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.4 - 2026-09-12
+
+- Fixed the app footer's GitHub and gitlocal.dev links not opening at all in the native macOS app (the embedded browser view had no handler for external-link navigation); both links now open in the system's default browser there, matching the web app's behavior. Restyled the footer with a paired icon + label for each link, following common developer-tool footer conventions.
+- Fixed PowerPoint preview rendering incorrectly for any deck using PowerPoint's slide master/layout system (the normal case for anything beyond a from-scratch deck): placeholder text, positioned geometry, and background fill inherited from a slide's layout or master are now resolved and rendered, not just what's defined directly on the slide. This includes backgrounds and text colors set via a theme reference (e.g. "Background 1", "Accent 1") rather than a literal color — the form real-world decks (including Microsoft's own Copilot in PowerPoint sample) actually use, which previously rendered with no background at all.
+- Fixed PowerPoint preview omitting non-placeholder artwork (logos, background graphics, static captions) placed directly on a slide's layout or master; these now render on every slide using that layout/master, matching PowerPoint's own composited rendering. A logo or graphic embedded in the legacy EMF/WMF vector format (which no browser can decode) shows as "not available in this preview" instead of a broken image.
+- Fixed PowerPoint preview slides rendering at a fixed pixel size that could overflow the preview panel; slides now scale responsively to fill the available width.
+- Replaced PowerPoint preview's Previous/Next button navigation with continuous scrolling through all slides, with a "Slide N of M" indicator that tracks scroll position and speaker notes shown inline per slide.
+
 ## 0.13.3 - 2026-09-10
 
 - Added a `gitlocal.dev` link to the web app footer, alongside the existing GitHub project link.
