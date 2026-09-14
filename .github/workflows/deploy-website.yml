@@ -1,0 +1,13 @@
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**"]
+
+jobs:
+  deploy:
+    uses: ehud-am/vizoalica/.github/workflows/deploy-vizoalica-pages.yml@main
+    with:
+      site-directory: docs
+    secrets: inherit
