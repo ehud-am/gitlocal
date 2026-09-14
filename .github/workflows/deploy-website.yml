@@ -1,13 +1,145 @@
 name: Deploy website
 
+# Vendored copy of vizoalica's reusable deployment workflow
+# (ehud-am/vizoalica: .github/workflows/deploy-vizoalica-pages.yml).
+#
+# Inlined here, rather than called via a workflow_call "uses:" reference,
+# because GitHub does not allow a public repository (this one) to call a
+# reusable workflow that lives in a private repository (vizoalica),
+# regardless of that repository's reusable-workflow access settings.
+# This copy will not auto-update when vizoalica's workflow changes --
+# re-sync manually by diffing against the source file above.
+#
+# Required repository variables: VIZOALICA_SDK_SRC,
+# VIZOALICA_INGEST_ENDPOINT, VIZOALICA_PUBLIC_SOURCE_KEY,
+# VIZOALICA_PROJECT_ID, VIZOALICA_TOKEN_URL, VIZOALICA_CONSENT,
+# VIZOALICA_SOURCE_ID, VIZOALICA_SITE_ORIGINS, CF_ACCOUNT_ID,
+# CF_PAGES_PROJECT.
+# Required repository secrets: CF_API_TOKEN (Cloudflare Pages: Edit
+# scope only), VIZOALICA_TOKEN_SECRET (>= 32 random characters).
+
 on:
   push:
     branches: [main]
     paths: ["docs/**"]
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    uses: ehud-am/vizoalica/.github/workflows/deploy-vizoalica-pages.yml@main
-    with:
-      site-directory: docs
-    secrets: inherit
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out website repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Validate required configuration
+        env:
+          VIZOALICA_SDK_SRC: ${{ vars.VIZOALICA_SDK_SRC }}
+          VIZOALICA_INGEST_ENDPOINT: ${{ vars.VIZOALICA_INGEST_ENDPOINT }}
+          VIZOALICA_PUBLIC_SOURCE_KEY: ${{ vars.VIZOALICA_PUBLIC_SOURCE_KEY }}
+          VIZOALICA_PROJECT_ID: ${{ vars.VIZOALICA_PROJECT_ID }}
+          VIZOALICA_TOKEN_URL: ${{ vars.VIZOALICA_TOKEN_URL }}
+          VIZOALICA_CONSENT: ${{ vars.VIZOALICA_CONSENT }}
+          VIZOALICA_SOURCE_ID: ${{ vars.VIZOALICA_SOURCE_ID }}
+          VIZOALICA_SITE_ORIGINS: ${{ vars.VIZOALICA_SITE_ORIGINS }}
+          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          VIZOALICA_TOKEN_SECRET: ${{ secrets.VIZOALICA_TOKEN_SECRET }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VIZOALICA_SDK_SRC VIZOALICA_INGEST_ENDPOINT VIZOALICA_PUBLIC_SOURCE_KEY \
+            VIZOALICA_PROJECT_ID VIZOALICA_TOKEN_URL VIZOALICA_CONSENT VIZOALICA_SOURCE_ID \
+            VIZOALICA_SITE_ORIGINS CF_ACCOUNT_ID CF_PAGES_PROJECT CF_API_TOKEN \
+            VIZOALICA_TOKEN_SECRET; do
+            value="${!name:-}"
+            if [ -z "$value" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#VIZOALICA_TOKEN_SECRET}" -lt 32 ] 2>/dev/null; then
+            echo "::error::VIZOALICA_TOKEN_SECRET must be at least 32 characters"
+            exit 1
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required repository variables/secrets: ${missing[*]}"
+            exit 1
+          fi
+          if [ ! -d "docs" ]; then
+            echo "::error::site directory 'docs' does not exist in this repository"
+            exit 1
+          fi
+
+      - name: Write vendored Vizoalica Pages Functions and loader
+        env:
+          CONFIG_JSON_TS_B64: aW50ZXJmYWNlIEVudiB7CiAgVklaT0FMSUNBX1NES19TUkM6IHN0cmluZzsKICBWSVpPQUxJQ0FfSU5HRVNUX0VORFBPSU5UOiBzdHJpbmc7CiAgVklaT0FMSUNBX1BVQkxJQ19TT1VSQ0VfS0VZOiBzdHJpbmc7CiAgVklaT0FMSUNBX1BST0pFQ1RfSUQ6IHN0cmluZzsKICBWSVpPQUxJQ0FfVE9LRU5fVVJMOiBzdHJpbmc7CiAgVklaT0FMSUNBX0NPTlNFTlQ6IHN0cmluZzsKfQoKY29uc3QgaGVhZGVycyA9IHsKICAnY29udGVudC10eXBlJzogJ2FwcGxpY2F0aW9uL2pzb247IGNoYXJzZXQ9dXRmLTgnLAogICdjYWNoZS1jb250cm9sJzogJ25vLXN0b3JlJywKICAneC1jb250ZW50LXR5cGUtb3B0aW9ucyc6ICdub3NuaWZmJwp9OwoKZnVuY3Rpb24gdW5hdmFpbGFibGUoc3RhdHVzID0gNTAzLCBleHRyYTogUmVjb3JkPHN0cmluZywgc3RyaW5nPiA9IHt9KTogUmVzcG9uc2UgewogIHJldHVybiBuZXcgUmVzcG9uc2UoSlNPTi5zdHJpbmdpZnkoeyBlcnJvcjogJ2NvbmZpZ3VyYXRpb25fdW5hdmFpbGFibGUnIH0pLCB7CiAgICBzdGF0dXMsCiAgICBoZWFkZXJzOiB7IC4uLmhlYWRlcnMsIC4uLmV4dHJhIH0KICB9KTsKfQoKZnVuY3Rpb24gdmFsaWRJZGVudGl0eSh2YWx1ZTogc3RyaW5nKTogYm9vbGVhbiB7CiAgcmV0dXJuIC9eW0EtWmEtejAtOV8tXXsxLDEyOH0kLy50ZXN0KHZhbHVlKSAmJiAhdmFsdWUuc3RhcnRzV2l0aCgnUkVQTEFDRV8nKTsKfQoKZnVuY3Rpb24gdmFsaWRIdHRwVXJsKHZhbHVlOiBzdHJpbmcsIG9yaWdpbjogc3RyaW5nLCBzYW1lT3JpZ2luID0gZmFsc2UpOiBib29sZWFuIHsKICB0cnkgewogICAgY29uc3QgdXJsID0gbmV3IFVSTCh2YWx1ZSwgb3JpZ2luKTsKICAgIGlmICghWydodHRwOicsICdodHRwczonXS5pbmNsdWRlcyh1cmwucHJvdG9jb2wpKSByZXR1cm4gZmFsc2U7CiAgICBpZiAodXJsLnByb3RvY29sID09PSAnaHR0cDonICYmICFbJ2xvY2FsaG9zdCcsICcxMjcuMC4wLjEnLCAnWzo6MV0nXS5pbmNsdWRlcyh1cmwuaG9zdG5hbWUpKQogICAgICByZXR1cm4gZmFsc2U7CiAgICByZXR1cm4gIXNhbWVPcmlnaW4gfHwgdXJsLm9yaWdpbiA9PT0gb3JpZ2luOwogIH0gY2F0Y2ggewogICAgcmV0dXJuIGZhbHNlOwogIH0KfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIG9uUmVxdWVzdCh7CiAgcmVxdWVzdCwKICBlbnYKfTogewogIHJlcXVlc3Q6IFJlcXVlc3Q7CiAgZW52OiBFbnY7Cn0pOiBQcm9taXNlPFJlc3BvbnNlPiB7CiAgaWYgKHJlcXVlc3QubWV0aG9kICE9PSAnR0VUJykgcmV0dXJuIHVuYXZhaWxhYmxlKDQwNSwgeyBhbGxvdzogJ0dFVCcgfSk7CiAgY29uc3Qgb3JpZ2luID0gbmV3IFVSTChyZXF1ZXN0LnVybCkub3JpZ2luOwogIGlmICgKICAgICF2YWxpZEh0dHBVcmwoZW52LlZJWk9BTElDQV9TREtfU1JDLCBvcmlnaW4pIHx8CiAgICAhdmFsaWRIdHRwVXJsKGVudi5WSVpPQUxJQ0FfSU5HRVNUX0VORFBPSU5ULCBvcmlnaW4pIHx8CiAgICAhdmFsaWRJZGVudGl0eShlbnYuVklaT0FMSUNBX1BVQkxJQ19TT1VSQ0VfS0VZKSB8fAogICAgIXZhbGlkSWRlbnRpdHkoZW52LlZJWk9BTElDQV9QUk9KRUNUX0lEKSB8fAogICAgIXZhbGlkSHR0cFVybChlbnYuVklaT0FMSUNBX1RPS0VOX1VSTCwgb3JpZ2luLCB0cnVlKSB8fAogICAgIVsnYW5hbHl0aWNzLWdyYW50ZWQnLCAnYW5hbHl0aWNzLWRlbmllZCcsICd1bmtub3duJ10uaW5jbHVkZXMoZW52LlZJWk9BTElDQV9DT05TRU5UKQogICkKICAgIHJldHVybiB1bmF2YWlsYWJsZSgpOwogIHJldHVybiBuZXcgUmVzcG9uc2UoCiAgICBKU09OLnN0cmluZ2lmeSh7CiAgICAgIHZlcnNpb246IDEsCiAgICAgIHNyYzogZW52LlZJWk9BTElDQV9TREtfU1JDLAogICAgICAnZGF0YS1lbmRwb2ludCc6IGVudi5WSVpPQUxJQ0FfSU5HRVNUX0VORFBPSU5ULAogICAgICAnZGF0YS1zb3VyY2UnOiBlbnYuVklaT0FMSUNBX1BVQkxJQ19TT1VSQ0VfS0VZLAogICAgICAnZGF0YS1wcm9qZWN0JzogZW52LlZJWk9BTElDQV9QUk9KRUNUX0lELAogICAgICAnZGF0YS10b2tlbi11cmwnOiBlbnYuVklaT0FMSUNBX1RPS0VOX1VSTCwKICAgICAgJ2RhdGEtY29uc2VudCc6IGVudi5WSVpPQUxJQ0FfQ09OU0VOVAogICAgfSksCiAgICB7IGhlYWRlcnMgfQogICk7Cn0K
+          INGEST_TOKEN_TS_B64: aW50ZXJmYWNlIEVudiB7CiAgVklaT0FMSUNBX1RPS0VOX1NFQ1JFVDogc3RyaW5nOwogIFZJWk9BTElDQV9QUk9KRUNUX0lEOiBzdHJpbmc7CiAgVklaT0FMSUNBX1NPVVJDRV9JRDogc3RyaW5nOwogIC8qKiBDb21tYS1zZXBhcmF0ZWQgbGlzdCBvZiBhbGxvd2VkIG9yaWdpbnMgKGUuZy4gYXBleCArIHd3dyBzZXJ2aW5nIHRoZSBzYW1lIHNpdGUpLiAqLwogIFZJWk9BTElDQV9TSVRFX09SSUdJTlM6IHN0cmluZzsKfQoKY29uc3QgZW5jb2RlciA9IG5ldyBUZXh0RW5jb2RlcigpOwpmdW5jdGlvbiBiYXNlNjR1cmwoYnl0ZXM6IFVpbnQ4QXJyYXkpOiBzdHJpbmcgewogIHJldHVybiBidG9hKFN0cmluZy5mcm9tQ2hhckNvZGUoLi4uYnl0ZXMpKQogICAgLnJlcGxhY2UoLz0vZywgJycpCiAgICAucmVwbGFjZSgvXCsvZywgJy0nKQogICAgLnJlcGxhY2UoL1wvL2csICdfJyk7Cn0KZnVuY3Rpb24gZW5jb2RlZCh2YWx1ZTogdW5rbm93bik6IHN0cmluZyB7CiAgcmV0dXJuIGJhc2U2NHVybChlbmNvZGVyLmVuY29kZShKU09OLnN0cmluZ2lmeSh2YWx1ZSkpKTsKfQpmdW5jdGlvbiByZXBseShib2R5OiBzdHJpbmcsIHN0YXR1czogbnVtYmVyKTogUmVzcG9uc2UgewogIHJldHVybiBuZXcgUmVzcG9uc2UoYm9keSwgewogICAgc3RhdHVzLAogICAgaGVhZGVyczogewogICAgICAnY29udGVudC10eXBlJzogJ3RleHQvcGxhaW47IGNoYXJzZXQ9dXRmLTgnLAogICAgICAnY2FjaGUtY29udHJvbCc6ICduby1zdG9yZScsCiAgICAgICd4LWNvbnRlbnQtdHlwZS1vcHRpb25zJzogJ25vc25pZmYnLAogICAgICAuLi4oc3RhdHVzID09PSA0MDUgPyB7IGFsbG93OiAnR0VUJyB9IDoge30pCiAgICB9CiAgfSk7Cn0KCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBvblJlcXVlc3QoewogIHJlcXVlc3QsCiAgZW52Cn06IHsKICByZXF1ZXN0OiBSZXF1ZXN0OwogIGVudjogRW52Owp9KTogUHJvbWlzZTxSZXNwb25zZT4gewogIGlmIChyZXF1ZXN0Lm1ldGhvZCAhPT0gJ0dFVCcpIHJldHVybiByZXBseSgnTWV0aG9kIG5vdCBhbGxvd2VkJywgNDA1KTsKICBsZXQgYWxsb3dlZE9yaWdpbnM6IHN0cmluZ1tdOwogIHRyeSB7CiAgICBhbGxvd2VkT3JpZ2lucyA9IGVudi5WSVpPQUxJQ0FfU0lURV9PUklHSU5TLnNwbGl0KCcsJykKICAgICAgLm1hcCgoZW50cnkpID0+IGVudHJ5LnRyaW0oKSkKICAgICAgLmZpbHRlcihCb29sZWFuKTsKICAgIGlmICgKICAgICAgIWVudi5WSVpPQUxJQ0FfVE9LRU5fU0VDUkVUIHx8CiAgICAgIGVudi5WSVpPQUxJQ0FfVE9LRU5fU0VDUkVULmxlbmd0aCA8IDMyIHx8CiAgICAgICFlbnYuVklaT0FMSUNBX1BST0pFQ1RfSUQgfHwKICAgICAgZW52LlZJWk9BTElDQV9QUk9KRUNUX0lELnN0YXJ0c1dpdGgoJ1JFUExBQ0VfJykgfHwKICAgICAgIWVudi5WSVpPQUxJQ0FfU09VUkNFX0lEIHx8CiAgICAgIGVudi5WSVpPQUxJQ0FfU09VUkNFX0lELnN0YXJ0c1dpdGgoJ1JFUExBQ0VfJykgfHwKICAgICAgYWxsb3dlZE9yaWdpbnMubGVuZ3RoID09PSAwIHx8CiAgICAgIGFsbG93ZWRPcmlnaW5zLnNvbWUoCiAgICAgICAgKG9yaWdpbikgPT4gbmV3IFVSTChvcmlnaW4pLm9yaWdpbiAhPT0gb3JpZ2luIHx8ICFvcmlnaW4uc3RhcnRzV2l0aCgnaHR0cHM6Ly8nKQogICAgICApCiAgICApCiAgICAgIHJldHVybiByZXBseSgnVG9rZW4gaXNzdWVyIGlzIG5vdCBjb25maWd1cmVkJywgNTAzKTsKICB9IGNhdGNoIHsKICAgIHJldHVybiByZXBseSgnVG9rZW4gaXNzdWVyIGlzIG5vdCBjb25maWd1cmVkJywgNTAzKTsKICB9CiAgbGV0IHByb3ZlbmFuY2UgPSByZXF1ZXN0LmhlYWRlcnMuZ2V0KCdvcmlnaW4nKTsKICBpZiAoIXByb3ZlbmFuY2UpIHsKICAgIHRyeSB7CiAgICAgIHByb3ZlbmFuY2UgPSBuZXcgVVJMKHJlcXVlc3QuaGVhZGVycy5nZXQoJ3JlZmVyZXInKSA/PyAnJykub3JpZ2luOwogICAgfSBjYXRjaCB7CiAgICAgIHJldHVybiByZXBseSgnT3JpZ2luIG5vdCBhbGxvd2VkJywgNDAzKTsKICAgIH0KICB9CiAgaWYgKCFhbGxvd2VkT3JpZ2lucy5pbmNsdWRlcyhwcm92ZW5hbmNlKSB8fCAhYWxsb3dlZE9yaWdpbnMuaW5jbHVkZXMobmV3IFVSTChyZXF1ZXN0LnVybCkub3JpZ2luKSkKICAgIHJldHVybiByZXBseSgnT3JpZ2luIG5vdCBhbGxvd2VkJywgNDAzKTsKCiAgLy8gU2NvcGUgY29tZXMgb25seSBmcm9tIHNlcnZlciBjb25maWd1cmF0aW9uLCBuZXZlciByZXF1ZXN0IHBhcmFtZXRlcnMgb3IgaGVhZGVycy4KICBjb25zdCBub3cgPSBNYXRoLmZsb29yKERhdGUubm93KCkgLyAxMDAwKTsKICBjb25zdCBjbGFpbXMgPSB7CiAgICBpc3M6ICd2aXpvYWxpY2EtcGFnZXMnLAogICAgYXVkOiAndml6b2FsaWNhLWluZ2VzdCcsCiAgICBzdWI6IGBzb3VyY2UvJHtlbnYuVklaT0FMSUNBX1NPVVJDRV9JRH1gLAogICAgcHJvamVjdF9pZDogZW52LlZJWk9BTElDQV9QUk9KRUNUX0lELAogICAgc291cmNlX2lkOiBlbnYuVklaT0FMSUNBX1NPVVJDRV9JRCwKICAgIG9yaWdpbjogcHJvdmVuYW5jZSwKICAgIHNjb3BlOiAnZXZlbnRzOndyaXRlJywKICAgIGlhdDogbm93LAogICAgbmJmOiBub3csCiAgICBleHA6IG5vdyArIDMwMCwKICAgIGp0aTogY3J5cHRvLnJhbmRvbVVVSUQoKSwKICAgIG1heF9ldmVudHM6IDI1CiAgfTsKICBjb25zdCBpbnB1dCA9IGAke2VuY29kZWQoeyBhbGc6ICdIUzI1NicsIHR5cDogJ0pXVCcgfSl9LiR7ZW5jb2RlZChjbGFpbXMpfWA7CiAgY29uc3Qga2V5ID0gYXdhaXQgY3J5cHRvLnN1YnRsZS5pbXBvcnRLZXkoCiAgICAncmF3JywKICAgIGVuY29kZXIuZW5jb2RlKGVudi5WSVpPQUxJQ0FfVE9LRU5fU0VDUkVUKSwKICAgIHsgbmFtZTogJ0hNQUMnLCBoYXNoOiAnU0hBLTI1NicgfSwKICAgIGZhbHNlLAogICAgWydzaWduJ10KICApOwogIGNvbnN0IHNpZ25hdHVyZSA9IGF3YWl0IGNyeXB0by5zdWJ0bGUuc2lnbignSE1BQycsIGtleSwgZW5jb2Rlci5lbmNvZGUoaW5wdXQpKTsKICByZXR1cm4gcmVwbHkoYCR7aW5wdXR9LiR7YmFzZTY0dXJsKG5ldyBVaW50OEFycmF5KHNpZ25hdHVyZSkpfWAsIDIwMCk7Cn0K
+          VIZOALICA_LOADER_JS_B64: LyogVml6b2FsaWNhIGR5bmFtaWMgY29uZmlndXJhdGlvbiBsb2FkZXIgKi8KInVzZSBzdHJpY3QiOygoKT0+e3ZhciBmPSIvdml6b2FsaWNhL2NvbmZpZy5qc29uIix1PSJfX3Zpem9hbGljYUxvYWRlclN0YXRlIixwPS9eW0EtWmEtejAtOV8tXXsxLDEyOH0kLyxsPS9eW15cdTAwMDAtXHUwMDFmXXsxLDI1Nn0kLyx5PW5ldyBTZXQoWyJhbmFseXRpY3MtZ3JhbnRlZCIsImFuYWx5dGljcy1kZW5pZWQiLCJ1bmtub3duIl0pO2Z1bmN0aW9uIGMobyxyKXt0cnl7bGV0IHQ9bmV3IFVSTChvLHIpO3JldHVybiB0LnByb3RvY29sIT09Imh0dHA6IiYmdC5wcm90b2NvbCE9PSJodHRwczoifHx0LnByb3RvY29sPT09Imh0dHA6IiYmIVsibG9jYWxob3N0IiwiMTI3LjAuMC4xIiwiWzo6MV0iXS5pbmNsdWRlcyh0Lmhvc3RuYW1lKT92b2lkIDA6dH1jYXRjaHtyZXR1cm59fWZ1bmN0aW9uIGgobyxyKXtpZighb3x8dHlwZW9mIG8hPSJvYmplY3QiKXJldHVybjtsZXQgdD1vLHM9bmV3IFVSTChyKSxuPXR5cGVvZiB0LnNyYz09InN0cmluZyI/Yyh0LnNyYyxzKTp2b2lkIDAsaT10eXBlb2YgdFsiZGF0YS1lbmRwb2ludCJdPT0ic3RyaW5nIj9jKHRbImRhdGEtZW5kcG9pbnQiXSxzKTp2b2lkIDAsZT10eXBlb2YgdFsiZGF0YS10b2tlbi11cmwiXT09InN0cmluZyI/Yyh0WyJkYXRhLXRva2VuLXVybCJdLHMpOnZvaWQgMDtpZighKHQudmVyc2lvbiE9PTF8fCFufHwhaXx8IWV8fGUub3JpZ2luIT09cy5vcmlnaW58fHR5cGVvZiB0WyJkYXRhLXNvdXJjZSJdIT0ic3RyaW5nInx8IWwudGVzdCh0WyJkYXRhLXNvdXJjZSJdKXx8dHlwZW9mIHRbImRhdGEtcHJvamVjdCJdIT0ic3RyaW5nInx8IXAudGVzdCh0WyJkYXRhLXByb2plY3QiXSl8fCF5Lmhhcyh0WyJkYXRhLWNvbnNlbnQiXSkpKXJldHVybnt2ZXJzaW9uOjEsc3JjOm4uaHJlZiwiZGF0YS1lbmRwb2ludCI6aS5ocmVmLCJkYXRhLXNvdXJjZSI6dFsiZGF0YS1zb3VyY2UiXSwiZGF0YS1wcm9qZWN0Ijp0WyJkYXRhLXByb2plY3QiXSwiZGF0YS10b2tlbi11cmwiOmAke2UucGF0aG5hbWV9JHtlLnNlYXJjaH0ke2UuaGFzaH1gLCJkYXRhLWNvbnNlbnQiOnRbImRhdGEtY29uc2VudCJdfX1hc3luYyBmdW5jdGlvbiBkKG89d2luZG93LHI9ZG9jdW1lbnQsdD1mZXRjaCl7bGV0IHM9byxuPXNbdV0/Pz17fTtpZihuLnN0YXJ0ZWR8fG4uc2RrSW5zZXJ0ZWR8fHMudml6b2FsaWNhfHxyLnF1ZXJ5U2VsZWN0b3IoInNjcmlwdFtkYXRhLWVuZHBvaW50XVtkYXRhLXNvdXJjZV0iKSlyZXR1cm4hMTtuLnN0YXJ0ZWQ9ITA7dHJ5e2xldCBpPWF3YWl0IHQoZix7Y2FjaGU6Im5vLXN0b3JlIixjcmVkZW50aWFsczoic2FtZS1vcmlnaW4iLGhlYWRlcnM6e2FjY2VwdDoiYXBwbGljYXRpb24vanNvbiJ9fSk7aWYoIWkub2spcmV0dXJuITE7bGV0IGU9aChhd2FpdCBpLmpzb24oKSxvLmxvY2F0aW9uLmhyZWYpO2lmKCFlfHxuLnNka0luc2VydGVkfHxzLnZpem9hbGljYXx8ci5xdWVyeVNlbGVjdG9yKCJzY3JpcHRbZGF0YS1lbmRwb2ludF1bZGF0YS1zb3VyY2VdIikpcmV0dXJuITE7bi5zZGtJbnNlcnRlZD0hMDtsZXQgYT1yLmNyZWF0ZUVsZW1lbnQoInNjcmlwdCIpO3JldHVybiBhLmFzeW5jPSEwLGEuc3JjPWUuc3JjLGEuZGF0YXNldC5lbmRwb2ludD1lWyJkYXRhLWVuZHBvaW50Il0sYS5kYXRhc2V0LnNvdXJjZT1lWyJkYXRhLXNvdXJjZSJdLGEuZGF0YXNldC5wcm9qZWN0PWVbImRhdGEtcHJvamVjdCJdLGEuZGF0YXNldC50b2tlblVybD1lWyJkYXRhLXRva2VuLXVybCJdLGEuZGF0YXNldC5jb25zZW50PWVbImRhdGEtY29uc2VudCJdLGEuYWRkRXZlbnRMaXN0ZW5lcigiZXJyb3IiLCgpPT57bi5zZGtJbnNlcnRlZD0hMX0pLHIuaGVhZC5hcHBlbmQoYSksITB9Y2F0Y2h7cmV0dXJuITF9fWQoKTt9KSgpOwo=
+        run: |
+          set -euo pipefail
+          mkdir -p docs/functions/vizoalica
+          echo "$CONFIG_JSON_TS_B64" | base64 -d > docs/functions/vizoalica/config.json.ts
+          echo "$INGEST_TOKEN_TS_B64" | base64 -d > docs/functions/vizoalica/ingest-token.ts
+          echo "$VIZOALICA_LOADER_JS_B64" | base64 -d > docs/vizoalica-loader.js
+
+      - name: Generate ephemeral Cloudflare Pages configuration
+        env:
+          VIZOALICA_SDK_SRC: ${{ vars.VIZOALICA_SDK_SRC }}
+          VIZOALICA_INGEST_ENDPOINT: ${{ vars.VIZOALICA_INGEST_ENDPOINT }}
+          VIZOALICA_PUBLIC_SOURCE_KEY: ${{ vars.VIZOALICA_PUBLIC_SOURCE_KEY }}
+          VIZOALICA_PROJECT_ID: ${{ vars.VIZOALICA_PROJECT_ID }}
+          VIZOALICA_TOKEN_URL: ${{ vars.VIZOALICA_TOKEN_URL }}
+          VIZOALICA_CONSENT: ${{ vars.VIZOALICA_CONSENT }}
+          VIZOALICA_SOURCE_ID: ${{ vars.VIZOALICA_SOURCE_ID }}
+          VIZOALICA_SITE_ORIGINS: ${{ vars.VIZOALICA_SITE_ORIGINS }}
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
+        run: |
+          set -euo pipefail
+          # This file exists only in the ephemeral CI workspace for this run.
+          # It is never committed to this repository.
+          cat > docs/wrangler.toml <<TOML
+          name = "$CF_PAGES_PROJECT"
+          pages_build_output_dir = "."
+          compatibility_date = "2026-09-09"
+
+          [vars]
+          VIZOALICA_SDK_SRC = "$VIZOALICA_SDK_SRC"
+          VIZOALICA_INGEST_ENDPOINT = "$VIZOALICA_INGEST_ENDPOINT"
+          VIZOALICA_PUBLIC_SOURCE_KEY = "$VIZOALICA_PUBLIC_SOURCE_KEY"
+          VIZOALICA_PROJECT_ID = "$VIZOALICA_PROJECT_ID"
+          VIZOALICA_TOKEN_URL = "$VIZOALICA_TOKEN_URL"
+          VIZOALICA_CONSENT = "$VIZOALICA_CONSENT"
+          VIZOALICA_SOURCE_ID = "$VIZOALICA_SOURCE_ID"
+          VIZOALICA_SITE_ORIGINS = "$VIZOALICA_SITE_ORIGINS"
+          TOML
+
+      - name: Set the ingest token signing secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+          VIZOALICA_TOKEN_SECRET: ${{ secrets.VIZOALICA_TOKEN_SECRET }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$VIZOALICA_TOKEN_SECRET" | npx --yes wrangler@4 pages secret put \
+            VIZOALICA_TOKEN_SECRET --project-name "${{ vars.CF_PAGES_PROJECT }}"
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 pages deploy \
+            --project-name "${{ vars.CF_PAGES_PROJECT }}" \
+            --branch "${{ github.ref_name }}" \
+            --cwd docs \
+            .
