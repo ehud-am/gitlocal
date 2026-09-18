@@ -6,6 +6,9 @@
 - Added a terminal panel position setting: the panel can now be docked to the bottom, left, or right of the window (previously bottom-only), defaulting to the right, chosen via three icon buttons; your choice is remembered across restarts and switching position never interrupts a running session. Fixed the terminal not rendering at all when docked to the left or right.
 - Redesigned the terminal panel's toolbar to match a standard code-editor layout: tabs on the left, a single "+" icon button to open a new terminal, the dock-position buttons, and one "collapse" (✕) button all grouped on the right — replacing the old text "+ New Terminal" button and the separate Collapse/Expand toggle. Also fixed a labeling bug where closing a tab and opening a new one could reuse an already-used tab number (e.g. two tabs both named "Terminal 2").
 - Made the active terminal tab easier to spot when several are open: it now gets a distinct background and a colored underline, instead of a background tint that looked the same as hovering over any other tab.
+- Fixed a collapsed left/right-docked terminal panel showing an oddly-placed toolbar instead of fully hiding; it now hides completely when collapsed, matching the bottom-docked panel's behavior of disappearing until reopened (Ctrl+` or the terminal button in the toolbar).
+- Changed the default left/right terminal panel width to a third of the window's width (previously a fixed size), and it now automatically falls back to docking at the bottom on a narrow window, reverting to your chosen side once the window is wide enough again.
+- Added hover tooltips to the terminal panel's toolbar buttons (new terminal, dock position, collapse, close tab, resize handle).
 
 ## 0.13.4 - 2026-09-12
 

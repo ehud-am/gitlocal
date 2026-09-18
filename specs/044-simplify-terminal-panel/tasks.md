@@ -375,3 +375,37 @@ the actual active one at a glance.
   than one shared-with-hover background.
 - Added a dedicated assertion in `TerminalTabStrip.test.tsx` checking the active tab's row
   carries these classes and that an inactive tab's row carries none of them.
+
+## Post-Implementation Follow-Up (round 4, pre-release)
+
+Three more issues from user feedback, all pre-release (still `v0.13.5`):
+
+- **Collapsed side-dock presentation bug**: a collapsed (hidden) left/right-docked panel
+  previously still rendered its full-height toolbar row (tabs, new-terminal, dock-position, and
+  collapse buttons) shrink-wrapped to an auto width — since that toolbar needs real width to lay
+  out, the panel didn't actually shrink small, and the buttons ended up looking oddly placed
+  rather than the panel appearing hidden. Fixed by introducing a `showChrome` flag
+  (`panel.state.visible || !isSideDock`) in `TerminalPanel.tsx`: a side-docked panel now renders
+  no header, no resize handle, and a `width: 0px` root when collapsed — fully hidden, exactly
+  like collapsing was already supposed to look. A bottom-docked panel is unaffected (its
+  `showChrome` is always true, preserving its existing "slim bar with tabs" collapsed look).
+  Reopening is still via Ctrl+` or the app header's terminal toggle button.
+- **Default side-dock width**: changed from a fixed 420px to a third of the window's width
+  (`DEFAULT_PANEL_WIDTH_RATIO = 1/3`, computed lazily from `window.innerWidth` at mount), still
+  passed through the existing `clampPanelWidth` bounds.
+- **Auto-reroute on a narrow window**: `useTerminalPanelPreference` now also computes
+  `effectiveDockPosition` — identical to the stored `dockPosition` except forced to `'bottom'`
+  when `window.innerWidth` is below `MIN_WINDOW_WIDTH_FOR_SIDE_DOCK` (700px), tracked via a
+  `resize` listener. Only the *effective* value drives layout (`App.tsx`'s wrapper flex-direction
+  and the `TerminalPanel` prop of the same name); the *stored* `dockPosition` is unchanged and
+  still drives which `DockPositionControl` button shows as selected — so the panel automatically
+  and reversibly falls back to bottom-docked on a narrow window and returns to the user's chosen
+  side once it widens again, with no explicit user action and no lost preference.
+- **Hover labels**: added `title` attributes to the tab-strip's close button and the resize
+  handle (the toolbar buttons already had them from the round-2 icon-button rework).
+- New/updated tests: `TerminalPanel.test.tsx` (collapsed-side-dock-hides-entirely, width-as-a-
+  third-of-window, all width-dependent resize tests updated to set an explicit window width so
+  their expected pixel values stay deterministic) and `useTerminalPanelPreference.test.ts` (four
+  new cases covering `effectiveDockPosition`: matches on a wide window, falls back on a narrow
+  one, never overrides an actual `'bottom'` preference, and reverts once the window widens back
+  up). All UI tests green with per-file coverage gates intact.

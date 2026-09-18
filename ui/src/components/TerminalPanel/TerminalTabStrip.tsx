@@ -56,6 +56,7 @@ export function TerminalTabStrip({ tabs, activeTabId, onSelectTab, onCloseTab }:
               type="button"
               onClick={() => onCloseTab(tab.id)}
               aria-label={`Close ${tab.label}`}
+              title={`Close ${tab.label}`}
               className="rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               ✕

@@ -50,7 +50,9 @@ function session(id: string): TerminalSession {
 }
 
 function renderPanel() {
-  return render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
+  return render(
+    <TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />,
+  )
 }
 
 async function openThreeTabs(user: ReturnType<typeof userEvent.setup>) {

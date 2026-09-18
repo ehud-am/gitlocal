@@ -72,7 +72,9 @@ const mockCloseSession = terminalApi.closeSession as unknown as ReturnType<typeo
 
 function Panel({ dockPosition = 'bottom' as DockPosition }: { dockPosition?: DockPosition }) {
   const [position, setPosition] = useState(dockPosition)
-  return <TerminalPanel dockPosition={position} onDockPositionChange={setPosition} />
+  return (
+    <TerminalPanel dockPosition={position} effectiveDockPosition={position} onDockPositionChange={setPosition} />
+  )
 }
 
 // Simulates the App.tsx shape: TerminalPanel mounted once alongside unrelated state that
@@ -356,7 +358,7 @@ describe('TerminalPanel', () => {
     mockCreateSession.mockResolvedValue(runningSession)
     const ref = createRef<TerminalPanelHandle>()
 
-    render(<TerminalPanel ref={ref} dockPosition="bottom" onDockPositionChange={vi.fn()} />)
+    render(<TerminalPanel ref={ref} dockPosition="bottom" effectiveDockPosition="bottom" onDockPositionChange={vi.fn()} />)
 
     act(() => ref.current?.toggleTerminal())
     await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
@@ -373,7 +375,7 @@ describe('TerminalPanel', () => {
     mockCreateSession.mockResolvedValue(runningSession)
     const ref = createRef<TerminalPanelHandle>()
 
-    render(<TerminalPanel ref={ref} dockPosition="bottom" onDockPositionChange={vi.fn()} />)
+    render(<TerminalPanel ref={ref} dockPosition="bottom" effectiveDockPosition="bottom" onDockPositionChange={vi.fn()} />)
 
     act(() => ref.current?.toggleTerminal())
     await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
@@ -510,7 +512,7 @@ describe('TerminalPanel', () => {
 
   describe('dock position (US2)', () => {
     it('defaults to the "right" position when no preference has been supplied', () => {
-      render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
       expect(screen.getByRole('button', { name: 'Dock terminal to right' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'false')
       expect(screen.getByRole('button', { name: 'Dock terminal to left' })).toHaveAttribute('aria-pressed', 'false')
@@ -529,11 +531,12 @@ describe('TerminalPanel', () => {
       expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'true')
     })
 
-    it('sizes by width with a vertical (column-resize) handle when docked left or right', async () => {
+    it('sizes by width — a third of the window — with a vertical (column-resize) handle when docked left or right', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
+      setInnerWidth(1260)
 
-      render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
 
       const panel = screen.getByTestId('terminal-panel')
@@ -562,9 +565,9 @@ describe('TerminalPanel', () => {
     it('drag-resizes the panel width when docked left, growing as the handle moves away from the panel', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
-      setInnerWidth(2000)
+      setInnerWidth(1260)
 
-      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
@@ -578,9 +581,9 @@ describe('TerminalPanel', () => {
     it('drag-resizes the panel width when docked right, growing as the handle moves away from the panel', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
-      setInnerWidth(2000)
+      setInnerWidth(1260)
 
-      render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
@@ -594,9 +597,9 @@ describe('TerminalPanel', () => {
     it('resizes width with ArrowLeft/ArrowRight when side-docked, clamped to min/max bounds', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
-      setInnerWidth(1000)
+      setInnerWidth(1260)
 
-      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
@@ -612,7 +615,7 @@ describe('TerminalPanel', () => {
       mockCreateSession.mockResolvedValue(runningSession)
       setInnerWidth(1000)
 
-      render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
 
       setInnerWidth(100)
@@ -624,9 +627,9 @@ describe('TerminalPanel', () => {
     it('keeps the resize handle interactive (mousedown-driven resize works) when side-docked', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
-      setInnerWidth(2000)
+      setInnerWidth(1260)
 
-      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
 
       const handle = screen.getByTestId('terminal-panel-resize-handle')
@@ -643,18 +646,40 @@ describe('TerminalPanel', () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
 
-      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
 
       expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
       expect(screen.getByTestId('fake-terminal-view')).toBeVisible()
     })
 
+    it('collapsing a side-docked panel hides it entirely (no toolbar sliver), unlike bottom dock', async () => {
+      const user = userEvent.setup()
+      mockCreateSession.mockResolvedValue(runningSession)
+
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
+      await openTerminal(user)
+      expect(screen.getByRole('button', { name: 'Collapse terminal' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
+
+      // No toolbar, no tabs, no resize handle — a fully zero-width, invisible panel — rather
+      // than a sliver showing the toolbar with nowhere sensible to lay it out.
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '0px' })
+      expect(screen.queryByRole('button', { name: 'Collapse terminal' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'Terminal 1' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('terminal-panel-resize-handle')).not.toBeInTheDocument()
+
+      toggleShortcut()
+      expect(screen.getByRole('button', { name: 'Collapse terminal' })).toBeInTheDocument()
+      expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
+    })
+
     it('has no accessibility violations when docked left with a tab open', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
 
-      const { container } = render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      const { container } = render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
       await openTerminal(user)
 
       expect((await axe(container)).violations).toHaveLength(0)

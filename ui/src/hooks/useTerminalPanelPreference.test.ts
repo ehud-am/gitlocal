@@ -1,6 +1,12 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { renderHook, waitFor, act, fireEvent } from '@testing-library/react'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useTerminalPanelPreference } from './useTerminalPanelPreference'
+
+const ORIGINAL_INNER_WIDTH = window.innerWidth
+
+function setInnerWidth(value: number) {
+  Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value })
+}
 
 vi.mock('../services/terminalPanelPreference', () => ({
   terminalPanelPreferenceApi: {
@@ -19,6 +25,10 @@ describe('useTerminalPanelPreference', () => {
     mockGet.mockReset()
     mockSet.mockReset()
     mockSet.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    setInnerWidth(ORIGINAL_INNER_WIDTH)
   })
 
   it('defaults to "right" before the fetch resolves', () => {
@@ -63,6 +73,50 @@ describe('useTerminalPanelPreference', () => {
 
     expect(result.current.dockPosition).toBe('left')
     await waitFor(() => expect(mockSet).toHaveBeenCalledWith('left'))
+  })
+
+  describe('effectiveDockPosition (auto-reroute on a narrow window)', () => {
+    it('matches dockPosition on a wide window', async () => {
+      setInnerWidth(1200)
+      mockGet.mockResolvedValue('left')
+      const { result } = renderHook(() => useTerminalPanelPreference())
+      await waitFor(() => expect(result.current.dockPosition).toBe('left'))
+
+      expect(result.current.effectiveDockPosition).toBe('left')
+    })
+
+    it('falls back to "bottom" when the window is too narrow for a side dock', async () => {
+      setInnerWidth(500)
+      mockGet.mockResolvedValue('right')
+      const { result } = renderHook(() => useTerminalPanelPreference())
+      await waitFor(() => expect(result.current.dockPosition).toBe('right'))
+
+      expect(result.current.effectiveDockPosition).toBe('bottom')
+    })
+
+    it('never overrides an actual "bottom" preference regardless of window width', async () => {
+      setInnerWidth(500)
+      mockGet.mockResolvedValue('bottom')
+      const { result } = renderHook(() => useTerminalPanelPreference())
+      await waitFor(() => expect(result.current.dockPosition).toBe('bottom'))
+
+      expect(result.current.effectiveDockPosition).toBe('bottom')
+    })
+
+    it('reverts to the stored side-dock preference once the window widens again', async () => {
+      setInnerWidth(500)
+      mockGet.mockResolvedValue('right')
+      const { result } = renderHook(() => useTerminalPanelPreference())
+      await waitFor(() => expect(result.current.effectiveDockPosition).toBe('bottom'))
+
+      act(() => {
+        setInnerWidth(1200)
+        fireEvent(window, new Event('resize'))
+      })
+
+      expect(result.current.dockPosition).toBe('right')
+      expect(result.current.effectiveDockPosition).toBe('right')
+    })
   })
 
   it('ignores a fetch that resolves after unmount', async () => {
