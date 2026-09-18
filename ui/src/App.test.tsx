@@ -7,6 +7,13 @@ import { axe } from 'jest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
+vi.mock('./services/terminalPanelPreference', () => ({
+  terminalPanelPreferenceApi: {
+    get: vi.fn().mockResolvedValue('right'),
+    set: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
 vi.mock('./services/api', () => ({
   api: {
     getInfo: vi.fn(),
@@ -391,6 +398,18 @@ describe('App', () => {
 
     const contentArea = document.querySelector('main.content-area')
     expect(contentArea).toHaveClass('min-h-0')
+  })
+
+  it('lays out the terminal dock row as a column when the saved dock position is "bottom" (044)', async () => {
+    const { terminalPanelPreferenceApi } = await import('./services/terminalPanelPreference')
+    vi.mocked(terminalPanelPreferenceApi.get).mockResolvedValueOnce('bottom')
+
+    renderWithClient()
+
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+    const appBody = document.querySelector('.app-body')
+    await waitFor(() => expect(appBody?.parentElement).toHaveClass('flex-col'))
+    expect(appBody).not.toHaveClass('min-w-0')
   })
 
   it('asks for default Markdown reader setup only after the native app announces support', async () => {

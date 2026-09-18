@@ -61,7 +61,7 @@ describe('session-manager', () => {
       })
     const manager = createSessionManager(factory, '/bin/sh')
 
-    const createPromise = manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const createPromise = manager.createSession({ cwd: '/tmp' })
     // The session is inserted into the registry before the factory resolves, so 'starting'
     // is observable mid-flight — this is the behavior data-model.md and T013 require.
     await Promise.resolve()
@@ -76,35 +76,10 @@ describe('session-manager', () => {
     expect(manager.listSessions()[0]?.status).toBe('running')
   })
 
-  // FR-008/FR-009 (T036): a claude/codex tab is a shell session where the server types the
-  // launch command for the user once the shell reports it's ready (its first output chunk).
-  it('auto-launches the claude CLI once, triggered by the first pty output chunk', async () => {
+  it('never writes anything to the pty on its own — only ever a plain shell', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'claude', cwd: '/tmp' })
-    expect(result.ok).toBe(true)
-
-    expect(pty.writes).toEqual([])
-    pty.emitData('$ ')
-    expect(pty.writes).toEqual(['claude\n'])
-
-    pty.emitData('more output\n')
-    expect(pty.writes).toEqual(['claude\n'])
-  })
-
-  it('auto-launches the codex CLI once, triggered by the first pty output chunk', async () => {
-    const pty = createFakePty()
-    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    await manager.createSession({ kind: 'codex', cwd: '/tmp' })
-
-    pty.emitData('$ ')
-    expect(pty.writes).toEqual(['codex\n'])
-  })
-
-  it('never auto-launches anything for a regular session', async () => {
-    const pty = createFakePty()
-    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    await manager.createSession({ cwd: '/tmp' })
 
     pty.emitData('$ ')
     pty.emitData('more output\n')
@@ -114,7 +89,7 @@ describe('session-manager', () => {
   it('flows pty output to subscribers and buffers it for late subscribers', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -131,7 +106,7 @@ describe('session-manager', () => {
   it('marks a session exited on pty exit and notifies exit listeners', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -149,7 +124,7 @@ describe('session-manager', () => {
   it('keeps an exited session registered while a listener is still attached, and removes it once unsubscribed', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -164,7 +139,7 @@ describe('session-manager', () => {
   it('removes a session immediately on exit when nobody is subscribed', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -175,7 +150,7 @@ describe('session-manager', () => {
   it('ignores a duplicate exit event once a session is already exited', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -190,7 +165,7 @@ describe('session-manager', () => {
   it('closeSession kills a running pty and marks it exited, and returns false for an unknown id', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     // Keep a listener attached so the session stays inspectable after close, per
@@ -210,7 +185,7 @@ describe('session-manager', () => {
   it('writeInput and resize forward to the pty only while running, and no-op otherwise', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -230,7 +205,7 @@ describe('session-manager', () => {
   it('clamps out-of-range resize dimensions before forwarding to the pty', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -246,11 +221,11 @@ describe('session-manager', () => {
     const manager = createSessionManager(() => Promise.resolve(createFakePty()), '/bin/sh')
 
     for (let i = 0; i < 20; i++) {
-      const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+      const result = await manager.createSession({ cwd: '/tmp' })
       expect(result.ok).toBe(true)
     }
 
-    const overflow = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const overflow = await manager.createSession({ cwd: '/tmp' })
     expect(overflow.ok).toBe(false)
     if (overflow.ok) return
     expect(overflow.error).toBe('session_limit_reached')
@@ -266,7 +241,7 @@ describe('session-manager', () => {
       throw new Error('spawn failed')
     })
     const manager = createSessionManager(factory, '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result).toEqual({
       ok: false,
       error: 'pty_unavailable',
@@ -281,7 +256,7 @@ describe('session-manager', () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'aix', configurable: true })
     try {
-      const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+      const result = await manager.createSession({ cwd: '/tmp' })
       expect(result).toEqual({
         ok: false,
         error: 'pty_unavailable',
@@ -296,7 +271,7 @@ describe('session-manager', () => {
   it('truncates the buffered output once it exceeds the max buffer size', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -333,7 +308,7 @@ describe('session-manager', () => {
   it('records a null exit code when the pty reports none', async () => {
     const pty = createFakePty()
     const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
-    const result = await manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const result = await manager.createSession({ cwd: '/tmp' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -350,7 +325,7 @@ describe('session-manager', () => {
       })
     const manager = createSessionManager(factory, '/bin/sh')
 
-    const createPromise = manager.createSession({ kind: 'regular', cwd: '/tmp' })
+    const createPromise = manager.createSession({ cwd: '/tmp' })
     await Promise.resolve()
     const [starting] = manager.listSessions()
     expect(starting?.status).toBe('starting')
@@ -367,8 +342,8 @@ describe('session-manager', () => {
 
   it('lists multiple concurrent sessions independently', async () => {
     const manager = createSessionManager(fakeFactory(createFakePty()), '/bin/sh')
-    const a = await manager.createSession({ kind: 'regular', cwd: '/tmp/a' })
-    const b = await manager.createSession({ kind: 'claude', cwd: '/tmp/b' })
+    const a = await manager.createSession({ cwd: '/tmp/a' })
+    const b = await manager.createSession({ cwd: '/tmp/b' })
     expect(a.ok && b.ok).toBe(true)
     const ids = manager.listSessions().map((s) => s.id)
     expect(ids).toHaveLength(2)
@@ -377,12 +352,12 @@ describe('session-manager', () => {
 
   it('never recomputes an already-open tab\'s cwd after creation, even as later sessions use a different cwd (FR-012, T040)', async () => {
     const manager = createSessionManager(fakeFactory(createFakePty()), '/bin/sh')
-    const first = await manager.createSession({ kind: 'regular', cwd: '/repo/src' })
+    const first = await manager.createSession({ cwd: '/repo/src' })
     expect(first.ok).toBe(true)
     if (!first.ok) return
 
-    await manager.createSession({ kind: 'regular', cwd: '/repo/lib' })
-    await manager.createSession({ kind: 'claude', cwd: '/repo/docs' })
+    await manager.createSession({ cwd: '/repo/lib' })
+    await manager.createSession({ cwd: '/repo/docs' })
 
     expect(manager.getSession(first.session.id)?.cwd).toBe('/repo/src')
     expect(manager.listSessions().find((s) => s.id === first.session.id)?.cwd).toBe('/repo/src')
@@ -396,7 +371,7 @@ describe('session-manager', () => {
 
     const sessions = []
     for (let i = 0; i < ptys.length; i++) {
-      const result = await manager.createSession({ kind: 'regular', cwd: `/tmp/${i}` })
+      const result = await manager.createSession({ cwd: `/tmp/${i}` })
       expect(result.ok).toBe(true)
       if (result.ok) sessions.push(result.session)
     }

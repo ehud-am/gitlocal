@@ -145,6 +145,12 @@ export interface DefaultReaderPreferenceResponse {
   message: string
 }
 
+export type TerminalDockPosition = 'bottom' | 'left' | 'right'
+
+export interface TerminalPanelPreference {
+  dockPosition: TerminalDockPosition
+}
+
 export interface Branch {
   name: string
   isCurrent: boolean

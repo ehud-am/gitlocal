@@ -1,15 +1,12 @@
-import { useCallback, useState } from 'react'
-import type { TerminalKind, TerminalPanelState, TerminalSessionStatus, TerminalTabRef } from '../types'
+import { useCallback, useRef, useState } from 'react'
+import type { TerminalPanelState, TerminalSessionStatus, TerminalTabRef } from '../types'
 
-function labelFor(kind: TerminalKind, regularOrdinal: number): string {
-  if (kind === 'claude') return 'Claude'
-  if (kind === 'codex') return 'Codex'
-  return `Terminal ${regularOrdinal}`
+function labelFor(ordinal: number): string {
+  return `Terminal ${ordinal}`
 }
 
 interface NewTerminalTab {
   id: string
-  kind: TerminalKind
   cwd: string
   status: TerminalSessionStatus
   unavailableMessage?: string
@@ -31,20 +28,24 @@ export interface UseTerminalPanelResult {
 // URL params: the panel always starts empty and hidden on mount (FR scope for US1).
 export function useTerminalPanel(): UseTerminalPanelResult {
   const [state, setState] = useState<TerminalPanelState>({ visible: false, tabs: [], activeTabId: null })
+  // A monotonic counter rather than tabs.length: closing "Terminal 2" and then opening a new
+  // tab must not reuse the number 2 for a different session while it's still ambiguous which
+  // one a user meant — this was the "something not right" a plain length-based ordinal caused.
+  const nextOrdinalRef = useRef(1)
 
   const show = useCallback(() => setState((prev) => ({ ...prev, visible: true })), [])
   const hide = useCallback(() => setState((prev) => ({ ...prev, visible: false })), [])
   const toggleVisible = useCallback(() => setState((prev) => ({ ...prev, visible: !prev.visible })), [])
 
   const addTab = useCallback((session: NewTerminalTab) => {
+    const ordinal = nextOrdinalRef.current
+    nextOrdinalRef.current += 1
     setState((prev) => {
-      const regularOrdinal = prev.tabs.filter((tab) => tab.kind === 'regular').length + 1
       const tab: TerminalTabRef = {
         id: session.id,
-        kind: session.kind,
         cwd: session.cwd,
         status: session.status,
-        label: labelFor(session.kind, regularOrdinal),
+        label: labelFor(ordinal),
         ...(session.unavailableMessage !== undefined ? { unavailableMessage: session.unavailableMessage } : {}),
       }
       return { ...prev, tabs: [...prev.tabs, tab], activeTabId: tab.id }

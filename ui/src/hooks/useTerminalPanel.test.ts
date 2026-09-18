@@ -23,22 +23,38 @@ describe('useTerminalPanel', () => {
     expect(result.current.state.visible).toBe(false)
   })
 
-  it('addTab labels regular tabs by ordinal and claude/codex tabs by kind, and activates the new tab', () => {
+  it('addTab labels every tab sequentially by creation order, and activates the new tab', () => {
     const { result } = renderHook(() => useTerminalPanel())
 
-    act(() => result.current.addTab({ id: 'a', kind: 'regular', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'b', kind: 'claude', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'c', kind: 'codex', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'd', kind: 'regular', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'c', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'd', cwd: '/repo', status: 'running' }))
 
-    expect(result.current.state.tabs.map((t) => t.label)).toEqual(['Terminal 1', 'Claude', 'Codex', 'Terminal 2'])
+    expect(result.current.state.tabs.map((t) => t.label)).toEqual([
+      'Terminal 1',
+      'Terminal 2',
+      'Terminal 3',
+      'Terminal 4',
+    ])
     expect(result.current.state.activeTabId).toBe('d')
+  })
+
+  it('never reuses a tab number, even after an earlier tab is closed', () => {
+    const { result } = renderHook(() => useTerminalPanel())
+
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
+    act(() => result.current.removeTab('a'))
+    act(() => result.current.addTab({ id: 'c', cwd: '/repo', status: 'running' }))
+
+    expect(result.current.state.tabs.map((t) => t.label)).toEqual(['Terminal 2', 'Terminal 3'])
   })
 
   it('removeTab drops the tab and, when it was active, activates the last remaining tab', () => {
     const { result } = renderHook(() => useTerminalPanel())
-    act(() => result.current.addTab({ id: 'a', kind: 'regular', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'b', kind: 'regular', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
 
     act(() => result.current.removeTab('b'))
     expect(result.current.state.tabs.map((t) => t.id)).toEqual(['a'])
@@ -51,8 +67,8 @@ describe('useTerminalPanel', () => {
 
   it('removeTab leaves activeTabId untouched when removing a non-active tab', () => {
     const { result } = renderHook(() => useTerminalPanel())
-    act(() => result.current.addTab({ id: 'a', kind: 'regular', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'b', kind: 'regular', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
     act(() => result.current.setActiveTab('a'))
 
     act(() => result.current.removeTab('b'))
@@ -61,8 +77,8 @@ describe('useTerminalPanel', () => {
 
   it('setActiveTab only switches when the id refers to an existing tab', () => {
     const { result } = renderHook(() => useTerminalPanel())
-    act(() => result.current.addTab({ id: 'a', kind: 'regular', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'b', kind: 'regular', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
 
     act(() => result.current.setActiveTab('a'))
     expect(result.current.state.activeTabId).toBe('a')
@@ -73,8 +89,8 @@ describe('useTerminalPanel', () => {
 
   it('updateTabStatus updates only the matching tab', () => {
     const { result } = renderHook(() => useTerminalPanel())
-    act(() => result.current.addTab({ id: 'a', kind: 'regular', cwd: '/repo', status: 'running' }))
-    act(() => result.current.addTab({ id: 'b', kind: 'regular', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'a', cwd: '/repo', status: 'running' }))
+    act(() => result.current.addTab({ id: 'b', cwd: '/repo', status: 'running' }))
 
     act(() => result.current.updateTabStatus('a', 'exited'))
     expect(result.current.state.tabs.find((t) => t.id === 'a')?.status).toBe('exited')

@@ -1,28 +1,10 @@
 import { dirname } from 'node:path'
 import type { Context } from 'hono'
 import { classifyLocalPath, resolveSafeRepoPath } from '../git/repo.js'
-import { detectCapabilities } from '../terminal/cli-detection.js'
 import { sessionManager } from '../terminal/session-manager.js'
-import type {
-  CreateTerminalSessionRequest,
-  TerminalContextType,
-  TerminalKind,
-  TerminalUnavailableResponse,
-} from '../terminal/types.js'
+import type { CreateTerminalSessionRequest, TerminalContextType, TerminalUnavailableResponse } from '../terminal/types.js'
 
 type Variables = { repoPath: string; pickerPath: string }
-
-const VALID_KINDS: readonly TerminalKind[] = ['regular', 'claude', 'codex']
-
-function isValidKind(value: unknown): value is TerminalKind {
-  return typeof value === 'string' && (VALID_KINDS as readonly string[]).includes(value)
-}
-
-function cliUnavailableMessage(kind: TerminalKind): string {
-  const cliName = kind === 'claude' ? 'Claude Code' : 'Codex'
-  const command = kind === 'claude' ? 'claude' : 'codex'
-  return `The ${cliName} CLI ("${command}") was not found on PATH. Install it to use a ${cliName} terminal.`
-}
 
 function resolveRepoRootCwd(repoPath: string): string {
   const classification = classifyLocalPath(repoPath)
@@ -73,23 +55,8 @@ export async function createTerminalSessionHandler(c: Context<{ Variables: Varia
     return c.json({ error: 'Invalid JSON body.' }, 400)
   }
 
-  if (!isValidKind(payload.kind)) {
-    return c.json({ error: 'kind must be one of "regular", "claude", "codex".' }, 400)
-  }
-
-  // FR-010: pre-flight the CLI's presence before spawning anything, so a missing claude/codex
-  // installation produces a deterministic 503 instead of a shell reporting "command not found".
-  if (payload.kind !== 'regular') {
-    const capabilities = detectCapabilities()
-    const found = payload.kind === 'claude' ? capabilities.claudeCliFound : capabilities.codexCliFound
-    if (!found) {
-      const body: TerminalUnavailableResponse = { error: 'cli_not_found', message: cliUnavailableMessage(payload.kind) }
-      return c.json(body, 503)
-    }
-  }
-
   const cwd = resolveSessionCwd(c.get('repoPath'), payload.contextPath, payload.contextType)
-  const result = await sessionManager.createSession({ kind: payload.kind, cwd })
+  const result = await sessionManager.createSession({ cwd })
 
   if (!result.ok) {
     const body: TerminalUnavailableResponse = { error: result.error, message: result.message }
@@ -109,8 +76,4 @@ export function closeTerminalSessionHandler(c: Context<{ Variables: Variables }>
     return c.json({ error: 'Terminal session not found.' }, 404)
   }
   return c.body(null, 204)
-}
-
-export function terminalCapabilitiesHandler(c: Context<{ Variables: Variables }>): Response {
-  return c.json(detectCapabilities(), 200)
 }

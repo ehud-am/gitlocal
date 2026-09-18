@@ -1,5 +1,11 @@
 # Contract: Terminal Session API
 
+> **Superseded (feature 044)**: the `kind` field described below (`regular`/`claude`/`codex`)
+> was removed — every terminal session is now a plain shell, and the `claude`/`codex`
+> pre-flight/auto-launch behavior no longer exists. See
+> `specs/044-simplify-terminal-panel/contracts/terminal-session-api.md` for the current contract.
+> This document is kept as-is for historical record of feature 032's original design.
+
 Session lifecycle is plain REST (Hono handler, `src/handlers/terminal.ts`, following the existing handler pattern). Live I/O is a WebSocket per session. All endpoints operate only on the server's currently active repository/picker path context (same `repoPath` injection pattern already used by other handlers, per `src/server.ts`).
 
 ## `POST /api/terminal/sessions`

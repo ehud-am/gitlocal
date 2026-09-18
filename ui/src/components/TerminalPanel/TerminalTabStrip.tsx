@@ -1,39 +1,18 @@
-import type { TerminalKind, TerminalTabRef } from '../../types'
-import { TerminalKindSelect } from './TerminalKindSelect'
+import type { TerminalTabRef } from '../../types'
 
 interface TerminalTabStripProps {
   tabs: TerminalTabRef[]
   activeTabId: string | null
   onSelectTab: (id: string) => void
   onCloseTab: (id: string) => void
-  onNewTab: () => void
-  creatingNewTab: boolean
-  pendingKind?: TerminalKind
-  onPendingKindChange?: (kind: TerminalKind) => void
-}
-
-// US4 acceptance scenario 5: a small glyph per kind so Regular/Claude/Codex tabs are
-// visually distinguishable at a glance, without duplicating what the tab's aria-label
-// (which already includes "Claude"/"Codex"/"Terminal N") tells screen readers.
-function kindIcon(kind: TerminalKind): string {
-  if (kind === 'claude') return '◆'
-  if (kind === 'codex') return '✳'
-  return '›_'
 }
 
 // Every open tab is kept mounted by the caller (TerminalPanel) regardless of which is active —
 // this strip only ever reads/writes which id is active and never unmounts a TerminalView itself,
-// so switching tabs can't lose scrollback (US3).
-export function TerminalTabStrip({
-  tabs,
-  activeTabId,
-  onSelectTab,
-  onCloseTab,
-  onNewTab,
-  creatingNewTab,
-  pendingKind = 'regular',
-  onPendingKindChange = () => {},
-}: TerminalTabStripProps) {
+// so switching tabs can't lose scrollback (US3). The "new terminal" action lives in the panel's
+// right-side toolbar (alongside dock position and close), not here, so all actions stay grouped
+// together per the panel's VS Code-style layout.
+export function TerminalTabStrip({ tabs, activeTabId, onSelectTab, onCloseTab }: TerminalTabStripProps) {
   // A tablist's owned elements must all be role="tab" — a close button anywhere in its DOM
   // subtree (even nested inside a role="presentation" wrapper) fails aria-required-children,
   // since axe still counts any focusable descendant as an owned, non-tab child. aria-owns lets
@@ -49,10 +28,14 @@ export function TerminalTabStrip({
         return (
           <div
             key={tab.id}
-            className={`flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-sm transition-colors ${
+            // Three visually distinct states — active must never look like a hovered inactive
+            // tab: a stronger background + bold text + a colored underline (not just a lighter
+            // tint shared with :hover, which was hard to tell apart from the active tab at a
+            // glance when several tabs were open).
+            className={`flex shrink-0 items-center gap-1.5 rounded-t-md border-b-2 px-2 py-0.5 text-sm transition-colors ${
               isActive
-                ? 'bg-[var(--muted)] text-[var(--foreground)]'
-                : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                ? 'border-[var(--primary)] bg-[var(--muted-strong)] font-medium text-[var(--foreground)]'
+                : 'border-transparent text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
             }`}
           >
             <span
@@ -67,13 +50,13 @@ export function TerminalTabStrip({
               }}
               className="flex items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
-              <span aria-hidden="true">{kindIcon(tab.kind)}</span>
               <span className="whitespace-nowrap">{tab.label}</span>
             </span>
             <button
               type="button"
               onClick={() => onCloseTab(tab.id)}
               aria-label={`Close ${tab.label}`}
+              title={`Close ${tab.label}`}
               className="rounded-sm text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               ✕
@@ -81,16 +64,6 @@ export function TerminalTabStrip({
           </div>
         )
       })}
-      <TerminalKindSelect value={pendingKind} onChange={onPendingKindChange} disabled={creatingNewTab} />
-      <button
-        type="button"
-        onClick={onNewTab}
-        disabled={creatingNewTab}
-        aria-label="New terminal tab"
-        className="shrink-0 rounded-sm px-1.5 text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
-      >
-        {creatingNewTab ? '…' : '+'}
-      </button>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -23,20 +23,11 @@ vi.mock('../../../src/terminal/session-manager.js', () => ({
   },
 }))
 
-// Real filesystem PATH state (whether `claude`/`codex` happen to be installed on the machine
-// running these tests) must never leak into the FR-010 pre-flight assertions below, so
-// detectCapabilities() is mocked with a controllable default and overridden per test.
-vi.mock('../../../src/terminal/cli-detection.js', () => ({
-  detectCapabilities: vi.fn(() => ({ available: true, claudeCliFound: true, codexCliFound: true })),
-}))
-
 const { sessionManager } = await import('../../../src/terminal/session-manager.js')
-const { detectCapabilities } = await import('../../../src/terminal/cli-detection.js')
 const { createApp } = await import('../../../src/server.js')
 
 const mockCreateSession = sessionManager.createSession as unknown as ReturnType<typeof vi.fn>
 const mockListSessions = sessionManager.listSessions as unknown as ReturnType<typeof vi.fn>
-const mockDetectCapabilities = detectCapabilities as unknown as ReturnType<typeof vi.fn>
 const mockCloseSession = sessionManager.closeSession as unknown as ReturnType<typeof vi.fn>
 
 function makeGitRepo(): { dir: string; cleanup: () => void } {
@@ -50,7 +41,6 @@ function makeGitRepo(): { dir: string; cleanup: () => void } {
 function fakeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
     id: 'session-1',
-    kind: 'regular',
     cwd: '/tmp',
     status: 'running',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -75,11 +65,9 @@ describe('terminal handlers', () => {
     mockCreateSession.mockReset()
     mockListSessions.mockReset()
     mockCloseSession.mockReset()
-    mockDetectCapabilities.mockReset()
-    mockDetectCapabilities.mockReturnValue({ available: true, claudeCliFound: true, codexCliFound: true })
   })
 
-  it('creates a session and returns 201 with the session body', async () => {
+  it('creates a plain session and returns 201 with the session body', async () => {
     const session = fakeSession()
     mockCreateSession.mockResolvedValue({ ok: true, session } satisfies CreateSessionResult)
 
@@ -87,24 +75,28 @@ describe('terminal handlers', () => {
     const res = await app.request('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'regular' }),
+      body: JSON.stringify({}),
     })
 
     expect(res.status).toBe(201)
     expect(await res.json()).toEqual(session)
-    expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'regular', cwd: expect.any(String) })
+    expect(mockCreateSession).toHaveBeenCalledWith({ cwd: expect.any(String) })
   })
 
-  it('rejects an invalid kind with 400 and never calls the session manager', async () => {
+  // Old client builds may still send a `kind` field; the server must ignore it rather than error.
+  it('ignores an unknown/legacy "kind" field sent by an old client build', async () => {
+    const session = fakeSession()
+    mockCreateSession.mockResolvedValue({ ok: true, session } satisfies CreateSessionResult)
+
     const app = createApp(dir)
     const res = await app.request('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'bogus' }),
+      body: JSON.stringify({ kind: 'claude' }),
     })
 
-    expect(res.status).toBe(400)
-    expect(mockCreateSession).not.toHaveBeenCalled()
+    expect(res.status).toBe(201)
+    expect(mockCreateSession).toHaveBeenCalledWith({ cwd: expect.any(String) })
   })
 
   it('rejects an invalid JSON body with 400', async () => {
@@ -130,7 +122,7 @@ describe('terminal handlers', () => {
     const res = await app.request('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'regular' }),
+      body: JSON.stringify({}),
     })
 
     expect(res.status).toBe(503)
@@ -153,7 +145,7 @@ describe('terminal handlers', () => {
     const res = await app.request('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'regular' }),
+      body: JSON.stringify({}),
     })
 
     expect(res.status).toBe(503)
@@ -164,7 +156,7 @@ describe('terminal handlers', () => {
   })
 
   it('lists sessions', async () => {
-    const sessions = [fakeSession({ id: 'a' }), fakeSession({ id: 'b', kind: 'claude' })]
+    const sessions = [fakeSession({ id: 'a' }), fakeSession({ id: 'b' })]
     mockListSessions.mockReturnValue(sessions)
 
     const app = createApp(dir)
@@ -193,73 +185,6 @@ describe('terminal handlers', () => {
     expect(res.status).toBe(404)
   })
 
-  // FR-010: a claude/codex tab must fail fast with a clear message instead of spawning a shell
-  // that would just report "command not found".
-  describe('cli_not_found pre-flight (FR-010)', () => {
-    it('returns 503 cli_not_found for a claude session when the claude CLI is missing, without spawning a pty', async () => {
-      mockDetectCapabilities.mockReturnValue({ available: true, claudeCliFound: false, codexCliFound: true })
-
-      const app = createApp(dir)
-      const res = await app.request('/api/terminal/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'claude' }),
-      })
-
-      expect(res.status).toBe(503)
-      const body = await res.json()
-      expect(body.error).toBe('cli_not_found')
-      expect(body.message).toMatch(/claude/i)
-      expect(mockCreateSession).not.toHaveBeenCalled()
-    })
-
-    it('returns 503 cli_not_found for a codex session when the codex CLI is missing, without spawning a pty', async () => {
-      mockDetectCapabilities.mockReturnValue({ available: true, claudeCliFound: true, codexCliFound: false })
-
-      const app = createApp(dir)
-      const res = await app.request('/api/terminal/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'codex' }),
-      })
-
-      expect(res.status).toBe(503)
-      const body = await res.json()
-      expect(body.error).toBe('cli_not_found')
-      expect(body.message).toMatch(/codex/i)
-      expect(mockCreateSession).not.toHaveBeenCalled()
-    })
-
-    it('creates a claude session when only codex is missing', async () => {
-      mockDetectCapabilities.mockReturnValue({ available: true, claudeCliFound: true, codexCliFound: false })
-      mockCreateSession.mockResolvedValue({ ok: true, session: fakeSession({ kind: 'claude' }) } satisfies CreateSessionResult)
-
-      const app = createApp(dir)
-      const res = await app.request('/api/terminal/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'claude' }),
-      })
-
-      expect(res.status).toBe(201)
-      expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'claude', cwd: expect.any(String) })
-    })
-
-    it('never pre-flights CLI availability for a regular session', async () => {
-      mockDetectCapabilities.mockReturnValue({ available: true, claudeCliFound: false, codexCliFound: false })
-      mockCreateSession.mockResolvedValue({ ok: true, session: fakeSession() } satisfies CreateSessionResult)
-
-      const app = createApp(dir)
-      const res = await app.request('/api/terminal/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular' }),
-      })
-
-      expect(res.status).toBe(201)
-    })
-  })
-
   // FR-011: a new tab's cwd defaults to whatever folder/file is currently visible.
   describe('cwd resolution from contextPath/contextType (FR-011)', () => {
     it('defaults to the repository root when contextPath/contextType are omitted', async () => {
@@ -269,10 +194,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular' }),
+        body: JSON.stringify({}),
       })
 
-      expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'regular', cwd: realpathSync(dir) })
+      expect(mockCreateSession).toHaveBeenCalledWith({ cwd: realpathSync(dir) })
     })
 
     it('defaults to the repository root when contextType is "none"', async () => {
@@ -282,10 +207,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: 'src', contextType: 'none' }),
+        body: JSON.stringify({ contextPath: 'src', contextType: 'none' }),
       })
 
-      expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'regular', cwd: realpathSync(dir) })
+      expect(mockCreateSession).toHaveBeenCalledWith({ cwd: realpathSync(dir) })
     })
 
     it('uses the visible directory itself when contextType is "dir"', async () => {
@@ -296,11 +221,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: 'src/nested', contextType: 'dir' }),
+        body: JSON.stringify({ contextPath: 'src/nested', contextType: 'dir' }),
       })
 
       expect(mockCreateSession).toHaveBeenCalledWith({
-        kind: 'regular',
         cwd: realpathSync(join(dir, 'src', 'nested')),
       })
     })
@@ -314,11 +238,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: 'lib/index.ts', contextType: 'file' }),
+        body: JSON.stringify({ contextPath: 'lib/index.ts', contextType: 'file' }),
       })
 
       expect(mockCreateSession).toHaveBeenCalledWith({
-        kind: 'regular',
         cwd: realpathSync(join(dir, 'lib')),
       })
     })
@@ -332,11 +255,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: 'ghost/gone', contextType: 'dir' }),
+        body: JSON.stringify({ contextPath: 'ghost/gone', contextType: 'dir' }),
       })
 
       expect(mockCreateSession).toHaveBeenCalledWith({
-        kind: 'regular',
         cwd: realpathSync(join(dir, 'ghost')),
       })
     })
@@ -350,10 +272,10 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: 'vanished', contextType: 'dir' }),
+        body: JSON.stringify({ contextPath: 'vanished', contextType: 'dir' }),
       })
 
-      expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'regular', cwd: realpathSync(dir) })
+      expect(mockCreateSession).toHaveBeenCalledWith({ cwd: realpathSync(dir) })
     })
 
     it('falls back to the repository root when contextPath attempts to escape the repository', async () => {
@@ -363,23 +285,80 @@ describe('terminal handlers', () => {
       await app.request('/api/terminal/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'regular', contextPath: '../../etc', contextType: 'dir' }),
+        body: JSON.stringify({ contextPath: '../../etc', contextType: 'dir' }),
       })
 
-      expect(mockCreateSession).toHaveBeenCalledWith({ kind: 'regular', cwd: realpathSync(dir) })
+      expect(mockCreateSession).toHaveBeenCalledWith({ cwd: realpathSync(dir) })
     })
   })
 
-  it('reports terminal capabilities', async () => {
-    const app = createApp(dir)
-    const res = await app.request('/api/terminal/capabilities')
+  describe('terminal panel dock-position preference', () => {
+    // Captured once (not per-test) so restoring it at the end reflects the value from before
+    // this describe block ran at all, not whatever a prior test's beforeEach last set it to.
+    const previousPreferencePath = process.env.GITLOCAL_TERMINAL_PANEL_PREFERENCE_PATH
+    let prefDir: string
 
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body).toMatchObject({
-      available: expect.any(Boolean),
-      claudeCliFound: expect.any(Boolean),
-      codexCliFound: expect.any(Boolean),
+    beforeEach(() => {
+      prefDir = mkdtempSync(join(tmpdir(), 'gitlocal-terminal-pref-test-'))
+      process.env.GITLOCAL_TERMINAL_PANEL_PREFERENCE_PATH = join(prefDir, 'terminal-panel-preference.json')
+    })
+
+    afterEach(() => {
+      rmSync(prefDir, { recursive: true, force: true })
+    })
+
+    afterAll(() => {
+      if (previousPreferencePath === undefined) {
+        delete process.env.GITLOCAL_TERMINAL_PANEL_PREFERENCE_PATH
+      } else {
+        process.env.GITLOCAL_TERMINAL_PANEL_PREFERENCE_PATH = previousPreferencePath
+      }
+    })
+
+    it('GET returns the default "right" position when no preference has been saved', async () => {
+      const app = createApp(dir)
+      const res = await app.request('/api/terminal-panel-preference')
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ dockPosition: 'right' })
+    })
+
+    it('PUT persists a valid dock position and GET then reflects it', async () => {
+      const app = createApp(dir)
+      const putRes = await app.request('/api/terminal-panel-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dockPosition: 'left' }),
+      })
+      expect(putRes.status).toBe(200)
+      expect(await putRes.json()).toEqual({ dockPosition: 'left' })
+
+      const getRes = await app.request('/api/terminal-panel-preference')
+      expect(await getRes.json()).toEqual({ dockPosition: 'left' })
+    })
+
+    it('PUT rejects an invalid dockPosition with 400', async () => {
+      const app = createApp(dir)
+      const res = await app.request('/api/terminal-panel-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dockPosition: 'top' }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual({ error: 'Invalid dockPosition' })
+    })
+
+    it('PUT rejects an invalid JSON body with 400', async () => {
+      const app = createApp(dir)
+      const res = await app.request('/api/terminal-panel-preference', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not json',
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual({ error: 'Invalid dockPosition' })
     })
   })
 })
