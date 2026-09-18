@@ -1,9 +1,4 @@
-import type {
-  CreateTerminalSessionRequest,
-  TerminalCapabilities,
-  TerminalSession,
-  TerminalUnavailableResponse,
-} from '../types'
+import type { CreateTerminalSessionRequest, TerminalSession, TerminalUnavailableResponse } from '../types'
 import { getJson } from './httpClient'
 
 const BASE = ''
@@ -54,9 +49,6 @@ export const terminalApi = {
       throw await res.json().catch(() => ({ error: 'pty_unavailable', message: res.statusText }))
     }
   },
-
-  getCapabilities: (): Promise<TerminalCapabilities> =>
-    requestJson<TerminalCapabilities>('/api/terminal/capabilities'),
 
   connectSessionSocket: (id: string): WebSocket => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

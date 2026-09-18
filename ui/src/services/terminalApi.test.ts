@@ -21,7 +21,6 @@ describe('terminalApi.createSession', () => {
     fetchMock.mockResolvedValueOnce(
       mockJsonResponse({
         id: 'session-1',
-        kind: 'regular',
         cwd: '/repo/src/nested',
         status: 'running',
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -29,12 +28,12 @@ describe('terminalApi.createSession', () => {
       }),
     )
 
-    await terminalApi.createSession({ kind: 'regular', contextPath: 'src/nested', contextType: 'dir' })
+    await terminalApi.createSession({ contextPath: 'src/nested', contextType: 'dir' })
 
     expect(fetchMock).toHaveBeenCalledWith('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'regular', contextPath: 'src/nested', contextType: 'dir' }),
+      body: JSON.stringify({ contextPath: 'src/nested', contextType: 'dir' }),
     })
   })
 
@@ -42,7 +41,6 @@ describe('terminalApi.createSession', () => {
     fetchMock.mockResolvedValueOnce(
       mockJsonResponse({
         id: 'session-2',
-        kind: 'regular',
         cwd: '/repo/lib',
         status: 'running',
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -50,12 +48,12 @@ describe('terminalApi.createSession', () => {
       }),
     )
 
-    await terminalApi.createSession({ kind: 'regular', contextPath: 'lib/util.ts', contextType: 'file' })
+    await terminalApi.createSession({ contextPath: 'lib/util.ts', contextType: 'file' })
 
     expect(fetchMock).toHaveBeenCalledWith('/api/terminal/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'regular', contextPath: 'lib/util.ts', contextType: 'file' }),
+      body: JSON.stringify({ contextPath: 'lib/util.ts', contextType: 'file' }),
     })
   })
 })

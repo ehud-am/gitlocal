@@ -42,12 +42,15 @@ const mockCloseSession = terminalApi.closeSession as unknown as ReturnType<typeo
 function session(id: string): TerminalSession {
   return {
     id,
-    kind: 'regular',
     cwd: '/repo',
     status: 'running',
     createdAt: '2026-01-01T00:00:00.000Z',
     exitInfo: null,
   }
+}
+
+function renderPanel() {
+  return render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
 }
 
 async function openThreeTabs(user: ReturnType<typeof userEvent.setup>) {
@@ -56,15 +59,15 @@ async function openThreeTabs(user: ReturnType<typeof userEvent.setup>) {
     .mockResolvedValueOnce(session('s2'))
     .mockResolvedValueOnce(session('s3'))
 
-  render(<TerminalPanel />)
+  renderPanel()
 
-  await user.click(screen.getByRole('button', { name: 'Open terminal' }))
+  await user.click(screen.getByRole('button', { name: 'New Terminal' }))
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeInTheDocument())
 
-  await user.click(screen.getByRole('button', { name: 'New terminal tab' }))
+  await user.click(screen.getByRole('button', { name: 'New Terminal' }))
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Terminal 2' })).toBeInTheDocument())
 
-  await user.click(screen.getByRole('button', { name: 'New terminal tab' }))
+  await user.click(screen.getByRole('button', { name: 'New Terminal' }))
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Terminal 3' })).toBeInTheDocument())
 }
 
@@ -124,34 +127,11 @@ describe('TerminalTabStrip', () => {
 
   describe('in isolation', () => {
     const tabs: TerminalTabRef[] = [
-      { id: 't1', kind: 'regular', label: 'Terminal 1', cwd: '/repo', status: 'running' },
-      { id: 't2', kind: 'regular', label: 'Terminal 2', cwd: '/repo', status: 'running' },
+      { id: 't1', label: 'Terminal 1', cwd: '/repo', status: 'running' },
+      { id: 't2', label: 'Terminal 2', cwd: '/repo', status: 'running' },
     ]
 
-    it('shows a distinct icon per tab kind (US4 acceptance scenario 5)', () => {
-      const kindTabs: TerminalTabRef[] = [
-        { id: 't1', kind: 'regular', label: 'Terminal 1', cwd: '/repo', status: 'running' },
-        { id: 't2', kind: 'claude', label: 'Claude', cwd: '/repo', status: 'running' },
-        { id: 't3', kind: 'codex', label: 'Codex', cwd: '/repo', status: 'running' },
-      ]
-      render(
-        <TerminalTabStrip
-          tabs={kindTabs}
-          activeTabId="t1"
-          onSelectTab={vi.fn()}
-          onCloseTab={vi.fn()}
-          onNewTab={vi.fn()}
-          creatingNewTab={false}
-        />,
-      )
-
-      expect(screen.getByRole('tab', { name: 'Terminal 1' })).toHaveTextContent('›_')
-      expect(screen.getByRole('tab', { name: 'Claude' })).toHaveTextContent('◆')
-      expect(screen.getByRole('tab', { name: 'Codex' })).toHaveTextContent('✳')
-    })
-
-    it('defaults pendingKind/onPendingKindChange to a no-op regular picker when the caller omits them', async () => {
-      const user = userEvent.setup()
+    it('renders plain sequential tab labels with no kind icon or selector', () => {
       render(
         <TerminalTabStrip
           tabs={tabs}
@@ -163,9 +143,9 @@ describe('TerminalTabStrip', () => {
         />,
       )
 
-      const select = screen.getByLabelText('New terminal kind') as HTMLSelectElement
-      expect(select.value).toBe('regular')
-      await user.selectOptions(select, 'claude')
+      expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Terminal 2' })).toBeInTheDocument()
+      expect(screen.queryByLabelText('New terminal kind')).not.toBeInTheDocument()
     })
 
     it('activates a tab via Enter or Space, and ignores other keys', async () => {
@@ -208,27 +188,20 @@ describe('TerminalTabStrip', () => {
         />,
       )
 
-      const newTabButton = screen.getByRole('button', { name: 'New terminal tab' })
+      const newTabButton = screen.getByRole('button', { name: 'Starting terminal…' })
       expect(newTabButton).toBeDisabled()
-      expect(newTabButton).toHaveTextContent('…')
+      expect(newTabButton).toHaveTextContent('Starting terminal…')
     })
 
-    it('has no accessibility violations across regular/claude/codex tabs (FR-014, SC-006, T043)', async () => {
-      const kindTabs: TerminalTabRef[] = [
-        { id: 't1', kind: 'regular', label: 'Terminal 1', cwd: '/repo', status: 'running' },
-        { id: 't2', kind: 'claude', label: 'Claude', cwd: '/repo', status: 'running' },
-        { id: 't3', kind: 'codex', label: 'Codex', cwd: '/repo', status: 'running' },
-      ]
+    it('has no accessibility violations', async () => {
       const { container } = render(
         <TerminalTabStrip
-          tabs={kindTabs}
+          tabs={tabs}
           activeTabId="t1"
           onSelectTab={vi.fn()}
           onCloseTab={vi.fn()}
           onNewTab={vi.fn()}
           creatingNewTab={false}
-          pendingKind="regular"
-          onPendingKindChange={vi.fn()}
         />,
       )
 

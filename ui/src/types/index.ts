@@ -239,11 +239,9 @@ export interface StartupFolderResponse {
   fallbackReason: string
 }
 
-// Integrated terminal panel (feature 032). Server-side counterparts live in
-// `src/terminal/types.ts`; kept in sync by hand since the server bundle and UI bundle are
-// built separately and don't share a types module.
-
-export type TerminalKind = 'regular' | 'claude' | 'codex'
+// Integrated terminal panel (feature 032, simplified by feature 044). Server-side counterparts
+// live in `src/terminal/types.ts`; kept in sync by hand since the server bundle and UI bundle
+// are built separately and don't share a types module.
 
 export type TerminalSessionStatus = 'starting' | 'running' | 'exited' | 'unavailable'
 
@@ -254,7 +252,6 @@ export interface TerminalExitInfo {
 
 export interface TerminalSession {
   id: string
-  kind: TerminalKind
   cwd: string
   status: TerminalSessionStatus
   createdAt: string
@@ -264,33 +261,33 @@ export interface TerminalSession {
 export type TerminalContextType = 'file' | 'dir' | 'none'
 
 export interface CreateTerminalSessionRequest {
-  kind: TerminalKind
   contextPath?: string
   contextType?: TerminalContextType
 }
 
-export type TerminalUnavailableErrorCode = 'cli_not_found' | 'pty_unavailable' | 'session_limit_reached'
+export type TerminalUnavailableErrorCode = 'pty_unavailable' | 'session_limit_reached'
 
 export interface TerminalUnavailableResponse {
   error: TerminalUnavailableErrorCode
   message: string
 }
 
-export interface TerminalCapabilities {
-  available: boolean
-  claudeCliFound: boolean
-  codexCliFound: boolean
+// Feature 044: the terminal panel's dock-position preference, persisted server-side and
+// defaulting to 'right' — see src/services/terminal-panel-preference.ts.
+export type DockPosition = 'bottom' | 'left' | 'right'
+
+export interface TerminalPanelPreference {
+  dockPosition: DockPosition
 }
 
 // Client-side UI state, per data-model.md — not mirrored server-side.
 export interface TerminalTabRef {
   id: string
-  kind: TerminalKind
   label: string
   cwd: string
   status: TerminalSessionStatus
-  // Set only for a locally-synthesized `unavailable` tab (FR-010): the server never created a
-  // session for it, so there's no real id/cwd to show alongside the "CLI not found" message.
+  // Set only for a locally-synthesized `unavailable` tab: the server never created a session
+  // for it, so there's no real id/cwd to show alongside the failure message.
   unavailableMessage?: string
 }
 

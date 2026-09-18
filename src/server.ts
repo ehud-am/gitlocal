@@ -47,8 +47,11 @@ import {
   closeTerminalSessionHandler,
   createTerminalSessionHandler,
   listTerminalSessionsHandler,
-  terminalCapabilitiesHandler,
 } from './handlers/terminal.js'
+import {
+  getTerminalPanelPreferenceHandler,
+  updateTerminalPanelPreferenceHandler,
+} from './handlers/terminal-panel-preference.js'
 import { classifyLocalPath, resolveDirectOpenTarget } from './git/repo.js'
 import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget } from './types.js'
@@ -327,7 +330,8 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.post('/api/terminal/sessions', createTerminalSessionHandler)
   app.get('/api/terminal/sessions', listTerminalSessionsHandler)
   app.delete('/api/terminal/sessions/:id', closeTerminalSessionHandler)
-  app.get('/api/terminal/capabilities', terminalCapabilitiesHandler)
+  app.get('/api/terminal-panel-preference', getTerminalPanelPreferenceHandler)
+  app.put('/api/terminal-panel-preference', updateTerminalPanelPreferenceHandler)
 
   // Static file serving with SPA fallback
   const uiDir = join(import.meta.dirname, '../ui/dist')

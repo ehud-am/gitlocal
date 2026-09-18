@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { isPtySupported } from './cli-detection.js'
-import type { TerminalExitInfo, TerminalKind, TerminalSession, TerminalSessionStatus } from './types.js'
+import { isPtySupported } from './pty-support.js'
+import type { TerminalExitInfo, TerminalSession, TerminalSessionStatus } from './types.js'
 
 const MAX_BUFFERED_OUTPUT_CHARS = 200_000
 const DEFAULT_COLS = 80
@@ -48,7 +48,6 @@ function defaultShellCommand(): string {
 }
 
 export interface CreateSessionOptions {
-  kind: TerminalKind
   cwd: string
 }
 
@@ -58,7 +57,6 @@ export type CreateSessionResult =
 
 interface ManagedSession {
   id: string
-  kind: TerminalKind
   cwd: string
   status: TerminalSessionStatus
   createdAt: string
@@ -72,7 +70,6 @@ interface ManagedSession {
 function toPublicSession(session: ManagedSession): TerminalSession {
   return {
     id: session.id,
-    kind: session.kind,
     cwd: session.cwd,
     status: session.status,
     createdAt: session.createdAt,
@@ -122,7 +119,6 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
 
     const session: ManagedSession = {
       id: randomUUID(),
-      kind: options.kind,
       cwd: options.cwd,
       status: 'starting',
       createdAt: new Date().toISOString(),
@@ -146,17 +142,9 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
     session.pty = pty
     session.status = 'running'
 
-    // FR-008/FR-009: a Claude/Codex tab is an ordinary shell session where the server types the
-    // launch command for the user, once — triggered by the first output chunk (the shell's
-    // initial prompt), exactly as research.md's "one code path, one entity" decision describes.
-    let autoLaunched = false
     pty.onData((chunk) => {
       appendBuffered(session, chunk)
       for (const listener of session.outputListeners) listener(chunk)
-      if (!autoLaunched && session.kind !== 'regular') {
-        autoLaunched = true
-        pty.write(`${session.kind}\n`)
-      }
     })
     pty.onExit((event) => {
       markExited(session, {

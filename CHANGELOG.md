@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.5 - 2026-09-18
+
+- Simplified the integrated terminal panel: removed the "Claude"/"Codex" terminal-tab kind picker — every terminal tab is now a plain shell, and `claude`/`codex` can still be run by typing the command. The corresponding server-side CLI auto-launch and pre-flight-detection behavior was also removed.
+- Added a terminal panel position setting: the panel can now be docked to the bottom, left, or right of the window (previously bottom-only), defaulting to the right; your choice is remembered across restarts and switching position never interrupts a running session.
+- Cleaned up the "open a new terminal" control into a single, consistently labeled action shown the same way whether the panel is empty or already has open tabs, and fixed a labeling bug where closing a tab and opening a new one could reuse an already-used tab number (e.g. two tabs both named "Terminal 2").
+
 ## 0.13.4 - 2026-09-12
 
 - Fixed the app footer's GitHub and gitlocal.dev links not opening at all in the native macOS app (the embedded browser view had no handler for external-link navigation); both links now open in the system's default browser there, matching the web app's behavior. Restyled the footer with a paired icon + label for each link, following common developer-tool footer conventions.

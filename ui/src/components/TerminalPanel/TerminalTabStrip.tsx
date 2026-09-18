@@ -1,5 +1,5 @@
-import type { TerminalKind, TerminalTabRef } from '../../types'
-import { TerminalKindSelect } from './TerminalKindSelect'
+import type { TerminalTabRef } from '../../types'
+import { NewTerminalButton } from './NewTerminalButton'
 
 interface TerminalTabStripProps {
   tabs: TerminalTabRef[]
@@ -8,17 +8,6 @@ interface TerminalTabStripProps {
   onCloseTab: (id: string) => void
   onNewTab: () => void
   creatingNewTab: boolean
-  pendingKind?: TerminalKind
-  onPendingKindChange?: (kind: TerminalKind) => void
-}
-
-// US4 acceptance scenario 5: a small glyph per kind so Regular/Claude/Codex tabs are
-// visually distinguishable at a glance, without duplicating what the tab's aria-label
-// (which already includes "Claude"/"Codex"/"Terminal N") tells screen readers.
-function kindIcon(kind: TerminalKind): string {
-  if (kind === 'claude') return '◆'
-  if (kind === 'codex') return '✳'
-  return '›_'
 }
 
 // Every open tab is kept mounted by the caller (TerminalPanel) regardless of which is active —
@@ -31,8 +20,6 @@ export function TerminalTabStrip({
   onCloseTab,
   onNewTab,
   creatingNewTab,
-  pendingKind = 'regular',
-  onPendingKindChange = () => {},
 }: TerminalTabStripProps) {
   // A tablist's owned elements must all be role="tab" — a close button anywhere in its DOM
   // subtree (even nested inside a role="presentation" wrapper) fails aria-required-children,
@@ -67,7 +54,6 @@ export function TerminalTabStrip({
               }}
               className="flex items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
-              <span aria-hidden="true">{kindIcon(tab.kind)}</span>
               <span className="whitespace-nowrap">{tab.label}</span>
             </span>
             <button
@@ -81,16 +67,7 @@ export function TerminalTabStrip({
           </div>
         )
       })}
-      <TerminalKindSelect value={pendingKind} onChange={onPendingKindChange} disabled={creatingNewTab} />
-      <button
-        type="button"
-        onClick={onNewTab}
-        disabled={creatingNewTab}
-        aria-label="New terminal tab"
-        className="shrink-0 rounded-sm px-1.5 text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
-      >
-        {creatingNewTab ? '…' : '+'}
-      </button>
+      <NewTerminalButton onClick={onNewTab} creating={creatingNewTab} />
     </div>
   )
 }

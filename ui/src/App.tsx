@@ -8,6 +8,7 @@ import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
 import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPanel/TerminalPanel'
+import { useTerminalPanelPreference } from './hooks/useTerminalPanelPreference'
 import AppFooter from './components/AppFooter'
 import {
   FolderDeleteDialog,
@@ -238,6 +239,7 @@ export default function App() {
   const startupOpenTargetAppliedRef = useRef('')
   const startupFolderFallbackAppliedRef = useRef(false)
   const terminalPanelRef = useRef<TerminalPanelHandle>(null)
+  const { dockPosition, setDockPosition } = useTerminalPanelPreference()
 
   const { data: baseInfo, isLoading, isError: isInfoError, error: infoError } = useQuery({
     queryKey: ['info'],
@@ -1292,7 +1294,8 @@ export default function App() {
           </div>
         </header>
 
-        <div className="app-body flex min-h-0 flex-1 pb-8">
+        <div className={`flex min-h-0 flex-1 ${dockPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
+        <div className={`app-body flex min-h-0 flex-1 pb-8 ${dockPosition !== 'bottom' ? 'min-w-0' : ''}`}>
           {sidebarCollapsed ? (
             <aside className="sidebar-rail flex w-14 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" aria-label="collapsed navigation">
               <div className="sidebar-rail-toolbar flex flex-col items-center gap-2 p-3">
@@ -1486,7 +1489,14 @@ export default function App() {
           </main>
         </div>
 
-        <TerminalPanel ref={terminalPanelRef} contextPath={visibleSelectedPath} contextType={visibleSelectedPathType} />
+          <TerminalPanel
+            ref={terminalPanelRef}
+            contextPath={visibleSelectedPath}
+            contextType={visibleSelectedPathType}
+            dockPosition={dockPosition}
+            onDockPositionChange={setDockPosition}
+          />
+        </div>
 
         <AppFooter version={info?.version ?? ''} />
       </div>
