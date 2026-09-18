@@ -141,6 +141,22 @@ describe('TerminalTabStrip', () => {
       expect(screen.queryByRole('button', { name: 'New Terminal' })).not.toBeInTheDocument()
     })
 
+    it('gives the active tab a distinct background, underline, and weight — not just the shared :hover tint', () => {
+      render(<TerminalTabStrip tabs={tabs} activeTabId="t1" onSelectTab={vi.fn()} onCloseTab={vi.fn()} />)
+
+      const activeTabRow = screen.getByRole('tab', { name: 'Terminal 1' }).parentElement!
+      const inactiveTabRow = screen.getByRole('tab', { name: 'Terminal 2' }).parentElement!
+
+      // The active tab's background/border must be a class inactive tabs never carry (even on
+      // hover), so it stays visually distinct from a merely-hovered inactive tab.
+      expect(activeTabRow.className).toContain('bg-[var(--muted-strong)]')
+      expect(activeTabRow.className).toContain('border-[var(--primary)]')
+      expect(activeTabRow.className).toContain('font-medium')
+      expect(inactiveTabRow.className).not.toContain('bg-[var(--muted-strong)]')
+      expect(inactiveTabRow.className).not.toContain('border-[var(--primary)]')
+      expect(inactiveTabRow.className).not.toContain('font-medium')
+    })
+
     it('activates a tab via Enter or Space, and ignores other keys', async () => {
       const user = userEvent.setup()
       const onSelectTab = vi.fn()

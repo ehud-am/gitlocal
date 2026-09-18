@@ -360,3 +360,18 @@ User feedback on the first implementation pass requested a UI-design refinement,
   exercised indirectly via `TerminalPanel.test.tsx`); updated `TerminalTabStrip.tsx`'s props
   (dropped `onNewTab`/`creatingNewTab`, no longer its concern) and all four terminal-panel test
   files accordingly. All UI tests green with per-file coverage gates intact.
+
+## Post-Implementation Follow-Up (round 3, pre-release)
+
+Further UI feedback: with multiple terminal tabs open, the active one was hard to distinguish —
+its only visual difference from an inactive tab was a `bg-[var(--muted)]` tint, which was also
+exactly what an inactive tab got on `:hover`, so a hovered inactive tab could look identical to
+the actual active one at a glance.
+
+- `TerminalTabStrip.tsx`: the active tab now gets a background inactive tabs never share even on
+  hover (`bg-[var(--muted-strong)]`, one step darker/lighter than the shared `--muted` hover
+  tint), a colored bottom border (`border-[var(--primary)]`, transparent on inactive tabs to
+  avoid layout shift), and `font-medium` — three simultaneous, non-overlapping signals rather
+  than one shared-with-hover background.
+- Added a dedicated assertion in `TerminalTabStrip.test.tsx` checking the active tab's row
+  carries these classes and that an inactive tab's row carries none of them.

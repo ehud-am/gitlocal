@@ -28,10 +28,14 @@ export function TerminalTabStrip({ tabs, activeTabId, onSelectTab, onCloseTab }:
         return (
           <div
             key={tab.id}
-            className={`flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-sm transition-colors ${
+            // Three visually distinct states — active must never look like a hovered inactive
+            // tab: a stronger background + bold text + a colored underline (not just a lighter
+            // tint shared with :hover, which was hard to tell apart from the active tab at a
+            // glance when several tabs were open).
+            className={`flex shrink-0 items-center gap-1.5 rounded-t-md border-b-2 px-2 py-0.5 text-sm transition-colors ${
               isActive
-                ? 'bg-[var(--muted)] text-[var(--foreground)]'
-                : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                ? 'border-[var(--primary)] bg-[var(--muted-strong)] font-medium text-[var(--foreground)]'
+                : 'border-transparent text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
             }`}
           >
             <span
