@@ -5,6 +5,7 @@ import { TerminalView, type TerminalViewHandle } from './TerminalView'
 import { TerminalTabStrip } from './TerminalTabStrip'
 import { NewTerminalButton } from './NewTerminalButton'
 import { DockPositionControl } from './DockPositionControl'
+import { CloseIcon } from '../ui/icons'
 import type { DockPosition, TerminalContextType, TerminalUnavailableResponse } from '../../types'
 
 interface TerminalPanelProps {
@@ -213,13 +214,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         className={`flex items-center gap-2 border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm ${emptyStateBorder} ${dockPosition === 'left' ? 'order-first' : ''}`}
         data-testid="terminal-panel-empty"
       >
-        <NewTerminalButton onClick={() => void openTerminal()} creating={creating} />
-        {dockPositionControl}
         {error && (
           <span className="text-[var(--danger)]" role="alert">
             {error}
           </span>
         )}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <NewTerminalButton onClick={() => void openTerminal()} creating={creating} />
+          {dockPositionControl}
+        </div>
       </div>
     )
   }
@@ -267,33 +270,18 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           activeTabId={panel.state.activeTabId}
           onSelectTab={panel.setActiveTab}
           onCloseTab={closeTab}
-          onNewTab={() => void openTerminal()}
-          creatingNewTab={creating}
         />
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
+          <NewTerminalButton onClick={() => void openTerminal()} creating={creating} />
           {dockPositionControl}
           <button
             type="button"
-            onClick={panel.toggleVisible}
-            aria-label={panel.state.visible ? 'Hide terminal' : 'Show terminal'}
-            title={panel.state.visible ? 'Collapse terminal panel' : 'Expand terminal panel'}
-            className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-xs font-medium text-[var(--muted-foreground)] outline-none transition-colors hover:border-[var(--ring)] hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            onClick={panel.hide}
+            aria-label="Collapse terminal"
+            title="Collapse terminal panel"
+            className="flex shrink-0 items-center justify-center rounded-md p-1 text-[var(--muted-foreground)] outline-none transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <svg
-              aria-hidden="true"
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`transition-transform ${panel.state.visible ? (isSideDock ? 'rotate-90' : 'rotate-180') : ''}`}
-            >
-              <path d="M4 10l4-4 4 4" />
-            </svg>
-            <span>{panel.state.visible ? 'Collapse' : 'Expand'}</span>
+            <CloseIcon />
           </button>
         </div>
       </div>
@@ -303,12 +291,16 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         </div>
       )}
       <div
-        className="flex-1 overflow-hidden"
+        className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
         style={{ display: panel.state.visible ? 'block' : 'none' }}
         data-testid="terminal-panel-content"
       >
         {panel.state.tabs.map((tab) => (
-          <div key={tab.id} className="h-full" style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}>
+          // Absolute-positioned to fill the content area exactly, rather than relying on nested
+          // flex-stretch percentages to reach TerminalView's container — xterm's FitAddon needs
+          // a guaranteed, unambiguous box to measure, which matters most in the side-dock case
+          // where the container's size comes from a width (not height) chain.
+          <div key={tab.id} className="absolute inset-0" style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}>
             {tab.status === 'unavailable' ? (
               <div className="flex h-full items-center justify-center px-4 text-center text-sm text-[var(--muted-foreground)]">
                 {tab.unavailableMessage}

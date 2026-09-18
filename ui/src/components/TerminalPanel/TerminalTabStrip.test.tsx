@@ -131,36 +131,20 @@ describe('TerminalTabStrip', () => {
       { id: 't2', label: 'Terminal 2', cwd: '/repo', status: 'running' },
     ]
 
-    it('renders plain sequential tab labels with no kind icon or selector', () => {
-      render(
-        <TerminalTabStrip
-          tabs={tabs}
-          activeTabId="t1"
-          onSelectTab={vi.fn()}
-          onCloseTab={vi.fn()}
-          onNewTab={vi.fn()}
-          creatingNewTab={false}
-        />,
-      )
+    it('renders plain sequential tab labels with no kind icon, selector, or embedded new-tab control', () => {
+      render(<TerminalTabStrip tabs={tabs} activeTabId="t1" onSelectTab={vi.fn()} onCloseTab={vi.fn()} />)
 
       expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: 'Terminal 2' })).toBeInTheDocument()
       expect(screen.queryByLabelText('New terminal kind')).not.toBeInTheDocument()
+      // The "new terminal" action now lives in TerminalPanel's right-side toolbar, not here.
+      expect(screen.queryByRole('button', { name: 'New Terminal' })).not.toBeInTheDocument()
     })
 
     it('activates a tab via Enter or Space, and ignores other keys', async () => {
       const user = userEvent.setup()
       const onSelectTab = vi.fn()
-      render(
-        <TerminalTabStrip
-          tabs={tabs}
-          activeTabId="t1"
-          onSelectTab={onSelectTab}
-          onCloseTab={vi.fn()}
-          onNewTab={vi.fn()}
-          creatingNewTab={false}
-        />,
-      )
+      render(<TerminalTabStrip tabs={tabs} activeTabId="t1" onSelectTab={onSelectTab} onCloseTab={vi.fn()} />)
 
       const tab2 = screen.getByRole('tab', { name: 'Terminal 2' })
       tab2.focus()
@@ -176,33 +160,9 @@ describe('TerminalTabStrip', () => {
       expect(onSelectTab).not.toHaveBeenCalled()
     })
 
-    it('shows a busy indicator and disables the new-tab control while a tab is being created', () => {
-      render(
-        <TerminalTabStrip
-          tabs={tabs}
-          activeTabId="t1"
-          onSelectTab={vi.fn()}
-          onCloseTab={vi.fn()}
-          onNewTab={vi.fn()}
-          creatingNewTab
-        />,
-      )
-
-      const newTabButton = screen.getByRole('button', { name: 'Starting terminal…' })
-      expect(newTabButton).toBeDisabled()
-      expect(newTabButton).toHaveTextContent('Starting terminal…')
-    })
-
     it('has no accessibility violations', async () => {
       const { container } = render(
-        <TerminalTabStrip
-          tabs={tabs}
-          activeTabId="t1"
-          onSelectTab={vi.fn()}
-          onCloseTab={vi.fn()}
-          onNewTab={vi.fn()}
-          creatingNewTab={false}
-        />,
+        <TerminalTabStrip tabs={tabs} activeTabId="t1" onSelectTab={vi.fn()} onCloseTab={vi.fn()} />,
       )
 
       expect((await axe(container)).violations).toHaveLength(0)

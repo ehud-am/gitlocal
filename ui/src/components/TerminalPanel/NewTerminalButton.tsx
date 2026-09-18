@@ -1,11 +1,14 @@
+import { PlusIcon } from '../ui/icons'
+
 interface NewTerminalButtonProps {
   onClick: () => void
   creating: boolean
 }
 
-// US3: a single, identically-labeled action for opening a new terminal, shared by the
-// empty-state prompt and the tab strip so there is exactly one "new terminal" affordance in
-// the whole panel rather than two subtly different controls.
+// US3: a single, identically-labeled icon action for opening a new terminal (VS Code's "+"
+// convention), shared by the empty-state prompt and the panel's right-side toolbar so there is
+// exactly one "new terminal" affordance in the whole panel rather than two subtly different
+// controls.
 export function NewTerminalButton({ onClick, creating }: NewTerminalButtonProps) {
   return (
     <button
@@ -13,9 +16,10 @@ export function NewTerminalButton({ onClick, creating }: NewTerminalButtonProps)
       onClick={onClick}
       disabled={creating}
       aria-label={creating ? 'Starting terminal…' : 'New Terminal'}
-      className="flex shrink-0 items-center gap-1 rounded-sm px-1 text-[var(--muted-foreground)] outline-none transition-colors hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
+      title={creating ? 'Starting terminal…' : 'New Terminal'}
+      className="flex shrink-0 items-center justify-center rounded-md p-1 text-[var(--muted-foreground)] outline-none transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:pointer-events-none disabled:opacity-50"
     >
-      {creating ? 'Starting terminal…' : '+ New Terminal'}
+      <PlusIcon />
     </button>
   )
 }

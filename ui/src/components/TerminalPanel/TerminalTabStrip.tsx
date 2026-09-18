@@ -1,26 +1,18 @@
 import type { TerminalTabRef } from '../../types'
-import { NewTerminalButton } from './NewTerminalButton'
 
 interface TerminalTabStripProps {
   tabs: TerminalTabRef[]
   activeTabId: string | null
   onSelectTab: (id: string) => void
   onCloseTab: (id: string) => void
-  onNewTab: () => void
-  creatingNewTab: boolean
 }
 
 // Every open tab is kept mounted by the caller (TerminalPanel) regardless of which is active —
 // this strip only ever reads/writes which id is active and never unmounts a TerminalView itself,
-// so switching tabs can't lose scrollback (US3).
-export function TerminalTabStrip({
-  tabs,
-  activeTabId,
-  onSelectTab,
-  onCloseTab,
-  onNewTab,
-  creatingNewTab,
-}: TerminalTabStripProps) {
+// so switching tabs can't lose scrollback (US3). The "new terminal" action lives in the panel's
+// right-side toolbar (alongside dock position and close), not here, so all actions stay grouped
+// together per the panel's VS Code-style layout.
+export function TerminalTabStrip({ tabs, activeTabId, onSelectTab, onCloseTab }: TerminalTabStripProps) {
   // A tablist's owned elements must all be role="tab" — a close button anywhere in its DOM
   // subtree (even nested inside a role="presentation" wrapper) fails aria-required-children,
   // since axe still counts any focusable descendant as an owned, non-tab child. aria-owns lets
@@ -67,7 +59,6 @@ export function TerminalTabStrip({
           </div>
         )
       })}
-      <NewTerminalButton onClick={onNewTab} creating={creatingNewTab} />
     </div>
   )
 }

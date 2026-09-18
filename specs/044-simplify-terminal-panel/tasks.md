@@ -330,3 +330,33 @@ Task: "Add handler tests for the new preference routes"
   `CLAUDE.md`'s history on specs 038/042.
 - Commit after each task or logical group; stop at any checkpoint to validate a story
   independently before continuing.
+
+---
+
+## Post-Implementation Follow-Up (round 2, pre-release)
+
+User feedback on the first implementation pass requested a UI-design refinement, still within
+`v0.13.5` (unreleased at the time of this round):
+
+- Replaced `DockPositionControl`'s `<select>` dropdown with three VS Code-style icon buttons
+  (bottom/left/right), added a `PlusIcon`/`CloseIcon`/`DockPositionIcon` set to
+  `ui/src/components/ui/icons.tsx`.
+- `NewTerminalButton` became an icon-only "+" action (was "+ New Terminal" text) and moved out of
+  `TerminalTabStrip` (which now renders only the tab list) into `TerminalPanel`'s right-side
+  toolbar, grouped with the dock-position buttons and a single "Collapse terminal" (X) button —
+  all panel action buttons now live together on the right, tabs on the left.
+- Replaced the old Show/Hide "Collapse"/"Expand" toggle button with one always-collapse X button,
+  rightmost in the toolbar; re-opening a collapsed panel is via Ctrl+` or the App-level "Toggle
+  terminal" header button (both pre-existing), matching VS Code's own panel-close convention.
+- Fixed a real rendering-robustness gap in the terminal content area: per-tab containers now use
+  `position: absolute; inset: 0` inside a `position: relative` content wrapper instead of relying
+  on multi-level flexbox percentage/stretch sizing, and `TerminalView`'s xterm `FitAddon` now
+  performs one extra `fit()` on the next animation frame after mount as a defensive guard against
+  a container measuring 0×0 on its first synchronous fit — both changes target the side-dock
+  case, where the terminal's box comes from a width-oriented flex chain rather than a simple
+  explicit height, and address a user report that the terminal appeared not to render at all when
+  docked left or right.
+- Added `NewTerminalButton.test.tsx` and `DockPositionControl.test.tsx` (previously only
+  exercised indirectly via `TerminalPanel.test.tsx`); updated `TerminalTabStrip.tsx`'s props
+  (dropped `onNewTab`/`creatingNewTab`, no longer its concern) and all four terminal-panel test
+  files accordingly. All UI tests green with per-file coverage gates intact.

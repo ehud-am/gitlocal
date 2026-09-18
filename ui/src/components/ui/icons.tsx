@@ -72,6 +72,41 @@ export function GlobeIcon() {
   )
 }
 
+export function PlusIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M8 2.5v11M2.5 8h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function CloseIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// VS Code-style "panel layout" glyphs: an outer frame with one edge shaded to indicate where
+// the terminal panel would dock, used by DockPositionControl's three position buttons.
+export function DockPositionIcon({ position }: { position: 'bottom' | 'left' | 'right' }) {
+  const shaded =
+    position === 'bottom' ? (
+      <rect x="1.5" y="9.5" width="13" height="4" fill="currentColor" />
+    ) : position === 'left' ? (
+      <rect x="1.5" y="1.5" width="4" height="12" fill="currentColor" />
+    ) : (
+      <rect x="10.5" y="1.5" width="4" height="12" fill="currentColor" />
+    )
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="13" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      {shaded}
+    </svg>
+  )
+}
+
 export function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
   return collapsed ? (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">

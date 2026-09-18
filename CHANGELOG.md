@@ -3,8 +3,8 @@
 ## 0.13.5 - 2026-09-18
 
 - Simplified the integrated terminal panel: removed the "Claude"/"Codex" terminal-tab kind picker — every terminal tab is now a plain shell, and `claude`/`codex` can still be run by typing the command. The corresponding server-side CLI auto-launch and pre-flight-detection behavior was also removed.
-- Added a terminal panel position setting: the panel can now be docked to the bottom, left, or right of the window (previously bottom-only), defaulting to the right; your choice is remembered across restarts and switching position never interrupts a running session.
-- Cleaned up the "open a new terminal" control into a single, consistently labeled action shown the same way whether the panel is empty or already has open tabs, and fixed a labeling bug where closing a tab and opening a new one could reuse an already-used tab number (e.g. two tabs both named "Terminal 2").
+- Added a terminal panel position setting: the panel can now be docked to the bottom, left, or right of the window (previously bottom-only), defaulting to the right, chosen via three icon buttons; your choice is remembered across restarts and switching position never interrupts a running session. Fixed the terminal not rendering at all when docked to the left or right.
+- Redesigned the terminal panel's toolbar to match a standard code-editor layout: tabs on the left, a single "+" icon button to open a new terminal, the dock-position buttons, and one "collapse" (✕) button all grouped on the right — replacing the old text "+ New Terminal" button and the separate Collapse/Expand toggle. Also fixed a labeling bug where closing a tab and opening a new one could reuse an already-used tab number (e.g. two tabs both named "Terminal 2").
 
 ## 0.13.4 - 2026-09-12
 

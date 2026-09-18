@@ -42,6 +42,15 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     terminal.open(container)
     fitAddon.fit()
 
+    // A container mounted mid-layout-pass (e.g. inside a side-docked panel, where the box's
+    // width comes from a sibling flex chain rather than a simple explicit height) can measure
+    // as 0x0 for this first synchronous fit(), leaving the terminal permanently blank until
+    // something else happens to resize it. One extra fit on the next animation frame — after
+    // the browser has definitely finished layout — is a cheap, standard guard against that.
+    const raf = requestAnimationFrame(() => {
+      if (container.clientWidth > 0 && container.clientHeight > 0) fitAddon.fit()
+    })
+
     // Without this, Ctrl+` while the terminal has focus is swallowed by xterm and sent to the
     // shell as literal input instead of toggling the panel (matches VS Code's terminal, where
     // the shortcut works the same whether or not the terminal is focused).
@@ -85,6 +94,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     resizeObserver.observe(container)
 
     return () => {
+      cancelAnimationFrame(raf)
       resizeObserver.disconnect()
       inputDisposable.dispose()
       socket.removeEventListener('open', handleOpen)

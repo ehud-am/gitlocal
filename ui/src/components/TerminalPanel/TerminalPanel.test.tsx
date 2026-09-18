@@ -17,6 +17,10 @@ function setInnerWidth(value: number) {
   Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value })
 }
 
+function toggleShortcut() {
+  fireEvent.keyDown(window, { key: '`', ctrlKey: true })
+}
+
 const runningSession: TerminalSession = {
   id: 'session-1',
   cwd: '/repo',
@@ -194,18 +198,19 @@ describe('TerminalPanel', () => {
     expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument()
   })
 
-  it('toggles the panel between expanded and collapsed', async () => {
+  it('collapses the panel via the rightmost X button, and re-opens via Ctrl+`', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue(runningSession)
 
     render(<Panel />)
     await openTerminal(user)
 
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
-    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
+
+    toggleShortcut()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
   })
 
   it('moves focus into the terminal when a session first opens, so a keyboard/screen-reader user is not stranded', async () => {
@@ -218,7 +223,7 @@ describe('TerminalPanel', () => {
     await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
   })
 
-  it('moves focus into the active terminal again when the panel is re-shown after being hidden', async () => {
+  it('moves focus into the active terminal again when the panel is re-shown after being collapsed', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue(runningSession)
 
@@ -226,14 +231,14 @@ describe('TerminalPanel', () => {
     await openTerminal(user)
     await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
 
-    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
     terminalFocusCalls.length = 0
-    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+    toggleShortcut()
 
     await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
   })
 
-  it('hiding the panel closes no session and keeps output visible on show again (US2)', async () => {
+  it('collapsing the panel closes no session and keeps output visible on show again (US2)', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue(runningSession)
 
@@ -241,9 +246,9 @@ describe('TerminalPanel', () => {
     await openTerminal(user)
     expect(terminalViewMountCount).toBe(1)
 
-    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
 
-    // Hiding must never end the session: no server-side close call, and the
+    // Collapsing must never end the session: no server-side close call, and the
     // TerminalView instance (and its WebSocket) stays mounted rather than being torn down.
     expect(mockCloseSession).not.toHaveBeenCalled()
     expect(terminalViewMountCount).toBe(1)
@@ -251,7 +256,7 @@ describe('TerminalPanel', () => {
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
     expect(screen.getByTestId('fake-terminal-view')).toHaveTextContent('session-1')
 
-    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+    toggleShortcut()
 
     // Same instance reappears with its state intact — output produced while hidden wasn't lost.
     expect(mockCloseSession).not.toHaveBeenCalled()
@@ -268,7 +273,7 @@ describe('TerminalPanel', () => {
     await user.click(screen.getByRole('button', { name: 'New Terminal' }))
     await waitFor(() => expect(screen.getByTestId('fake-terminal-view')).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
 
     await user.click(screen.getByRole('button', { name: 'bump unrelated state' }))
@@ -276,17 +281,15 @@ describe('TerminalPanel', () => {
     await waitFor(() => expect(screen.getByTestId('unrelated-count')).toHaveTextContent('2'))
 
     // Still hidden — an unrelated re-render must not reset visibility.
-    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
 
-    await user.click(screen.getByRole('button', { name: 'Show terminal' }))
+    toggleShortcut()
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
 
     await user.click(screen.getByRole('button', { name: 'bump unrelated state' }))
     await waitFor(() => expect(screen.getByTestId('unrelated-count')).toHaveTextContent('3'))
 
     // Still visible — same guarantee in the other direction.
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
     expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
   })
 
@@ -357,13 +360,13 @@ describe('TerminalPanel', () => {
 
     act(() => ref.current?.toggleTerminal())
     await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
 
     act(() => ref.current?.toggleTerminal())
-    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
 
     act(() => ref.current?.toggleTerminal())
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
   })
 
   it('never forces the collapsed panel below its own content height, and never shrinks below the fold', async () => {
@@ -379,7 +382,7 @@ describe('TerminalPanel', () => {
     const panel = screen.getByTestId('terminal-panel')
     expect(panel).toHaveStyle({ height: 'auto' })
     expect(panel.className).toContain('shrink-0')
-    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Collapse terminal' })).toBeVisible()
   })
 
   it('Ctrl+` opens the first tab when none exist, and toggles visibility once one does (matches VS Code default binding)', async () => {
@@ -387,12 +390,12 @@ describe('TerminalPanel', () => {
 
     render(<Panel />)
 
-    fireEvent.keyDown(window, { key: '`', ctrlKey: true })
+    toggleShortcut()
     await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Hide terminal' })).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
 
-    fireEvent.keyDown(window, { key: '`', ctrlKey: true })
-    expect(screen.getByRole('button', { name: 'Show terminal' })).toBeInTheDocument()
+    toggleShortcut()
+    expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'none' })
   })
 
   it('ignores Ctrl+` variants that do not exactly match the shortcut', () => {
@@ -420,7 +423,7 @@ describe('TerminalPanel', () => {
     expect(handle).toHaveAttribute('aria-orientation', 'horizontal')
     expect(handle).toHaveAttribute('tabindex', '0')
 
-    await user.click(screen.getByRole('button', { name: 'Hide terminal' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
 
     expect(handle).not.toHaveAttribute('role')
     expect(handle).not.toHaveAttribute('aria-orientation')
@@ -508,20 +511,22 @@ describe('TerminalPanel', () => {
   describe('dock position (US2)', () => {
     it('defaults to the "right" position when no preference has been supplied', () => {
       render(<TerminalPanel dockPosition="right" onDockPositionChange={vi.fn()} />)
-      expect(screen.getByLabelText('Terminal panel position')).toHaveValue('right')
+      expect(screen.getByRole('button', { name: 'Dock terminal to right' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByRole('button', { name: 'Dock terminal to left' })).toHaveAttribute('aria-pressed', 'false')
     })
 
-    it('lets the user switch position via the DockPositionControl, in both the empty and open states', async () => {
+    it('lets the user switch position via the dock-position icon buttons, in both the empty and open states', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
 
       render(<Panel dockPosition="right" />)
-      await user.selectOptions(screen.getByLabelText('Terminal panel position'), 'left')
-      expect(screen.getByLabelText('Terminal panel position')).toHaveValue('left')
+      await user.click(screen.getByRole('button', { name: 'Dock terminal to left' }))
+      expect(screen.getByRole('button', { name: 'Dock terminal to left' })).toHaveAttribute('aria-pressed', 'true')
 
       await openTerminal(user)
-      await user.selectOptions(screen.getByLabelText('Terminal panel position'), 'bottom')
-      expect(screen.getByLabelText('Terminal panel position')).toHaveValue('bottom')
+      await user.click(screen.getByRole('button', { name: 'Dock terminal to bottom' }))
+      expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('sizes by width with a vertical (column-resize) handle when docked left or right', async () => {
@@ -545,8 +550,8 @@ describe('TerminalPanel', () => {
       await openTerminal(user)
       expect(terminalViewMountCount).toBe(1)
 
-      await user.selectOptions(screen.getByLabelText('Terminal panel position'), 'left')
-      await user.selectOptions(screen.getByLabelText('Terminal panel position'), 'bottom')
+      await user.click(screen.getByRole('button', { name: 'Dock terminal to left' }))
+      await user.click(screen.getByRole('button', { name: 'Dock terminal to bottom' }))
 
       // Same TerminalView instance throughout — never unmounted/remounted by a position change.
       expect(terminalViewMountCount).toBe(1)
@@ -614,6 +619,35 @@ describe('TerminalPanel', () => {
       fireEvent(window, new Event('resize'))
 
       expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '240px' })
+    })
+
+    it('keeps the resize handle interactive (mousedown-driven resize works) when side-docked', async () => {
+      const user = userEvent.setup()
+      mockCreateSession.mockResolvedValue(runningSession)
+      setInnerWidth(2000)
+
+      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      await openTerminal(user)
+
+      const handle = screen.getByTestId('terminal-panel-resize-handle')
+      expect(handle).toHaveAttribute('role', 'separator')
+      expect(handle).toHaveAttribute('tabindex', '0')
+
+      fireEvent.mouseDown(handle, { clientX: 0 })
+      fireEvent.mouseMove(window, { clientX: 100 })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '520px' })
+      fireEvent.mouseUp(window)
+    })
+
+    it('renders the terminal content area (not display:none) once visible, regardless of dock position', async () => {
+      const user = userEvent.setup()
+      mockCreateSession.mockResolvedValue(runningSession)
+
+      render(<TerminalPanel dockPosition="left" onDockPositionChange={vi.fn()} />)
+      await openTerminal(user)
+
+      expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
+      expect(screen.getByTestId('fake-terminal-view')).toBeVisible()
     })
 
     it('has no accessibility violations when docked left with a tab open', async () => {
