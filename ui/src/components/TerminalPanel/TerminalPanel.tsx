@@ -223,6 +223,25 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   const dockPositionControl = <DockPositionControl value={dockPosition} onChange={onDockPositionChange} />
 
   if (panel.state.tabs.length === 0) {
+    // A side-docked panel with nothing open yet has the same "nothing useful to show" problem
+    // as a collapsed one (see showChrome above) — its invitation bar needs real width to lay
+    // out, so it can't just be a slim strip, and showing it unprompted on first load looked like
+    // an unwanted terminal frame appearing on its own. Hide entirely for side dock UNLESS a
+    // create attempt just failed — an error must stay visible regardless of dock position, so a
+    // failure while side-docked doesn't silently vanish. Opening the first terminal is via
+    // Ctrl+` or the app header's terminal toggle button, both already wired to create-and-show a
+    // tab directly. Bottom dock keeps its existing always-visible invitation bar, which is a
+    // slim horizontal strip and wasn't reported as a problem.
+    if (isSideDock && !error) {
+      return (
+        <div
+          className={`overflow-hidden ${effectiveDockPosition === 'left' ? 'order-first' : ''}`}
+          style={{ width: '0px' }}
+          data-testid="terminal-panel-empty"
+        />
+      )
+    }
+
     const emptyStateBorder =
       effectiveDockPosition === 'bottom' ? 'border-t' : effectiveDockPosition === 'left' ? 'border-r' : 'border-l'
     return (

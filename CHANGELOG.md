@@ -9,6 +9,7 @@
 - Fixed a collapsed left/right-docked terminal panel showing an oddly-placed toolbar instead of fully hiding; it now hides completely when collapsed, matching the bottom-docked panel's behavior of disappearing until reopened (Ctrl+` or the terminal button in the toolbar).
 - Changed the default left/right terminal panel width to a third of the window's width (previously a fixed size), and it now automatically falls back to docking at the bottom on a narrow window, reverting to your chosen side once the window is wide enough again.
 - Added hover tooltips to the terminal panel's toolbar buttons (new terminal, dock position, collapse, close tab, resize handle).
+- Fixed the same left/right terminal panel presentation problem on first launch: if your saved position is left or right, the panel no longer appears on screen until you actually open a terminal (Ctrl+` or the terminal button in the toolbar) — it stays fully hidden rather than showing an empty frame. If opening a terminal fails, the panel still shows the error message.
 
 ## 0.13.4 - 2026-09-12
 

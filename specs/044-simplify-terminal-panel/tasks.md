@@ -409,3 +409,32 @@ Three more issues from user feedback, all pre-release (still `v0.13.5`):
   new cases covering `effectiveDockPosition`: matches on a wide window, falls back on a narrow
   one, never overrides an actual `'bottom'` preference, and reverts once the window widens back
   up). All UI tests green with per-file coverage gates intact.
+
+## Post-Implementation Follow-Up (round 5, pre-release)
+
+Same presentation bug as round 4, but for the *empty* state rather than the *collapsed* state:
+on a fresh session (no tabs yet), the side-dock empty-state "invitation bar" (with its own
+`NewTerminalButton`/`DockPositionControl`) rendered unconditionally regardless of
+`panel.state.visible` — so the moment a user's saved dock position was left/right, that bar
+appeared immediately on first app load with nothing open, looking exactly like the "terminal
+frame" the round-4 fix had just eliminated for the collapsed case.
+
+- `TerminalPanel.tsx`'s `tabs.length === 0` branch: for `isSideDock`, renders the same
+  zero-width/hidden marker as the collapsed case UNLESS an `error` is set (a failed create
+  attempt must stay visible regardless of dock position — that path renders the full invitation
+  bar with the error message, matching bottom dock's existing error handling). Bottom dock's
+  empty state is unchanged (always visible, unaffected by `error`).
+- Opening the very first terminal for a side-docked, empty panel is now only possible via Ctrl+`
+  or the app header's terminal toggle button (both already call `openTerminal()` directly,
+  bypassing the now-hidden button) — the in-panel mouse entry point only reappears once a tab
+  exists (revealing the normal toolbar) or a create attempt fails.
+- Test fallout: every "dock position (US2)" test that opened a first tab via clicking the
+  (now-hidden) "New Terminal" button was updated to use `openTerminal(user, { viaShortcut: true })`
+  (a new option on the shared helper, using Ctrl+`); `TerminalTabStrip.test.tsx`'s `renderPanel()`
+  switched from a side dock to bottom dock, since dock position was incidental to what that file
+  tests. Added three new tests: no terminal frame at all on first load for a side dock, the
+  bottom-dock invitation bar is unaffected, and a failed side-docked create attempt reveals the
+  bar with its error. Also fixed an incidental `App.test.tsx` regression this exposed
+  (`'routes the toggle-terminal native command...'`, which relies on an unmocked `fetch` failure
+  producing a visible error alert to prove the toggle reached the terminal panel) — it now passes
+  again since the error-forces-visible branch applies regardless of dock position.

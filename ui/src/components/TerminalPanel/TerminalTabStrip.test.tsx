@@ -49,10 +49,12 @@ function session(id: string): TerminalSession {
   }
 }
 
+// Bottom dock, not side dock: this file exercises tab independence/switching/closing, which is
+// unrelated to dock position — bottom dock's empty state keeps its "New Terminal" button always
+// visible (a side dock's does not, once no tabs are open — see TerminalPanel.test.tsx's
+// dedicated dock-position coverage), keeping this file's setup simple.
 function renderPanel() {
-  return render(
-    <TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />,
-  )
+  return render(<TerminalPanel dockPosition="bottom" effectiveDockPosition="bottom" onDockPositionChange={vi.fn()} />)
 }
 
 async function openThreeTabs(user: ReturnType<typeof userEvent.setup>) {

@@ -105,8 +105,16 @@ describe('TerminalPanel', () => {
     setInnerWidth(ORIGINAL_INNER_WIDTH)
   })
 
-  async function openTerminal(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'New Terminal' }))
+  // Side-docked panels have no visible "New Terminal" button until a tab already exists (see
+  // TerminalPanel.tsx's isSideDock branch of the empty state), so side-dock tests open the
+  // first terminal the same way a real user would: Ctrl+` or the app header's terminal toggle
+  // button — both call the exact same openTerminal() path as the button does.
+  async function openTerminal(user: ReturnType<typeof userEvent.setup>, { viaShortcut = false } = {}) {
+    if (viaShortcut) {
+      toggleShortcut()
+    } else {
+      await user.click(screen.getByRole('button', { name: 'New Terminal' }))
+    }
     await waitFor(() => expect(screen.getByTestId('terminal-panel')).toBeInTheDocument())
   }
 
@@ -511,8 +519,15 @@ describe('TerminalPanel', () => {
   })
 
   describe('dock position (US2)', () => {
-    it('defaults to the "right" position when no preference has been supplied', () => {
+    it('defaults to the "right" position when no preference has been supplied', async () => {
+      const user = userEvent.setup()
+      mockCreateSession.mockResolvedValue(runningSession)
+
       render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
+      // The dock-position control lives in the panel's toolbar, which (for a side dock with no
+      // tabs open) is hidden until a terminal exists — see the isSideDock empty-state branch.
+      await openTerminal(user, { viaShortcut: true })
+
       expect(screen.getByRole('button', { name: 'Dock terminal to right' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'false')
       expect(screen.getByRole('button', { name: 'Dock terminal to left' })).toHaveAttribute('aria-pressed', 'false')
@@ -522,11 +537,13 @@ describe('TerminalPanel', () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
 
-      render(<Panel dockPosition="right" />)
+      render(<Panel dockPosition="bottom" />)
       await user.click(screen.getByRole('button', { name: 'Dock terminal to left' }))
-      expect(screen.getByRole('button', { name: 'Dock terminal to left' })).toHaveAttribute('aria-pressed', 'true')
+      // Switching to a side dock with no tabs open hides the panel's own chrome entirely
+      // (including this control) — see the isSideDock branch of the empty state.
+      expect(screen.queryByRole('button', { name: 'Dock terminal to left' })).not.toBeInTheDocument()
 
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       await user.click(screen.getByRole('button', { name: 'Dock terminal to bottom' }))
       expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'true')
     })
@@ -537,7 +554,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1260)
 
       render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
 
       const panel = screen.getByTestId('terminal-panel')
       expect(panel).toHaveStyle({ width: '420px' })
@@ -550,7 +567,7 @@ describe('TerminalPanel', () => {
       mockCreateSession.mockResolvedValue(runningSession)
 
       render(<Panel dockPosition="right" />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       expect(terminalViewMountCount).toBe(1)
 
       await user.click(screen.getByRole('button', { name: 'Dock terminal to left' }))
@@ -568,7 +585,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1260)
 
       render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
       fireEvent.mouseDown(handle, { clientX: 300 })
@@ -584,7 +601,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1260)
 
       render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
       fireEvent.mouseDown(handle, { clientX: 400 })
@@ -600,7 +617,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1260)
 
       render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
       fireEvent.keyDown(handle, { key: 'ArrowRight' })
@@ -616,7 +633,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1000)
 
       render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
 
       setInnerWidth(100)
       fireEvent(window, new Event('resize'))
@@ -630,7 +647,7 @@ describe('TerminalPanel', () => {
       setInnerWidth(1260)
 
       render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
 
       const handle = screen.getByTestId('terminal-panel-resize-handle')
       expect(handle).toHaveAttribute('role', 'separator')
@@ -647,7 +664,7 @@ describe('TerminalPanel', () => {
       mockCreateSession.mockResolvedValue(runningSession)
 
       render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
 
       expect(screen.getByTestId('terminal-panel-content')).toHaveStyle({ display: 'block' })
       expect(screen.getByTestId('fake-terminal-view')).toBeVisible()
@@ -658,7 +675,7 @@ describe('TerminalPanel', () => {
       mockCreateSession.mockResolvedValue(runningSession)
 
       render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
       expect(screen.getByRole('button', { name: 'Collapse terminal' })).toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: 'Collapse terminal' }))
@@ -680,9 +697,37 @@ describe('TerminalPanel', () => {
       mockCreateSession.mockResolvedValue(runningSession)
 
       const { container } = render(<TerminalPanel dockPosition="left" effectiveDockPosition="left" onDockPositionChange={vi.fn()} />)
-      await openTerminal(user)
+      await openTerminal(user, { viaShortcut: true })
 
       expect((await axe(container)).violations).toHaveLength(0)
+    })
+
+    it('shows no terminal frame at all on first load when the configured position is a side dock (no tabs, no error)', () => {
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
+
+      const empty = screen.getByTestId('terminal-panel-empty')
+      expect(empty).toHaveStyle({ width: '0px' })
+      expect(screen.queryByRole('button', { name: 'New Terminal' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: 'Terminal panel position' })).not.toBeInTheDocument()
+    })
+
+    it('still shows the invitation bar on first load when the configured position is bottom', () => {
+      render(<TerminalPanel dockPosition="bottom" effectiveDockPosition="bottom" onDockPositionChange={vi.fn()} />)
+
+      expect(screen.getByRole('button', { name: 'New Terminal' })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Terminal panel position' })).toBeInTheDocument()
+    })
+
+    it('reveals the empty-state bar (with an error) if a side-docked create attempt fails before any tab exists', async () => {
+      mockCreateSession.mockRejectedValue({ error: 'pty_unavailable', message: 'No PTY on this platform.' })
+
+      render(<TerminalPanel dockPosition="right" effectiveDockPosition="right" onDockPositionChange={vi.fn()} />)
+      expect(screen.getByTestId('terminal-panel-empty')).toHaveStyle({ width: '0px' })
+
+      toggleShortcut()
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('No PTY on this platform.')
+      expect(screen.getByTestId('terminal-panel-empty')).not.toHaveStyle({ width: '0px' })
     })
   })
 })
