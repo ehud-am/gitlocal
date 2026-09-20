@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="GitLocal — A local, GitHub-style viewer for the AI coding era">
 <meta name="twitter:description" content="GitLocal is a local, GitHub-style viewer for the code your AI agent wrote. Browse, read Markdown, review changes, and hand off to your terminal, without opening a full IDE.">
 <meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
-  
+
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -44,100 +44,31 @@
         "https://github.com/ehud-am/gitlocal",
         "https://www.npmjs.com/package/gitlocal"
       ]
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is GitLocal?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Is GitLocal free?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does GitLocal send my code anywhere?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed git only, and only when you choose to run them."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What operating systems does GitLocal support?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "The npm package runs on macOS, Windows, and Linux with Node.js 22 or later. A native macOS app is also available in beta via Homebrew."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How is GitLocal different from an IDE like VS Code?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits, the tasks people still do by hand when an AI agent generates most of the code, plus an integrated terminal for handing work back to that agent."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do I install GitLocal?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Run npm install -g gitlocal, then gitlocal . in any folder, or npx gitlocal to try it without installing. A macOS app is available via brew install --cask gitlocal after running brew tap ehud-am/gitlocal."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What file types can GitLocal preview?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (.xlsx and .xls), and PowerPoint (.pptx) files — many of which GitHub's web UI cannot render inline and offers only as a raw download."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How can I suggest a feature or contribute?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "GitLocal is built in the open on GitHub. Share ideas and questions in GitHub Discussions, report bugs by opening an issue, or help build it by picking up an issue or proposing a change (see CONTRIBUTING.md in the repository). You do not need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not."
-          }
-        }
-      ]
     }
   ]
 }
 </script>
 </head>
-<body>
+<body data-page="home">
 
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="#top">
+    <a class="brand" href="./">
       <img src="assets/site/logo.svg" alt="" width="32" height="32">
       <span>GitLocal</span>
     </a>
-    <nav class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#install">Install</a>
-      <a href="#community">Community</a>
-      <a href="#faq">FAQ</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="features/">Features</a>
+      <a href="install/">Install</a>
+      <a href="community/">Community</a>
+      <a href="faq/">FAQ</a>
       <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
     </nav>
   </div>
 </header>
 
-<main>
-
+<main id="main">
   <section class="hero" id="top">
     <div class="wrap hero-inner">
       <div class="hero-copy">
@@ -145,8 +76,8 @@
         <h1>Designed for builders.<br><span class="accent">Not just developers.</span></h1>
         <p class="lede">A local, GitHub-style viewer for the code your AI agent wrote. Browse the repo, read Markdown clearly, review what changed, and hand off to a terminal — without opening a full IDE.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="#install">Get started — it's free</a>
-          <a class="btn btn-ghost" href="https://github.com/ehud-am/gitlocal">View on GitHub</a>
+          <a class="btn btn-primary" href="install/">Get started — it's free</a>
+          <a class="btn btn-ghost" href="features/">See what it does</a>
         </div>
         <div class="install-chip">
           <code id="install-cmd">npx gitlocal</code>
@@ -169,36 +100,50 @@
   <section class="features" id="features">
     <div class="wrap">
       <h2 class="section-title center">What GitLocal helps with</h2>
+      <p class="lede center section-lede">Pick a topic to see what it does.</p>
       <div class="feature-grid">
-        <article class="feature-card">
+        <a class="feature-card feature-link" href="features/browse/">
           <h3>Browse like GitHub</h3>
           <p>A lazy-loading, keyboard-navigable file tree for regular folders and git repositories, right on your machine.</p>
-        </article>
-        <article class="feature-card">
-          <h3>Read Markdown clearly</h3>
-          <p>GitHub-like rendering with relative links, heading anchors, find highlights, and share/copy actions. No IDE required.</p>
-        </article>
-        <article class="feature-card">
-          <h3>Review what changed</h3>
-          <p>A changed-files panel for modified, deleted, untracked, generated, and local-only paths, plus active-file refresh notices.</p>
-        </article>
-        <article class="feature-card">
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/search/">
           <h3>Search intentionally</h3>
           <p>Repository-wide search with current-folder and Markdown-focused scopes, plus file-level find inside the current file.</p>
-        </article>
-        <article class="feature-card">
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/markdown/">
+          <h3>Read Markdown clearly</h3>
+          <p>GitHub-like rendering with relative links, heading anchors, find highlights, and share/copy actions. No IDE required.</p>
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/previews/">
+          <h3>Preview beyond code</h3>
+          <p>Built-in viewers for PDF, SVG, CSV, Excel, and PowerPoint files alongside Markdown and images, rendered locally where GitHub's web UI often falls back to a raw download link.</p>
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/review/">
+          <h3>Review what changed</h3>
+          <p>A changed-files panel for modified, deleted, untracked, generated, and local-only paths, plus active-file refresh notices.</p>
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/git-state/">
           <h3>Understand git state</h3>
           <p>A plain-language repository summary — branch, remote, sync, and local changes — backed by technical detail when you need it.</p>
-        </article>
-        <article class="feature-card">
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/edit/">
+          <h3>Make small edits safely</h3>
+          <p>Create, update, and delete files right from the viewer, with warnings before you lose unsaved work and protection against overwriting changes made elsewhere.</p>
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
+        <a class="feature-card feature-link" href="features/terminal/">
           <h3>Hand off to your agent</h3>
-          <p>A built-in terminal docked to the right, left, or bottom of the window, so you can run Claude, Codex, or any command without leaving GitLocal. Sessions persist as you move between pages.</p>
-        </article>
-        <article class="feature-card">
-          <h3>Preview beyond code</h3>
-          <p>Built-in viewers for PDF, SVG, CSV, Excel, and PowerPoint files alongside Markdown and images — growing steadily, and rendered locally where GitHub's web UI often falls back to a raw download link.</p>
-        </article>
+          <p>A built-in terminal docked to the right, left, or bottom of the window, so you can run Claude, Codex, or any command without leaving GitLocal.</p>
+          <span class="card-link">Learn more &rarr;</span>
+        </a>
       </div>
+      <p class="center install-more"><a href="features/">Browse all features &rarr;</a></p>
     </div>
   </section>
 
@@ -238,7 +183,7 @@
           <p class="install-note">No terminal needed after install. This beta build is unsigned, so run the command above once — without it, Gatekeeper blocks the app from opening at all.</p>
         </article>
       </div>
-      <p class="center install-more">Full setup and troubleshooting notes are in the <a href="https://github.com/ehud-am/gitlocal#readme">README</a>.</p>
+      <p class="center install-more">Requirements, upgrade steps, and troubleshooting are in the <a href="install/">full install guide</a>.</p>
     </div>
   </section>
 
@@ -263,65 +208,54 @@
           <a class="card-link" href="https://github.com/ehud-am/gitlocal/blob/main/CONTRIBUTING.md">How to contribute &rarr;</a>
         </article>
       </div>
-      <p class="center install-more">Taking part happens on GitHub and needs a free GitHub account. GitLocal itself still has no accounts and no telemetry.</p>
+      <p class="center install-more">Taking part happens on GitHub and needs a free GitHub account. GitLocal itself still has no accounts and no telemetry. <a href="community/">More ways to take part &rarr;</a></p>
     </div>
   </section>
 
-  <section class="faq" id="faq">
-    <div class="wrap">
-      <h2 class="section-title center">Frequently asked questions</h2>
-      <div class="faq-list">
-        <article class="faq-item">
-          <h3>What is GitLocal?</h3>
-          <p>GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Is GitLocal free?</h3>
-          <p>Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Does GitLocal send my code anywhere?</h3>
-          <p>No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed <code>git</code> only, and only when you choose to run them.</p>
-        </article>
-        <article class="faq-item">
-          <h3>What operating systems does GitLocal support?</h3>
-          <p>The npm package runs on macOS, Windows, and Linux with Node.js 22+. A native macOS app is also available in beta via Homebrew.</p>
-        </article>
-        <article class="faq-item">
-          <h3>How is GitLocal different from an IDE like VS Code?</h3>
-          <p>GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits — the tasks people still do by hand when an AI agent generates most of the code — plus an integrated terminal for handing work back to that agent.</p>
-        </article>
-        <article class="faq-item">
-          <h3>How do I install GitLocal?</h3>
-          <p>Run <code>npm install -g gitlocal</code>, then <code>gitlocal .</code> in any folder, or <code>npx gitlocal</code> to try it without installing. A macOS app is available via <code>brew install --cask gitlocal</code> after <code>brew tap ehud-am/gitlocal</code>.</p>
-        </article>
-        <article class="faq-item">
-          <h3>What file types can GitLocal preview?</h3>
-          <p>GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (<code>.xlsx</code> and <code>.xls</code>), and PowerPoint (<code>.pptx</code>) files — many of which GitHub's web UI cannot render inline and offers only as a raw download.</p>
-        </article>
-        <article class="faq-item">
-          <h3>How can I suggest a feature or contribute?</h3>
-          <p>GitLocal is built in the open on GitHub. Share ideas and questions in <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>, report bugs by <a href="https://github.com/ehud-am/gitlocal/issues/new/choose">opening an issue</a>, or help build it by picking up an issue or proposing a change &mdash; see <a href="https://github.com/ehud-am/gitlocal/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>. You don't need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not.</p>
-        </article>
-      </div>
+  <section class="faq-teaser">
+    <div class="wrap center">
+      <h2 class="section-title">Questions?</h2>
+      <p class="lede center">Is it free, does it send my code anywhere, what can it preview? <a href="faq/">Read the FAQ &rarr;</a></p>
     </div>
   </section>
-
 </main>
 
 <footer class="site-footer">
-  <div class="wrap footer-inner">
-    <div class="brand">
-      <img src="assets/site/logo.svg" alt="" width="24" height="24">
-      <span>GitLocal</span>
-    </div>
-    <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
-    <div class="footer-links">
-      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
-      <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
-      <a href="https://www.npmjs.com/package/gitlocal">npm</a>
-      <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
-      <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="./">
+          <img src="assets/site/logo.svg" alt="" width="24" height="24">
+          <span>GitLocal</span>
+        </a>
+        <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="features/">Features</a>
+        <a href="install/">Install</a>
+        <a href="community/">Community</a>
+        <a href="faq/">FAQ</a>
+      </nav>
+      <nav class="footer-col" aria-label="Features">
+        <h2>Features</h2>
+        <a href="features/browse/">Browse like GitHub</a>
+        <a href="features/search/">Search intentionally</a>
+        <a href="features/markdown/">Read Markdown clearly</a>
+        <a href="features/previews/">Preview beyond code</a>
+        <a href="features/review/">Review what changed</a>
+        <a href="features/git-state/">Understand git state</a>
+        <a href="features/edit/">Make small edits safely</a>
+        <a href="features/terminal/">Hand off to your agent</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+        <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
+        <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+      </nav>
     </div>
   </div>
 </footer>

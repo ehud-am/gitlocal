@@ -15,3 +15,8 @@ document.querySelectorAll(".copy-btn").forEach((btn) => {
     }, 1500);
   });
 });
+
+// The FAQ used to be a section of the home page. Keep old /#faq links working.
+if (document.body.dataset.page === "home" && location.hash === "#faq") {
+  location.replace("faq/");
+}
