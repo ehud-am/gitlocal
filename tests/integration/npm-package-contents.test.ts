@@ -31,6 +31,8 @@ describe('npm package contents', () => {
     expect(npmReadme).toContain('npx gitlocal')
     expect(npmReadme).toContain('https://github.com/ehud-am/gitlocal#readme')
     expect(npmReadme).not.toContain('brew install --cask gitlocal')
+    expect(npmReadme).toContain('https://github.com/ehud-am/gitlocal/discussions')
+    expect(npmReadme).toContain('https://github.com/ehud-am/gitlocal/issues/new/choose')
   })
 
   it('keeps the GitHub README branded and explicit about unsigned macOS beta builds', () => {

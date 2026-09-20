@@ -1,0 +1,42 @@
+name: Something isn't working
+description: GitLocal did something unexpected, broke, or showed the wrong thing.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. You don't need to be technical. Tell us what you saw in your own words. A screenshot helps a lot.
+        Please don't include private code or files. If needed, reproduce it with a small sample folder.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did you see instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run GitLocal?
+      options:
+        - npm package (in a browser)
+        - macOS app (Homebrew)
+        - From source
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GitLocal version
+      description: Shown in the footer at the bottom of the GitLocal window (for example v0.13.5). Leave blank if you're not sure.
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. macOS 15, Windows 11, Ubuntu 24.04
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, the type of file you were looking at, or the steps to make it happen again.

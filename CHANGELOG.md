@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.6 - 2026-09-20
+
+- Opened GitLocal up to community participation. GitHub Discussions is now on (Ideas, Q&A, Show and tell, Announcements), and issues use plain-language forms for bug reports and improvement suggestions, with open-ended ideas routed to Discussions. Added a pull request template and a `SECURITY.md` with private vulnerability reporting.
+- Added a "Help Shape GitLocal" section and Discussions badge to both the GitHub README and the separate concise README that is published as the npm listing (`packaging/npm/README.md`, now guarded by a test), a "Built in the open" section, nav link, footer link, and FAQ entry to gitlocal.dev (including its structured data and `llms.txt`), and a "Ways to Take Part" section to `CONTRIBUTING.md` that lays out non-code ways to contribute before the code-change rules.
+- Corrected outdated terminal-panel wording in the README, website, and `llms.txt`, which still described a bottom-only panel with Claude/Codex tab kinds (changed in 0.13.5).
+
 ## 0.13.5 - 2026-09-18
 
 - Simplified the integrated terminal panel: removed the "Claude"/"Codex" terminal-tab kind picker — every terminal tab is now a plain shell, and `claude`/`codex` can still be run by typing the command. The corresponding server-side CLI auto-launch and pre-flight-detection behavior was also removed.

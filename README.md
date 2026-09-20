@@ -9,10 +9,13 @@
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
 [![Website](https://img.shields.io/badge/website-gitlocal.dev-34d67a)](https://gitlocal.dev)
+[![Discussions](https://img.shields.io/badge/discussions-join%20in-8957e5)](https://github.com/ehud-am/gitlocal/discussions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
 **Website:** [gitlocal.dev](https://gitlocal.dev) — screenshots, feature overview, and one-line install.
+
+**Community:** got an idea, a question, or a rough edge? [Start a discussion](https://github.com/ehud-am/gitlocal/discussions) or [open an issue](https://github.com/ehud-am/gitlocal/issues/new/choose). GitLocal is built in the open, and [your input shapes it](#help-shape-gitlocal).
 
 When AI agents do most of the code generation, direct hand-editing of source files becomes the exception rather than the default. A full IDE can be overkill for that. GitLocal focuses on the work humans still need to do constantly: browse the codebase, understand structure, read Markdown documents clearly, inspect changes, and make small edits when needed. Editing remains possible, but the product is optimized first for navigation, reading, review, and lightweight intervention — plus an integrated terminal for when you need to hand something back to an agent.
 
@@ -125,11 +128,24 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 - **Manage folders** by creating child folders or deleting subfolders with typed confirmation and impact counts.
 - **Switch branches safely** with commit or discard confirmation when the working tree is dirty.
 - **Manage local git identity** by saving repo-local `user.name`, `user.email`, and optional SSH key settings.
-- **Use an integrated terminal** docked at the bottom of the window, discoverable via a header button or the `Ctrl+\`` shortcut (matching VS Code), with drag/keyboard-resizable height and cross-page session persistence.
+- **Use an integrated terminal** docked to the right, left, or bottom of the window (your choice is remembered), discoverable via a header button or the `Ctrl+\`` shortcut (matching VS Code), with drag/keyboard-resizable size and cross-page session persistence. Every tab is a plain shell, so run `claude`, `codex`, or anything else you like.
 - **Share rendered Markdown** through print, Save as PDF, local email/share flows, copy, and download fallbacks.
 - **Stay local-first** because browsing, editing, and git actions run against your local filesystem and installed `git`; there are no accounts or telemetry.
 
 GitLocal supports light and dark themes. The macOS app also supports native menu and keyboard shortcuts for standard editing commands, preview-scoped Find, panel-scoped Select All, and Refresh.
+
+---
+
+## Help Shape GitLocal
+
+GitLocal is built in the open for people working with AI coding tools, and it gets better when those people tell us what they need. You don't have to write code to take part:
+
+- **Share an idea or a wish** in [Discussions → Ideas](https://github.com/ehud-am/gitlocal/discussions/categories/ideas). Describe the job you're trying to get done, and we'll figure out the rest together.
+- **Ask a question or show how you use it** in [Q&A](https://github.com/ehud-am/gitlocal/discussions/categories/q-a) and [Show and tell](https://github.com/ehud-am/gitlocal/discussions/categories/show-and-tell).
+- **Report a bug** by [opening an issue](https://github.com/ehud-am/gitlocal/issues/new/choose). Plain language and a screenshot are plenty.
+- **Build something.** Browse [`help wanted`](https://github.com/ehud-am/gitlocal/labels/help%20wanted) and [`good first issue`](https://github.com/ehud-am/gitlocal/labels/good%20first%20issue) issues. Using an AI coding tool to write your change is welcome.
+
+Taking part happens on GitHub and needs a free GitHub account. GitLocal itself still has no accounts and no telemetry. See [CONTRIBUTING.md](CONTRIBUTING.md) for the details.
 
 ---
 
@@ -362,4 +378,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Contributing
 
-Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md). This project follows the [GitLocal constitution](.specify/memory/constitution.md) — all changes must maintain ≥90% branch coverage per file.
+Ideas, questions, bug reports, and pull requests are all welcome. See [Help Shape GitLocal](#help-shape-gitlocal) for where to start, and [CONTRIBUTING.md](CONTRIBUTING.md) for how to make a code change. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report security problems privately per [SECURITY.md](SECURITY.md). Code changes follow the [GitLocal constitution](.specify/memory/constitution.md), including ≥90% branch coverage per file, which CI checks for you.
