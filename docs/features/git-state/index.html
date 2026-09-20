@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understand git state in plain language — GitLocal</title>
+<meta name="description" content="A plain-language summary of your branch, remote, sync, and local changes, plus safe branch switching and repo-local git identity.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://gitlocal.dev/features/git-state/">
+<link rel="icon" type="image/svg+xml" href="../../assets/site/logo.svg">
+<link rel="stylesheet" href="../../styles.css">
+<script async src="/vizoalica-loader.js"></script>
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gitlocal.dev/features/git-state/">
+<meta property="og:site_name" content="GitLocal">
+<meta property="og:title" content="Understand git state in plain language — GitLocal">
+<meta property="og:description" content="A plain-language summary of your branch, remote, sync, and local changes, plus safe branch switching and repo-local git identity.">
+<meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Understand git state in plain language — GitLocal">
+<meta name="twitter:description" content="A plain-language summary of your branch, remote, sync, and local changes, plus safe branch switching and repo-local git identity.">
+<meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://gitlocal.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Features",
+          "item": "https://gitlocal.dev/features/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Understand git state",
+          "item": "https://gitlocal.dev/features/git-state/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../../">
+      <img src="../../assets/site/logo.svg" alt="" width="32" height="32">
+      <span>GitLocal</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="../../features/" aria-current="page">Features</a>
+      <a href="../../install/">Install</a>
+      <a href="../../community/">Community</a>
+      <a href="../../faq/">FAQ</a>
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="topic">
+    <div class="wrap topic-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../">Home</a></li><li><a href="../">Features</a></li><li aria-current="page">Understand git state</li></ol></nav>
+      <p class="eyebrow">SEE WHAT CHANGED</p>
+      <h1>Understand git state in plain language</h1>
+      <p class="lede">You should not need to remember what a detached HEAD is to know whether your work is safe. GitLocal explains where things stand in plain words, with the technical detail one click away.</p>
+      <h2>What you get</h2>
+      <ul class="topic-list">
+        <li><strong>A plain-language summary.</strong> Your branch, its remote, whether you are in sync, and what has changed locally.</li>
+        <li><strong>Technical badges when you want them.</strong> The same information as compact git status badges.</li>
+        <li><strong>Switch branches safely.</strong> If you have uncommitted work, GitLocal asks whether to commit or discard it first, instead of surprising you.</li>
+        <li><strong>Local git identity.</strong> Save a repo-local <code>user.name</code>, <code>user.email</code>, and an optional SSH key setting.</li>
+        <li><strong>You stay in control of git.</strong> Clone, fetch, pull, and push go through your installed <code>git</code>, and only when you choose to run them.</li>
+      </ul>
+      <section class="try-it" aria-labelledby="try-it-title">
+        <h2 id="try-it-title">Try it in one command</h2>
+        <div class="install-chip">
+          <code>npx gitlocal</code>
+          <button type="button" class="copy-btn" data-copy="npx gitlocal" aria-label="Copy npx command">Copy</button>
+        </div>
+        <p class="install-note">Needs Node.js 22+. <a href="../../install/">Full install guide, including the macOS app &rarr;</a></p>
+      </section>
+      <nav class="pager" aria-label="More features">
+        <a class="pager-link" href="../../features/review/" rel="prev"><span>&larr; Previous</span><strong>Review what changed</strong></a>
+        <a class="pager-link next" href="../../features/edit/" rel="next"><span>Next &rarr;</span><strong>Make small edits safely</strong></a>
+      </nav>
+    </div>
+  </article>
+
+  <section class="related">
+    <div class="wrap">
+      <h2 class="section-title">Related</h2>
+      <div class="feature-grid">
+        <a class="feature-card feature-link" href="../review/"><h3>Review what changed</h3><p>A changed-files panel for modified, deleted, untracked, generated, and local-only paths, plus active-file refresh notices.</p></a>
+        <a class="feature-card feature-link" href="../edit/"><h3>Make small edits safely</h3><p>Create, update, and delete files right from the viewer, with warnings before you lose unsaved work and protection against overwriting changes made elsewhere.</p></a>
+        <a class="feature-card feature-link" href="../terminal/"><h3>Hand off to your agent</h3><p>A built-in terminal docked to the right, left, or bottom of the window, so you can run Claude, Codex, or any command without leaving GitLocal.</p></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="../../">
+          <img src="../../assets/site/logo.svg" alt="" width="24" height="24">
+          <span>GitLocal</span>
+        </a>
+        <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="../../features/">Features</a>
+        <a href="../../install/">Install</a>
+        <a href="../../community/">Community</a>
+        <a href="../../faq/">FAQ</a>
+      </nav>
+      <nav class="footer-col" aria-label="Features">
+        <h2>Features</h2>
+        <a href="../../features/browse/">Browse like GitHub</a>
+        <a href="../../features/search/">Search intentionally</a>
+        <a href="../../features/markdown/">Read Markdown clearly</a>
+        <a href="../../features/previews/">Preview beyond code</a>
+        <a href="../../features/review/">Review what changed</a>
+        <a href="../../features/git-state/">Understand git state</a>
+        <a href="../../features/edit/">Make small edits safely</a>
+        <a href="../../features/terminal/">Hand off to your agent</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+        <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
+        <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="../../script.js"></script>
+</body>
+</html>

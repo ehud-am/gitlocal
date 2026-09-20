@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ — GitLocal</title>
+<meta name="description" content="Answers about what GitLocal is, whether it is free and private, supported systems, installation, and previewable file types.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://gitlocal.dev/faq/">
+<link rel="icon" type="image/svg+xml" href="../assets/site/logo.svg">
+<link rel="stylesheet" href="../styles.css">
+<script async src="/vizoalica-loader.js"></script>
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gitlocal.dev/faq/">
+<meta property="og:site_name" content="GitLocal">
+<meta property="og:title" content="FAQ — GitLocal">
+<meta property="og:description" content="Answers about what GitLocal is, whether it is free and private, supported systems, installation, and previewable file types.">
+<meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FAQ — GitLocal">
+<meta name="twitter:description" content="Answers about what GitLocal is, whether it is free and private, supported systems, installation, and previewable file types.">
+<meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://gitlocal.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "FAQ",
+          "item": "https://gitlocal.dev/faq/"
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is GitLocal?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is GitLocal free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does GitLocal send my code anywhere?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed git only, and only when you choose to run them."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What operating systems does GitLocal support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The npm package runs on macOS, Windows, and Linux with Node.js 22+. A native macOS app is also available in beta via Homebrew."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is GitLocal different from an IDE like VS Code?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits — the tasks people still do by hand when an AI agent generates most of the code — plus an integrated terminal for handing work back to that agent."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I install GitLocal?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Run npm install -g gitlocal, then gitlocal . in any folder, or npx gitlocal to try it without installing. A macOS app is available via brew install --cask gitlocal after brew tap ehud-am/gitlocal."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What file types can GitLocal preview?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (.xlsx and .xls), and PowerPoint (.pptx) files — many of which GitHub's web UI cannot render inline and offers only as a raw download."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How can I suggest a feature or contribute?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is built in the open on GitHub. Share ideas and questions in Discussions, report bugs by opening an issue, or help build it by picking up an issue or proposing a change — see CONTRIBUTING.md. You don't need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../">
+      <img src="../assets/site/logo.svg" alt="" width="32" height="32">
+      <span>GitLocal</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="../features/">Features</a>
+      <a href="../install/">Install</a>
+      <a href="../community/">Community</a>
+      <a href="../faq/" aria-current="page">FAQ</a>
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../">Home</a></li><li aria-current="page">FAQ</li></ol></nav>
+      <p class="eyebrow">FAQ</p>
+      <h1>Frequently asked questions</h1>
+      <p class="lede">Quick answers about what GitLocal is, what it does with your files, and how to get it.</p>
+    </div>
+  </section>
+
+  <section class="faq faq-page">
+    <div class="wrap">
+      <div class="faq-list">
+        <article class="faq-item">
+          <h3>What is GitLocal?</h3>
+          <p>GitLocal is a free, local-first tool that opens a GitHub-style viewer for any folder or git repository on your computer. It renders Markdown, browses the file tree, and shows what changed, right in your browser, with no IDE required.</p>
+        </article>
+        <article class="faq-item">
+          <h3>Is GitLocal free?</h3>
+          <p>Yes. GitLocal is free and open source under the MIT license. There are no accounts, subscriptions, or telemetry.</p>
+        </article>
+        <article class="faq-item">
+          <h3>Does GitLocal send my code anywhere?</h3>
+          <p>No. GitLocal runs entirely on your machine. Clone, fetch, pull, and push actions go through your locally installed <code>git</code> only, and only when you choose to run them.</p>
+        </article>
+        <article class="faq-item">
+          <h3>What operating systems does GitLocal support?</h3>
+          <p>The npm package runs on macOS, Windows, and Linux with Node.js 22+. A native macOS app is also available in beta via Homebrew.</p>
+          <p class="faq-more"><a href="../install/">Install guide &rarr;</a></p>
+        </article>
+        <article class="faq-item">
+          <h3>How is GitLocal different from an IDE like VS Code?</h3>
+          <p>GitLocal is intentionally narrower than a full IDE. It focuses on reading, browsing, reviewing, and lightweight edits — the tasks people still do by hand when an AI agent generates most of the code — plus an integrated terminal for handing work back to that agent.</p>
+          <p class="faq-more"><a href="../features/">See all features &rarr;</a></p>
+        </article>
+        <article class="faq-item">
+          <h3>How do I install GitLocal?</h3>
+          <p>Run <code>npm install -g gitlocal</code>, then <code>gitlocal .</code> in any folder, or <code>npx gitlocal</code> to try it without installing. A macOS app is available via <code>brew install --cask gitlocal</code> after <code>brew tap ehud-am/gitlocal</code>.</p>
+          <p class="faq-more"><a href="../install/">Full install guide &rarr;</a></p>
+        </article>
+        <article class="faq-item">
+          <h3>What file types can GitLocal preview?</h3>
+          <p>GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (<code>.xlsx</code> and <code>.xls</code>), and PowerPoint (<code>.pptx</code>) files — many of which GitHub's web UI cannot render inline and offers only as a raw download.</p>
+          <p class="faq-more"><a href="../features/previews/">About file previews &rarr;</a></p>
+        </article>
+        <article class="faq-item">
+          <h3>How can I suggest a feature or contribute?</h3>
+          <p>GitLocal is built in the open on GitHub. Share ideas and questions in <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>, report bugs by <a href="https://github.com/ehud-am/gitlocal/issues/new/choose">opening an issue</a>, or help build it by picking up an issue or proposing a change &mdash; see <a href="https://github.com/ehud-am/gitlocal/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>. You don't need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not.</p>
+          <p class="faq-more"><a href="../community/">More ways to take part &rarr;</a></p>
+        </article>
+      </div>
+      <p class="center install-more">Something missing? Ask in <a href="https://github.com/ehud-am/gitlocal/discussions/categories/q-a">Q&amp;A</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="../">
+          <img src="../assets/site/logo.svg" alt="" width="24" height="24">
+          <span>GitLocal</span>
+        </a>
+        <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="../features/">Features</a>
+        <a href="../install/">Install</a>
+        <a href="../community/">Community</a>
+        <a href="../faq/">FAQ</a>
+      </nav>
+      <nav class="footer-col" aria-label="Features">
+        <h2>Features</h2>
+        <a href="../features/browse/">Browse like GitHub</a>
+        <a href="../features/search/">Search intentionally</a>
+        <a href="../features/markdown/">Read Markdown clearly</a>
+        <a href="../features/previews/">Preview beyond code</a>
+        <a href="../features/review/">Review what changed</a>
+        <a href="../features/git-state/">Understand git state</a>
+        <a href="../features/edit/">Make small edits safely</a>
+        <a href="../features/terminal/">Hand off to your agent</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+        <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
+        <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="../script.js"></script>
+</body>
+</html>

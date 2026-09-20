@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install GitLocal — npm or macOS app</title>
+<meta name="description" content="Install GitLocal with npm on macOS, Windows, or Linux, or as a native macOS app via Homebrew. Requirements, steps, upgrade, and uninstall.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://gitlocal.dev/install/">
+<link rel="icon" type="image/svg+xml" href="../assets/site/logo.svg">
+<link rel="stylesheet" href="../styles.css">
+<script async src="/vizoalica-loader.js"></script>
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gitlocal.dev/install/">
+<meta property="og:site_name" content="GitLocal">
+<meta property="og:title" content="Install GitLocal — npm or macOS app">
+<meta property="og:description" content="Install GitLocal with npm on macOS, Windows, or Linux, or as a native macOS app via Homebrew. Requirements, steps, upgrade, and uninstall.">
+<meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Install GitLocal — npm or macOS app">
+<meta name="twitter:description" content="Install GitLocal with npm on macOS, Windows, or Linux, or as a native macOS app via Homebrew. Requirements, steps, upgrade, and uninstall.">
+<meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://gitlocal.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Install",
+          "item": "https://gitlocal.dev/install/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../">
+      <img src="../assets/site/logo.svg" alt="" width="32" height="32">
+      <span>GitLocal</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="../features/">Features</a>
+      <a href="../install/" aria-current="page">Install</a>
+      <a href="../community/">Community</a>
+      <a href="../faq/">FAQ</a>
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../">Home</a></li><li aria-current="page">Install</li></ol></nav>
+      <p class="eyebrow">INSTALL</p>
+      <h1>Install GitLocal</h1>
+      <p class="lede">Choose the npm package for any OS, or the native macOS app if you'd rather skip the terminal. Both run the same GitLocal server and viewer. The Mac app is a native wrapper around the same code, not a separate fork.</p>
+    </div>
+  </section>
+
+  <section class="install install-page">
+    <div class="wrap">
+      <div class="install-grid">
+        <article class="install-card">
+          <h3>npm package</h3>
+          <p class="install-meta">macOS, Windows, Linux &middot; Node.js 22+</p>
+          <div class="code-block">
+            <code>npm install -g gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="npm install -g gitlocal" aria-label="Copy npm install command">Copy</button>
+          </div>
+          <div class="code-block">
+            <code>gitlocal .</code>
+            <button type="button" class="copy-btn" data-copy="gitlocal ." aria-label="Copy gitlocal run command">Copy</button>
+          </div>
+          <p class="install-note">Opens in your default browser. Keep the terminal window open while you use it.</p>
+        </article>
+        <article class="install-card">
+          <h3>macOS app <span class="badge">beta</span></h3>
+          <p class="install-meta">Native GitLocal.app via Homebrew</p>
+          <div class="code-block">
+            <code>brew tap ehud-am/gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="brew tap ehud-am/gitlocal" aria-label="Copy brew tap command">Copy</button>
+          </div>
+          <div class="code-block">
+            <code>brew install --cask gitlocal</code>
+            <button type="button" class="copy-btn" data-copy="brew install --cask gitlocal" aria-label="Copy brew install command">Copy</button>
+          </div>
+          <div class="code-block">
+            <code>xattr -dr com.apple.quarantine /Applications/GitLocal.app</code>
+            <button type="button" class="copy-btn" data-copy="xattr -dr com.apple.quarantine /Applications/GitLocal.app" aria-label="Copy xattr command">Copy</button>
+          </div>
+          <p class="install-note">No terminal needed after install. This beta build is unsigned, so run the command above once — without it, Gatekeeper blocks the app from opening at all.</p>
+        </article>
+      </div>
+
+      <div class="prose">
+        <h2>Requirements</h2>
+        <table class="req-table">
+          <thead><tr><th scope="col">Dependency</th><th scope="col">npm package</th><th scope="col">macOS app</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Node.js</th><td>22+</td><td>Bundled in the app</td></tr>
+            <tr><th scope="row">git</th><td>2.22+</td><td>2.22+</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Which one should I use?</h2>
+        <p>Use the <strong>npm package</strong> if you want the most mature and portable install path, especially on Windows or Linux. It opens in your default browser and needs its terminal window to stay open while you use it. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> there to stop it.</p>
+        <p>Use the <strong>macOS app beta</strong> if you are on a Mac and want a normal app experience without a running terminal. It is aligned with the npm version, but the one-time <code>xattr</code> step is required until the app is signed and notarized.</p>
+
+        <h2>Using the npm package</h2>
+        <p>Install it, then open a folder or repository:</p>
+        <div class="code-block"><code>gitlocal .</code><button type="button" class="copy-btn" data-copy="gitlocal ." aria-label="Copy gitlocal run command">Copy</button></div>
+        <p>Pass any path to open a different folder, or run <code>gitlocal</code> with no argument to reopen the last one you used. GitLocal starts a local server, opens your browser, and prints its address. To try it without installing anything, run <code>npx gitlocal</code>.</p>
+
+        <h2>Using the macOS app</h2>
+        <p>After the Homebrew install, run the <code>xattr</code> command once, then open <code>GitLocal.app</code> from your Applications folder. The app starts the same local service in the background for the session and stops it when you quit, so you never need a terminal.</p>
+        <p><strong>Why the extra command?</strong> The current Mac app is not signed or notarized with an Apple Developer ID, so without it macOS Gatekeeper blocks the app from opening at all. This is not just a dismissible warning. Future signed releases should remove the step.</p>
+        <p>On first launch the app asks before setting GitLocal as your default Markdown reader. If you accept, double-clicking <code>.md</code> and <code>.markdown</code> files in Finder opens them in GitLocal. If you decline, nothing changes, and you can choose <strong>GitLocal &gt; Set as Default Markdown Reader</strong> later.</p>
+
+        <h2>Upgrade and uninstall</h2>
+        <div class="code-block"><code>npm install -g gitlocal@latest</code><button type="button" class="copy-btn" data-copy="npm install -g gitlocal@latest" aria-label="Copy npm upgrade command">Copy</button></div>
+        <div class="code-block"><code>brew update &amp;&amp; brew upgrade --cask gitlocal</code><button type="button" class="copy-btn" data-copy="brew update &amp;&amp; brew upgrade --cask gitlocal" aria-label="Copy brew upgrade command">Copy</button></div>
+        <div class="code-block"><code>brew uninstall --cask gitlocal</code><button type="button" class="copy-btn" data-copy="brew uninstall --cask gitlocal" aria-label="Copy brew uninstall command">Copy</button></div>
+        <p>To remove the npm package, run <code>npm uninstall -g gitlocal</code>.</p>
+
+        <h2>Need help?</h2>
+        <p>Troubleshooting notes for Homebrew are in the <a href="https://github.com/ehud-am/gitlocal#homebrew-troubleshooting">README</a>. For anything else, ask in <a href="https://github.com/ehud-am/gitlocal/discussions/categories/q-a">Q&amp;A</a> or <a href="https://github.com/ehud-am/gitlocal/issues/new/choose">open an issue</a>.</p>
+      </div>
+
+      <div class="cta-band">
+        <h2>Not sure it's for you yet?</h2>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="../features/">See what it does</a>
+          <a class="btn btn-ghost" href="../faq/">Read the FAQ</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="../">
+          <img src="../assets/site/logo.svg" alt="" width="24" height="24">
+          <span>GitLocal</span>
+        </a>
+        <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="../features/">Features</a>
+        <a href="../install/">Install</a>
+        <a href="../community/">Community</a>
+        <a href="../faq/">FAQ</a>
+      </nav>
+      <nav class="footer-col" aria-label="Features">
+        <h2>Features</h2>
+        <a href="../features/browse/">Browse like GitHub</a>
+        <a href="../features/search/">Search intentionally</a>
+        <a href="../features/markdown/">Read Markdown clearly</a>
+        <a href="../features/previews/">Preview beyond code</a>
+        <a href="../features/review/">Review what changed</a>
+        <a href="../features/git-state/">Understand git state</a>
+        <a href="../features/edit/">Make small edits safely</a>
+        <a href="../features/terminal/">Hand off to your agent</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+        <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
+        <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="../script.js"></script>
+</body>
+</html>

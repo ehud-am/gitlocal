@@ -6,6 +6,12 @@ GitLocal runs entirely on the user's machine, with no accounts or telemetry. Clo
 
 Core features: a lazy-loading keyboard-navigable file tree, GitHub-like Markdown rendering with relative links and heading anchors, a changed-files review panel, repository-wide search, a plain-language git status summary, safe local file/folder editing with revision-token conflict protection, and an integrated terminal docked to the right, left, or bottom of the window (plain shell tabs) for handing work back to an AI coding agent.
 
+## Site
+- [Features](https://gitlocal.dev/features/): Overview of everything GitLocal does, with a page for each topic: [browse](https://gitlocal.dev/features/browse/), [search](https://gitlocal.dev/features/search/), [Markdown](https://gitlocal.dev/features/markdown/), [file previews](https://gitlocal.dev/features/previews/), [review changes](https://gitlocal.dev/features/review/), [git state](https://gitlocal.dev/features/git-state/), [safe edits](https://gitlocal.dev/features/edit/), [terminal](https://gitlocal.dev/features/terminal/)
+- [Install](https://gitlocal.dev/install/): npm and macOS app install steps, requirements, upgrade, and uninstall
+- [Community](https://gitlocal.dev/community/): Ways to take part
+- [FAQ](https://gitlocal.dev/faq/): Common questions
+
 ## Docs
 - [README](https://github.com/ehud-am/gitlocal#readme): Full documentation, architecture, and API reference
 - [npm package](https://www.npmjs.com/package/gitlocal): Install instructions and release history

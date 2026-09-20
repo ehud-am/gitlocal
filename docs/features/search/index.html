@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search your repository — GitLocal</title>
+<meta name="description" content="Repository-wide search with current-folder and Markdown-focused scopes, plus find inside the file you are reading.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://gitlocal.dev/features/search/">
+<link rel="icon" type="image/svg+xml" href="../../assets/site/logo.svg">
+<link rel="stylesheet" href="../../styles.css">
+<script async src="/vizoalica-loader.js"></script>
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gitlocal.dev/features/search/">
+<meta property="og:site_name" content="GitLocal">
+<meta property="og:title" content="Search your repository — GitLocal">
+<meta property="og:description" content="Repository-wide search with current-folder and Markdown-focused scopes, plus find inside the file you are reading.">
+<meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Search your repository — GitLocal">
+<meta name="twitter:description" content="Repository-wide search with current-folder and Markdown-focused scopes, plus find inside the file you are reading.">
+<meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://gitlocal.dev/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Features",
+          "item": "https://gitlocal.dev/features/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Search intentionally",
+          "item": "https://gitlocal.dev/features/search/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../../">
+      <img src="../../assets/site/logo.svg" alt="" width="32" height="32">
+      <span>GitLocal</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="../../features/" aria-current="page">Features</a>
+      <a href="../../install/">Install</a>
+      <a href="../../community/">Community</a>
+      <a href="../../faq/">FAQ</a>
+      <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="topic">
+    <div class="wrap topic-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../">Home</a></li><li><a href="../">Features</a></li><li aria-current="page">Search intentionally</li></ol></nav>
+      <p class="eyebrow">FIND YOUR WAY AROUND</p>
+      <h1>Search your repository</h1>
+      <p class="lede">Look across the whole repository, or narrow to the folder or the documents you care about, and then find text inside the file you have open.</p>
+      <h2>What you get</h2>
+      <ul class="topic-list">
+        <li><strong>A dedicated repository search.</strong> It lives on its own surface so results are easy to scan.</li>
+        <li><strong>Scopes that match how you look for things.</strong> Search the current folder, or focus on Markdown files when you are hunting for a document.</li>
+        <li><strong>Generated and local files, on your terms.</strong> Controls let you decide whether generated or local-only files show up, and results come with counts.</li>
+        <li><strong>Find inside the current file.</strong> File-level find highlights matches in the file you are reading, including in rendered Markdown.</li>
+      </ul>
+      <section class="try-it" aria-labelledby="try-it-title">
+        <h2 id="try-it-title">Try it in one command</h2>
+        <div class="install-chip">
+          <code>npx gitlocal</code>
+          <button type="button" class="copy-btn" data-copy="npx gitlocal" aria-label="Copy npx command">Copy</button>
+        </div>
+        <p class="install-note">Needs Node.js 22+. <a href="../../install/">Full install guide, including the macOS app &rarr;</a></p>
+      </section>
+      <nav class="pager" aria-label="More features">
+        <a class="pager-link" href="../../features/browse/" rel="prev"><span>&larr; Previous</span><strong>Browse like GitHub</strong></a>
+        <a class="pager-link next" href="../../features/markdown/" rel="next"><span>Next &rarr;</span><strong>Read Markdown clearly</strong></a>
+      </nav>
+    </div>
+  </article>
+
+  <section class="related">
+    <div class="wrap">
+      <h2 class="section-title">Related</h2>
+      <div class="feature-grid">
+        <a class="feature-card feature-link" href="../browse/"><h3>Browse like GitHub</h3><p>A lazy-loading, keyboard-navigable file tree for regular folders and git repositories, right on your machine.</p></a>
+        <a class="feature-card feature-link" href="../markdown/"><h3>Read Markdown clearly</h3><p>GitHub-like rendering with relative links, heading anchors, find highlights, and share/copy actions. No IDE required.</p></a>
+        <a class="feature-card feature-link" href="../review/"><h3>Review what changed</h3><p>A changed-files panel for modified, deleted, untracked, generated, and local-only paths, plus active-file refresh notices.</p></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="../../">
+          <img src="../../assets/site/logo.svg" alt="" width="24" height="24">
+          <span>GitLocal</span>
+        </a>
+        <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="../../features/">Features</a>
+        <a href="../../install/">Install</a>
+        <a href="../../community/">Community</a>
+        <a href="../../faq/">FAQ</a>
+      </nav>
+      <nav class="footer-col" aria-label="Features">
+        <h2>Features</h2>
+        <a href="../../features/browse/">Browse like GitHub</a>
+        <a href="../../features/search/">Search intentionally</a>
+        <a href="../../features/markdown/">Read Markdown clearly</a>
+        <a href="../../features/previews/">Preview beyond code</a>
+        <a href="../../features/review/">Review what changed</a>
+        <a href="../../features/git-state/">Understand git state</a>
+        <a href="../../features/edit/">Make small edits safely</a>
+        <a href="../../features/terminal/">Hand off to your agent</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+        <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
+        <a href="https://www.npmjs.com/package/gitlocal">npm</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="../../script.js"></script>
+</body>
+</html>
