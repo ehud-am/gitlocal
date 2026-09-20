@@ -1,0 +1,33 @@
+name: Suggest an improvement
+description: A specific change that would make GitLocal more useful for you.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only have a rough idea? Start a conversation in [Discussions](https://github.com/ehud-am/gitlocal/discussions/categories/ideas) instead. Ideas that take shape there can become issues.
+        GitLocal is for reading, reviewing, and light edits, not for being a full IDE. Suggestions in that spirit are the best fit.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task or workflow, not the feature you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What's hard or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What would a good result look like?
+      description: Sketches, screenshots, and examples from other tools are all welcome.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Want to help build it?
+      options:
+        - label: I'd be interested in helping build this (it's fine if you'd use an AI coding tool to do it)

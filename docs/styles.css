@@ -312,6 +312,26 @@ h1 {
 
 .install-more a { color: var(--accent2); }
 
+/* Community */
+
+.community {
+  padding: 72px 0;
+  border-top: 1px solid var(--border);
+}
+
+.community .lede { max-width: 60ch; margin-left: auto; margin-right: auto; }
+
+.card-link {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--accent2);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.card-link:hover { text-decoration: underline; }
+
 /* FAQ */
 
 .faq { padding: 72px 0; }
@@ -382,6 +402,7 @@ h1 {
 @media (max-width: 860px) {
   .hero-inner { grid-template-columns: 1fr; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  .community-grid { grid-template-columns: 1fr; }
   .install-grid { grid-template-columns: 1fr; }
   h1 { font-size: 34px; }
 }

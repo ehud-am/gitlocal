@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.13.5",
+  "version": "0.13.6",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -32,6 +32,7 @@
   "files": [
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
+    "SECURITY.md",
     "dist",
     "ui/dist",
     "scripts/verify-node-pty.mjs"

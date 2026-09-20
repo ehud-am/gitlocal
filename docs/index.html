@@ -103,6 +103,14 @@
             "@type": "Answer",
             "text": "GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (.xlsx and .xls), and PowerPoint (.pptx) files — many of which GitHub's web UI cannot render inline and offers only as a raw download."
           }
+        },
+        {
+          "@type": "Question",
+          "name": "How can I suggest a feature or contribute?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GitLocal is built in the open on GitHub. Share ideas and questions in GitHub Discussions, report bugs by opening an issue, or help build it by picking up an issue or proposing a change (see CONTRIBUTING.md in the repository). You do not need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not."
+          }
         }
       ]
     }
@@ -121,6 +129,7 @@
     <nav class="nav-links">
       <a href="#features">Features</a>
       <a href="#install">Install</a>
+      <a href="#community">Community</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
     </nav>
@@ -183,7 +192,7 @@
         </article>
         <article class="feature-card">
           <h3>Hand off to your agent</h3>
-          <p>A built-in terminal docked at the bottom of the window, wired for Claude, Codex, or a plain shell, with cross-page session persistence.</p>
+          <p>A built-in terminal docked to the right, left, or bottom of the window, so you can run Claude, Codex, or any command without leaving GitLocal. Sessions persist as you move between pages.</p>
         </article>
         <article class="feature-card">
           <h3>Preview beyond code</h3>
@@ -233,6 +242,31 @@
     </div>
   </section>
 
+  <section class="community" id="community">
+    <div class="wrap">
+      <h2 class="section-title center">Built in the open. Help shape it.</h2>
+      <p class="lede center">GitLocal is made for people working with AI coding tools, and it gets better when you tell us what you need. You don't have to write code to take part.</p>
+      <div class="feature-grid community-grid">
+        <article class="feature-card">
+          <h3>Share an idea</h3>
+          <p>Tell us what you wish GitLocal did, or what got in your way. Describe the job you're trying to get done and we'll work out the rest together.</p>
+          <a class="card-link" href="https://github.com/ehud-am/gitlocal/discussions/categories/ideas">Post in Discussions &rarr;</a>
+        </article>
+        <article class="feature-card">
+          <h3>Report a bug</h3>
+          <p>Something look wrong or break? Open an issue in plain language. A screenshot is plenty, and no technical detail is required.</p>
+          <a class="card-link" href="https://github.com/ehud-am/gitlocal/issues/new/choose">Open an issue &rarr;</a>
+        </article>
+        <article class="feature-card">
+          <h3>Help build it</h3>
+          <p>Pick up an open issue or propose a change. Building it with Claude, Codex, or another AI coding tool is welcome.</p>
+          <a class="card-link" href="https://github.com/ehud-am/gitlocal/blob/main/CONTRIBUTING.md">How to contribute &rarr;</a>
+        </article>
+      </div>
+      <p class="center install-more">Taking part happens on GitHub and needs a free GitHub account. GitLocal itself still has no accounts and no telemetry.</p>
+    </div>
+  </section>
+
   <section class="faq" id="faq">
     <div class="wrap">
       <h2 class="section-title center">Frequently asked questions</h2>
@@ -265,6 +299,10 @@
           <h3>What file types can GitLocal preview?</h3>
           <p>GitLocal renders Markdown, source code with syntax highlighting, JSON, and images, plus built-in viewers for PDF, SVG, CSV, Excel (<code>.xlsx</code> and <code>.xls</code>), and PowerPoint (<code>.pptx</code>) files — many of which GitHub's web UI cannot render inline and offers only as a raw download.</p>
         </article>
+        <article class="faq-item">
+          <h3>How can I suggest a feature or contribute?</h3>
+          <p>GitLocal is built in the open on GitHub. Share ideas and questions in <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>, report bugs by <a href="https://github.com/ehud-am/gitlocal/issues/new/choose">opening an issue</a>, or help build it by picking up an issue or proposing a change &mdash; see <a href="https://github.com/ehud-am/gitlocal/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>. You don't need to write code to take part, and using an AI coding tool to write a change is welcome. Participating needs a free GitHub account; using GitLocal does not.</p>
+        </article>
       </div>
     </div>
   </section>
@@ -280,6 +318,7 @@
     <p class="footer-note">Local-first. No accounts, no telemetry. MIT licensed.</p>
     <div class="footer-links">
       <a href="https://github.com/ehud-am/gitlocal">GitHub</a>
+      <a href="https://github.com/ehud-am/gitlocal/discussions">Discussions</a>
       <a href="https://www.npmjs.com/package/gitlocal">npm</a>
       <a href="https://github.com/ehud-am/gitlocal/blob/main/CHANGELOG.md">Changelog</a>
       <a href="https://github.com/ehud-am/gitlocal/blob/main/LICENSE">License</a>

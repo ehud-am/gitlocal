@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Share an idea or wish
+    url: https://github.com/ehud-am/gitlocal/discussions/categories/ideas
+    about: Not sure how it should work yet? Start in Discussions. Ideas that firm up become issues.
+  - name: Ask a question or get help
+    url: https://github.com/ehud-am/gitlocal/discussions/categories/q-a
+    about: Questions about installing or using GitLocal.
+  - name: Show and tell
+    url: https://github.com/ehud-am/gitlocal/discussions/categories/show-and-tell
+    about: Tell us how you use GitLocal alongside your AI coding tools.
+  - name: Report a security problem privately
+    url: https://github.com/ehud-am/gitlocal/security/advisories/new
+    about: Please do not file security problems as public issues.
