@@ -99,6 +99,19 @@ describe('terminal handlers', () => {
     expect(mockCreateSession).toHaveBeenCalledWith({ cwd: expect.any(String) })
   })
 
+  it('refuses to create a session from a non-JSON request, which another origin could send without a preflight', async () => {
+    const app = createApp(dir)
+    for (const contentType of ['text/plain', 'application/x-www-form-urlencoded', undefined]) {
+      const res = await app.request('/api/terminal/sessions', {
+        method: 'POST',
+        headers: contentType ? { 'Content-Type': contentType } : {},
+        body: '{}',
+      })
+      expect(res.status).toBe(415)
+    }
+    expect(mockCreateSession).not.toHaveBeenCalled()
+  })
+
   it('rejects an invalid JSON body with 400', async () => {
     const app = createApp(dir)
     const res = await app.request('/api/terminal/sessions', {

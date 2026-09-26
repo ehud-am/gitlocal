@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { classifyTerminalKey, detectTerminalPlatform } from './terminal-shortcuts'
+import { describe, expect, it, vi } from 'vitest'
+import { classifyTerminalKey, createTerminalKeyHandler, detectTerminalPlatform } from './terminal-shortcuts'
 
 function key(keyName: string, modifiers: Partial<Record<'ctrlKey' | 'altKey' | 'metaKey' | 'shiftKey', boolean>> = {}, type = 'keydown') {
   return { type, key: keyName, ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, ...modifiers }
@@ -13,7 +13,12 @@ describe('detectTerminalPlatform', () => {
   })
 
   it('defaults to the current navigator', () => {
-    expect(['mac', 'windows', 'other']).toContain(detectTerminalPlatform())
+    const spy = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    try {
+      expect(detectTerminalPlatform()).toBe('windows')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 
@@ -53,5 +58,92 @@ describe('classifyTerminalKey', () => {
     expect(classifyTerminalKey(key('c', { ctrlKey: true, altKey: true }), 'windows', true)).toBeNull()
     expect(classifyTerminalKey(key('v', { ctrlKey: true, metaKey: true }), 'windows', false)).toBeNull()
     expect(classifyTerminalKey(key('a', { ctrlKey: true }), 'windows', false)).toBeNull()
+  })
+})
+
+function handlerSetup(platform: 'mac' | 'windows' | 'other', selection = '', copyWorks = true) {
+  const terminal = {
+    hasSelection: () => selection !== '',
+    getSelection: () => selection,
+    clearSelection: vi.fn(),
+    clear: vi.fn(),
+  }
+  const env = {
+    platform,
+    onTogglePanel: vi.fn(),
+    copyViaCommand: vi.fn(() => copyWorks),
+    writeClipboard: vi.fn(() => Promise.resolve()),
+  }
+  return { terminal, env, handle: createTerminalKeyHandler(terminal, env) }
+}
+
+function handledKey(...args: Parameters<typeof key>) {
+  return { ...key(...args), preventDefault: vi.fn(), stopPropagation: vi.fn() }
+}
+
+describe('createTerminalKeyHandler', () => {
+  it('passes ordinary keys through to xterm untouched', () => {
+    const { handle } = handlerSetup('other')
+    const event = handledKey('ArrowUp')
+    expect(handle(event)).toBe(true)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('toggles the panel once, stopping the event so the window listener does not toggle it back', () => {
+    const { env, handle } = handlerSetup('mac')
+    const event = handledKey('`', { ctrlKey: true })
+    expect(handle(event)).toBe(false)
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(event.stopPropagation).toHaveBeenCalled()
+    expect(env.onTogglePanel).toHaveBeenCalledTimes(1)
+  })
+
+  it('copies the selection with the synchronous copy command and clears it', () => {
+    const { terminal, env, handle } = handlerSetup('windows', 'text')
+    const event = handledKey('c', { ctrlKey: true })
+    expect(handle(event)).toBe(false)
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(env.copyViaCommand).toHaveBeenCalled()
+    expect(env.writeClipboard).not.toHaveBeenCalled()
+    expect(terminal.clearSelection).toHaveBeenCalled()
+  })
+
+  it('falls back to the clipboard API when the copy command fails, clearing only once it succeeds', async () => {
+    const { terminal, env, handle } = handlerSetup('other', 'text', false)
+    handle(handledKey('c', { ctrlKey: true, shiftKey: true }))
+    expect(env.writeClipboard).toHaveBeenCalledWith('text')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(terminal.clearSelection).toHaveBeenCalled()
+
+    const failing = handlerSetup('other', 'text', false)
+    failing.env.writeClipboard.mockReturnValue(Promise.reject(new Error('denied')))
+    failing.handle(handledKey('c', { ctrlKey: true, shiftKey: true }))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(failing.terminal.clearSelection).not.toHaveBeenCalled()
+  })
+
+  it('does nothing on copy with an empty selection or no clipboard at all', () => {
+    const empty = handlerSetup('other')
+    expect(empty.handle(handledKey('c', { ctrlKey: true, shiftKey: true }))).toBe(false)
+    expect(empty.env.copyViaCommand).not.toHaveBeenCalled()
+
+    const terminal = { hasSelection: () => true, getSelection: () => 'x', clearSelection: vi.fn(), clear: vi.fn() }
+    const handle = createTerminalKeyHandler(terminal, { platform: 'other', onTogglePanel: vi.fn(), copyViaCommand: () => false })
+    handle(handledKey('c', { ctrlKey: true }))
+    expect(terminal.clearSelection).not.toHaveBeenCalled()
+  })
+
+  it('clears the screen on Cmd+K and leaves paste to the browser paste event', () => {
+    const { terminal, handle } = handlerSetup('mac')
+    const clearEvent = handledKey('k', { metaKey: true })
+    expect(handle(clearEvent)).toBe(false)
+    expect(terminal.clear).toHaveBeenCalled()
+
+    const paste = handlerSetup('windows')
+    const pasteEvent = handledKey('v', { ctrlKey: true })
+    expect(paste.handle(pasteEvent)).toBe(false)
+    expect(pasteEvent.preventDefault).not.toHaveBeenCalled()
   })
 })

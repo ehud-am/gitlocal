@@ -48,6 +48,13 @@ function resolveSessionCwd(repoPath: string, contextPath?: string, contextType?:
 }
 
 export async function createTerminalSessionHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
+  // A web page on another origin can only send this without a CORS preflight (which the server
+  // never approves) as text/plain or a form type. Requiring JSON means only GitLocal's own page can
+  // start a shell, including pages served by other local servers on another loopback port.
+  if (!(c.req.header('content-type') ?? '').toLowerCase().startsWith('application/json')) {
+    return c.json({ error: 'Content-Type must be application/json.' }, 415)
+  }
+
   let payload: CreateTerminalSessionRequest
   try {
     payload = await c.req.json<CreateTerminalSessionRequest>()

@@ -41,6 +41,19 @@ describe('repo-watch', () => {
     }
   })
 
+  it('computes a non-working-tree branch status asynchronously without the working-tree checks', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# Changed')
+      const status = await getSyncStatusAsync(dir, 'feature-sync', 'feature.md')
+      expect(status.branch).toBe('feature-sync')
+      expect(status.changedFilesSummary.total).toBe(0)
+      expect(status.repoSync.mode).toBe('unavailable')
+    } finally {
+      cleanup()
+    }
+  })
+
   it('returns an unchanged status when no repo is loaded', () => {
     const status = getSyncStatus('', 'main', '')
     expect(status.treeStatus).toBe('unchanged')

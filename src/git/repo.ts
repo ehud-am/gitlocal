@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { type Stats, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -110,7 +110,9 @@ function runGit(repoPath: string, args: string[]): GitRunResult {
 
 function runGitAsync(repoPath: string, args: string[]): Promise<GitRunResult> {
   return new Promise((resolvePromise) => {
-    const child = spawn('git', args, { cwd: repoPath })
+    // GIT_OPTIONAL_LOCKS=0: a background `git status` must not take index.lock and make a git
+    // command the user runs in the terminal at the same moment fail (VS Code does the same).
+    const child = spawn('git', args, { cwd: repoPath, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
     child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
@@ -124,6 +126,11 @@ function runGitAsync(repoPath: string, args: string[]): Promise<GitRunResult> {
       })
     })
   })
+}
+
+export async function getCurrentBranchAsync(repoPath: string): Promise<string> {
+  const result = await runGitAsync(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD'])
+  return result.status === 0 ? result.stdout.trim() : ''
 }
 
 /**
@@ -914,17 +921,28 @@ export function nearestExistingRepoPath(repoPath: string, filePath: string): str
   return ''
 }
 
-export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
+// Every path in the index, verbatim. `-z` matters: without it git C-quotes any path with non-ASCII
+// or special characters ("caf\303\251.md"), which then never matches the raw paths `git status -z`
+// reports.
+function listIndexedPaths(repoPath: string): string[] {
+  const result = runGitCapture(repoPath, 'ls-files', '-z')
+  if (result.status !== 0) return []
+  return result.stdout.split('\0').filter(Boolean)
+}
+
+function statTrackedFile(repoPath: string, filePath: string): Stats | null {
   try {
-    return spawnGit(repoPath, 'ls-files')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((filePath) => getPathType(repoPath, filePath) === 'file')
-      .sort()
+    const stats = statSync(resolveRepoPath(repoPath, filePath))
+    return stats.isDirectory() ? null : stats
   } catch {
-    return []
+    return null
   }
+}
+
+export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
+  return listIndexedPaths(repoPath)
+    .filter((filePath) => statTrackedFile(repoPath, filePath) !== null)
+    .sort()
 }
 
 export function getTrackedPathType(repoPath: string, filePath: string, trackedFiles?: string[]): 'file' | 'dir' | 'missing' | 'none' {
@@ -957,9 +975,11 @@ export function getWorkingTreeRevision(repoPath: string): string {
   const hash = createHash('sha1')
   hash.update(getCurrentBranch(repoPath))
 
-  for (const relPath of getTrackedWorkingTreeFiles(repoPath)) {
-    const fullPath = resolveRepoPath(repoPath, relPath)
-    const stats = statSync(fullPath)
+  // One stat per tracked file: this runs on every sync-status poll, on the event loop that also
+  // carries terminal I/O.
+  for (const relPath of listIndexedPaths(repoPath).sort()) {
+    const stats = statTrackedFile(repoPath, relPath)
+    if (!stats) continue
     hash.update(relPath)
     hash.update(String(stats.size))
     hash.update(String(stats.mtimeMs))
@@ -1230,7 +1250,11 @@ function describeChangedFile(changeState: ChangedFileState, generatedLocalState:
 // `git ls-files` and one batched `git check-ignore` for the whole listing. Calling
 // classifyGeneratedLocalState per entry spawned `ls-files` twice and stat'ed every tracked file for
 // each changed path, which took seconds on an ordinary repository with a few dozen local changes.
-function classifyChangedEntries(repoPath: string, paths: string[]): Map<string, GeneratedLocalState> {
+function classifyChangedEntries(
+  repoPath: string,
+  entries: Array<{ path: string; changeState: ChangedFileState }>,
+): Map<string, GeneratedLocalState> {
+  const paths = entries.map((entry) => entry.path)
   const states = new Map<string, GeneratedLocalState>()
   if (!validateRepo(repoPath)) {
     for (const path of paths) states.set(path, 'unknown')
@@ -1240,7 +1264,7 @@ function classifyChangedEntries(repoPath: string, paths: string[]): Map<string, 
   // `ls-files --error-unmatch <path>` (what classifyGeneratedLocalState asks) matches an indexed
   // file or any directory holding one, so both the entries and their ancestors count as tracked.
   const indexed = new Set<string>()
-  for (const line of runGitCapture(repoPath, 'ls-files').stdout.split('\n')) {
+  for (const line of listIndexedPaths(repoPath)) {
     const entry = normalizeRepoRelativePath(line)
     for (let boundary = entry.length; boundary > 0; boundary = entry.lastIndexOf('/', boundary - 1)) {
       const prefix = entry.slice(0, boundary)
@@ -1249,8 +1273,13 @@ function classifyChangedEntries(repoPath: string, paths: string[]): Map<string, 
     }
   }
 
-  const untracked = paths.filter((path) => !indexed.has(normalizeRepoRelativePath(path)))
-  const ignored = getIgnoredPathSet(repoPath, untracked)
+  // git status never lists ignored untracked files, so only paths it reports for another reason
+  // (a staged deletion of a file that is still on disk, say) can be ignored; for everything else
+  // the check-ignore spawn would be wasted.
+  const ignoreCandidates = entries
+    .filter((entry) => entry.changeState !== 'untracked' && !indexed.has(normalizeRepoRelativePath(entry.path)))
+    .map((entry) => entry.path)
+  const ignored = getIgnoredPathSet(repoPath, ignoreCandidates)
   for (const path of paths) {
     const normalized = normalizeRepoRelativePath(path)
     if (!normalized) states.set(path, 'unknown')
@@ -1263,7 +1292,7 @@ function classifyChangedEntries(repoPath: string, paths: string[]): Map<string, 
 
 export function buildChangedFileItems(repoPath: string, includeGeneratedLocal = false): ChangedFileItem[] {
   const changes = getWorkingTreeChangeDetails(repoPath)
-  const generatedLocalStates = classifyChangedEntries(repoPath, changes.map((entry) => entry.path))
+  const generatedLocalStates = classifyChangedEntries(repoPath, changes)
   return changes
     .map((entry) => {
       const generatedLocalState = generatedLocalStates.get(entry.path) ?? 'unknown'
@@ -1790,14 +1819,15 @@ function getIgnoredPathSet(repoPath: string, paths: string[]): Set<string> {
   const normalizedPaths = uniqueNormalizedPaths(paths)
   if (normalizedPaths.length === 0) return new Set()
 
-  const result = spawnSync('git', ['check-ignore', '--stdin'], {
+  // `-z` on both ends: without it git C-quotes output paths with non-ASCII or special characters.
+  const result = spawnSync('git', ['check-ignore', '-z', '--stdin'], {
     cwd: repoPath,
-    input: normalizedPaths.join('\n'),
+    input: normalizedPaths.join('\0'),
     encoding: 'utf-8',
   })
 
   if (result.status !== 0 || !result.stdout) return new Set()
-  return new Set(result.stdout.split('\n').map((line) => line.trim()).filter(Boolean))
+  return new Set(result.stdout.split('\0').filter(Boolean))
 }
 
 export function getEditableState(repoPath: string, filePath: string, branch: string): { editable: boolean; revisionToken: string | null } {

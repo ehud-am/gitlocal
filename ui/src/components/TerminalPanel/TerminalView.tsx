@@ -1,9 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { createTerminalConnection } from './terminal-connection'
-import { classifyTerminalKey, detectTerminalPlatform } from './terminal-shortcuts'
+import { createTerminalKeyHandler, detectTerminalPlatform } from './terminal-shortcuts'
 
 interface TerminalViewProps {
   sessionId: string
@@ -24,6 +24,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [notice, setNotice] = useState('')
   const terminalRef = useRef<Terminal | null>(null)
   const onExitRef = useRef(onExit)
   onExitRef.current = onExit
@@ -46,11 +47,26 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     terminal.open(container)
     fitAddon.fit()
 
+    // While xterm parses a replay of old output it answers any terminal queries in it (cursor
+    // position, device attributes) through onData; those answers belong to programs that asked
+    // long ago and would land in the shell as typed junk, so they are dropped.
+    let replaying = false
     const connection = createTerminalConnection(sessionId, {
       onOutput: (data) => terminal.write(data),
+      onReplay: (data, afterReconnect) => {
+        replaying = true
+        // RIS in-band rather than terminal.reset(), so it applies after any output still queued
+        // from before the drop instead of racing it.
+        terminal.write(afterReconnect ? `\x1bc${data}` : data, () => {
+          replaying = false
+        })
+      },
       onExit: (code, signal) => onExitRef.current(code, signal),
-      onNotice: (message) => terminal.write(`\r\n\x1b[2m[${message}]\x1b[0m\r\n`),
-      onReconnected: () => terminal.reset(),
+      onNotice: (message) => {
+        terminal.write(`\r\n\x1b[2m[${message}]\x1b[0m\r\n`)
+        // Text written into the terminal grid isn't announced to screen readers.
+        setNotice(message)
+      },
     })
     connection.resize(terminal.cols, terminal.rows)
 
@@ -66,41 +82,21 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
     })
 
-    const platform = detectTerminalPlatform()
-    const copySelection = () => {
-      const text = terminal.getSelection()
-      if (!text) return
-      const fallback = () => document.execCommand('copy')
-      if (navigator.clipboard?.writeText) {
-        void navigator.clipboard.writeText(text).catch(fallback)
-      } else {
-        fallback()
-      }
-      terminal.clearSelection()
-    }
-
     // Keys the panel handles instead of the shell (see classifyTerminalKey). Ctrl+` must be
     // caught here too: xterm would otherwise swallow it and send it to the shell as input
     // instead of toggling the panel (matches VS Code's terminal).
-    terminal.attachCustomKeyEventHandler((event) => {
-      const shortcut = classifyTerminalKey(event, platform, terminal.hasSelection())
-      if (shortcut === null) return true
-      if (shortcut === 'toggle-panel') {
-        event.preventDefault()
-        onToggleShortcutRef.current?.()
-      } else if (shortcut === 'copy') {
-        event.preventDefault()
-        copySelection()
-      } else if (shortcut === 'clear') {
-        event.preventDefault()
-        terminal.clear()
-      }
-      // 'paste': no preventDefault, so the browser fires its paste event, which xterm turns into
-      // input (with bracketed-paste markers when the shell asks for them).
-      return false
-    })
+    terminal.attachCustomKeyEventHandler(
+      createTerminalKeyHandler(terminal, {
+        platform: detectTerminalPlatform(),
+        onTogglePanel: () => onToggleShortcutRef.current?.(),
+        copyViaCommand: () => document.execCommand('copy'),
+        writeClipboard: navigator.clipboard?.writeText ? (text) => navigator.clipboard.writeText(text) : undefined,
+      }),
+    )
 
-    const inputDisposable = terminal.onData((data) => connection.sendInput(data))
+    const inputDisposable = terminal.onData((data) => {
+      if (!replaying) connection.sendInput(data)
+    })
 
     // Fitting is cheap; the resize message is only sent when the column/row count actually
     // changes, so dragging the panel edge doesn't flood the shell with redraw signals.
@@ -121,5 +117,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     }
   }, [sessionId])
 
-  return <div ref={containerRef} className="h-full w-full" data-testid="terminal-view" />
+  return (
+    <>
+      <div ref={containerRef} className="h-full w-full" data-testid="terminal-view" />
+      <div className="sr-only" role="status" aria-live="polite">
+        {notice}
+      </div>
+    </>
+  )
 })

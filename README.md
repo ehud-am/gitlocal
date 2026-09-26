@@ -128,7 +128,7 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 - **Manage folders** by creating child folders or deleting subfolders with typed confirmation and impact counts.
 - **Switch branches safely** with commit or discard confirmation when the working tree is dirty.
 - **Manage local git identity** by saving repo-local `user.name`, `user.email`, and optional SSH key settings.
-- **Use an integrated terminal** docked to the right, left, or bottom of the window (your choice is remembered), discoverable via a header button or the `Ctrl+\`` shortcut (matching VS Code), with drag/keyboard-resizable size and cross-page session persistence. Every tab is a plain shell, so run `claude`, `codex`, or anything else you like.
+- **Use an integrated terminal** docked to the right, left, or bottom of the window (your choice is remembered), discoverable via a header button or the `Ctrl+\`` shortcut (matching VS Code), with drag/keyboard-resizable size and cross-page session persistence. Every tab is a plain shell, so run `claude`, `codex`, or anything else you like. Copy and paste with Cmd+C / Cmd+V on macOS or Ctrl+Shift+C / Ctrl+Shift+V on Windows and Linux; the terminal reconnects on its own after the computer sleeps.
 - **Share rendered Markdown** through print, Save as PDF, local email/share flows, copy, and download fallbacks.
 - **Stay local-first** because browsing, editing, and git actions run against your local filesystem and installed `git`; there are no accounts or telemetry.
 

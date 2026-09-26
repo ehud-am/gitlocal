@@ -46,7 +46,12 @@ export function TerminalTabStrip({ tabs, activeTabId, onSelectTab, onCloseTab }:
               tabIndex={0}
               onClick={() => onSelectTab(tab.id)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') onSelectTab(tab.id)
+                if (event.key === 'Enter' || event.key === ' ') {
+                  // Selecting moves focus into the terminal; without preventDefault the same key's
+                  // keypress could land there and reach the shell (and Space would scroll the page).
+                  event.preventDefault()
+                  onSelectTab(tab.id)
+                }
               }}
               className="flex items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >

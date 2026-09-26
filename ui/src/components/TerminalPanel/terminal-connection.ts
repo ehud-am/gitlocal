@@ -26,11 +26,15 @@ export function splitInput(data: string, maxChars: number = MAX_INPUT_CHARS_PER_
 
 export interface TerminalConnectionCallbacks {
   onOutput: (data: string) => void
+  /**
+   * The server's replay of the session's recent output, sent on every (re)connect that has any.
+   * `afterReconnect` is true when the screen still shows the pre-drop output, which the replay
+   * should replace rather than be appended to.
+   */
+  onReplay: (data: string, afterReconnect: boolean) => void
   onExit: (code: number | null, signal: string | null) => void
-  /** A short status line to print in the terminal (connection lost, reconnecting, gave up). */
+  /** A short status line to show (connection lost, reconnecting, gave up, input discarded). */
   onNotice: (message: string) => void
-  /** The socket reopened after a drop; the server is about to replay the session's recent output. */
-  onReconnected: () => void
 }
 
 export interface TerminalConnectionOptions {
@@ -46,8 +50,10 @@ export interface TerminalConnection {
 }
 
 // One session's WebSocket, kept alive across drops (a laptop waking from sleep, the server
-// briefly unreachable): input typed meanwhile is queued, and after reconnecting the terminal is
-// reset so the server's replay of recent output redraws it instead of being appended twice.
+// briefly unreachable): input typed meanwhile is queued, and after reconnecting the server's replay
+// of recent output redraws the screen instead of being appended twice. The screen is only replaced
+// once a replay actually arrives, so reconnecting to a session that has since ended (the server
+// accepts the socket, then closes it with 1011) leaves the last output visible.
 export function createTerminalConnection(
   sessionId: string,
   callbacks: TerminalConnectionCallbacks,
@@ -64,6 +70,10 @@ export function createTerminalConnection(
   let reconnectHandle: unknown = null
   let pendingInput: string[] = []
   let pendingChars = 0
+  // Set once queued input overflows: everything after it is dropped too until the socket reopens,
+  // so a later Enter can't run a half-typed line whose middle was discarded.
+  let discardingInput = false
+  let reconnected = false
   let size: { cols: number; rows: number } | null = null
   let sentSize = ''
 
@@ -83,19 +93,25 @@ export function createTerminalConnection(
     socket = connect(sessionId)
     socket.addEventListener('open', () => {
       failedAttempts = 0
-      if (isReconnect) callbacks.onReconnected()
+      reconnected = isReconnect
       sentSize = ''
       sendSizeIfChanged()
       const queued = pendingInput.join('')
       pendingInput = []
       pendingChars = 0
+      discardingInput = false
       if (queued) send(queued)
     })
     socket.addEventListener('message', (event: MessageEvent) => {
       const frame = terminalApi.parseInboundFrame(String(event.data))
       if (!frame) return
       if (frame.type === 'output' && frame.data) {
-        callbacks.onOutput(frame.data)
+        if (frame.replay) {
+          callbacks.onReplay(frame.data, reconnected)
+        } else {
+          callbacks.onOutput(frame.data)
+        }
+        reconnected = false
       } else if (frame.type === 'exit') {
         exited = true
         callbacks.onExit(frame.code ?? null, frame.signal ?? null)
@@ -126,9 +142,14 @@ export function createTerminalConnection(
       if (disposed || exited) return
       if (socket.readyState === WebSocket.OPEN) {
         send(data)
+      } else if (discardingInput) {
+        return
       } else if (pendingChars + data.length <= MAX_PENDING_INPUT_CHARS) {
         pendingInput.push(data)
         pendingChars += data.length
+      } else {
+        discardingInput = true
+        callbacks.onNotice('Too much was typed or pasted while disconnected; input is being discarded until the terminal reconnects.')
       }
     },
     resize(cols: number, rows: number) {

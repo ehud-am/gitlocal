@@ -36,3 +36,58 @@ export function classifyTerminalKey(
   if (key === 'v' && (event.shiftKey || platform === 'windows')) return 'paste'
   return null
 }
+
+export interface ShortcutTerminal {
+  hasSelection: () => boolean
+  getSelection: () => string
+  clearSelection: () => void
+  clear: () => void
+}
+
+export interface ShortcutEnvironment {
+  platform: TerminalPlatform
+  onTogglePanel: () => void
+  /** Synchronous copy through the focused xterm textarea's own copy handler (document.execCommand). */
+  copyViaCommand: () => boolean
+  writeClipboard?: (text: string) => Promise<void>
+}
+
+type HandledKeyEvent = KeyEventLike & Pick<KeyboardEvent, 'preventDefault' | 'stopPropagation'>
+
+// Builds the handler for xterm's attachCustomKeyEventHandler: returns false for keys the panel
+// handles itself (xterm then leaves them alone), true for everything the shell should get.
+export function createTerminalKeyHandler(terminal: ShortcutTerminal, env: ShortcutEnvironment) {
+  const copySelection = () => {
+    const text = terminal.getSelection()
+    if (!text) return
+    // The copy command runs inside the key press, where every browser allows it, and copies the
+    // current selection through xterm's own copy handler. The async clipboard API is the fallback;
+    // the selection is only cleared once one of them has the text.
+    if (env.copyViaCommand()) {
+      terminal.clearSelection()
+    } else if (env.writeClipboard) {
+      void env.writeClipboard(text).then(() => terminal.clearSelection(), () => {})
+    }
+  }
+
+  return (event: HandledKeyEvent): boolean => {
+    const shortcut = classifyTerminalKey(event, env.platform, terminal.hasSelection())
+    if (shortcut === null) return true
+    if (shortcut === 'toggle-panel') {
+      // Stop the event here: the panel's window-level Ctrl+` listener would otherwise toggle a
+      // second time, leaving the panel as it was (and a keyboard user with no way out).
+      event.preventDefault()
+      event.stopPropagation()
+      env.onTogglePanel()
+    } else if (shortcut === 'copy') {
+      event.preventDefault()
+      copySelection()
+    } else if (shortcut === 'clear') {
+      event.preventDefault()
+      terminal.clear()
+    }
+    // 'paste': no preventDefault, so the browser fires its paste event, which xterm turns into
+    // input (with bracketed-paste markers when the shell asks for them).
+    return false
+  }
+}

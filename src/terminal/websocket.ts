@@ -60,8 +60,12 @@ function wireTerminalSocket(ws: WebSocket, sessionId: string): void {
     return
   }
 
+  // Marked as a replay so the client can tell it apart from live output: it resets the screen
+  // before a replay after a reconnect, and ignores its terminal's automatic answers to queries in
+  // the replayed text (a program's old cursor-position request would otherwise get a fresh answer
+  // typed into the shell).
   if (subscription.bufferedOutput) {
-    sendFrame(ws, { type: 'output', data: subscription.bufferedOutput })
+    sendFrame(ws, { type: 'output', data: subscription.bufferedOutput, replay: true })
   }
 
   ws.on('message', (raw) => {

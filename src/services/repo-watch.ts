@@ -1,5 +1,5 @@
 import {
-  getCurrentBranch,
+  getCurrentBranchAsync,
   getPathSyncState,
   buildChangedFileItems,
   getPathType,
@@ -133,13 +133,17 @@ export function getSyncStatus(repoPath: string, branch: string, currentPath: str
 // commands left run synchronously once each.
 const SYNC_STATUS_PREFETCH = [
   ['status', '--porcelain=v1', '-z', '-uall'],
-  ['ls-files'],
+  ['ls-files', '-z'],
   ['rev-parse', '--abbrev-ref', 'HEAD'],
   ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
 ]
 
-export function getSyncStatusAsync(repoPath: string, branch: string | undefined, currentPath: string): Promise<SyncStatus> {
-  return withGitOutputCache(repoPath, SYNC_STATUS_PREFETCH, () =>
-    getSyncStatus(repoPath, branch ?? getCurrentBranch(repoPath), currentPath),
+export async function getSyncStatusAsync(repoPath: string, branch: string | undefined, currentPath: string): Promise<SyncStatus> {
+  const currentBranch = await getCurrentBranchAsync(repoPath)
+  // Viewing another branch skips the working-tree checks (getSyncStatus returns early), so don't
+  // pay for a full `git status` of the working tree on every poll in that case.
+  const viewsWorkingTree = !branch || branch === 'HEAD' || branch === currentBranch
+  return withGitOutputCache(repoPath, viewsWorkingTree ? SYNC_STATUS_PREFETCH : [], () =>
+    getSyncStatus(repoPath, branch ?? currentBranch, currentPath),
   )
 }

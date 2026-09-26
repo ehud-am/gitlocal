@@ -138,7 +138,7 @@ describe('attachTerminalWebSocketServer', () => {
     const httpServer = fakeHttpServer()
     attachTerminalWebSocketServer(httpServer as never)
     emitUpgrade(httpServer, '/api/terminal/sessions/abc/io')
-    expect(createdSockets[0]?.sent).toEqual([JSON.stringify({ type: 'output', data: 'hello' })])
+    expect(createdSockets[0]?.sent).toEqual([JSON.stringify({ type: 'output', data: 'hello', replay: true })])
 
     mockSubscribe.mockReturnValue({ bufferedOutput: '', unsubscribe: vi.fn() })
     emitUpgrade(httpServer, '/api/terminal/sessions/def/io')

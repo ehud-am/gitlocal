@@ -301,8 +301,15 @@ describe('viewer usability repo helpers', () => {
       writeFileSync(join(dir, 'kept.log'), 'log')
       spawnSync('git', ['add', 'dist/app.js', 'kept.log'], { cwd: dir, env: isolatedGitEnv() })
       spawnSync('git', ['commit', '-m', 'add outputs'], { cwd: dir, env: isolatedGitEnv() })
-      writeFileSync(join(dir, '.gitignore'), 'dist/\n*.log\n')
-      spawnSync('git', ['rm', '--cached', '-q', 'dist/app.js', 'kept.log'], { cwd: dir, env: isolatedGitEnv() })
+      // Names git C-quotes unless asked for NUL-delimited output.
+      for (const name of ['café.md', 'tab"q.md', 'ignored-ü.tmp']) writeFileSync(join(dir, name), 'v1')
+      mkdirSync(join(dir, 'dir ü'))
+      writeFileSync(join(dir, 'dir ü', 'x.md'), 'v1')
+      spawnSync('git', ['add', 'café.md', 'tab"q.md', 'dir ü/x.md', 'ignored-ü.tmp'], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['commit', '-m', 'unicode names'], { cwd: dir, env: isolatedGitEnv() })
+      for (const name of ['café.md', 'tab"q.md', 'dir ü/x.md']) writeFileSync(join(dir, name), 'v2')
+      writeFileSync(join(dir, '.gitignore'), 'dist/\n*.log\n*.tmp\n')
+      spawnSync('git', ['rm', '--cached', '-q', 'dist/app.js', 'kept.log', 'ignored-ü.tmp'], { cwd: dir, env: isolatedGitEnv() })
       // A staged deletion whose file is gone from disk too.
       spawnSync('git', ['rm', '-q', 'notes.txt'], { cwd: dir, env: isolatedGitEnv() })
       writeFileSync(join(dir, 'README.md'), '# changed')
@@ -318,6 +325,12 @@ describe('viewer usability repo helpers', () => {
       expect(items).toContainEqual(expect.objectContaining({ path: 'notes.txt', generatedLocalState: 'unknown' }))
       expect(items).toContainEqual(expect.objectContaining({ path: 'README.md', generatedLocalState: 'tracked' }))
       expect(items).toContainEqual(expect.objectContaining({ path: 'new-folder/nested/file.md', generatedLocalState: 'local-only' }))
+      for (const name of ['café.md', 'tab"q.md', 'dir ü/x.md']) {
+        expect(items).toContainEqual(expect.objectContaining({ path: name, changeState: 'modified', generatedLocalState: 'tracked' }))
+      }
+      expect(items).toContainEqual(expect.objectContaining({ path: 'ignored-ü.tmp', generatedLocalState: 'ignored' }))
+      // The default (tracked-only) listing the review panel shows keeps them too.
+      expect(buildChangedFileItems(dir).map((item) => item.path)).toEqual(expect.arrayContaining(['café.md', 'tab"q.md', 'dir ü/x.md']))
     } finally {
       cleanup()
     }
@@ -374,17 +387,38 @@ describe('viewer usability repo helpers', () => {
     }
   })
 
-  it('records a failed prefetch as a failed command', async () => {
+  it('serves a prefetched failure from the cache even after the command would succeed', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const result = await withGitOutputCache(dir, [['cat-file', '-e', 'HEAD:later.txt']], () => {
+        writeFileSync(join(dir, 'later.txt'), 'now it exists')
+        spawnSync('git', ['add', 'later.txt'], { cwd: dir, env: isolatedGitEnv() })
+        spawnSync('git', ['commit', '-q', '-m', 'later'], { cwd: dir, env: isolatedGitEnv() })
+        try {
+          spawnGit(dir, 'cat-file', '-e', 'HEAD:later.txt')
+          return 'succeeded'
+        } catch {
+          return 'cached failure'
+        }
+      })
+      expect(result).toBe('cached failure')
+      expect(() => spawnGit(dir, 'cat-file', '-e', 'HEAD:later.txt')).not.toThrow()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('records a prefetch that cannot start as a failed command', async () => {
     const missing = join(tmpdir(), 'gitlocal-missing-dir-does-not-exist')
-    const result = await withGitOutputCache(missing, [['status']], () => {
+    const message = await withGitOutputCache(missing, [['status']], () => {
       try {
         spawnGit(missing, 'status')
-        return 'ran'
+        return ''
       } catch (error) {
         return (error as Error).message
       }
     })
-    expect(result).not.toBe('ran')
+    expect(message).toMatch(/ENOENT/)
   })
 
   it('maps staged added and renamed changed-file items', () => {

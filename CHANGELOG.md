@@ -1,13 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.13.7 - 2026-09-26
 
-- Fixed 1-2 second pauses while typing in the terminal. The app's background check for local file changes (every 3 seconds) ran git synchronously, which froze every open terminal until it finished; on a 5,000-file repository with 40 local changes each check blocked for about 2.4 seconds. The check now runs git in the background and asks git for the file list once instead of once per changed file; the longest pause measured on the same repository dropped from 2.4 seconds to about 20 ms.
+- Fixed 1-2 second pauses while typing in the terminal. The app's background check for local file changes (every 3 seconds) ran git synchronously, which froze every open terminal until it finished; on a 5,000-file repository with 40 local changes each check blocked for about 2.4 seconds. The check now runs git in the background and asks git for the file list once instead of once per changed file; the longest pause measured on the same repository dropped from 2.4 seconds to under 0.25 seconds, and the slowest keystroke echo from 2.4 seconds to 0.14 seconds.
 - Added a margin between the terminal and the window edges in every dock position (bottom, left, right).
 - Fixed arrow keys and command history misbehaving in the terminal: output line endings are no longer rewritten (which put the cursor in the wrong place when the shell redrew a line), the shell now runs as `xterm-256color` instead of the older `xterm-color`, and clicking a terminal tab moves keyboard focus into that terminal.
 - Fixed large pastes (over about 64 KB) silently disconnecting the terminal; input is now sent in bounded pieces. Added Ctrl+Shift+C / Ctrl+Shift+V for copy and paste on Windows and Linux, Ctrl+C copies when text is selected, Ctrl+V pastes on Windows, and Cmd+K clears the terminal on macOS.
 - The terminal now reconnects after a dropped connection (for example after the computer sleeps) and redraws its recent output, instead of silently stopping to respond. Keystrokes typed while it reconnects are sent once it's back.
 - Shells started from the macOS app now get a UTF-8 locale when none is set, so non-ASCII text types and pastes correctly.
+- Ctrl+` now also hides the terminal panel while the terminal has keyboard focus (it was previously sent to the shell). Connection notices ("Connection lost. Reconnecting...") are now announced to screen readers.
 - Terminal endpoints now refuse requests from any page that isn't GitLocal itself (checked by Host and Origin), so another website open in the same browser can't attach to a terminal.
 
 ## 0.13.6 - 2026-09-20

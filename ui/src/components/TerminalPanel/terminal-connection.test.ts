@@ -27,7 +27,7 @@ class FakeSocket extends EventTarget {
 function setup() {
   const sockets: FakeSocket[] = []
   const scheduled: Array<{ callback: () => void; delayMs: number }> = []
-  const callbacks = { onOutput: vi.fn(), onExit: vi.fn(), onNotice: vi.fn(), onReconnected: vi.fn() }
+  const callbacks = { onOutput: vi.fn(), onExit: vi.fn(), onNotice: vi.fn(), onReplay: vi.fn() }
   const cancel = vi.fn()
   const connection = createTerminalConnection('session-1', callbacks, {
     connect: () => {
@@ -101,6 +101,20 @@ describe('createTerminalConnection', () => {
     expect(sentText).not.toContain('overflow')
   })
 
+  it('keeps discarding input after an overflow until the socket reopens, with one notice', () => {
+    const { sockets, callbacks, connection } = setup()
+    connection.sendInput('a'.repeat(64 * 1024))
+    connection.sendInput('overflow')
+    connection.sendInput('\r')
+    expect(callbacks.onNotice).toHaveBeenCalledTimes(1)
+    expect(callbacks.onNotice.mock.calls[0][0]).toMatch(/discarded/)
+    sockets[0].open()
+    const sentText = sockets[0].sent.map((frame) => frame.data).join('')
+    expect(sentText).not.toContain('\r')
+    connection.sendInput('after')
+    expect(sockets[0].sent[sockets[0].sent.length - 1]).toEqual({ type: 'input', data: 'after' })
+  })
+
   it('sends a resize only when the grid size changes', () => {
     const { sockets, connection } = setup()
     sockets[0].open()
@@ -139,11 +153,32 @@ describe('createTerminalConnection', () => {
 
     runNextReconnect()
     sockets[1].open()
-    expect(callbacks.onReconnected).toHaveBeenCalledTimes(1)
+    sockets[1].receive({ type: 'output', data: 'screen', replay: true })
+    sockets[1].receive({ type: 'output', data: 'live' })
+    expect(callbacks.onReplay).toHaveBeenCalledWith('screen', true)
+    expect(callbacks.onOutput).toHaveBeenCalledWith('live')
     expect(sockets[1].sent).toEqual([
       { type: 'resize', cols: 80, rows: 24 },
       { type: 'input', data: 'typed while offline' },
     ])
+  })
+
+  it('marks the first replay as not after a reconnect', () => {
+    const { sockets, callbacks } = setup()
+    sockets[0].open()
+    sockets[0].receive({ type: 'output', data: 'history', replay: true })
+    expect(callbacks.onReplay).toHaveBeenCalledWith('history', false)
+  })
+
+  it('leaves the old screen alone when a reconnect finds the session gone', () => {
+    const { sockets, callbacks, runNextReconnect } = setup()
+    sockets[0].open()
+    sockets[0].drop()
+    runNextReconnect()
+    sockets[1].open()
+    sockets[1].drop(1011)
+    expect(callbacks.onReplay).not.toHaveBeenCalled()
+    expect(callbacks.onExit).toHaveBeenCalledWith(null, null)
   })
 
   it('backs off between failed attempts and gives up after the last one', () => {
@@ -213,7 +248,7 @@ describe('createTerminalConnection', () => {
     Object.assign(FakeWebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 })
     vi.stubGlobal('WebSocket', FakeWebSocket)
     try {
-      const connection = createTerminalConnection('abc', { onOutput: vi.fn(), onExit: vi.fn(), onNotice: vi.fn(), onReconnected: vi.fn() })
+      const connection = createTerminalConnection('abc', { onOutput: vi.fn(), onExit: vi.fn(), onNotice: vi.fn(), onReplay: vi.fn() })
       expect(FakeWebSocket).toHaveBeenCalledWith(expect.stringContaining('/api/terminal/sessions/abc/io'))
       created[0].drop()
       vi.advanceTimersByTime(250)
