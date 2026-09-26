@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server as HttpServer } from 'node:http'
 import type { Socket } from 'node:net'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { isTrustedTerminalRequest } from './request-origin.js'
 import { sessionManager } from './session-manager.js'
 
 const TERMINAL_IO_PATH = /^\/api\/terminal\/sessions\/([^/]+)\/io$/
@@ -25,6 +26,12 @@ export function attachTerminalWebSocketServer(httpServer: HttpServer): WebSocket
     const match = TERMINAL_IO_PATH.exec(pathname)
     if (!match) {
       socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+      socket.destroy()
+      return
+    }
+
+    if (!isTrustedTerminalRequest(request.headers.host, request.headers.origin)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
       socket.destroy()
       return
     }

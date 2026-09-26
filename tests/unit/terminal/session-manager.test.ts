@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createSessionManager } from '../../../src/terminal/session-manager.js'
+import { buildPtyEnv, createSessionManager } from '../../../src/terminal/session-manager.js'
 import type { PtyLike, PtyFactory } from '../../../src/terminal/session-manager.js'
 
 interface FakePty extends PtyLike {
@@ -285,6 +285,23 @@ describe('session-manager', () => {
     expect(subscription?.bufferedOutput.startsWith('a')).toBe(true)
   })
 
+  it('keeps the most recent output across many small chunks, capped at the max buffer size', async () => {
+    const pty = createFakePty()
+    const manager = createSessionManager(fakeFactory(pty), '/bin/sh')
+    const result = await manager.createSession({ cwd: '/tmp' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    for (let index = 0; index < 5000; index += 1) pty.emitData(`${String(index).padStart(4, '0')}${'x'.repeat(46)}\n`)
+
+    const buffered = manager.subscribe(result.session.id, vi.fn(), vi.fn())!.bufferedOutput
+    expect(buffered.length).toBe(200_000)
+    expect(buffered.endsWith(`4999${'x'.repeat(46)}\n`)).toBe(true)
+    // 5000 chunks of 51 chars = 255,000; the oldest 55,000 chars (chunks 0000-1077, and the
+    // first 22 chars of chunk 1078) were dropped.
+    expect(buffered.startsWith(`${'x'.repeat(28)}\n1079`)).toBe(true)
+  })
+
   it('falls back to the default shell command across platform and $SHELL combinations', async () => {
     const originalPlatform = process.platform
     const originalShell = process.env.SHELL
@@ -400,5 +417,18 @@ describe('session-manager', () => {
     sessions.forEach((s, i) => {
       if (i !== 4) expect(manager.getSession(s.id)?.status).toBe('running')
     })
+  })
+})
+
+describe('buildPtyEnv', () => {
+  it('advertises xterm-256color with truecolor and drops undefined variables', () => {
+    const env = buildPtyEnv({ HOME: '/home/me', TERM: 'dumb', EMPTY: undefined, LANG: 'de_DE.UTF-8' })
+    expect(env).toEqual({ HOME: '/home/me', TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'de_DE.UTF-8' })
+  })
+
+  it('falls back to a UTF-8 locale only when no locale variable is set', () => {
+    expect(buildPtyEnv({}).LANG).toBe('en_US.UTF-8')
+    expect(buildPtyEnv({ LC_ALL: 'C.UTF-8' }).LANG).toBeUndefined()
+    expect(buildPtyEnv({ LC_CTYPE: 'UTF-8' }).LANG).toBeUndefined()
   })
 })

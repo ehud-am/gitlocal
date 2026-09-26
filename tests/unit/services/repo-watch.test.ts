@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { getSyncStatus } from '../../../src/services/repo-watch.js'
+import { getSyncStatus, getSyncStatusAsync } from '../../../src/services/repo-watch.js'
 
 function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'gitlocal-sync-test-'))
@@ -24,6 +24,23 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
 }
 
 describe('repo-watch', () => {
+  it('computes the same status asynchronously as synchronously, defaulting to the current branch', async () => {
+    const { dir, branch, cleanup } = makeGitRepo()
+    try {
+      writeFileSync(join(dir, 'README.md'), '# Changed')
+      writeFileSync(join(dir, 'untracked.md'), 'new')
+      const withoutTimes = (value: unknown) =>
+        JSON.stringify(value, (key, field) => (['checkedAt', 'detectedAt', 'lastRefreshedAt'].includes(key) ? undefined : field))
+
+      const expected = getSyncStatus(dir, branch, 'README.md')
+      expect(withoutTimes(await getSyncStatusAsync(dir, undefined, 'README.md'))).toBe(withoutTimes(expected))
+      expect(withoutTimes(await getSyncStatusAsync(dir, branch, 'README.md'))).toBe(withoutTimes(expected))
+      expect(expected.changedFilesSummary).toMatchObject({ total: 2, modified: 1, untracked: 1 })
+    } finally {
+      cleanup()
+    }
+  })
+
   it('returns an unchanged status when no repo is loaded', () => {
     const status = getSyncStatus('', 'main', '')
     expect(status.treeStatus).toBe('unchanged')

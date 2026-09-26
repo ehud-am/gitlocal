@@ -48,6 +48,7 @@ import {
   createTerminalSessionHandler,
   listTerminalSessionsHandler,
 } from './handlers/terminal.js'
+import { isTrustedTerminalRequest } from './terminal/request-origin.js'
 import {
   getTerminalPanelPreferenceHandler,
   updateTerminalPanelPreferenceHandler,
@@ -327,6 +328,12 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
+  app.use('/api/terminal/*', async (c, next) => {
+    if (!isTrustedTerminalRequest(c.req.header('host'), c.req.header('origin'))) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    await next()
+  })
   app.post('/api/terminal/sessions', createTerminalSessionHandler)
   app.get('/api/terminal/sessions', listTerminalSessionsHandler)
   app.delete('/api/terminal/sessions/:id', closeTerminalSessionHandler)

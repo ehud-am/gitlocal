@@ -58,8 +58,8 @@ function fakeHttpServer() {
   return new EventEmitter() as EventEmitter & { on: EventEmitter['on'] }
 }
 
-function emitUpgrade(httpServer: EventEmitter, path: string, socket: object = {}) {
-  httpServer.emit('upgrade', { url: path }, socket, Buffer.alloc(0))
+function emitUpgrade(httpServer: EventEmitter, path: string, socket: object = {}, headers: Record<string, string> = {}) {
+  httpServer.emit('upgrade', { url: path, headers }, socket, Buffer.alloc(0))
 }
 
 describe('attachTerminalWebSocketServer', () => {
@@ -94,10 +94,32 @@ describe('attachTerminalWebSocketServer', () => {
     attachTerminalWebSocketServer(httpServer as never)
     const socket = { write: vi.fn(), destroy: vi.fn() }
 
-    httpServer.emit('upgrade', {}, socket, Buffer.alloc(0))
+    httpServer.emit('upgrade', { headers: {} }, socket, Buffer.alloc(0))
 
     expect(createdSockets).toHaveLength(0)
     expect(socket.destroy).toHaveBeenCalledOnce()
+  })
+
+  it('refuses upgrades from a non-loopback Host or Origin, so other web pages cannot attach to a shell', () => {
+    mockSubscribe.mockReturnValue({ bufferedOutput: '', unsubscribe: vi.fn() })
+    const httpServer = fakeHttpServer()
+    attachTerminalWebSocketServer(httpServer as never)
+
+    for (const headers of [
+      { host: 'evil.example:4321' },
+      { host: '127.0.0.1:4321', origin: 'https://evil.example' },
+      { host: '127.0.0.1:4321', origin: 'null' },
+    ]) {
+      const socket = { write: vi.fn(), destroy: vi.fn() }
+      emitUpgrade(httpServer, '/api/terminal/sessions/abc/io', socket, headers)
+      expect(socket.write).toHaveBeenCalledWith('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+      expect(socket.destroy).toHaveBeenCalledOnce()
+    }
+    expect(createdSockets).toHaveLength(0)
+    expect(mockSubscribe).not.toHaveBeenCalled()
+
+    emitUpgrade(httpServer, '/api/terminal/sessions/abc/io', {}, { host: '127.0.0.1:4321', origin: 'http://127.0.0.1:4321' })
+    expect(createdSockets).toHaveLength(1)
   })
 
   it('closes the socket with 1011 when the session id is unknown', () => {

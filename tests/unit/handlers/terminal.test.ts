@@ -362,3 +362,37 @@ describe('terminal handlers', () => {
     })
   })
 })
+
+describe('terminal HTTP routes origin guard', () => {
+  it('refuses terminal requests from a non-loopback Host or Origin before reaching any handler', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-terminal-origin-'))
+    try {
+      spawnSync('git', ['init'], { cwd: dir })
+      const app = createApp(dir)
+      mockCreateSession.mockReset()
+      mockListSessions.mockReset()
+      mockListSessions.mockReturnValue([])
+
+      const rebound = await app.fetch(new Request('http://evil.example:4321/api/terminal/sessions', {
+        method: 'POST',
+        headers: { host: 'evil.example:4321', 'content-type': 'text/plain' },
+        body: '{}',
+      }))
+      expect(rebound.status).toBe(403)
+
+      const crossSite = await app.fetch(new Request('http://127.0.0.1:4321/api/terminal/sessions', {
+        headers: { host: '127.0.0.1:4321', origin: 'https://evil.example' },
+      }))
+      expect(crossSite.status).toBe(403)
+      expect(mockCreateSession).not.toHaveBeenCalled()
+      expect(mockListSessions).not.toHaveBeenCalled()
+
+      const sameOrigin = await app.fetch(new Request('http://127.0.0.1:4321/api/terminal/sessions', {
+        headers: { host: '127.0.0.1:4321', origin: 'http://127.0.0.1:4321' },
+      }))
+      expect(sameOrigin.status).toBe(200)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

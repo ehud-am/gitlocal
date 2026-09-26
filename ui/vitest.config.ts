@@ -41,6 +41,8 @@ export default defineConfig({
         'src/components/TerminalPanel/TerminalTabStrip.tsx',
         'src/components/TerminalPanel/NewTerminalButton.tsx',
         'src/components/TerminalPanel/DockPositionControl.tsx',
+        'src/components/TerminalPanel/terminal-shortcuts.ts',
+        'src/components/TerminalPanel/terminal-connection.ts',
         'src/hooks/useTerminalPanel.ts',
         'src/hooks/useTerminalPanelPreference.ts',
         'src/lib/sync.ts',

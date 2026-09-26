@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -77,23 +77,88 @@ export function getAppVersion(): string {
   return cachedAppVersion
 }
 
-export function spawnGit(repoPath: string, ...args: string[]): string {
-  const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
-  /* v8 ignore next */
-  if (result.error) throw result.error
-  /* v8 ignore next */
-  if (result.status !== 0) throw new Error(result.stderr?.trim() || `git ${args[0]} failed`)
-  /* v8 ignore next */
-  return result.stdout?.trim() ?? ''
+interface GitRunResult {
+  status: number
+  stdout: string
+  stderr: string
+  error?: Error
 }
 
-function runGitCapture(repoPath: string, ...args: string[]): { status: number; stdout: string; stderr: string } {
+// Git output shared by every read inside one withGitOutputCache() call. The helpers in this module
+// are synchronous and freely re-run the same read-only command (a single sync-status check used to
+// run `git status` four times); the cache makes each distinct command run once per call.
+let activeGitOutputCache: Map<string, GitRunResult> | null = null
+
+function gitCacheKey(repoPath: string, args: string[]): string {
+  return `${repoPath}\0${args.join('\0')}`
+}
+
+function runGit(repoPath: string, args: string[]): GitRunResult {
+  const key = gitCacheKey(repoPath, args)
+  const cached = activeGitOutputCache?.get(key)
+  if (cached) return cached
   const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
-  return {
+  const captured: GitRunResult = {
     status: result.status ?? 1,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
+    error: result.error,
   }
+  activeGitOutputCache?.set(key, captured)
+  return captured
+}
+
+function runGitAsync(repoPath: string, args: string[]): Promise<GitRunResult> {
+  return new Promise((resolvePromise) => {
+    const child = spawn('git', args, { cwd: repoPath })
+    const stdout: Buffer[] = []
+    const stderr: Buffer[] = []
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+    child.on('error', (error) => resolvePromise({ status: 1, stdout: '', stderr: '', error }))
+    child.on('close', (code) => {
+      resolvePromise({
+        status: code ?? 1,
+        stdout: Buffer.concat(stdout).toString('utf-8'),
+        stderr: Buffer.concat(stderr).toString('utf-8'),
+      })
+    })
+  })
+}
+
+/**
+ * Runs `compute` with every read-only git command it issues memoized, after first running the
+ * `prefetch` commands asynchronously. The server's event loop also carries terminal I/O, so the
+ * expensive commands of a frequently-polled request (git status, ls-files) must not run through
+ * spawnSync, which would freeze every open terminal for the command's full duration. `compute`
+ * must be synchronous and must not modify the repository: the cache is only valid while nothing
+ * else can run, and a write would make cached output stale.
+ */
+export async function withGitOutputCache<T>(repoPath: string, prefetch: string[][], compute: () => T): Promise<T> {
+  const cache = new Map<string, GitRunResult>()
+  const results = await Promise.all(prefetch.map((args) => runGitAsync(repoPath, args)))
+  prefetch.forEach((args, index) => cache.set(gitCacheKey(repoPath, args), results[index]))
+  const previous = activeGitOutputCache
+  activeGitOutputCache = cache
+  try {
+    return compute()
+  } finally {
+    activeGitOutputCache = previous
+  }
+}
+
+export function spawnGit(repoPath: string, ...args: string[]): string {
+  const result = runGit(repoPath, args)
+  /* v8 ignore next */
+  if (result.error) throw result.error
+  /* v8 ignore next */
+  if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`)
+  return result.stdout.trim()
+}
+
+function runGitCapture(repoPath: string, ...args: string[]): { status: number; stdout: string; stderr: string } {
+  const { status, stdout, stderr } = runGit(repoPath, args)
+  return { status, stdout, stderr }
 }
 
 function readGitConfig(repoPath: string, scope: '--local' | '--global', key: string): string {
@@ -1161,10 +1226,47 @@ function describeChangedFile(changeState: ChangedFileState, generatedLocalState:
   return 'Modified locally'
 }
 
+// Same result as classifyGeneratedLocalState for every entry of a `git status` listing, with one
+// `git ls-files` and one batched `git check-ignore` for the whole listing. Calling
+// classifyGeneratedLocalState per entry spawned `ls-files` twice and stat'ed every tracked file for
+// each changed path, which took seconds on an ordinary repository with a few dozen local changes.
+function classifyChangedEntries(repoPath: string, paths: string[]): Map<string, GeneratedLocalState> {
+  const states = new Map<string, GeneratedLocalState>()
+  if (!validateRepo(repoPath)) {
+    for (const path of paths) states.set(path, 'unknown')
+    return states
+  }
+
+  // `ls-files --error-unmatch <path>` (what classifyGeneratedLocalState asks) matches an indexed
+  // file or any directory holding one, so both the entries and their ancestors count as tracked.
+  const indexed = new Set<string>()
+  for (const line of runGitCapture(repoPath, 'ls-files').stdout.split('\n')) {
+    const entry = normalizeRepoRelativePath(line)
+    for (let boundary = entry.length; boundary > 0; boundary = entry.lastIndexOf('/', boundary - 1)) {
+      const prefix = entry.slice(0, boundary)
+      if (indexed.has(prefix)) break
+      indexed.add(prefix)
+    }
+  }
+
+  const untracked = paths.filter((path) => !indexed.has(normalizeRepoRelativePath(path)))
+  const ignored = getIgnoredPathSet(repoPath, untracked)
+  for (const path of paths) {
+    const normalized = normalizeRepoRelativePath(path)
+    if (!normalized) states.set(path, 'unknown')
+    else if (indexed.has(normalized)) states.set(path, 'tracked')
+    else if (ignored.has(normalized)) states.set(path, isLikelyGeneratedPath(normalized) ? 'generated' : 'ignored')
+    else states.set(path, getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only')
+  }
+  return states
+}
+
 export function buildChangedFileItems(repoPath: string, includeGeneratedLocal = false): ChangedFileItem[] {
-  return getWorkingTreeChangeDetails(repoPath)
+  const changes = getWorkingTreeChangeDetails(repoPath)
+  const generatedLocalStates = classifyChangedEntries(repoPath, changes.map((entry) => entry.path))
+  return changes
     .map((entry) => {
-      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      const generatedLocalState = generatedLocalStates.get(entry.path) ?? 'unknown'
       const pathType = getPathType(repoPath, entry.path)
       const canOpen = pathType === 'file' || pathType === 'dir'
       return {

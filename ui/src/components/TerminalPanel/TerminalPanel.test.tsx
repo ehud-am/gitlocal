@@ -248,6 +248,36 @@ describe('TerminalPanel', () => {
     await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
   })
 
+  it('moves focus into the terminal when its tab is clicked, including the already-active tab', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession)
+
+    render(<Panel />)
+    await openTerminal(user)
+    await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
+    terminalFocusCalls.length = 0
+
+    await user.click(screen.getByRole('tab', { name: 'Terminal 1' }))
+
+    await waitFor(() => expect(terminalFocusCalls).toEqual(['session-1']))
+  })
+
+  it('insets every terminal from the panel edges in each dock position', async () => {
+    const user = userEvent.setup()
+    mockCreateSession.mockResolvedValue(runningSession)
+
+    render(<Panel />)
+    await openTerminal(user)
+
+    for (const position of ['Dock terminal to left', 'Dock terminal to right', 'Dock terminal to bottom']) {
+      await user.click(screen.getByRole('button', { name: position }))
+      const wrapper = screen.getByTestId('terminal-tab-content')
+      expect(wrapper.className).toMatch(/\bpx-2\b/)
+      expect(wrapper.className).toMatch(/\bpb-2\b/)
+      expect(wrapper.className).toMatch(/\bpt-1\b/)
+    }
+  })
+
   it('collapsing the panel closes no session and keeps output visible on show again (US2)', async () => {
     const user = userEvent.setup()
     mockCreateSession.mockResolvedValue(runningSession)
