@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
-import { getCurrentBranch } from '../git/repo.js'
-import { emptyChangedFilesSummary, getSyncStatus } from '../services/repo-watch.js'
+import { emptyChangedFilesSummary, getSyncStatusAsync } from '../services/repo-watch.js'
 
 type Variables = { repoPath: string }
 
@@ -35,6 +34,5 @@ export async function syncHandler(c: Context<{ Variables: Variables }>): Promise
   }
 
   const currentPath = c.req.query('path') ?? ''
-  const branch = c.req.query('branch') ?? getCurrentBranch(repoPath)
-  return c.json(getSyncStatus(repoPath, branch, currentPath))
+  return c.json(await getSyncStatusAsync(repoPath, c.req.query('branch'), currentPath))
 }

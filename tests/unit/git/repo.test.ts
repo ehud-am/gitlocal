@@ -67,6 +67,7 @@ import {
   buildChangedFileItems,
   summarizeChangedFiles,
   buildRepositoryStatusSummary,
+  withGitOutputCache,
 } from '../../../src/git/repo.js'
 
 afterEach(() => {
@@ -288,6 +289,136 @@ describe('viewer usability repo helpers', () => {
     } finally {
       cleanup()
     }
+  })
+
+  it('classifies changed files the same way classifyGeneratedLocalState does, in one pass', () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      // Tracked, then untracked-but-kept and ignored: listed by git status as a staged deletion
+      // whose file is still on disk and now ignored.
+      mkdirSync(join(dir, 'dist'))
+      writeFileSync(join(dir, 'dist', 'app.js'), 'built')
+      writeFileSync(join(dir, 'kept.log'), 'log')
+      spawnSync('git', ['add', 'dist/app.js', 'kept.log'], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['commit', '-m', 'add outputs'], { cwd: dir, env: isolatedGitEnv() })
+      // Names git C-quotes unless asked for NUL-delimited output.
+      for (const name of ['café.md', 'tab"q.md', 'ignored-ü.tmp']) writeFileSync(join(dir, name), 'v1')
+      mkdirSync(join(dir, 'dir ü'))
+      writeFileSync(join(dir, 'dir ü', 'x.md'), 'v1')
+      spawnSync('git', ['add', 'café.md', 'tab"q.md', 'dir ü/x.md', 'ignored-ü.tmp'], { cwd: dir, env: isolatedGitEnv() })
+      spawnSync('git', ['commit', '-m', 'unicode names'], { cwd: dir, env: isolatedGitEnv() })
+      for (const name of ['café.md', 'tab"q.md', 'dir ü/x.md']) writeFileSync(join(dir, name), 'v2')
+      writeFileSync(join(dir, '.gitignore'), 'dist/\n*.log\n*.tmp\n')
+      spawnSync('git', ['rm', '--cached', '-q', 'dist/app.js', 'kept.log', 'ignored-ü.tmp'], { cwd: dir, env: isolatedGitEnv() })
+      // A staged deletion whose file is gone from disk too.
+      spawnSync('git', ['rm', '-q', 'notes.txt'], { cwd: dir, env: isolatedGitEnv() })
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      mkdirSync(join(dir, 'new-folder', 'nested'), { recursive: true })
+      writeFileSync(join(dir, 'new-folder', 'nested', 'file.md'), 'new')
+
+      const items = buildChangedFileItems(dir, true)
+      for (const item of items) {
+        expect(item.generatedLocalState, item.path).toBe(classifyGeneratedLocalState(dir, item.path))
+      }
+      expect(items).toContainEqual(expect.objectContaining({ path: 'dist/app.js', generatedLocalState: 'generated' }))
+      expect(items).toContainEqual(expect.objectContaining({ path: 'kept.log', generatedLocalState: 'ignored' }))
+      expect(items).toContainEqual(expect.objectContaining({ path: 'notes.txt', generatedLocalState: 'unknown' }))
+      expect(items).toContainEqual(expect.objectContaining({ path: 'README.md', generatedLocalState: 'tracked' }))
+      expect(items).toContainEqual(expect.objectContaining({ path: 'new-folder/nested/file.md', generatedLocalState: 'local-only' }))
+      for (const name of ['café.md', 'tab"q.md', 'dir ü/x.md']) {
+        expect(items).toContainEqual(expect.objectContaining({ path: name, changeState: 'modified', generatedLocalState: 'tracked' }))
+      }
+      expect(items).toContainEqual(expect.objectContaining({ path: 'ignored-ü.tmp', generatedLocalState: 'ignored' }))
+      // The default (tracked-only) listing the review panel shows keeps them too.
+      expect(buildChangedFileItems(dir).map((item) => item.path)).toEqual(expect.arrayContaining(['café.md', 'tab"q.md', 'dir ü/x.md']))
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('returns no changed-file items outside a repository', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitlocal-not-a-repo-'))
+    try {
+      expect(buildChangedFileItems(dir, true)).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runs each git read once inside withGitOutputCache, and prefetches asynchronously', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const firstBranch = spawnGit(dir, 'rev-parse', '--abbrev-ref', 'HEAD')
+      const reads = await withGitOutputCache(dir, [['status', '--porcelain=v1']], () => {
+        const before = spawnGit(dir, 'status', '--porcelain=v1')
+        const branchBefore = spawnGit(dir, 'rev-parse', '--abbrev-ref', 'HEAD')
+        writeFileSync(join(dir, 'README.md'), '# changed inside the cached call')
+        spawnSync('git', ['checkout', '-q', '-b', 'other-branch'], { cwd: dir, env: isolatedGitEnv() })
+        return {
+          before,
+          after: spawnGit(dir, 'status', '--porcelain=v1'),
+          branchBefore,
+          branchAfter: spawnGit(dir, 'rev-parse', '--abbrev-ref', 'HEAD'),
+        }
+      })
+      expect(reads.before).toBe('')
+      expect(reads.after).toBe('')
+      expect(reads.branchBefore).toBe(firstBranch)
+      expect(reads.branchAfter).toBe(firstBranch)
+
+      // Outside the call nothing is cached.
+      expect(spawnGit(dir, 'status', '--porcelain=v1')).toContain('README.md')
+      expect(spawnGit(dir, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('other-branch')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('stops caching once compute throws', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      await expect(withGitOutputCache(dir, [['status', '--porcelain=v1']], () => {
+        throw new Error('boom')
+      })).rejects.toThrow('boom')
+      writeFileSync(join(dir, 'README.md'), '# changed')
+      expect(spawnGit(dir, 'status', '--porcelain=v1')).toContain('README.md')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('serves a prefetched failure from the cache even after the command would succeed', async () => {
+    const { dir, cleanup } = makeGitRepo()
+    try {
+      const result = await withGitOutputCache(dir, [['cat-file', '-e', 'HEAD:later.txt']], () => {
+        writeFileSync(join(dir, 'later.txt'), 'now it exists')
+        spawnSync('git', ['add', 'later.txt'], { cwd: dir, env: isolatedGitEnv() })
+        spawnSync('git', ['commit', '-q', '-m', 'later'], { cwd: dir, env: isolatedGitEnv() })
+        try {
+          spawnGit(dir, 'cat-file', '-e', 'HEAD:later.txt')
+          return 'succeeded'
+        } catch {
+          return 'cached failure'
+        }
+      })
+      expect(result).toBe('cached failure')
+      expect(() => spawnGit(dir, 'cat-file', '-e', 'HEAD:later.txt')).not.toThrow()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('records a prefetch that cannot start as a failed command', async () => {
+    const missing = join(tmpdir(), 'gitlocal-missing-dir-does-not-exist')
+    const message = await withGitOutputCache(missing, [['status']], () => {
+      try {
+        spawnGit(missing, 'status')
+        return ''
+      } catch (error) {
+        return (error as Error).message
+      }
+    })
+    expect(message).toMatch(/ENOENT/)
   })
 
   it('maps staged added and renamed changed-file items', () => {

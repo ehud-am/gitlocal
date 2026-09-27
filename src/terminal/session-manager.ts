@@ -34,14 +34,34 @@ export type PtyFactory = (options: SpawnPtyOptions) => Promise<PtyLike>
 const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
   const nodePty = await import('node-pty')
   return nodePty.spawn(shell, [], {
-    name: 'xterm-color',
+    name: TERMINAL_NAME,
     cols,
     rows,
     cwd,
-    env: process.env as Record<string, string>,
+    env: buildPtyEnv(process.env),
   })
 }
 /* v8 ignore stop */
+
+// xterm.js implements xterm-256color; the older `xterm-color` terminfo entry advertises 8 colors
+// and a smaller key/capability set, which makes line editors and full-screen programs fall back
+// to less reliable cursor handling.
+const TERMINAL_NAME = 'xterm-256color'
+const FALLBACK_LOCALE = 'en_US.UTF-8'
+
+// The macOS app starts GitLocal from launchd, which sets no locale; a shell without one treats
+// input as single bytes, so pasted or typed non-ASCII text is mangled and the line editor loses
+// track of the cursor. Same fallback VS Code's terminal applies.
+export function buildPtyEnv(baseEnv: NodeJS.ProcessEnv): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const [key, value] of Object.entries(baseEnv)) {
+    if (value !== undefined) env[key] = value
+  }
+  env.TERM = TERMINAL_NAME
+  env.COLORTERM = 'truecolor'
+  if (!env.LANG && !env.LC_ALL && !env.LC_CTYPE) env.LANG = FALLBACK_LOCALE
+  return env
+}
 
 function defaultShellCommand(): string {
   return process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/sh'
@@ -62,7 +82,11 @@ interface ManagedSession {
   createdAt: string
   exitInfo: TerminalExitInfo | null
   pty: PtyLike | null
-  outputBuffer: string
+  // Recent output kept for replay when a client (re)connects, as whole chunks so trimming it is
+  // cheap: re-slicing one 200 KB string on every chunk made heavy output (a build log, `cat` of a
+  // large file) cost a 200 KB copy per chunk on the event loop that also carries keystrokes.
+  outputChunks: string[]
+  outputLength: number
   outputListeners: Set<(chunk: string) => void>
   exitListeners: Set<() => void>
 }
@@ -81,9 +105,15 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
   const sessions = new Map<string, ManagedSession>()
 
   function appendBuffered(session: ManagedSession, chunk: string): void {
-    session.outputBuffer += chunk
-    if (session.outputBuffer.length > MAX_BUFFERED_OUTPUT_CHARS) {
-      session.outputBuffer = session.outputBuffer.slice(-MAX_BUFFERED_OUTPUT_CHARS)
+    session.outputChunks.push(chunk)
+    session.outputLength += chunk.length
+    while (session.outputLength - session.outputChunks[0].length >= MAX_BUFFERED_OUTPUT_CHARS) {
+      session.outputLength -= session.outputChunks.shift()!.length
+    }
+    const excess = session.outputLength - MAX_BUFFERED_OUTPUT_CHARS
+    if (excess > 0) {
+      session.outputChunks[0] = session.outputChunks[0].slice(excess)
+      session.outputLength = MAX_BUFFERED_OUTPUT_CHARS
     }
   }
 
@@ -124,7 +154,8 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
       createdAt: new Date().toISOString(),
       exitInfo: null,
       pty: null,
-      outputBuffer: '',
+      outputChunks: [],
+      outputLength: 0,
       outputListeners: new Set(),
       exitListeners: new Set(),
     }
@@ -185,7 +216,7 @@ export function createSessionManager(ptyFactory: PtyFactory, shellCommand: strin
     session.outputListeners.add(onData)
     session.exitListeners.add(onExit)
     return {
-      bufferedOutput: session.outputBuffer,
+      bufferedOutput: session.outputChunks.join(''),
       unsubscribe: () => {
         session.outputListeners.delete(onData)
         session.exitListeners.delete(onExit)

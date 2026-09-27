@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { type Stats, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type {
   Branch,
   BranchSwitchRequest,
@@ -77,23 +77,95 @@ export function getAppVersion(): string {
   return cachedAppVersion
 }
 
-export function spawnGit(repoPath: string, ...args: string[]): string {
-  const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
-  /* v8 ignore next */
-  if (result.error) throw result.error
-  /* v8 ignore next */
-  if (result.status !== 0) throw new Error(result.stderr?.trim() || `git ${args[0]} failed`)
-  /* v8 ignore next */
-  return result.stdout?.trim() ?? ''
+interface GitRunResult {
+  status: number
+  stdout: string
+  stderr: string
+  error?: Error
 }
 
-function runGitCapture(repoPath: string, ...args: string[]): { status: number; stdout: string; stderr: string } {
+// Git output shared by every read inside one withGitOutputCache() call. The helpers in this module
+// are synchronous and freely re-run the same read-only command (a single sync-status check used to
+// run `git status` four times); the cache makes each distinct command run once per call.
+let activeGitOutputCache: Map<string, GitRunResult> | null = null
+
+function gitCacheKey(repoPath: string, args: string[]): string {
+  return `${repoPath}\0${args.join('\0')}`
+}
+
+function runGit(repoPath: string, args: string[]): GitRunResult {
+  const key = gitCacheKey(repoPath, args)
+  const cached = activeGitOutputCache?.get(key)
+  if (cached) return cached
   const result = spawnSync('git', args, { cwd: repoPath, encoding: 'utf-8' })
-  return {
+  const captured: GitRunResult = {
     status: result.status ?? 1,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
+    error: result.error,
   }
+  activeGitOutputCache?.set(key, captured)
+  return captured
+}
+
+function runGitAsync(repoPath: string, args: string[]): Promise<GitRunResult> {
+  return new Promise((resolvePromise) => {
+    // GIT_OPTIONAL_LOCKS=0: a background `git status` must not take index.lock and make a git
+    // command the user runs in the terminal at the same moment fail (VS Code does the same).
+    const child = spawn('git', args, { cwd: repoPath, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
+    const stdout: Buffer[] = []
+    const stderr: Buffer[] = []
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+    child.on('error', (error) => resolvePromise({ status: 1, stdout: '', stderr: '', error }))
+    child.on('close', (code) => {
+      resolvePromise({
+        status: code ?? 1,
+        stdout: Buffer.concat(stdout).toString('utf-8'),
+        stderr: Buffer.concat(stderr).toString('utf-8'),
+      })
+    })
+  })
+}
+
+export async function getCurrentBranchAsync(repoPath: string): Promise<string> {
+  const result = await runGitAsync(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD'])
+  return result.status === 0 ? result.stdout.trim() : ''
+}
+
+/**
+ * Runs `compute` with every read-only git command it issues memoized, after first running the
+ * `prefetch` commands asynchronously. The server's event loop also carries terminal I/O, so the
+ * expensive commands of a frequently-polled request (git status, ls-files) must not run through
+ * spawnSync, which would freeze every open terminal for the command's full duration. `compute`
+ * must be synchronous and must not modify the repository: the cache is only valid while nothing
+ * else can run, and a write would make cached output stale.
+ */
+export async function withGitOutputCache<T>(repoPath: string, prefetch: string[][], compute: () => T): Promise<T> {
+  const cache = new Map<string, GitRunResult>()
+  const results = await Promise.all(prefetch.map((args) => runGitAsync(repoPath, args)))
+  prefetch.forEach((args, index) => cache.set(gitCacheKey(repoPath, args), results[index]))
+  const previous = activeGitOutputCache
+  activeGitOutputCache = cache
+  try {
+    return compute()
+  } finally {
+    activeGitOutputCache = previous
+  }
+}
+
+export function spawnGit(repoPath: string, ...args: string[]): string {
+  const result = runGit(repoPath, args)
+  /* v8 ignore next */
+  if (result.error) throw result.error
+  /* v8 ignore next */
+  if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`)
+  return result.stdout.trim()
+}
+
+function runGitCapture(repoPath: string, ...args: string[]): { status: number; stdout: string; stderr: string } {
+  const { status, stdout, stderr } = runGit(repoPath, args)
+  return { status, stdout, stderr }
 }
 
 function readGitConfig(repoPath: string, scope: '--local' | '--global', key: string): string {
@@ -849,17 +921,28 @@ export function nearestExistingRepoPath(repoPath: string, filePath: string): str
   return ''
 }
 
-export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
+// Every path in the index, verbatim. `-z` matters: without it git C-quotes any path with non-ASCII
+// or special characters ("caf\303\251.md"), which then never matches the raw paths `git status -z`
+// reports.
+function listIndexedPaths(repoPath: string): string[] {
+  const result = runGitCapture(repoPath, 'ls-files', '-z')
+  if (result.status !== 0) return []
+  return result.stdout.split('\0').filter(Boolean)
+}
+
+function statTrackedFile(repoPath: string, filePath: string): Stats | null {
   try {
-    return spawnGit(repoPath, 'ls-files')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((filePath) => getPathType(repoPath, filePath) === 'file')
-      .sort()
+    const stats = statSync(resolveRepoPath(repoPath, filePath))
+    return stats.isDirectory() ? null : stats
   } catch {
-    return []
+    return null
   }
+}
+
+export function getTrackedWorkingTreeFiles(repoPath: string): string[] {
+  return listIndexedPaths(repoPath)
+    .filter((filePath) => statTrackedFile(repoPath, filePath) !== null)
+    .sort()
 }
 
 export function getTrackedPathType(repoPath: string, filePath: string, trackedFiles?: string[]): 'file' | 'dir' | 'missing' | 'none' {
@@ -892,9 +975,11 @@ export function getWorkingTreeRevision(repoPath: string): string {
   const hash = createHash('sha1')
   hash.update(getCurrentBranch(repoPath))
 
-  for (const relPath of getTrackedWorkingTreeFiles(repoPath)) {
-    const fullPath = resolveRepoPath(repoPath, relPath)
-    const stats = statSync(fullPath)
+  // One stat per tracked file: this runs on every sync-status poll, on the event loop that also
+  // carries terminal I/O.
+  for (const relPath of listIndexedPaths(repoPath).sort()) {
+    const stats = statTrackedFile(repoPath, relPath)
+    if (!stats) continue
     hash.update(relPath)
     hash.update(String(stats.size))
     hash.update(String(stats.mtimeMs))
@@ -1161,10 +1246,56 @@ function describeChangedFile(changeState: ChangedFileState, generatedLocalState:
   return 'Modified locally'
 }
 
+// Same result as classifyGeneratedLocalState for every entry of a `git status` listing, with one
+// `git ls-files` and one batched `git check-ignore` for the whole listing. Calling
+// classifyGeneratedLocalState per entry spawned `ls-files` twice and stat'ed every tracked file for
+// each changed path, which took seconds on an ordinary repository with a few dozen local changes.
+function classifyChangedEntries(
+  repoPath: string,
+  entries: Array<{ path: string; changeState: ChangedFileState }>,
+): Map<string, GeneratedLocalState> {
+  const paths = entries.map((entry) => entry.path)
+  const states = new Map<string, GeneratedLocalState>()
+  if (!validateRepo(repoPath)) {
+    for (const path of paths) states.set(path, 'unknown')
+    return states
+  }
+
+  // `ls-files --error-unmatch <path>` (what classifyGeneratedLocalState asks) matches an indexed
+  // file or any directory holding one, so both the entries and their ancestors count as tracked.
+  const indexed = new Set<string>()
+  for (const line of listIndexedPaths(repoPath)) {
+    const entry = normalizeRepoRelativePath(line)
+    for (let boundary = entry.length; boundary > 0; boundary = entry.lastIndexOf('/', boundary - 1)) {
+      const prefix = entry.slice(0, boundary)
+      if (indexed.has(prefix)) break
+      indexed.add(prefix)
+    }
+  }
+
+  // git status never lists ignored untracked files, so only paths it reports for another reason
+  // (a staged deletion of a file that is still on disk, say) can be ignored; for everything else
+  // the check-ignore spawn would be wasted.
+  const ignoreCandidates = entries
+    .filter((entry) => entry.changeState !== 'untracked' && !indexed.has(normalizeRepoRelativePath(entry.path)))
+    .map((entry) => entry.path)
+  const ignored = getIgnoredPathSet(repoPath, ignoreCandidates)
+  for (const path of paths) {
+    const normalized = normalizeRepoRelativePath(path)
+    if (!normalized) states.set(path, 'unknown')
+    else if (indexed.has(normalized)) states.set(path, 'tracked')
+    else if (ignored.has(normalized)) states.set(path, isLikelyGeneratedPath(normalized) ? 'generated' : 'ignored')
+    else states.set(path, getPathType(repoPath, normalized) === 'missing' ? 'unknown' : 'local-only')
+  }
+  return states
+}
+
 export function buildChangedFileItems(repoPath: string, includeGeneratedLocal = false): ChangedFileItem[] {
-  return getWorkingTreeChangeDetails(repoPath)
+  const changes = getWorkingTreeChangeDetails(repoPath)
+  const generatedLocalStates = classifyChangedEntries(repoPath, changes)
+  return changes
     .map((entry) => {
-      const generatedLocalState = classifyGeneratedLocalState(repoPath, entry.path)
+      const generatedLocalState = generatedLocalStates.get(entry.path) ?? 'unknown'
       const pathType = getPathType(repoPath, entry.path)
       const canOpen = pathType === 'file' || pathType === 'dir'
       return {
@@ -1688,14 +1819,15 @@ function getIgnoredPathSet(repoPath: string, paths: string[]): Set<string> {
   const normalizedPaths = uniqueNormalizedPaths(paths)
   if (normalizedPaths.length === 0) return new Set()
 
-  const result = spawnSync('git', ['check-ignore', '--stdin'], {
+  // `-z` on both ends: without it git C-quotes output paths with non-ASCII or special characters.
+  const result = spawnSync('git', ['check-ignore', '-z', '--stdin'], {
     cwd: repoPath,
-    input: normalizedPaths.join('\n'),
+    input: normalizedPaths.join('\0'),
     encoding: 'utf-8',
   })
 
   if (result.status !== 0 || !result.stdout) return new Set()
-  return new Set(result.stdout.split('\n').map((line) => line.trim()).filter(Boolean))
+  return new Set(result.stdout.split('\0').filter(Boolean))
 }
 
 export function getEditableState(repoPath: string, filePath: string, branch: string): { editable: boolean; revisionToken: string | null } {

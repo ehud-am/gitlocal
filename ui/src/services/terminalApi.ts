@@ -17,6 +17,8 @@ export interface TerminalIoOutboundFrame {
 export interface TerminalIoInboundFrame {
   type: 'output' | 'exit'
   data?: string
+  /** Set on the recent-output replay the server sends when a client (re)connects. */
+  replay?: boolean
   code?: number | null
   signal?: string | null
 }

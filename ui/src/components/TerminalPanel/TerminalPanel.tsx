@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { terminalApi } from '../../services/terminalApi'
 import { useTerminalPanel } from '../../hooks/useTerminalPanel'
 import { TerminalView, type TerminalViewHandle } from './TerminalView'
@@ -67,7 +67,9 @@ function defaultPanelWidth(): number {
 // region — see App.tsx's wrapping flex container. This component is always rendered at the same
 // place in the tree regardless of position (only its own className/style change), so changing
 // position never remounts it and never loses open tabs/sessions (FR-006).
-export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel(
+// Memoized because App re-renders on every sync-status poll; none of those renders change this
+// panel's props, and re-rendering it would re-run every open tab's render for nothing.
+export const TerminalPanel = memo(forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel(
   { contextPath, contextType, dockPosition, effectiveDockPosition, onDockPositionChange }: TerminalPanelProps,
   ref,
 ) {
@@ -104,6 +106,17 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     (id: string) => {
       panel.removeTab(id)
       void terminalApi.closeSession(id).catch(() => {})
+    },
+    [panel],
+  )
+
+  // Clicking a tab leaves keyboard focus on the tab itself, so arrow keys and typing went nowhere
+  // until the terminal was clicked again. Selecting a tab (even the already-active one) moves
+  // focus into its terminal, after the tab's content has been shown.
+  const selectTab = useCallback(
+    (id: string) => {
+      panel.setActiveTab(id)
+      requestAnimationFrame(() => viewHandlesRef.current.get(id)?.focus())
     },
     [panel],
   )
@@ -305,7 +318,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           <TerminalTabStrip
             tabs={panel.state.tabs}
             activeTabId={panel.state.activeTabId}
-            onSelectTab={panel.setActiveTab}
+            onSelectTab={selectTab}
             onCloseTab={closeTab}
           />
           <div className="flex shrink-0 items-center gap-1">
@@ -338,7 +351,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           // flex-stretch percentages to reach TerminalView's container — xterm's FitAddon needs
           // a guaranteed, unambiguous box to measure, which matters most in the side-dock case
           // where the container's size comes from a width (not height) chain.
-          <div key={tab.id} className="absolute inset-0" style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}>
+          // The padding keeps the terminal off the window edge in every dock position. It sits
+          // here rather than on TerminalView's own container because FitAddon sizes the grid
+          // from that container's computed size, which must not include padding.
+          <div
+            key={tab.id}
+            className="absolute inset-0 px-2 pb-2 pt-1"
+            style={{ display: tab.id === activeTab.id ? 'block' : 'none' }}
+            data-testid="terminal-tab-content"
+          >
             {tab.status === 'unavailable' ? (
               <div className="flex h-full items-center justify-center px-4 text-center text-sm text-[var(--muted-foreground)]">
                 {tab.unavailableMessage}
@@ -375,4 +396,4 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       {showChrome && effectiveDockPosition === 'left' && resizeHandle}
     </div>
   )
-})
+}))
