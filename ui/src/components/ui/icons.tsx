@@ -118,3 +118,21 @@ export function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
     </svg>
   )
 }
+
+// Glyphs for the main view's tab strip: the permanent folder tab and each open file tab.
+export function FolderTabIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M1.75 4.25a1 1 0 0 1 1-1h3.1l1.4 1.5h6a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H2.75a1 1 0 0 1-1-1v-8Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function FileTabIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M4 1.75h5l3 3v9.5H4v-12.5Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M9 1.75v3h3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}

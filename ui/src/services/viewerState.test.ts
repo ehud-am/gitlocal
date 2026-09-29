@@ -45,6 +45,7 @@ describe('viewerState', () => {
       searchQuery: '',
       searchMode: 'both',
       searchCaseSensitive: false,
+      tabs: [],
     })
   })
 
@@ -66,6 +67,7 @@ describe('viewerState', () => {
       searchQuery: 'hello',
       searchMode: 'content',
       searchCaseSensitive: true,
+      tabs: ['README.md', 'src/index.ts'],
     })
 
     expect(readViewerState()).toEqual({
@@ -85,6 +87,7 @@ describe('viewerState', () => {
       searchQuery: 'hello',
       searchMode: 'content',
       searchCaseSensitive: true,
+      tabs: ['README.md', 'src/index.ts'],
     })
   })
 
@@ -122,7 +125,24 @@ describe('viewerState', () => {
       searchQuery: '',
       searchMode: 'both',
       searchCaseSensitive: false,
+      tabs: [],
     })
+  })
+
+  it('persists open file tabs in order, dropping empty and duplicate entries (049)', () => {
+    window.history.replaceState(null, '', '/?tab=b.md&tab=&tab=a.md&tab=b.md')
+    expect(readViewerState().tabs).toEqual(['b.md', 'a.md'])
+    writeViewerState({ tabs: ['docs/x.md', 'y.md'] })
+    expect(window.location.search).toBe('?tab=docs%2Fx.md&tab=y.md')
+    writeViewerState({ branch: 'main' })
+    expect(readViewerState().tabs).toEqual(['docs/x.md', 'y.md'])
+  })
+
+  it('caps restored file tabs at 50 (049)', () => {
+    const params = new URLSearchParams()
+    for (let index = 0; index < 60; index += 1) params.append('tab', `f${index}.md`)
+    window.history.replaceState(null, '', `/?${params.toString()}`)
+    expect(readViewerState().tabs).toHaveLength(50)
   })
 
   it('persists expanded search presentation separately from query text', () => {

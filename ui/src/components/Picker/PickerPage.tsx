@@ -125,6 +125,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
       searchQuery: '',
       searchMode: 'both',
       searchCaseSensitive: false,
+      tabs: [],
     })
     window.location.reload()
   }

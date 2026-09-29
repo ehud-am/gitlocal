@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.8 - 2026-09-29
+
+- The main view now supports tabs, like a code editor. The landing view is unchanged (folder listing followed by the README, no tabs). Opening a file adds a tab strip with a folder tab first and a tab for the file; closing the file tab returns to the folder view you were on. Opening more files adds more tabs, and clicking a tab switches to it. Opening a file that is already open switches to its tab instead of adding a second one.
+- Tabs can be closed with their close button, a middle-click, or Delete/Backspace when the tab has keyboard focus; "Close all" closes every file tab. Closing the active tab switches to the tab on its right, then the one on its left, then the folder view. Arrow keys, Home, and End move between tabs.
+- Files with the same name (for example `README.md` and `docs/README.md`) show their folder next to the name in the tab. The active tab shows a dot while it has unsaved edits, and closing or leaving it asks before discarding them.
+- Open tabs are kept in the page address, so a reload restores them. Tabs close automatically when their file or folder is deleted, and are cleared when you open a different folder.
+
 ## 0.13.7 - 2026-09-26
 
 - Fixed 1-2 second pauses while typing in the terminal. The app's background check for local file changes (every 3 seconds) ran git synchronously, which froze every open terminal until it finished; on a 5,000-file repository with 40 local changes each check blocked for about 2.4 seconds. The check now runs git in the background and asks git for the file list once instead of once per changed file; the longest pause measured on the same repository dropped from 2.4 seconds to under 0.25 seconds, and the slowest keystroke echo from 2.4 seconds to 0.14 seconds.

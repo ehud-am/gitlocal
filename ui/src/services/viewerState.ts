@@ -39,6 +39,7 @@ const DEFAULTS: ViewerState = {
   searchQuery: '',
   searchMode: 'both',
   searchCaseSensitive: false,
+  tabs: [],
 }
 
 function parseBoolean(value: string | null, fallback: boolean): boolean {
@@ -82,6 +83,14 @@ function parseDefaultReaderPromptStatus(value: unknown): DefaultReaderPreference
     : 'not-asked'
 }
 
+const MAX_TABS = 50
+
+// Drops empty and duplicate entries and caps the count, so a hand-edited or stale URL can't
+// produce an unusable tab strip.
+function parseTabs(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.length > 0))].slice(0, MAX_TABS)
+}
+
 export function readViewerState(): ViewerState {
   const params = getParams()
   const presentation = params.get('searchPresentation')
@@ -114,6 +123,7 @@ export function readViewerState(): ViewerState {
     searchQuery: params.get('searchQuery') ?? DEFAULTS.searchQuery,
     searchMode,
     searchCaseSensitive: parseBoolean(params.get('searchCaseSensitive'), DEFAULTS.searchCaseSensitive),
+    tabs: parseTabs(params.getAll('tab')),
   }
 }
 
@@ -137,6 +147,7 @@ export function writeViewerState(partial: Partial<ViewerState>): ViewerState {
   if (next.searchQuery) params.set('searchQuery', next.searchQuery)
   if (next.searchMode !== DEFAULTS.searchMode) params.set('searchMode', next.searchMode)
   if (next.searchCaseSensitive) params.set('searchCaseSensitive', 'true')
+  for (const tab of next.tabs ?? []) params.append('tab', tab)
 
   writeParams(params)
   return next

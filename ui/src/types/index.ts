@@ -223,6 +223,8 @@ export interface ViewerState {
   searchQuery: string
   searchMode: SearchMode
   searchCaseSensitive: boolean
+  // Open file tabs in the main view, in strip order (spec 049). Absent means no tabs.
+  tabs?: string[]
 }
 
 export interface ApiError {

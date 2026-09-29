@@ -7,6 +7,7 @@ import PickerPage from './components/Picker/PickerPage'
 import BranchSwitchDialog from './components/RepoContext/BranchSwitchDialog'
 import RepoContextHeader from './components/RepoContext/RepoContextHeader'
 import SearchPanel from './components/Search/SearchPanel'
+import { ContentTabStrip } from './components/ContentTabs/ContentTabStrip'
 import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPanel/TerminalPanel'
 import { useTerminalPanelPreference } from './hooks/useTerminalPanelPreference'
 import AppFooter from './components/AppFooter'
@@ -30,6 +31,13 @@ import {
 } from './components/ui/dropdown-menu'
 import { applyTheme, getInitialTheme, writeStoredTheme, type ThemeMode } from './services/theme'
 import { parentPathOf } from './lib/utils'
+import {
+  closeTab,
+  closeTabsUnder,
+  openTab,
+  tabToActivateAfterClose,
+  type FileTab,
+} from './lib/file-tabs'
 import {
   readDefaultReaderPromptPreference,
   readRecentItems,
@@ -233,6 +241,16 @@ export default function App() {
   const [defaultReaderPreference, setDefaultReaderPreference] = useState<DefaultReaderPreference>(() => readDefaultReaderPromptPreference())
   const [defaultReaderSetupPending, setDefaultReaderSetupPending] = useState(false)
   const [refreshingCurrentView, setRefreshingCurrentView] = useState(false)
+  // Main-view tabs (spec 049): every opened file gets a tab; the folder view is the permanent
+  // first tab and remembers the last folder browsed so closing file tabs returns to it.
+  const [fileTabs, setFileTabs] = useState<FileTab[]>(() =>
+    (initialViewerState.tabs ?? []).map((path) => ({ path, localOnly: false })),
+  )
+  const [folderView, setFolderView] = useState(() => ({
+    path: initialViewerState.pathType === 'dir' ? initialViewerState.path : '',
+    localOnly: false,
+  }))
+  const previousActiveFileRef = useRef('')
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
   const nativeRefreshPendingRef = useRef(false)
@@ -362,6 +380,8 @@ export default function App() {
     setSelectedPath('')
     setSelectedPathType('none')
     setSelectedPathLocalOnly(false)
+    setFileTabs([])
+    setFolderView({ path: '', localOnly: false })
     setShowRaw(false)
     setSearchPresentation('collapsed')
     setSearchQuery('')
@@ -395,8 +415,9 @@ export default function App() {
       searchContentKind,
       searchTrackedMode,
       searchLimit,
+      tabs: fileTabs.map((tab) => tab.path),
     }),
-    [currentBranch, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath],
+    [currentBranch, fileTabs, generatedLocalVisibility, hideDotfiles, searchCaseSensitive, searchContentKind, searchLimit, searchMode, searchPresentation, searchQuery, searchRootPath, searchTrackedMode, selectedPath, selectedPathType, showRaw, sidebarCollapsed, viewerRepoPath],
   )
 
   // Gated separately from the snapshot above: this effect only decides *whether* to persist
@@ -430,6 +451,20 @@ export default function App() {
     setSelectedPathLocalOnly(false)
   }, [currentBranch, info?.currentBranch])
 
+  // Whatever route selected a file (tree, search, links, startup restore, a created file), it
+  // shows up as a tab; selecting a folder moves the folder tab there. New tabs open right after
+  // the previously active file tab, like VS Code.
+  useEffect(() => {
+    if (selectedPathType === 'file' && selectedPath) {
+      const previousActiveFile = previousActiveFileRef.current
+      setFileTabs((tabs) => openTab(tabs, selectedPath, selectedPathLocalOnly, previousActiveFile))
+      previousActiveFileRef.current = selectedPath
+      return
+    }
+    setFolderView({ path: selectedPath, localOnly: selectedPathLocalOnly })
+    previousActiveFileRef.current = ''
+  }, [selectedPath, selectedPathLocalOnly, selectedPathType])
+
   useEffect(() => {
     if (!syncStatus) return
 
@@ -444,6 +479,8 @@ export default function App() {
     lastRevisionRef.current = syncStatus.workingTreeRevision
 
     if (syncStatus.currentPath && syncStatus.currentPathType === 'missing') {
+      const missingPath = syncStatus.currentPath
+      setFileTabs((tabs) => closeTab(tabs, missingPath))
       setStatusMessage(syncStatus.activePathNotice?.message ?? syncStatus.statusMessage)
       setSelectedPath(syncStatus.resolvedPath)
       setSelectedPathType(syncStatus.resolvedPathType === 'missing' ? 'none' : syncStatus.resolvedPathType)
@@ -736,6 +773,11 @@ export default function App() {
 
   function selectPath(path: string, type: 'file' | 'dir', localOnly = false): boolean {
     if (!confirmDiscardChanges()) return false
+    navigateTo(path, type, localOnly)
+    return true
+  }
+
+  function navigateTo(path: string, type: 'file' | 'dir', localOnly: boolean): void {
     setSelectedPath(path)
     setSelectedPathType(path ? type : 'none')
     setSelectedPathLocalOnly(path ? localOnly : false)
@@ -749,7 +791,43 @@ export default function App() {
         available: true,
       }))
     }
-    return true
+  }
+
+  function handleSelectFolderTab(): void {
+    if (selectedPathType !== 'file') return
+    selectPath(folderView.path, 'dir', folderView.localOnly)
+  }
+
+  function handleSelectFileTab(path: string): void {
+    if (selectedPathType === 'file' && selectedPath === path) return
+    const tab = fileTabs.find((candidate) => candidate.path === path)
+    selectPath(path, 'file', tab?.localOnly ?? false)
+  }
+
+  // Closing an inactive tab never touches the view. Closing the active one (after the usual
+  // unsaved-changes check) activates its right neighbor, else its left one, else the folder view.
+  function handleCloseTab(path: string): void {
+    const isActive = selectedPathType === 'file' && selectedPath === path
+    if (!isActive) {
+      setFileTabs((tabs) => closeTab(tabs, path))
+      return
+    }
+    if (!confirmDiscardChanges()) return
+    const nextTab = tabToActivateAfterClose(fileTabs, path)
+    setFileTabs((tabs) => closeTab(tabs, path))
+    if (nextTab) {
+      navigateTo(nextTab.path, 'file', nextTab.localOnly)
+    } else {
+      navigateTo(folderView.path, 'dir', folderView.localOnly)
+    }
+  }
+
+  function handleCloseAllTabs(): void {
+    if (selectedPathType === 'file' && !confirmDiscardChanges()) return
+    setFileTabs([])
+    if (selectedPathType === 'file') {
+      navigateTo(folderView.path, 'dir', folderView.localOnly)
+    }
   }
 
   function handleSelectFile(path: string, localOnly = false): boolean {
@@ -946,6 +1024,10 @@ export default function App() {
     nextPathType: ViewerPathType
     result: { message: string }
   }) {
+    if (selectedPathType === 'file' && event.nextPathType !== 'file') {
+      const deletedPath = selectedPath
+      setFileTabs((tabs) => closeTab(tabs, deletedPath))
+    }
     setHasUnsavedChanges(false)
     setSelectedPath(event.nextPath)
     setSelectedPathType(event.nextPathType)
@@ -991,6 +1073,8 @@ export default function App() {
         previewFolderCount: folderDeletePreview.folderCount ?? 0,
         previewImpactToken: folderDeletePreview.impactToken ?? '',
       })
+      const deletedFolderPath = folderDeletePreview.path
+      setFileTabs((tabs) => closeTabsUnder(tabs, deletedFolderPath))
       setFolderDeletePreview(null)
       setFolderDeleteConfirmationName('')
       setHasUnsavedChanges(false)
@@ -1048,6 +1132,8 @@ export default function App() {
             ? 'none'
             : nextSyncStatus.resolvedPathType
 
+          const missingPath = selectedPath
+          setFileTabs((tabs) => closeTab(tabs, missingPath))
           setSelectedPath(fallbackPath)
           setSelectedPathType(fallbackPathType)
           setSelectedPathLocalOnly(false)
@@ -1344,6 +1430,19 @@ export default function App() {
           )}
 
           <main className="content-area flex min-h-0 min-w-0 flex-1 flex-col">
+            {fileTabs.length > 0 && !startupOpenTargetBlocksSavedSelection ? (
+              <ContentTabStrip
+                tabs={fileTabs}
+                activePath={visibleSelectedPathType === 'file' ? visibleSelectedPath : null}
+                folderLabel={folderView.path ? folderView.path.split('/').pop() || folderView.path : info?.name || 'Folder'}
+                folderTitle={folderView.path ? `Folder view: ${folderView.path}` : 'Folder view: repository root'}
+                dirty={hasUnsavedChanges}
+                onSelectFolder={handleSelectFolderTab}
+                onSelectTab={handleSelectFileTab}
+                onCloseTab={handleCloseTab}
+                onCloseAll={handleCloseAllTabs}
+              />
+            ) : null}
             {showDefaultReaderPrompt ? (
               <div className="border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--foreground)]" role="region" aria-label="Default Markdown reader setup">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
