@@ -35,6 +35,7 @@ npx gitlocal
 
 ## What you get
 
+- Several files open at once in editor-style tabs, with a folder tab that takes you back to the GitHub-like folder view.
 - GitHub-style Markdown rendering, plus built-in preview for PDF, SVG, CSV, Excel (`.xlsx`/`.xls`), and PowerPoint (`.pptx`) files alongside images — file types GitHub's web UI often can't render inline and falls back to a raw download for.
 - Local print, Save as PDF, email/share, copy, and download fallback actions on rendered Markdown.
 - A Refresh button, focused undo/redo while editing, and panel-scoped Select All.

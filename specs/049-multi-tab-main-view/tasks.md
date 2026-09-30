@@ -30,4 +30,5 @@
 - [X] T012 Run `cd ui && npx tsc --noEmit`, `npx vitest run --coverage`, repository `npm run lint`, `npm test`, `npm run build`.
 - [X] T013 Bump version to 0.13.8 (`package.json`, `package-lock.json`); add CHANGELOG entry; add CLAUDE.md "Recent Changes" entry.
 - [X] T015 Review feedback: remove the file view's "Back to folder" button (`ContentPanel.tsx` + test) and move the tab strip from the top of `<main>` to below the repository block, directly on the content card (`App.tsx`, `ContentTabStrip.tsx`, `.content-with-tabs` in `globals.css`).
-- [ ] T014 Manual check in a browser: landing, open/close, several tabs, reload restore, unsaved-edit prompt, dark theme (left for reviewer).
+- [X] T016 Pre-release QA (see `releases/0.13.8-release-review.md`): clear tabs on any repository-root switch (not only the launch mismatch), refresh repository info before applying a cross-repository open so the opened file is kept, hide the strip while the startup selection is pending, announce unsaved changes in the close button's name; README, npm README, and gitlocal.dev browse page mention tabs.
+- [X] T014 Manual check in a browser: landing, open/close, several tabs, reload restore, keyboard close, dark theme (Playwright, see release review).

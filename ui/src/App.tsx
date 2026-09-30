@@ -251,6 +251,7 @@ export default function App() {
     localOnly: false,
   }))
   const previousActiveFileRef = useRef('')
+  const tabsRepoPathRef = useRef(initialViewerState.repoPath)
   const queryClient = useQueryClient()
   const lastRevisionRef = useRef('')
   const nativeRefreshPendingRef = useRef(false)
@@ -380,8 +381,6 @@ export default function App() {
     setSelectedPath('')
     setSelectedPathType('none')
     setSelectedPathLocalOnly(false)
-    setFileTabs([])
-    setFolderView({ path: '', localOnly: false })
     setShowRaw(false)
     setSearchPresentation('collapsed')
     setSearchQuery('')
@@ -450,6 +449,19 @@ export default function App() {
     if (!info?.currentBranch || currentBranch === info.currentBranch) return
     setSelectedPathLocalOnly(false)
   }, [currentBranch, info?.currentBranch])
+
+  // Tabs belong to one repository root. Any switch to another root (a different folder at launch,
+  // a startup open target or a macOS open-file event in another repository) drops them. This
+  // runs before the effect below, so a file opened in the new root still gets its tab.
+  useEffect(() => {
+    if (!viewerRepoPath) return
+    const previousRepoPath = tabsRepoPathRef.current
+    tabsRepoPathRef.current = viewerRepoPath
+    if (!previousRepoPath || previousRepoPath === viewerRepoPath) return
+    setFileTabs([])
+    setFolderView({ path: '', localOnly: false })
+    previousActiveFileRef.current = ''
+  }, [viewerRepoPath])
 
   // Whatever route selected a file (tree, search, links, startup restore, a created file), it
   // shows up as a tab; selecting a folder moves the folder tab there. New tabs open right after
@@ -583,6 +595,10 @@ export default function App() {
       return
     }
 
+    // Opening a file in another repository switches the server's root. Refresh the repository
+    // info first: otherwise the stale info.path makes the repository-mismatch reset above clear
+    // the file we are about to select, and the view lands on the new root without it.
+    await queryClient.refetchQueries({ queryKey: ['info'] })
     applyAcceptedOpenTarget({
       rootPath: response.rootPath,
       selectedPath: response.selectedPath ?? '',
@@ -590,7 +606,7 @@ export default function App() {
       message: response.message || (response.selectedPath ? `Opened ${response.selectedPath}.` : `Opened ${response.rootPath}.`),
     })
     await invalidateWorkspaceQueries()
-  }, [applyAcceptedOpenTarget, applyOpenFailure, invalidateWorkspaceQueries])
+  }, [applyAcceptedOpenTarget, applyOpenFailure, invalidateWorkspaceQueries, queryClient])
 
   const openNativeFile = useCallback(async (path: string): Promise<void> => {
     if (!path.trim()) {
@@ -1287,14 +1303,18 @@ export default function App() {
   const emptyStateTitle = emptyState?.title
   const emptyStateDetail = emptyState?.detail
   const emptyStateActions = emptyState?.actions
+  // Hidden until the saved/startup selection is settled, so the strip never shows the folder tab
+  // as active over content that is about to be replaced.
+  const showContentTabs = fileTabs.length > 0
+    && !startupOpenTargetBlocksSavedSelection
+    && !startupOpenTargetPending
+    && !hasRepoMismatch
 
   // Clicking Parent Folder usually just browses to the containing folder within this repository
   // (handleNavigateParent -> handleSelectFolder), but from the repository root it instead leaves
   // the repository into the folder browser (handleBrowseParentRequest, gated by a confirmation
   // dialog). The tooltip previews which one is about to happen so the reload/leave-repo case
   // isn't a surprise; aria-label stays constant so the button's accessible name doesn't change.
-  const showContentTabs = fileTabs.length > 0 && !startupOpenTargetBlocksSavedSelection
-
   const parentFolderLeavesRepository = !(visibleSelectedPathType !== 'none' && visibleSelectedPath)
 
   return (

@@ -5,7 +5,9 @@
 - The main view now supports tabs, like a code editor. The landing view is unchanged (folder listing followed by the README, no tabs). Opening a file adds a tab strip with a folder tab first and a tab for the file; closing the file tab returns to the folder view you were on. Opening more files adds more tabs, and clicking a tab switches to it. The page order is the repository block, then the tabs, then the file content. The "Back to folder" button in the file view was removed, since the folder tab and the file tree cover it. Opening a file that is already open switches to its tab instead of adding a second one.
 - Tabs can be closed with their close button, a middle-click, or Delete/Backspace when the tab has keyboard focus; "Close all" closes every file tab. Closing the active tab switches to the tab on its right, then the one on its left, then the folder view. Arrow keys, Home, and End move between tabs.
 - Files with the same name (for example `README.md` and `docs/README.md`) show their folder next to the name in the tab. The active tab shows a dot while it has unsaved edits, and closing or leaving it asks before discarding them.
-- Open tabs are kept in the page address, so a reload restores them. Tabs close automatically when their file or folder is deleted, and are cleared when you open a different folder.
+- Open tabs are kept in the page address, so a reload restores them. Tabs close automatically when their file or folder is deleted, and are cleared when you open a different folder, including a file from another repository opened from Finder in the macOS app.
+- Fixed opening a file from another repository while the macOS app is running (for example double-clicking a Markdown file in Finder): the app switched to the new repository but showed its root instead of the file.
+- Screen readers now hear "unsaved changes" on the close button of a tab with unsaved edits.
 
 ## 0.13.7 - 2026-09-26
 
