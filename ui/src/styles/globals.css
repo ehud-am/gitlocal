@@ -2079,3 +2079,9 @@ pre {
     display: table-row;
   }
 }
+
+/* 049: the file tab strip sits directly on top of the content card. */
+.content-with-tabs .content-panel {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}

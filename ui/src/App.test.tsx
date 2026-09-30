@@ -1848,4 +1848,171 @@ describe('App', () => {
     // (not just the picker), since a successful fallback resolution never enters picker mode.
     expect(await screen.findByText(/last used folder no longer exists/i)).toBeInTheDocument()
   })
+
+  describe('main view tabs (049)', () => {
+    function tabStrip() {
+      return screen.queryByTestId('content-tab-strip')
+    }
+
+    function tabNames(): string[] {
+      const strip = tabStrip()
+      if (!strip) return []
+      return within(strip).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label') ?? '')
+    }
+
+    function selectedTabName(): string | null {
+      const strip = tabStrip()
+      if (!strip) return null
+      return within(strip).getAllByRole('tab').find((tab) => tab.getAttribute('aria-selected') === 'true')?.getAttribute('aria-label') ?? null
+    }
+
+    async function openFromTree(...segments: string[]) {
+      const tree = await screen.findByRole('tree', { name: /repository files/i })
+      for (const segment of segments) {
+        fireEvent.click(await within(tree).findByText(segment))
+      }
+    }
+
+    it('lands on the folder view with no tab strip, opens a file as a tab, and closes it back to the folder view', async () => {
+      renderWithClient()
+
+      expect(await screen.findByText(/root readme/i)).toBeInTheDocument()
+      expect(tabStrip()).not.toBeInTheDocument()
+
+      await openFromTree('README.md')
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: repo', 'README.md']))
+      expect(selectedTabName()).toBe('README.md')
+      await waitFor(() => expect(api.getFile).toHaveBeenCalledWith('README.md', 'main', false))
+      await waitFor(() => expect(window.location.search).toContain('tab=README.md'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close README.md' }))
+      await waitFor(() => expect(tabStrip()).not.toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText(/root readme/i)).toBeInTheDocument())
+      await waitFor(() => expect(window.location.search).not.toContain('tab='))
+    })
+
+    it('keeps several files open as tabs, switches between them, and returns to the folder view without closing them', async () => {
+      renderWithClient()
+
+      await openFromTree('README.md')
+      await openFromTree('docs', 'guide.md')
+      expect(await screen.findByText('guide content')).toBeInTheDocument()
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'README.md', 'guide.md']))
+      expect(selectedTabName()).toBe('guide.md')
+
+      fireEvent.click(within(tabStrip() as HTMLElement).getByRole('tab', { name: 'README.md' }))
+      await waitFor(() => expect(selectedTabName()).toBe('README.md'))
+      // Re-selecting the active tab is a no-op.
+      fireEvent.click(within(tabStrip() as HTMLElement).getByRole('tab', { name: 'README.md' }))
+
+      fireEvent.click(within(tabStrip() as HTMLElement).getByRole('tab', { name: 'Folder view: docs' }))
+      await waitFor(() => expect(selectedTabName()).toBe('Folder view: docs'))
+      expect(tabNames()).toEqual(['Folder view: docs', 'README.md', 'guide.md'])
+      await waitFor(() => expect(api.getTree).toHaveBeenCalledWith('docs', 'main'))
+      // Selecting the already-active folder tab changes nothing.
+      fireEvent.click(within(tabStrip() as HTMLElement).getByRole('tab', { name: 'Folder view: docs' }))
+
+      // Closing an inactive tab leaves the current view alone.
+      fireEvent.click(screen.getByRole('button', { name: 'Close README.md' }))
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'guide.md']))
+      expect(selectedTabName()).toBe('Folder view: docs')
+
+      // Close all from the folder view just empties the strip.
+      fireEvent.click(screen.getByRole('button', { name: 'Close all file tabs' }))
+      await waitFor(() => expect(tabStrip()).not.toBeInTheDocument())
+    })
+
+    it('opens new tabs next to the active one and activates a neighbor when the active tab closes', async () => {
+      window.history.replaceState(null, '', '/?branch=main&path=README.md&pathType=file&tab=README.md&tab=docs/guide.md')
+      vi.mocked(api.getTree).mockImplementation(async (path?: string) => (path === 'docs'
+        ? [
+            { name: 'README.md', path: 'docs/README.md', type: 'file', localOnly: false },
+            { name: 'guide.md', path: 'docs/guide.md', type: 'file', localOnly: false },
+          ]
+        : [
+            { name: 'docs', path: 'docs', type: 'dir', localOnly: false },
+            { name: 'README.md', path: 'README.md', type: 'file', localOnly: false },
+          ]))
+      renderWithClient()
+
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: repo', 'README.md', 'guide.md']))
+      await waitFor(() => expect(selectedTabName()).toBe('README.md'))
+
+      await openFromTree('docs')
+      const tree = screen.getByRole('tree', { name: /repository files/i })
+      await waitFor(() => expect(within(tree).getAllByText('README.md')).toHaveLength(2))
+      fireEvent.click(within(tree).getAllByText('README.md')[0])
+      // Opened from the folder view, so it goes to the end of the strip.
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'README.md (root)', 'guide.md', 'README.md (docs)']))
+      expect(selectedTabName()).toBe('README.md (docs)')
+
+      // Closing the active last tab activates its left neighbor.
+      fireEvent.click(screen.getAllByRole('button', { name: 'Close README.md' })[1])
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'README.md', 'guide.md']))
+      expect(selectedTabName()).toBe('guide.md')
+      await waitFor(() => expect(screen.getByText('guide content')).toBeInTheDocument())
+
+      // Closing an active middle tab activates its right neighbor.
+      fireEvent.click(within(tabStrip() as HTMLElement).getByRole('tab', { name: 'README.md' }))
+      await waitFor(() => expect(selectedTabName()).toBe('README.md'))
+      fireEvent.click(screen.getByRole('button', { name: 'Close README.md' }))
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'guide.md']))
+      expect(selectedTabName()).toBe('guide.md')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close all file tabs' }))
+      await waitFor(() => expect(tabStrip()).not.toBeInTheDocument())
+      await waitFor(() => expect(api.getTree).toHaveBeenCalledWith('docs', 'main'))
+    })
+
+    it('asks before closing the active tab with unsaved edits and keeps it open when declined', async () => {
+      window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file&tab=docs/guide.md')
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      renderWithClient()
+
+      await screen.findByText('guide content')
+      await userEvent.setup().click(await screen.findByRole('button', { name: /file actions/i }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: /edit file/i }))
+      fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty guide' } })
+      await waitFor(() => expect(within(tabStrip() as HTMLElement).getByTestId('content-tab-dirty')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close guide.md' }))
+      expect(confirm).toHaveBeenCalled()
+      expect(tabNames()).toEqual(['Folder view: repo', 'guide.md'])
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close all file tabs' }))
+      expect(tabNames()).toEqual(['Folder view: repo', 'guide.md'])
+      confirm.mockRestore()
+    })
+
+    it('drops the tab of a file that was deleted outside GitLocal', async () => {
+      window.history.replaceState(null, '', '/?branch=main&path=docs/missing.md&pathType=file&tab=docs/missing.md&tab=README.md')
+      vi.mocked(api.getSyncStatus).mockResolvedValue(buildSyncStatus({
+        currentPath: 'docs/missing.md',
+        currentPathType: 'missing',
+        resolvedPath: 'docs',
+        resolvedPathType: 'dir',
+        fileStatus: 'deleted',
+        treeStatus: 'invalid',
+      }))
+      renderWithClient()
+
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'README.md']))
+      expect(selectedTabName()).toBe('Folder view: docs')
+    })
+
+    it('closes tabs inside a deleted folder', async () => {
+      window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir&tab=docs/guide.md&tab=README.md')
+      renderWithClient()
+
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: docs', 'guide.md', 'README.md']))
+      await userEvent.setup().click(await screen.findByRole('button', { name: /folder actions/i }))
+      await userEvent.setup().click(await screen.findByRole('menuitem', { name: /^delete folder$/i }))
+      const dialog = await screen.findByRole('alertdialog')
+      fireEvent.change(within(dialog).getByLabelText(/folder deletion confirmation name/i), { target: { value: 'docs' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: /^delete folder$/i }))
+
+      await waitFor(() => expect(api.deleteFolder).toHaveBeenCalled())
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: repo', 'README.md']))
+    }, 15000)
+  })
 })
