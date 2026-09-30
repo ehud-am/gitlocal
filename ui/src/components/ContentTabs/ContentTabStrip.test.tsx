@@ -89,7 +89,7 @@ describe('ContentTabStrip', () => {
   it('shows an unsaved-changes dot on the active tab only', () => {
     renderStrip({ dirty: true })
     expect(screen.getAllByTestId('content-tab-dirty')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Close README.md' })).toHaveAttribute('title', 'README.md has unsaved changes. Close README.md')
+    expect(screen.getByRole('button', { name: 'Close README.md (unsaved changes)' })).toHaveAttribute('title', 'README.md has unsaved changes. Close README.md')
   })
 
   it('adds the parent folder to tabs whose file names collide', () => {

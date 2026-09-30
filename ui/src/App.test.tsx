@@ -1975,13 +1975,65 @@ describe('App', () => {
       fireEvent.change(screen.getByLabelText(/edit file content/i), { target: { value: 'dirty guide' } })
       await waitFor(() => expect(within(tabStrip() as HTMLElement).getByTestId('content-tab-dirty')).toBeInTheDocument())
 
-      fireEvent.click(screen.getByRole('button', { name: 'Close guide.md' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Close guide.md (unsaved changes)' }))
       expect(confirm).toHaveBeenCalled()
       expect(tabNames()).toEqual(['Folder view: repo', 'guide.md'])
 
       fireEvent.click(screen.getByRole('button', { name: 'Close all file tabs' }))
       expect(tabNames()).toEqual(['Folder view: repo', 'guide.md'])
       confirm.mockRestore()
+    })
+
+    it('drops tabs from the previous repository when a native open-file event switches repositories', async () => {
+      window.history.replaceState(null, '', '/?repoPath=/tmp/repo&branch=main&path=README.md&pathType=file&tab=README.md&tab=docs/guide.md')
+      vi.mocked(api.openRepository).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        path: '/tmp/other/notes.md',
+        rootPath: '/tmp/other',
+        selectedPath: 'notes.md',
+        selectedPathType: 'file',
+        openMode: 'file',
+        gitState: 'inside-repository',
+        message: 'Opened notes.md.',
+      })
+      renderWithClient()
+      await waitFor(() => expect(selectedTabName()).toBe('README.md'))
+      expect(tabNames()).toEqual(['Folder view: repo', 'README.md', 'guide.md'])
+
+      vi.mocked(api.getInfo).mockResolvedValue({ ...buildInfo('main'), name: 'other', path: '/tmp/other' })
+      window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+        detail: { command: 'open-file', path: '/tmp/other/notes.md' },
+      }))
+
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: other', 'notes.md']))
+      expect(selectedTabName()).toBe('notes.md')
+      await waitFor(() => expect(api.getFile).toHaveBeenCalledWith('notes.md', 'main', false))
+      await waitFor(() => expect(window.location.search).not.toContain('tab=README.md'))
+    })
+
+    it('keeps existing tabs when a native open-file event stays in the same repository', async () => {
+      window.history.replaceState(null, '', '/?repoPath=/tmp/repo&branch=main&path=README.md&pathType=file&tab=README.md')
+      vi.mocked(api.openRepository).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        path: '/tmp/repo/docs/guide.md',
+        rootPath: '/tmp/repo',
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+        openMode: 'file',
+        gitState: 'inside-repository',
+        message: 'Opened docs/guide.md.',
+      })
+      renderWithClient()
+      await waitFor(() => expect(selectedTabName()).toBe('README.md'))
+
+      window.dispatchEvent(new CustomEvent('gitlocal:native-command', {
+        detail: { command: 'open-file', path: '/tmp/repo/docs/guide.md' },
+      }))
+
+      await waitFor(() => expect(tabNames()).toEqual(['Folder view: repo', 'README.md', 'guide.md']))
+      expect(selectedTabName()).toBe('guide.md')
     })
 
     it('drops the tab of a file that was deleted outside GitLocal', async () => {

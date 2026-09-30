@@ -118,6 +118,7 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 ## What GitLocal Helps With
 
 - **Browse local projects** with a lazy-loading, keyboard-navigable file tree (arrow keys, Enter/Space) for regular folders and git repositories.
+- **Keep several files open in tabs**, like a code editor: opening a file adds a tab next to a folder tab, and closing the last file tab returns to the folder view. Open tabs survive a reload.
 - **Read Markdown clearly** in the normal repository viewer with GitHub-like rendering, relative links, heading anchors, rendered find highlights, and share/copy actions.
 - **Preview beyond code, locally** with built-in PDF, SVG, CSV, Excel (`.xlsx`/`.xls`), and PowerPoint (`.pptx`) viewers alongside Markdown and images — files GitHub's web UI often can't render inline and falls back to a raw download for.
 - **Start from useful repository context** with a root dashboard for status, key documents, recent files, recently changed files, and raw directory browsing.
@@ -309,6 +310,7 @@ gitlocal/
     │   ├── FileTree/                — lazy expand/collapse tree
     │   ├── Breadcrumb/              — path navigation
     │   ├── ContentPanel/            — Markdown, code, image, binary rendering, and local file editing
+    │   ├── ContentTabs/             — file tab strip above the content panel
     │   ├── RepoContext/             — branch switcher, sync summary, repo metadata, and identity editing
     │   └── Picker/                  — PickerPage table browser with setup actions
     └── services/api.ts              — typed fetch wrappers for all endpoints

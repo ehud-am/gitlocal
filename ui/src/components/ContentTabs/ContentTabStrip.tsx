@@ -149,7 +149,7 @@ export function ContentTabStrip({
               <button
                 type="button"
                 onClick={close}
-                aria-label={`Close ${label}`}
+                aria-label={showDirty ? `Close ${label} (unsaved changes)` : `Close ${label}`}
                 title={showDirty ? `${label} has unsaved changes. Close ${label}` : `Close ${label}`}
                 className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded-sm text-[var(--muted-foreground)] outline-none transition hover:bg-[var(--muted-strong)] hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                   isActive || showDirty ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
