@@ -84,7 +84,7 @@ export function ContentTabStrip({
   function tabClassName(isActive: boolean): string {
     return `content-tab group flex shrink-0 items-center gap-1 border-r border-[var(--border)] border-t-2 px-3 text-sm transition-colors ${
       isActive
-        ? 'border-t-[var(--primary)] bg-[var(--background)] font-medium text-[var(--foreground)]'
+        ? 'border-t-[var(--primary)] bg-[var(--card)] font-medium text-[var(--foreground)]'
         : 'border-t-transparent bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted-strong)] hover:text-[var(--foreground)]'
     }`
   }
@@ -94,7 +94,7 @@ export function ContentTabStrip({
   return (
     <div
       ref={stripRef}
-      className="content-tab-strip flex h-9 shrink-0 items-stretch border-b border-[var(--border)] bg-[var(--muted)]"
+      className="content-tab-strip flex h-9 shrink-0 items-stretch overflow-hidden rounded-t-lg border border-b-0 border-[var(--border)] bg-[var(--muted)]"
       data-testid="content-tab-strip"
     >
       {/* aria-owns: see TerminalTabStrip — lets each tab sit beside its close button without the

@@ -75,6 +75,8 @@ A user reviewing changes wants to flip between several files without re-finding 
 - **FR-007**: Open tabs MUST be persisted in the page URL (`tab` query parameters, in order) and restored on reload.
 - **FR-008**: Unsaved-edit confirmation MUST apply to closing the active tab, switching tabs, and "Close all".
 - **FR-009**: Tabs for deleted files/folders MUST be closed as described in Edge Cases.
+- **FR-011**: The main view MUST be ordered repository block, then tab strip, then content; the tab strip sits directly on top of the content card.
+- **FR-012**: The file view MUST NOT show a "Back to folder" button (the folder tab and the always-visible tree replace it).
 - **FR-010**: No server/API change; both distributions (npm, macOS app) get the feature from the shared UI.
 
 ### Out of Scope (this patch)

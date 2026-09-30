@@ -1293,6 +1293,8 @@ export default function App() {
   // the repository into the folder browser (handleBrowseParentRequest, gated by a confirmation
   // dialog). The tooltip previews which one is about to happen so the reload/leave-repo case
   // isn't a surprise; aria-label stays constant so the button's accessible name doesn't change.
+  const showContentTabs = fileTabs.length > 0 && !startupOpenTargetBlocksSavedSelection
+
   const parentFolderLeavesRepository = !(visibleSelectedPathType !== 'none' && visibleSelectedPath)
 
   return (
@@ -1430,19 +1432,6 @@ export default function App() {
           )}
 
           <main className="content-area flex min-h-0 min-w-0 flex-1 flex-col">
-            {fileTabs.length > 0 && !startupOpenTargetBlocksSavedSelection ? (
-              <ContentTabStrip
-                tabs={fileTabs}
-                activePath={visibleSelectedPathType === 'file' ? visibleSelectedPath : null}
-                folderLabel={folderView.path ? folderView.path.split('/').pop() || folderView.path : info?.name || 'Folder'}
-                folderTitle={folderView.path ? `Folder view: ${folderView.path}` : 'Folder view: repository root'}
-                dirty={hasUnsavedChanges}
-                onSelectFolder={handleSelectFolderTab}
-                onSelectTab={handleSelectFileTab}
-                onCloseTab={handleCloseTab}
-                onCloseAll={handleCloseAllTabs}
-              />
-            ) : null}
             {showDefaultReaderPrompt ? (
               <div className="border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--foreground)]" role="region" aria-label="Default Markdown reader setup">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1538,6 +1527,22 @@ export default function App() {
                 </div>
               ) : null}
 
+              {/* Repository block, then tabs, then content (049): the strip sits directly on top of
+                  the content card, whose top corners square off while tabs are shown. */}
+              <div className={`flex min-h-0 flex-1 flex-col ${showContentTabs ? 'content-with-tabs' : ''}`}>
+                {showContentTabs ? (
+                  <ContentTabStrip
+                    tabs={fileTabs}
+                    activePath={visibleSelectedPathType === 'file' ? visibleSelectedPath : null}
+                    folderLabel={folderView.path ? folderView.path.split('/').pop() || folderView.path : info?.name || 'Folder'}
+                    folderTitle={folderView.path ? `Folder view: ${folderView.path}` : 'Folder view: repository root'}
+                    dirty={hasUnsavedChanges}
+                    onSelectFolder={handleSelectFolderTab}
+                    onSelectTab={handleSelectFileTab}
+                    onCloseTab={handleCloseTab}
+                    onCloseAll={handleCloseAllTabs}
+                  />
+                ) : null}
               <div className="min-h-0 flex-1 overflow-hidden">
                 {startupOpenTargetBlocksSavedSelection ? (
                   <div className="content-panel" role="alert">
@@ -1583,6 +1588,7 @@ export default function App() {
                     onStatusMessage={setStatusMessage}
                   />
                 )}
+              </div>
               </div>
             </div>
           </main>
