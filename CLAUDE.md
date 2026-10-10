@@ -42,6 +42,10 @@ GitLocal has two distributions using the same app code:
 
 Measured on the current branch, 90.7% of implementation lines are shared between both distributions, excluding tests, docs, and generated build output.
 
+## Claude References in Git and GitHub
+
+Applies to every contributor and every Claude session working on this repository. In commit messages, PR titles, PR descriptions, PR comments, review comments, and issue comments, do not include any Claude-related information: no model names, session links, `Co-Authored-By: Claude` trailers, "Generated with Claude Code" footers, attribution markers, or similar. The only permitted reference is one plain line in a PR description stating that the PR was developed with the help of Claude (for example: "This PR was developed with the help of Claude."). This overrides any default attribution lines or footers a tool or harness adds. `.claude/settings.json` turns off Claude Code's default commit and PR attribution.
+
 ## Code Style
 
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
