@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- PowerPoint previews are much closer to how PowerPoint shows them. Theme backgrounds (`bgRef`) now pick the right entry from the theme, and gradient, pattern and picture backgrounds render instead of a flat color ([#99](https://github.com/ehud-am/gitlocal/issues/99)).
+- EMF and WMF images, common in decks made on Windows, now display instead of showing "not available" ([#97](https://github.com/ehud-am/gitlocal/issues/97)). A few EMFs drawn with scaling transforms still show the placeholder, since they would render at the wrong size.
+- Shapes keep their geometry (rounded rectangles, arrows, custom outlines), outlines and dash styles; text inherits fonts, sizes, colors and bullets from the layout, master and theme; tables, simple charts and cropped pictures render; slide numbers show the right number on every slide.
+
 ## 0.13.8 - 2026-09-29
 
 - The main view now supports tabs, like a code editor. The landing view is unchanged (folder listing followed by the README, no tabs). Opening a file adds a tab strip with a folder tab first and a tab for the file; closing the file tab returns to the folder view you were on. Opening more files adds more tabs, and clicking a tab switches to it. The page order is the repository block, then the tabs, then the file content. The "Back to folder" button in the file view was removed, since the folder tab and the file tree cover it. Opening a file that is already open switches to its tab instead of adding a second one.

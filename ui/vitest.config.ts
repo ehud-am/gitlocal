@@ -32,6 +32,7 @@ export default defineConfig({
         'src/components/ContentPanel/CsvViewer.tsx',
         'src/components/ContentPanel/ExcelViewer.tsx',
         'src/components/ContentPanel/PptxViewer.tsx',
+        'src/components/ContentPanel/pptx/*.{ts,tsx}',
         'src/components/RepoContext/**/*.tsx',
         'src/components/Search/**/*.tsx',
         'src/components/Picker/**/*.tsx',
@@ -49,7 +50,7 @@ export default defineConfig({
         'src/lib/file-tabs.ts',
         'src/lib/sync.ts',
       ],
-      exclude: ['**/*.test.tsx', '**/*.test.ts'],
+      exclude: ['**/*.test.tsx', '**/*.test.ts', 'src/components/ContentPanel/pptx/test-support.ts'],
       thresholds: {
         perFile: true,
         lines: 90,
