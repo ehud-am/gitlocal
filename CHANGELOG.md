@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.9 - 2026-10-11
 
 - PowerPoint previews are much closer to how PowerPoint shows them. Theme backgrounds (`bgRef`) now pick the right entry from the theme, and gradient, pattern and picture backgrounds render instead of a flat color ([#99](https://github.com/ehud-am/gitlocal/issues/99)).
 - EMF and WMF images, common in decks made on Windows, now display instead of showing "not available" ([#97](https://github.com/ehud-am/gitlocal/issues/97)). A few EMFs drawn with scaling transforms still show the placeholder, since they would render at the wrong size.
