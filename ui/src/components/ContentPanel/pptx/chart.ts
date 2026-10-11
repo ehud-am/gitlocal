@@ -54,7 +54,13 @@ function seriesColor(ser: Element, index: number, scope: PartScope): string {
 // Office's automatic chart palette cycles through the theme accents.
 function accentColor(index: number, scope: PartScope): string {
   const slot = scope.colors.clrMap[ACCENTS[index % ACCENTS.length]] ?? ACCENTS[index % ACCENTS.length]
-  return `#${scope.theme.scheme[slot] ?? '4472C4'}`
+  return `#${scope.theme.scheme[slot] ?? '4472C4'}`.toLowerCase()
+}
+
+// A series name is literal text (c:v) or a cell reference with its cached text (c:strRef).
+function seriesName(tx: Element | null): string | null {
+  const value = tx?.getElementsByTagNameNS('*', 'v')[0]?.textContent ?? null
+  return richText(tx) ?? (value && value.trim().length > 0 ? value : null)
 }
 
 function richText(element: Element | null): string | null {
@@ -96,7 +102,7 @@ export function parseChart(chartSpace: Element, scope: PartScope): ChartModel | 
       })
     }
     return {
-      name: richText(child(ser, 'tx')) ?? child(child(ser, 'tx'), 'v')?.textContent ?? `Series ${index + 1}`,
+      name: seriesName(child(ser, 'tx')) ?? `Series ${index + 1}`,
       color,
       values,
       xValues: isScatter ? numbers(categoryRef) : null,
@@ -121,7 +127,7 @@ export function parseChart(chartSpace: Element, scope: PartScope): ChartModel | 
     series,
     showLegend: child(chart, 'legend') !== null,
     legendPosition: legendPosition === 'b' || legendPosition === 't' || legendPosition === 'l' ? legendPosition : 'r',
-    textColor: `#${scope.theme.scheme[textSlot] ?? '000000'}`,
+    textColor: `#${scope.theme.scheme[textSlot] ?? '000000'}`.toLowerCase(),
     gridColor: '#d9d9d9',
   }
 }

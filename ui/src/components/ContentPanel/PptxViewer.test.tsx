@@ -57,9 +57,9 @@ class FakeIntersectionObserver {
   unobserve(): void {}
   disconnect(): void {}
 
-  trigger(element: Element): void {
+  trigger(element: Element, isIntersecting = true): void {
     this.callback(
-      [{ isIntersecting: true, target: element } as IntersectionObserverEntry],
+      [{ isIntersecting, target: element } as IntersectionObserverEntry],
       this as unknown as IntersectionObserver,
     )
   }
@@ -178,12 +178,18 @@ describe('PptxViewer', () => {
       expect(visibilityObserver).toBeDefined()
 
       // Triggering the render observer for slide 1 reveals its shapes (deferred-render path).
+      renderObserver?.trigger(firstSlideEl, false)
+      expect(screen.queryByText('Slide One Title')).toBeNull()
       renderObserver?.trigger(firstSlideEl)
       await waitFor(() => expect(screen.getByText('Slide One Title')).toBeInTheDocument())
 
       // Triggering the visibility observer for slide 3 moves the position indicator to it.
       visibilityObserver?.trigger(thirdSlideEl)
       await waitFor(() => expect(screen.getByText('Slide 3 of 3')).toBeInTheDocument())
+
+      // Once slide 3 scrolls out of view again the indicator returns to the first slide.
+      visibilityObserver?.trigger(thirdSlideEl, false)
+      await waitFor(() => expect(screen.getByText('Slide 1 of 3')).toBeInTheDocument())
     } finally {
       globalThis.IntersectionObserver = OriginalIO
     }
@@ -233,6 +239,22 @@ describe('PptxViewer', () => {
     await waitFor(() => expect(screen.getByText('Slide One Title')).toBeInTheDocument())
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+
+  it('releases image URLs when unmounted before parsing finishes', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    try {
+      const { unmount } = render(<PptxViewer content={variants} />)
+      unmount()
+      // A deck that fails to parse after unmounting reports nothing either.
+      render(<PptxViewer content={broken} />).unmount()
+      // Let the in-flight parse settle; its result is discarded, not rendered.
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(document.querySelector('.pptx-viewer')).toBeNull()
+      expect(screen.queryByRole('alert')).toBeNull()
+    } finally {
+      revoke.mockRestore()
+    }
   })
 
   it('resets to showing the first slide\'s position when the content prop changes to a different deck', async () => {

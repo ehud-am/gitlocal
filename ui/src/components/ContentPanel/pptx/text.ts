@@ -110,7 +110,7 @@ function runColor(sources: RunSources, chain: TextStyleChain, context: TextConte
   const after = first(sources.rPrs.slice(sources.fontRefAt), fromElement)
   if (after) return after
   // Nothing set the color: PowerPoint's default text color is the theme's tx1.
-  return `#${scope.colors.scheme[scope.colors.clrMap.tx1 ?? 'dk1'] ?? '000000'}`
+  return `#${scope.colors.scheme[scope.colors.clrMap.tx1 ?? 'dk1'] ?? '000000'}`.toLowerCase()
 }
 
 function runFont(sources: RunSources, chain: TextStyleChain, context: TextContext): string {

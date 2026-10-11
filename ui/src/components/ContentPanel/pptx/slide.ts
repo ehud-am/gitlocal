@@ -451,20 +451,23 @@ function loadLayout(deck: DeckContext, layoutPath: string): LayoutInfo | null {
   return info
 }
 
-// A layout's or master's own artwork (logos, bands, decorative text), parsed once per part.
+// A layout's or master's own artwork (logos, bands, decorative text), parsed once per part - or
+// once per slide when that artwork shows the slide number.
 function partNodes(deck: DeckContext, part: PartInfo, master: MasterInfo | null, slideNumber: number): SlideNode[] {
-  if (!part.nodes) {
-    part.nodes = parseShapeTree(path(part.root, 'cSld', 'spTree'), {
-      deck,
-      scope: part.scope,
-      slideNumber,
-      layout: null,
-      master,
-      skipPlaceholders: true,
-      groupFill: null,
-    })
-  }
-  return part.nodes
+  if (part.nodes) return part.nodes
+  const spTree = path(part.root, 'cSld', 'spTree')
+  const nodes = parseShapeTree(spTree, {
+    deck,
+    scope: part.scope,
+    slideNumber,
+    layout: null,
+    master,
+    skipPlaceholders: true,
+    groupFill: null,
+  })
+  const showsSlideNumber = Array.from(spTree?.getElementsByTagNameNS('*', 'fld') ?? []).some((field) => attr(field, 'type') === 'slidenum')
+  if (!showsSlideNumber) part.nodes = nodes
+  return nodes
 }
 
 function parseNotes(deck: DeckContext, slidePath: string): string | null {

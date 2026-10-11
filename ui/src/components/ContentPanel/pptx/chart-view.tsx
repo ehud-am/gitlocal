@@ -181,7 +181,7 @@ function AxisChart({ chart, width, height }: { chart: ChartModel; width: number;
       const points: [number, number][] = []
       const bases: [number, number][] = []
       for (let index = 0; index < count; index += 1) {
-        if (series.values[index] === null && !stacked) continue
+        if ((series.values[index] ?? null) === null && !stacked) continue
         const base = stacked ? cumulative[index] : 0
         const value = valueAt(seriesIndex, index) + base
         if (stacked) cumulative[index] = value

@@ -42,7 +42,13 @@ function makeUrl(data: Uint8Array | string, mime: string, objectUrls: string[]):
 async function gunzip(bytes: Uint8Array): Promise<Uint8Array | null> {
   if (typeof DecompressionStream === 'undefined') return null
   try {
-    const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'))
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes)
+        controller.close()
+      },
+    })
+    const stream = source.pipeThrough(new DecompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
     return new Uint8Array(await new Response(stream).arrayBuffer())
   } catch {
     return null
@@ -54,7 +60,7 @@ async function loadOne(pkg: OpcPackage, mediaPath: string, objectUrls: string[])
   if (!file) return null
   try {
     let bytes = await file.async('uint8array')
-    const extension = mediaPath.split('.').pop()?.toLowerCase() ?? ''
+    const extension = mediaPath.slice(mediaPath.lastIndexOf('.') + 1).toLowerCase()
     if (extension === 'emz' || extension === 'wmz') {
       const unzipped = await gunzip(bytes)
       if (!unzipped) return null
