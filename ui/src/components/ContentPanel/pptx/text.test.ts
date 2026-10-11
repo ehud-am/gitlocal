@@ -74,6 +74,17 @@ describe('parseTextBody', () => {
     expect(deep.runs[0].sizePt).toBe(18)
   })
 
+  it('formats runs from the paragraph\'s own default run properties, below the run\'s own', async () => {
+    const inherited = el('<a:lstStyle><a:lvl1pPr><a:defRPr sz="1000" i="1"><a:solidFill><a:srgbClr val="222222"/></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle>')
+    const body = await parse(`<a:bodyPr/><a:p><a:pPr><a:defRPr sz="2800" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="Verdana"/></a:defRPr></a:pPr>
+      <a:r><a:t>Plain</a:t></a:r><a:r><a:rPr sz="1200"><a:solidFill><a:srgbClr val="20A88A"/></a:solidFill></a:rPr><a:t>Own</a:t></a:r></a:p>`,
+    { lstStyles: [null, inherited], bodyPrs: [], fontRef: el('<a:fontRef idx="minor"><a:srgbClr val="333333"/></a:fontRef>') })
+    const [plain, own] = body?.paragraphs[0].runs ?? []
+    expect(plain).toMatchObject({ sizePt: 28, bold: true, italic: true, color: '#ffffff' })
+    expect(plain.fontFamily).toContain('Verdana')
+    expect(own).toMatchObject({ sizePt: 12, bold: true, color: '#20a88a' })
+  })
+
   it('places a shape style font reference between the shape list style and inherited styles', async () => {
     const own = '<a:lstStyle><a:lvl1pPr><a:defRPr><a:solidFill><a:srgbClr val="111111"/></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle>'
     const inherited = el('<a:lstStyle><a:lvl1pPr><a:defRPr b="1"><a:solidFill><a:srgbClr val="222222"/></a:solidFill><a:latin typeface="Courier New"/></a:defRPr></a:lvl1pPr></a:lstStyle>')

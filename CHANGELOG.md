@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed PowerPoint slides whose text showed in black at the default size (invisible on dark slides) when the deck sets text formatting on the paragraph instead of on each run, as some generated decks do.
+
 ## 0.13.9 - 2026-10-11
 
 - PowerPoint previews are much closer to how PowerPoint shows them. Theme backgrounds (`bgRef`) now pick the right entry from the theme, and gradient, pattern and picture backgrounds render instead of a flat color ([#99](https://github.com/ehud-am/gitlocal/issues/99)).

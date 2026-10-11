@@ -257,9 +257,11 @@ export function parseTextBody(txBody: Element | null, chain: TextStyleChain, con
     // Each list style's level entry, followed by its defPPr (defaults for every level).
     const levelStyles = lstStyles.flatMap((lstStyle) => [child(lstStyle, `lvl${level + 1}pPr`), child(lstStyle, 'defPPr')])
     const levelSources = [pPr, ...levelStyles]
-    const defRPrs = levelStyles.map((style) => child(style, 'defRPr'))
-    // fontRef sits right after the run's own properties and the shape's own lstStyle entries.
-    const fontRefAt = 3
+    // The paragraph's own a:pPr/a:defRPr comes first: generated decks often format runs only there.
+    const defRPrs = [child(pPr, 'defRPr'), ...levelStyles.map((style) => child(style, 'defRPr'))]
+    // fontRef sits right after the run's own properties, the paragraph defaults and the shape's
+    // own lstStyle entries.
+    const fontRefAt = 4
 
     const runs: TextRun[] = []
     for (const element of children(paragraph)) {
