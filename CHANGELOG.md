@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.10 - 2026-10-11
 
 - Fixed PowerPoint slides whose text showed in black at the default size (invisible on dark slides) when the deck sets text formatting on the paragraph instead of on each run, as some generated decks do.
 

@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.13.9",
+  "version": "0.13.10",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
