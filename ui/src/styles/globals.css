@@ -1714,18 +1714,34 @@ pre {
   background: var(--surface-subtle);
 }
 
-.pptx-viewer-shape {
-  overflow: hidden;
+/* Slides are drawn with their own colors and fonts, independent of the app's light/dark theme. */
+.pptx-viewer-slide {
+  background: #ffffff;
+  color: #000000;
+  line-height: normal;
+  font-kerning: normal;
 }
 
-.pptx-viewer-shape p {
+/* Text and outlines may extend past a shape's box, as they do in PowerPoint. */
+.pptx-viewer-shape {
+  overflow: visible;
+}
+
+.pptx-viewer-paragraph {
   margin: 0;
 }
 
+.pptx-viewer-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pptx-viewer-table td {
+  padding: 0;
+}
+
 .pptx-viewer-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  display: block;
 }
 
 .pptx-viewer-image-placeholder {

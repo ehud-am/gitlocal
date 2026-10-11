@@ -65,6 +65,34 @@ class FakeIntersectionObserver {
   }
 }
 
+const EMU_PER_PX = 9525
+
+// Shape positions are rounded to thousandths of a pixel in the rendered styles.
+function expectPx(value: string, emu: number): void {
+  expect(value.endsWith('px')).toBe(true)
+  expect(parseFloat(value)).toBeCloseTo(emu / EMU_PER_PX, 2)
+}
+
+// A shape inside a group is positioned relative to the group's box; this adds up the offsets of
+// every enclosing group to give the shape's position on the slide.
+function slideOffset(element: HTMLElement): { left: number; top: number } {
+  let left = 0
+  let top = 0
+  for (let node: HTMLElement | null = element; node && !node.classList.contains('pptx-viewer-slide-content'); node = node.parentElement) {
+    if (node.classList.contains('pptx-viewer-shape') || node.classList.contains('pptx-viewer-group')) {
+      left += parseFloat(node.style.left || '0')
+      top += parseFloat(node.style.top || '0')
+    }
+  }
+  return { left, top }
+}
+
+function slideBackground(index: number): HTMLElement {
+  return slideItem(index).querySelector('.pptx-viewer-background') as HTMLElement
+}
+
+const IMAGE_SRC = /^(blob:|data:image\/png;base64,)/
+
 function slideItem(index: number): HTMLElement {
   const el = document.querySelector(`[data-slide-index="${index}"]`)
   if (!el) throw new Error(`No slide item rendered for index ${index}`)
@@ -216,22 +244,22 @@ describe('PptxViewer', () => {
     expect(screen.getByText('Slide 1 of 1')).toBeInTheDocument()
   })
 
-  it('embeds a resolvable slide image as a data URI', async () => {
+  it('embeds a resolvable slide image as an object or data URL', async () => {
     render(<PptxViewer content={sample} />)
     await waitFor(() => expect(screen.getByText('Slide Two Title')).toBeInTheDocument())
     const image = slideItem(1).querySelector('.pptx-viewer-image')
     expect(image).not.toBeNull()
-    expect(image?.getAttribute('src')).toContain('data:image/png;base64,')
+    expect(image?.getAttribute('src')).toMatch(IMAGE_SRC)
   })
 
-  it('renders an unformatted text run without bold/italic/size/color styling', async () => {
+  it('renders an unformatted text run with the inherited defaults (18pt, regular, theme text color)', async () => {
     render(<PptxViewer content={variants} />)
     await waitFor(() => expect(screen.getByText('Unformatted body text.')).toBeInTheDocument())
     const run = screen.getByText('Unformatted body text.')
-    expect(run.style.fontWeight).toBe('')
-    expect(run.style.fontStyle).toBe('')
-    expect(run.style.fontSize).toBe('')
-    expect(run.style.color).toBe('')
+    expect(run.style.fontWeight).toBe('400')
+    expect(run.style.fontStyle).toBe('normal')
+    expect(run.style.fontSize).toBe('18pt')
+    expect(run.style.color).toBe('rgb(0, 0, 0)')
   })
 
   it('shows a placeholder for an unresolvable embedded image instead of omitting the shape', async () => {
@@ -254,7 +282,7 @@ describe('PptxViewer', () => {
     const italicRun = screen.getByText('Italic run text.')
     expect(italicRun.style.fontStyle).toBe('italic')
     const noRPrRun = screen.getByText('No-rPr run text.')
-    expect(noRPrRun.style.fontWeight).toBe('')
+    expect(noRPrRun.style.fontWeight).toBe('400')
 
     // Five shapes total on this slide: Title + Italic/No-rPr text box + empty text box (dropped,
     // has zero runs) + an unpositioned text box (no a:xfrm at all) — three text boxes render.
@@ -292,7 +320,7 @@ describe('PptxViewer', () => {
     render(<PptxViewer content={dottedPathImage} />)
     await waitFor(() => expect(screen.getByText('Dotted Path Image')).toBeInTheDocument())
     const image = document.querySelector('.pptx-viewer-image')
-    expect(image?.getAttribute('src')).toContain('data:image/png;base64,')
+    expect(image?.getAttribute('src')).toMatch(IMAGE_SRC)
   })
 
   it('renders a placeholder\'s text at its layout-inherited position/size when the slide defines no geometry of its own', async () => {
@@ -302,19 +330,16 @@ describe('PptxViewer', () => {
     const shapeEl = screen.getByText('Inherited Title').closest('.pptx-viewer-shape') as HTMLElement
     // The layout places this placeholder at x=457200 EMU / 9525 = 48px, not at the slide's own
     // (absent) geometry, which would have defaulted to 0px, nor at the master's 100000 EMU.
-    expect(shapeEl.style.left).toBe(`${457200 / 9525}px`)
-    expect(shapeEl.style.top).toBe(`${274638 / 9525}px`)
+    expectPx(shapeEl.style.left, 457200)
+    expectPx(shapeEl.style.top, 274638)
   })
 
   it('inherits a slide\'s background from its layout, and falls through to the master when the layout has none', async () => {
     render(<PptxViewer content={layoutBackground} />)
     await waitFor(() => expect(screen.getByText('Layout Background Slide')).toBeInTheDocument())
 
-    const layoutBgSlide = slideItem(0).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(layoutBgSlide.style.backgroundColor).toBe('rgb(0, 255, 0)') // layout's own bg (green) wins over master's (red)
-
-    const masterBgSlide = slideItem(1).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(masterBgSlide.style.backgroundColor).toBe('rgb(255, 0, 0)') // layout has none -> falls through to master's (red)
+    expect(slideBackground(0).style.backgroundColor).toBe('rgb(0, 255, 0)') // layout's own bg (green) wins over master's (red)
+    expect(slideBackground(1).style.backgroundColor).toBe('rgb(255, 0, 0)') // layout has none -> falls through to master's (red)
   })
 
   it('renders each slide\'s own layout formatting across a deck with multiple layouts, honoring a slide-level override', async () => {
@@ -322,14 +347,14 @@ describe('PptxViewer', () => {
     await waitFor(() => expect(screen.getByText('Layout One Title')).toBeInTheDocument())
 
     const layout1Shape = screen.getByText('Layout One Title').closest('.pptx-viewer-shape') as HTMLElement
-    expect(layout1Shape.style.left).toBe(`${457200 / 9525}px`)
+    expectPx(layout1Shape.style.left, 457200)
 
     const layout2Shape = screen.getByText('Layout Two Title').closest('.pptx-viewer-shape') as HTMLElement
-    expect(layout2Shape.style.left).toBe(`${685800 / 9525}px`)
+    expectPx(layout2Shape.style.left, 685800)
 
     // Slide 3 uses layout2 too, but defines its own position directly - that override must win.
     const overriddenShape = screen.getByText('Overridden Title').closest('.pptx-viewer-shape') as HTMLElement
-    expect(overriddenShape.style.left).toBe(`${1000000 / 9525}px`)
+    expectPx(overriddenShape.style.left, 1000000)
     expect(overriddenShape.style.left).not.toBe(layout2Shape.style.left)
   })
 
@@ -338,14 +363,14 @@ describe('PptxViewer', () => {
     await waitFor(() => expect(screen.getByText('Missing Layout Slide')).toBeInTheDocument())
     const shapeEl = screen.getByText('Missing Layout Slide').closest('.pptx-viewer-shape') as HTMLElement
     // The slide's own direct geometry is still used - no crash, no silent drop.
-    expect(shapeEl.style.left).toBe(`${500000 / 9525}px`)
+    expectPx(shapeEl.style.left, 500000)
   })
 
   it('matches a slide placeholder to its layout counterpart by shared @idx', async () => {
     render(<PptxViewer content={multiLayoutDeck} />)
     await waitFor(() => expect(screen.getByText('Layout One Title')).toBeInTheDocument())
     const shapeEl = screen.getByText('Layout One Title').closest('.pptx-viewer-shape') as HTMLElement
-    expect(shapeEl.style.left).toBe(`${457200 / 9525}px`)
+    expectPx(shapeEl.style.left, 457200)
   })
 
   it.each([
@@ -366,8 +391,7 @@ describe('PptxViewer', () => {
     render(<PptxViewer content={themeSchemeColors} />)
     await waitFor(() => expect(screen.getByText('Accent Background Slide')).toBeInTheDocument())
 
-    const slideEl = slideItem(0).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(255, 102, 0)') // theme1's accent1 = #FF6600
+    expect(slideBackground(0).style.backgroundColor).toBe('rgb(255, 102, 0)') // theme1's accent1 = #FF6600
 
     const titleRun = screen.getByText('Accent Background Slide')
     expect(titleRun.style.color).toBe('rgb(255, 102, 0)')
@@ -377,24 +401,21 @@ describe('PptxViewer', () => {
     render(<PptxViewer content={themeSchemeColors} />)
     await waitFor(() => expect(screen.getByText('Default Mapped Background Slide')).toBeInTheDocument())
 
-    const slideEl = slideItem(1).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(255, 255, 255)') // theme1's lt1 = #FFFFFF
+    expect(slideBackground(1).style.backgroundColor).toBe('rgb(255, 255, 255)') // theme1's lt1 = #FFFFFF
   })
 
   it('resolves a theme color defined via a:sysClr\'s lastClr attribute (not a:srgbClr)', async () => {
     render(<PptxViewer content={themeSchemeColors} />)
     await waitFor(() => expect(screen.getByText('SysClr Theme Background Slide')).toBeInTheDocument())
 
-    const slideEl = slideItem(2).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(245, 245, 245)') // theme2's lt1 via sysClr lastClr = #F5F5F5
+    expect(slideBackground(2).style.backgroundColor).toBe('rgb(245, 245, 245)') // theme2's lt1 via sysClr lastClr = #F5F5F5
   })
 
   it('degrades a schemeClr background to the default when the referenced theme slot is undefined', async () => {
     render(<PptxViewer content={themeSchemeColors} />)
     await waitFor(() => expect(screen.getByText('Incomplete Theme Slide')).toBeInTheDocument())
-    // theme3 has no lt1 color at all - "bg1" (-> lt1) can't resolve, so no crash and no color set.
-    const slideEl = slideItem(3).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(255, 255, 255)')
+    // theme3 has no lt1 color at all - "bg1" (-> lt1) falls back to the default Office palette's white.
+    expect(slideBackground(3).style.backgroundColor).toBe('rgb(255, 255, 255)')
   })
 
   it.each([
@@ -414,12 +435,12 @@ describe('PptxViewer', () => {
     expect(screen.queryByText('Master Hidden Text')).not.toBeInTheDocument()
     expect(screen.queryByText('Layout Hidden Text')).not.toBeInTheDocument()
 
-    // Two visible decoration images (master + layout) render as real <img> data URIs; the two
+    // Two visible decoration images (master + layout) render as real <img> elements; the two
     // hidden ones are skipped entirely (not even as an "unavailable" placeholder).
     const images = slideItem(0).querySelectorAll('.pptx-viewer-image')
     expect(images).toHaveLength(2)
     for (const image of images) {
-      expect(image.getAttribute('src')).toContain('data:image/png;base64,')
+      expect(image.getAttribute('src')).toMatch(IMAGE_SRC)
     }
   })
 
@@ -436,41 +457,39 @@ describe('PptxViewer', () => {
     expect(layoutIdx).toBeLessThan(slideIdx)
   })
 
-  it('treats an EMF/WMF image as unavailable rather than showing a broken image (no browser-native decoder)', async () => {
+  it('shows an EMF/WMF image it cannot decode as unavailable rather than as a broken image', async () => {
     render(<PptxViewer content={layoutMasterDecorations} />)
     await waitFor(() => expect(screen.getByText('Slide Own Title')).toBeInTheDocument())
-    // The layout's third decoration picture references an .emf target - shown as unavailable,
-    // same as an unresolvable image reference, rather than a browser-broken-image icon.
+    // The layout's third decoration picture references an .emf target whose bytes are not a valid
+    // metafile - shown as unavailable, same as an unresolvable image reference.
     expect(screen.getByText('Image not available in this preview')).toBeInTheDocument()
   })
 
   it('resolves a p:bgRef themed background (an index into the theme\'s bgFillStyleLst)', async () => {
     render(<PptxViewer content={themeBgRef} />)
     await waitFor(() => expect(screen.getByText('BgRef Themed Background Slide')).toBeInTheDocument())
-    const slideEl = slideItem(0).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(51, 102, 204)') // theme accent1 = #3366CC
+    expect(slideBackground(0).style.backgroundColor).toBe('rgb(51, 102, 204)') // theme accent1 = #3366CC
   })
 
   it('still resolves a direct p:bgPr background on a different slide in the same deck as bgRef', async () => {
     render(<PptxViewer content={themeBgRef} />)
     await waitFor(() => expect(screen.getByText('BgPr Still Works Slide')).toBeInTheDocument())
-    const slideEl = slideItem(1).querySelector('.pptx-viewer-slide') as HTMLElement
-    expect(slideEl.style.backgroundColor).toBe('rgb(0, 255, 0)')
+    expect(slideBackground(1).style.backgroundColor).toBe('rgb(0, 255, 0)')
   })
 
-  it('flattens a group shape (p:grpSp) into slide coordinates via its group transform', async () => {
+  it('maps a group shape\'s (p:grpSp) children into slide coordinates via its group transform', async () => {
     render(<PptxViewer content={groupedShapes} />)
     await waitFor(() => expect(screen.getByText('Group Child A')).toBeInTheDocument())
 
     const childA = screen.getByText('Group Child A').closest('.pptx-viewer-shape') as HTMLElement
-    expect(childA.style.left).toBe(`${1000000 / 9525}px`)
-    expect(childA.style.top).toBe(`${1000000 / 9525}px`)
-    expect(childA.style.width).toBe(`${500000 / 9525}px`)
-    expect(childA.style.height).toBe(`${250000 / 9525}px`)
+    expect(slideOffset(childA).left).toBeCloseTo(1000000 / EMU_PER_PX, 2)
+    expect(slideOffset(childA).top).toBeCloseTo(1000000 / EMU_PER_PX, 2)
+    expectPx(childA.style.width, 500000)
+    expectPx(childA.style.height, 250000)
 
     const childB = screen.getByText('Group Child B').closest('.pptx-viewer-shape') as HTMLElement
-    expect(childB.style.left).toBe(`${2000000 / 9525}px`)
-    expect(childB.style.top).toBe(`${1500000 / 9525}px`)
+    expect(slideOffset(childB).left).toBeCloseTo(2000000 / EMU_PER_PX, 2)
+    expect(slideOffset(childB).top).toBeCloseTo(1500000 / EMU_PER_PX, 2)
   })
 
   it('composes transforms through a nested group (group inside a group), including an image inside it', async () => {
@@ -480,15 +499,15 @@ describe('PptxViewer', () => {
     // Outer group scale=2, inner group's own scale=0.5 -> composed scale=1 (exercises
     // multiplication, not just one level passing through as an identity).
     const innerText = screen.getByText('Inner Group Text').closest('.pptx-viewer-shape') as HTMLElement
-    expect(innerText.style.left).toBe(`${2000000 / 9525}px`)
-    expect(innerText.style.top).toBe(`${2000000 / 9525}px`)
-    expect(innerText.style.width).toBe(`${500000 / 9525}px`)
+    expect(slideOffset(innerText).left).toBeCloseTo(2000000 / EMU_PER_PX, 2)
+    expect(slideOffset(innerText).top).toBeCloseTo(2000000 / EMU_PER_PX, 2)
+    expectPx(innerText.style.width, 500000)
 
     const image = slideItem(1).querySelector('.pptx-viewer-image') as HTMLElement
     expect(image).not.toBeNull()
     const imageShape = image.closest('.pptx-viewer-shape') as HTMLElement
-    expect(imageShape.style.left).toBe(`${2500000 / 9525}px`)
-    expect(imageShape.style.top).toBe(`${2000000 / 9525}px`)
+    expect(slideOffset(imageShape).left).toBeCloseTo(2500000 / EMU_PER_PX, 2)
+    expect(slideOffset(imageShape).top).toBeCloseTo(2000000 / EMU_PER_PX, 2)
   })
 
   it('renders nothing from inside a hidden (hidden="1") group', async () => {
@@ -501,16 +520,16 @@ describe('PptxViewer', () => {
     render(<PptxViewer content={groupedShapes} />)
     await waitFor(() => expect(screen.getByText('Group Edge Cases Slide')).toBeInTheDocument())
     const shapeEl = screen.getByText('No Xfrm Group Child').closest('.pptx-viewer-shape') as HTMLElement
-    expect(shapeEl.style.left).toBe(`${1000000 / 9525}px`)
-    expect(shapeEl.style.top).toBe(`${1000000 / 9525}px`)
+    expect(slideOffset(shapeEl).left).toBeCloseTo(1000000 / EMU_PER_PX, 2)
+    expect(slideOffset(shapeEl).top).toBeCloseTo(1000000 / EMU_PER_PX, 2)
   })
 
   it('falls back scale to the group\'s own a:ext when a:chExt is missing', async () => {
     render(<PptxViewer content={groupedShapes} />)
     await waitFor(() => expect(screen.getByText('Group Edge Cases Slide')).toBeInTheDocument())
     const shapeEl = screen.getByText('No ChExt Group Child').closest('.pptx-viewer-shape') as HTMLElement
-    expect(shapeEl.style.left).toBe(`${500000 / 9525}px`)
-    expect(shapeEl.style.top).toBe(`${500000 / 9525}px`)
+    expect(slideOffset(shapeEl).left).toBeCloseTo(500000 / EMU_PER_PX, 2)
+    expect(slideOffset(shapeEl).top).toBeCloseTo(500000 / EMU_PER_PX, 2)
   })
 
   it('skips a hidden shape and an empty-run shape inside a visible group, but keeps its other visible content', async () => {
@@ -529,7 +548,7 @@ describe('PptxViewer', () => {
     render(<PptxViewer content={groupedShapes} />)
     await waitFor(() => expect(screen.getByText('Zero Size Group Child')).toBeInTheDocument())
     const shapeEl = screen.getByText('Zero Size Group Child').closest('.pptx-viewer-shape') as HTMLElement
-    expect(shapeEl.style.left).toBe(`${4500000 / 9525}px`)
+    expect(slideOffset(shapeEl).left).toBeCloseTo(4500000 / EMU_PER_PX, 2)
     expect(shapeEl.style.width).toBe('0px')
   })
 
