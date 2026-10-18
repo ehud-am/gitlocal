@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.1 - 2026-10-18
+
+- Fixed PowerPoint files showing "This presentation has no slides" in the macOS app when the deck's internal files start with a byte order mark, as some generated decks do. The browser version was not affected.
+
 ## 0.14.0 - 2026-10-18
 
 - PowerPoint preview: links in slides now work. Web and email links open outside GitLocal; links to another slide (including "next", "previous", "first" and "last" slide actions) scroll to that slide. Linked text uses the theme's hyperlink color and underline, as in PowerPoint. Whole shapes and pictures can be links too.

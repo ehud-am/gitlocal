@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { openPackage, relsPathFor, resolvePartPath } from './package'
 import { el, relsXml, THEME_XML } from './test-support'
 import { cssFontFamily, DEFAULT_THEME, loadTheme, resolveTypeface } from './theme'
@@ -9,6 +9,10 @@ describe('xml helpers', () => {
   it('parses well-formed XML and rejects malformed XML', () => {
     expect(parseXml('<a><b/></a>')?.localName).toBe('a')
     expect(parseXml('<a><b></a>')).toBeNull()
+    const parse = vi.spyOn(DOMParser.prototype, 'parseFromString')
+    expect(parseXml('\uFEFF<?xml version="1.0"?><a/>')?.localName).toBe('a')
+    expect(parse).toHaveBeenLastCalledWith('<?xml version="1.0"?><a/>', 'application/xml')
+    parse.mockRestore()
   })
 
   it('walks children by local name', () => {

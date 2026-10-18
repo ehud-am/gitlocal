@@ -8,7 +8,10 @@
 // local name for two different things in a position where both could appear.
 
 export function parseXml(text: string): Element | null {
-  const doc = new DOMParser().parseFromString(text, 'application/xml')
+  // Some generators write parts with a UTF-8 byte order mark, which survives decoding as U+FEFF.
+  // WebKit's parser (the macOS app) rejects the XML declaration after it, so it is dropped here.
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  const doc = new DOMParser().parseFromString(source, 'application/xml')
   const root = doc.documentElement
   if (!root || root.localName === 'parsererror' || doc.getElementsByTagName('parsererror').length > 0) return null
   return root
