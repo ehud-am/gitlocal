@@ -1,8 +1,8 @@
-import { useId, type CSSProperties, type ReactNode } from 'react'
+import { createContext, useContext, useId, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { ChartView } from './chart-view'
 import { fillStyle, imageCropStyle } from './fill-css'
 import { geometryPaths, type GeometryPath } from './geometry'
-import type { Box, Geometry, GroupNode, Line, LineEnd, Paragraph, PictureNode, ShapeNode, SlideModel, SlideNode, TableNode, TextBody, TextRun } from './model'
+import type { Box, Geometry, GroupNode, Line, LineEnd, Link, Paragraph, PictureNode, ShapeNode, SlideModel, SlideNode, TableNode, TabStop, TextBody, TextRun } from './model'
 
 const px = (value: number) => `${Math.round(value * 1000) / 1000}px`
 
@@ -32,6 +32,43 @@ function clipPathFor(geometry: Geometry, paths: GeometryPath[]): string | undefi
   return d ? `path(evenodd, "${d}")` : undefined
 }
 
+// ---- Links ----
+
+// Called with a slide index when a link to another slide of the deck is followed.
+export const SlideJumpContext = createContext<(index: number) => void>(() => undefined)
+
+function linkLabel(link: Link): string {
+  return link.kind === 'url' ? link.href : `Go to slide ${link.index + 1}`
+}
+
+function LinkAnchor({ link, className, style, label, children }: { link: Link; className: string; style?: CSSProperties; label?: string; children?: ReactNode }) {
+  const jump = useContext(SlideJumpContext)
+  if (link.kind === 'url') {
+    return <a className={className} style={style} href={link.href} target="_blank" rel="noopener noreferrer" title={link.href} aria-label={label}>{children}</a>
+  }
+  return (
+    <a
+      className={className}
+      style={style}
+      href={`#slide-${link.index + 1}`}
+      title={linkLabel(link)}
+      aria-label={label}
+      onClick={(event) => {
+        event.preventDefault()
+        jump(link.index)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
+// A link covering a whole shape or picture; PowerPoint makes the entire object clickable.
+function ShapeLink({ link }: { link: Link | null }) {
+  if (!link) return null
+  return <LinkAnchor link={link} className="pptx-viewer-shape-link" style={{ position: 'absolute', inset: 0 }} label={linkLabel(link)} />
+}
+
 // ---- Text ----
 
 function RunView({ run }: { run: TextRun }) {
@@ -51,7 +88,63 @@ function RunView({ run }: { run: TextRun }) {
     letterSpacing: run.letterSpacingPt ? `${run.letterSpacingPt}pt` : undefined,
     backgroundColor: run.highlight ?? undefined,
   }
-  return <span className="pptx-viewer-run" style={style}>{run.text}</span>
+  const span = <span className="pptx-viewer-run" style={style}>{run.text}</span>
+  return run.link ? <LinkAnchor link={run.link} className="pptx-viewer-link">{span}</LinkAnchor> : span
+}
+
+// How far a tab at `x` (px from the paragraph's left edge) advances: to the next custom stop past
+// it, or else to the next multiple of the default interval. Right- and center-aligned stops end
+// or center the following text (`segmentPx` wide) on the stop; decimal stops are treated as right.
+export function tabAdvance(x: number, segmentPx: number, stops: TabStop[], defaultTabPx: number): number {
+  const stop = stops.find((candidate) => candidate.posPx > x + 0.5)
+  if (!stop) return (Math.floor((x + 0.5) / defaultTabPx) + 1) * defaultTabPx - x
+  const shift = stop.align === 'l' ? 0 : stop.align === 'ctr' ? segmentPx / 2 : segmentPx
+  return Math.max(0, stop.posPx - x - shift)
+}
+
+type ParagraphItem = { kind: 'run'; run: TextRun } | { kind: 'tab' }
+
+// Splits runs at tab characters, which are laid out as measured gaps instead of CSS tab-size.
+function paragraphItems(runs: TextRun[]): ParagraphItem[] {
+  return runs.flatMap((run): ParagraphItem[] => {
+    if (run.isBreak || !run.text.includes('\t')) return [{ kind: 'run', run }]
+    return run.text.split('\t').flatMap((text, index): ParagraphItem[] => {
+      const piece: ParagraphItem[] = text ? [{ kind: 'run', run: { ...run, text } }] : []
+      return index === 0 ? piece : [{ kind: 'tab' }, ...piece]
+    })
+  })
+}
+
+// Sizes each tab gap in order, since every gap moves the text after it. offsetLeft is in the
+// slide's own (unscaled) pixels, the same space as the tab stops.
+function useTabLayout(paragraph: Paragraph, hasTabs: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (!element || !hasTabs) return
+    const measure = () => {
+      const tabs = Array.from(element.querySelectorAll<HTMLElement>('[data-pptx-tab]'))
+      const end = element.querySelector<HTMLElement>('[data-pptx-tab-end]')
+      for (const tab of tabs) tab.style.width = '0px'
+      tabs.forEach((tab, index) => {
+        const next = tabs[index + 1] ?? end
+        const x = tab.offsetLeft
+        // The text up to the next tab (or the paragraph end); a marker left of the tab has wrapped.
+        const segment = next ? Math.max(0, next.offsetLeft - x) : 0
+        tab.style.width = `${tabAdvance(x, segment, paragraph.tabStops, paragraph.defaultTabPx)}px`
+      })
+    }
+    measure()
+    // Text widths change once the deck's web fonts finish loading.
+    let active = true
+    void document.fonts?.ready.then(() => {
+      if (active) measure()
+    })
+    return () => {
+      active = false
+    }
+  }, [paragraph, hasTabs])
+  return ref
 }
 
 function ParagraphView({ paragraph, first }: { paragraph: Paragraph; first: boolean }) {
@@ -71,8 +164,11 @@ function ParagraphView({ paragraph, first }: { paragraph: Paragraph; first: bool
     direction: paragraph.rtl ? 'rtl' : undefined,
   }
   const { bullet } = paragraph
+  const items = paragraphItems(paragraph.runs)
+  const hasTabs = items.some((item) => item.kind === 'tab')
+  const ref = useTabLayout(paragraph, hasTabs)
   return (
-    <div className="pptx-viewer-paragraph" style={style}>
+    <div className="pptx-viewer-paragraph" style={hasTabs ? { ...style, position: 'relative' } : style} ref={ref}>
       {bullet ? (
         <span
           aria-hidden="true"
@@ -90,8 +186,33 @@ function ParagraphView({ paragraph, first }: { paragraph: Paragraph; first: bool
           {bullet.kind === 'char' ? bullet.char : bullet.text}
         </span>
       ) : null}
-      {paragraph.runs.map((run, index) => <RunView key={index} run={run} />)}
+      {items.map((item, index) => (item.kind === 'run'
+        ? <RunView key={index} run={item.run} />
+        : <span key={index} data-pptx-tab="" className="pptx-viewer-tab" style={{ display: 'inline-block', width: px(paragraph.defaultTabPx) }} />))}
+      {hasTabs ? <span data-pptx-tab-end="" /> : null}
       {firstRun ? null : <span style={{ fontSize: `${paragraph.baseSizePt}pt` }}>{'​'}</span>}
+    </div>
+  )
+}
+
+// PowerPoint fills columns one after the other within the box's height (CSS column-fill: auto).
+// Text that doesn't fit would spill into extra columns beside the box in CSS, where PowerPoint
+// lets it run past the bottom instead, so overflowing text falls back to balanced columns.
+function TextColumns({ body, children }: { body: TextBody; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    element.style.height = '100%'
+    element.style.columnFill = 'auto'
+    if (element.scrollWidth > element.clientWidth + 1) {
+      element.style.height = 'auto'
+      element.style.columnFill = 'balance'
+    }
+  }, [body])
+  return (
+    <div ref={ref} className="pptx-viewer-columns" style={{ columnCount: body.columns, columnGap: px(body.columnSpacingPx) }}>
+      {children}
     </div>
   )
 }
@@ -99,6 +220,7 @@ function ParagraphView({ paragraph, first }: { paragraph: Paragraph; first: bool
 export function TextBodyView({ body, style }: { body: TextBody; style?: CSSProperties }) {
   const justify = body.anchor === 'middle' ? 'center' : body.anchor === 'bottom' ? 'flex-end' : 'flex-start'
   const vertical = body.vertical !== 'horz'
+  const paragraphs = body.paragraphs.map((paragraph, index) => <ParagraphView key={index} paragraph={paragraph} first={index === 0} />)
   return (
     <div
       className="pptx-viewer-text"
@@ -117,7 +239,7 @@ export function TextBodyView({ body, style }: { body: TextBody; style?: CSSPrope
         ...style,
       }}
     >
-      {body.paragraphs.map((paragraph, index) => <ParagraphView key={index} paragraph={paragraph} first={index === 0} />)}
+      {body.columns > 1 ? <TextColumns body={body}>{paragraphs}</TextColumns> : paragraphs}
     </div>
   )
 }
@@ -233,6 +355,7 @@ function ShapeView({ node }: { node: ShapeNode }) {
           style={textBox ? { left: px(textBox.x), top: px(textBox.y), width: px(textBox.w), height: px(textBox.h), right: 'auto', bottom: 'auto' } : undefined}
         />
       ) : null}
+      <ShapeLink link={node.link} />
     </div>
   )
 }
@@ -250,6 +373,12 @@ function PictureView({ node }: { node: PictureNode }) {
         )}
       </div>
       {node.line ? <OutlineView paths={paths} line={node.line} box={box} /> : null}
+      {node.media ? (
+        <span className="pptx-viewer-media-badge" title="Playback isn't available in this preview">
+          {node.media === 'video' ? '▶ Video' : '♪ Audio'}
+        </span>
+      ) : null}
+      <ShapeLink link={node.link} />
     </div>
   )
 }

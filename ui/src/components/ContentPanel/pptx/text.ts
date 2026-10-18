@@ -1,9 +1,9 @@
 import { resolveColor, toCss } from './color'
 import type { PartScope } from './fill'
-import type { Bullet, Paragraph, TextBody, TextRun } from './model'
+import type { Bullet, Link, Paragraph, TabStop, TextBody, TextRun } from './model'
 import { EMU_PER_PX } from './model'
 import { cssFontFamily, resolveTypeface } from './theme'
-import { attr, child, children, numAttr } from './xml'
+import { attr, child, children, numAttr, relAttr } from './xml'
 
 // Where a text body's formatting can come from, highest priority first. Text formatting in OOXML
 // is inherited level by level: a paragraph at outline level N takes each property from the first
@@ -20,9 +20,16 @@ export interface TextStyleChain {
   bold?: boolean
 }
 
+// The deck's slides, for links that jump to another slide.
+export interface SlideIndex {
+  count: number
+  indexByPath: Map<string, number>
+}
+
 export interface TextContext {
   scope: PartScope
   slideNumber: number
+  slides?: SlideIndex
 }
 
 const DEFAULT_SIZE_PT = 18
@@ -134,6 +141,41 @@ function runFont(sources: RunSources, chain: TextStyleChain, context: TextContex
   return eastAsian && eastAsian !== latin ? family.replace(/^("[^"]*")/, `$1, "${eastAsian.replace(/"/g, '')}"`) : family
 }
 
+// Only web and mail links leave the preview; other schemes (file:, javascript:, ...) are dropped.
+const SAFE_URL = /^(https?:|mailto:)/i
+
+// Resolves an a:hlinkClick (on a run or a shape) to a web address or a slide of this deck.
+export function parseLink(hlinkClick: Element | null, context: TextContext): Link | null {
+  if (!hlinkClick) return null
+  const action = attr(hlinkClick, 'action') ?? ''
+  const last = (context.slides?.count ?? 1) - 1
+  if (action.startsWith('ppaction://hlinkshowjump')) {
+    const current = context.slideNumber - 1
+    const jump = /jump=(\w+)/.exec(action)?.[1]
+    const index = jump === 'firstslide' ? 0
+      : jump === 'lastslide' ? last
+        : jump === 'nextslide' ? current + 1
+          : jump === 'previousslide' ? current - 1
+            : -1
+    return index >= 0 && index <= last ? { kind: 'slide', index } : null
+  }
+  const relId = relAttr(hlinkClick, 'id')
+  const rel = relId ? context.scope.pkg.rels(context.scope.partPath).get(relId) : undefined
+  if (!rel) return null
+  if (!rel.external) {
+    const index = context.slides?.indexByPath.get(rel.target)
+    return index === undefined ? null : { kind: 'slide', index }
+  }
+  const href = rel.target.trim()
+  return SAFE_URL.test(href) ? { kind: 'url', href } : null
+}
+
+// PowerPoint draws linked text in the theme's hyperlink color, underlined, unless the link is set
+// to keep the text's own color (a16:hlinkClr val="tx").
+function keepsTextColor(hlinkClick: Element): boolean {
+  return Array.from(hlinkClick.getElementsByTagNameNS('*', 'hlinkClr')).some((element) => attr(element, 'val') === 'tx')
+}
+
 const isOn = (value: string | undefined) => value === '1' || value === 'true' || value === 'on'
 
 function parseRun(
@@ -153,6 +195,12 @@ function parseRun(
     const color = resolveColor(child(element, 'highlight'), context.scope.colors)
     return color ? toCss(color) : undefined
   })
+  // Only the run's own properties carry a link; list-style defaults never do.
+  const hlinkClick = child(rPrs[0], 'hlinkClick')
+  const link = isBreak ? null : parseLink(hlinkClick, context)
+  const linkColor = link && hlinkClick && !keepsTextColor(hlinkClick)
+    ? `#${context.scope.colors.scheme[context.scope.colors.clrMap.hlink ?? 'hlink'] ?? '0563c1'}`.toLowerCase()
+    : null
   return {
     text,
     isBreak,
@@ -161,14 +209,15 @@ function parseRun(
       ?? (chain.bold === undefined ? undefined : String(chain.bold))
       ?? first(rPrs.slice(sources.fontRefAt), (element) => attr(element, 'b'))),
     italic: isOn(first(rPrs, (element) => attr(element, 'i'))),
-    underline: underline !== undefined && underline !== 'none',
+    underline: link !== null || (underline !== undefined && underline !== 'none'),
     strike: strike !== undefined && strike !== 'noStrike',
-    color: runColor(sources, chain, context),
+    color: linkColor ?? runColor(sources, chain, context),
     fontFamily: runFont(sources, chain, context),
     baseline: (first(rPrs, (element) => numAttr(element, 'baseline')) ?? 0) / 1000,
     caps: cap === 'all' ? 'all' : cap === 'small' ? 'small' : 'none',
     letterSpacingPt: (first(rPrs, (element) => numAttr(element, 'spc')) ?? 0) / 100,
     highlight: highlight ?? null,
+    link,
   }
 }
 
@@ -231,6 +280,19 @@ export function symbolBullet(typeface: string | null, char: string): string | nu
   const code = char.codePointAt(0) ?? 0
   const normalized = code >= 0xf020 && code <= 0xf0ff ? String.fromCharCode(code - 0xf000) : char
   return table[normalized] ?? '•'
+}
+
+const TAB_ALIGN = new Set(['l', 'ctr', 'r', 'dec'])
+const DEFAULT_TAB_EMU = 914400
+
+function parseTabStops(levelSources: (Element | null)[]): TabStop[] {
+  const tabLst = first(levelSources, (element) => child(element, 'tabLst'))
+  return children(tabLst ?? null, 'tab')
+    .map((tab) => {
+      const align = attr(tab, 'algn') ?? 'l'
+      return { posPx: (numAttr(tab, 'pos') ?? 0) / EMU_PER_PX, align: (TAB_ALIGN.has(align) ? align : 'l') as TabStop['align'] }
+    })
+    .sort((a, b) => a.posPx - b.posPx)
 }
 
 const ALIGN: Record<string, Paragraph['align']> = { l: 'left', ctr: 'center', r: 'right', just: 'justify', dist: 'justify', justLow: 'justify', thaiDist: 'justify' }
@@ -319,6 +381,8 @@ export function parseTextBody(txBody: Element | null, chain: TextStyleChain, con
       runs,
       baseSizePt,
       rtl: first(levelSources, (element) => attr(element, 'rtl')) === '1',
+      tabStops: parseTabStops(levelSources),
+      defaultTabPx: (first(levelSources, (element) => numAttr(element, 'defTabSz')) || DEFAULT_TAB_EMU) / EMU_PER_PX,
     })
   }
 
@@ -336,5 +400,7 @@ export function parseTextBody(txBody: Element | null, chain: TextStyleChain, con
     vertical: vert === 'vert' || vert === 'eaVert' || vert === 'wordArtVertRtl' ? 'vert' : vert === 'vert270' ? 'vert270' : 'horz',
     fontScale,
     lineSpacingReduction,
+    columns: Math.min(16, Math.max(1, Math.round(first(bodyPrs, (element) => numAttr(element, 'numCol')) ?? 1))),
+    columnSpacingPx: (first(bodyPrs, (element) => numAttr(element, 'spcCol')) ?? 0) / EMU_PER_PX,
   }
 }

@@ -2,12 +2,13 @@ import type { PartScope } from './fill'
 import { parseFill, parseLine, parseStyleFill } from './fill'
 import type { Box, Fill, Line, TableCell, TableNode } from './model'
 import { EMU_PER_PX } from './model'
-import { parseTextBody } from './text'
+import { parseTextBody, type SlideIndex } from './text'
 import { attr, child, children, numAttr, parseXml } from './xml'
 
 export interface TableContext {
   scope: PartScope
   slideNumber: number
+  slides?: SlideIndex
   // ppt/tableStyles.xml's root (a:tblStyleLst), if the deck has one.
   tableStyles: Element | null
   defaultTextStyle: Element | null
@@ -117,7 +118,7 @@ export function parseTable(tbl: Element | null, box: Box, context: TableContext)
         bodyPrs: [],
         fontRef: lastTextStyle,
         bold: boldFlag === undefined ? undefined : boldFlag === 'on',
-      }, { scope: context.scope, slideNumber: context.slideNumber })
+      }, { scope: context.scope, slideNumber: context.slideNumber, slides: context.slides })
       if (text) {
         text.insets = {
           l: (numAttr(tcPr, 'marL') ?? 91440) / EMU_PER_PX,

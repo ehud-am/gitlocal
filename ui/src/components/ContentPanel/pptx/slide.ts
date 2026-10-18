@@ -1,11 +1,11 @@
 import { DEFAULT_CLR_MAP, type ColorContext } from './color'
 import { parseChart } from './chart'
 import { MediaRegistry, parseBackground, parseFill, parseLine, parseShadow, parseStyleFill, type PartScope } from './fill'
-import type { Box, CustomPath, Fill, Geometry, GeometryCommand, ImageRef, SlideModel, SlideNode } from './model'
+import type { Box, CustomPath, Fill, Geometry, GeometryCommand, ImageRef, Link, PictureNode, SlideModel, SlideNode } from './model'
 import { EMU_PER_PX } from './model'
 import type { OpcPackage } from './package'
 import { parseTable } from './table'
-import { parseTextBody, type TextStyleChain } from './text'
+import { parseLink, parseTextBody, type SlideIndex, type TextContext, type TextStyleChain } from './text'
 import { loadTheme, type Theme } from './theme'
 import { attr, boolAttr, child, children, contentChildren, numAttr, path, relAttr } from './xml'
 
@@ -45,6 +45,7 @@ export interface DeckContext {
   layouts: Map<string, LayoutInfo | null>
   masters: Map<string, MasterInfo | null>
   themes: Map<string, Theme>
+  slides: SlideIndex
 }
 
 // What shape parsing needs beyond the part scope: placeholder inheritance sources (slides only -
@@ -69,9 +70,33 @@ function placeholderOf(element: Element): Placeholder | null {
   return { type: attr(ph, 'type'), idx: attr(ph, 'idx'), element }
 }
 
-function isHidden(element: Element): boolean {
+function nonVisualProps(element: Element): Element | null {
   const nvPr = children(element).find((candidate) => candidate.localName.startsWith('nv'))
-  return attr(child(nvPr, 'cNvPr'), 'hidden') === '1' || attr(child(nvPr, 'cNvPr'), 'hidden') === 'true'
+  return child(nvPr, 'cNvPr')
+}
+
+function isHidden(element: Element): boolean {
+  const cNvPr = nonVisualProps(element)
+  return attr(cNvPr, 'hidden') === '1' || attr(cNvPr, 'hidden') === 'true'
+}
+
+function textContext(context: ShapeContext): TextContext {
+  return { scope: context.scope, slideNumber: context.slideNumber, slides: context.deck.slides }
+}
+
+// A link set on the whole shape or picture (p:cNvPr > a:hlinkClick), as opposed to on its text.
+function shapeLink(element: Element, context: ShapeContext): Link | null {
+  return parseLink(child(nonVisualProps(element), 'hlinkClick'), textContext(context))
+}
+
+// Video and audio appear as pictures (the poster frame or a speaker icon) whose p:nvPr names the
+// clip: a:videoFile / a:quickTimeFile or a:audioFile / a:wavAudioFile / a:audioCd.
+function mediaKind(element: Element): PictureNode['media'] {
+  const nvPr = path(element, 'nvPicPr', 'nvPr')
+  const has = (name: string) => child(nvPr, name) !== null
+  if (has('videoFile') || has('quickTimeFile')) return 'video'
+  if (has('audioFile') || has('wavAudioFile') || has('audioCd')) return 'audio'
+  return null
 }
 
 // Placeholder types fall into the master's three text style families.
@@ -221,10 +246,7 @@ function parseShape(element: Element, context: ShapeContext): SlideNode | null {
   const line = parseLine(propertySources.map((source) => child(source, 'ln')), context.scope, child(style, 'lnRef'))
   const shadow = parseShadow(propertySources.map((source) => child(source, 'effectLst')), context.scope, child(style, 'effectRef'))
 
-  const text = parseTextBody(child(element, 'txBody'), textChain(element, inherited, type, isPlaceholder, context), {
-    scope: context.scope,
-    slideNumber: context.slideNumber,
-  })
+  const text = parseTextBody(child(element, 'txBody'), textChain(element, inherited, type, isPlaceholder, context), textContext(context))
   const textXfrm = readBox(child(element, 'txXfrm'))
   const textBox = textXfrm ? { ...textXfrm, x: textXfrm.x - box.x, y: textXfrm.y - box.y } : null
 
@@ -233,7 +255,7 @@ function parseShape(element: Element, context: ShapeContext): SlideNode | null {
   if (isPlaceholder && !text && !parseFill(spPr, context.scope) && !child(spPr, 'ln') && !ownStyle) return null
   const geometry = readGeometry(spPrs)
   if (!text && (fill === null || fill.type === 'none') && line === null) return null
-  return { kind: 'shape', box, geometry, fill, line, text, textBox, shadow }
+  return { kind: 'shape', box, geometry, fill, line, text, textBox, shadow, link: shapeLink(element, context) }
 }
 
 function parsePicture(element: Element, context: ShapeContext, frameBox: Box | null = null): SlideNode | null {
@@ -257,6 +279,8 @@ function parsePicture(element: Element, context: ShapeContext, frameBox: Box | n
     image,
     line: parseLine(spPrs.map((source) => child(source, 'ln')), context.scope, child(style, 'lnRef')),
     shadow: parseShadow(spPrs.map((source) => child(source, 'effectLst')), context.scope, child(style, 'effectRef')),
+    link: shapeLink(element, context),
+    media: mediaKind(element),
   }
 }
 
@@ -324,6 +348,7 @@ function parseGraphicFrame(element: Element, context: ShapeContext): SlideNode |
     const table = parseTable(child(graphicData, 'tbl'), box, {
       scope: context.scope,
       slideNumber: context.slideNumber,
+      slides: context.deck.slides,
       tableStyles: context.deck.tableStyles,
       defaultTextStyle: context.deck.defaultTextStyle,
     })
@@ -341,7 +366,7 @@ function parseGraphicFrame(element: Element, context: ShapeContext): SlideNode |
   const preview = graphicData?.getElementsByTagNameNS('*', 'pic')[0]
   if (preview) return parsePicture(preview, context, box)
   const image = legacyOlePreview(attr(graphicData?.getElementsByTagNameNS('*', 'oleObj')[0] ?? null, 'spid'), context)
-  return image ? { kind: 'picture', box, geometry: { kind: 'preset', name: 'rect', adj: {} }, image, line: null, shadow: null } : null
+  return image ? { kind: 'picture', box, geometry: { kind: 'preset', name: 'rect', adj: {} }, image, line: null, shadow: null, link: null, media: null } : null
 }
 
 function legacyOlePreview(spid: string | null, context: ShapeContext): ImageRef | null {
@@ -513,6 +538,7 @@ export function parseSlide(deck: DeckContext, slidePath: string, index: number):
   }))
 
   const background = slide.background ?? layout?.background ?? master?.background ?? { type: 'solid', color: '#ffffff' }
-  return { index, background, nodes, notes: parseNotes(deck, slidePath) }
+  const show = attr(root, 'show')
+  return { index, background, nodes, notes: parseNotes(deck, slidePath), hidden: show === '0' || show === 'false' }
 }
 

@@ -34,6 +34,7 @@ export async function parsePresentation(bytes: Uint8Array): Promise<Presentation
     layouts: new Map(),
     masters: new Map(),
     themes: new Map(),
+    slides: { count: slidePaths.length, indexByPath: new Map(slidePaths.map((slidePath, index) => [slidePath, index])) },
   }
 
   const slides: SlideModel[] = []

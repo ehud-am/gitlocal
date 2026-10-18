@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PresentationModel, SlideModel } from './pptx/model'
-import { SlideView } from './pptx/render'
+import { SlideJumpContext, SlideView } from './pptx/render'
 
 interface Props {
   /** Base64-encoded .pptx (OOXML zip) bytes, as delivered by the server. */
@@ -16,6 +16,10 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes
 }
 
+// Zoom is relative to "fit to width"; 1 is the default.
+export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3]
+const FIT_ZOOM_INDEX = ZOOM_LEVELS.indexOf(1)
+
 interface SlideCanvasProps {
   slide: SlideModel
   widthPx: number
@@ -29,7 +33,7 @@ interface SlideCanvasProps {
 // (fills the panel, no fixed-width overflow/scrollbar) without having to redo any shape math.
 function PptxSlideCanvas({ slide, widthPx, heightPx, scale }: SlideCanvasProps) {
   return (
-    <div className="pptx-viewer-slide-frame" style={{ height: `${heightPx * scale}px` }}>
+    <div className="pptx-viewer-slide-frame" style={{ width: `${widthPx * scale}px`, height: `${heightPx * scale}px` }}>
       <div
         className="pptx-viewer-slide"
         style={{
@@ -113,18 +117,19 @@ function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibil
   return (
     <div
       ref={elementRef}
-      className="pptx-viewer-slide-item"
+      className={slide.hidden ? 'pptx-viewer-slide-item pptx-viewer-slide-hidden' : 'pptx-viewer-slide-item'}
       data-slide-index={slide.index}
       tabIndex={0}
       role="group"
-      aria-label={`Slide ${slide.index + 1} of ${totalSlides}`}
+      aria-label={`Slide ${slide.index + 1} of ${totalSlides}${slide.hidden ? ' (hidden)' : ''}`}
     >
+      {slide.hidden ? <span className="pptx-viewer-hidden-tag">Hidden slide</span> : null}
       {shouldRender ? (
         <PptxSlideCanvas slide={slide} widthPx={widthPx} heightPx={heightPx} scale={scale} />
       ) : (
         <div
           className="pptx-viewer-slide-frame pptx-viewer-slide-pending"
-          style={{ height: `${heightPx * scale}px` }}
+          style={{ width: `${widthPx * scale}px`, height: `${heightPx * scale}px` }}
           aria-hidden="true"
         />
       )}
@@ -147,7 +152,11 @@ export default function PptxViewer({ content }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [visibleIndices, setVisibleIndices] = useState<ReadonlySet<number>>(() => new Set())
   const [containerWidthPx, setContainerWidthPx] = useState(0)
+  const [zoomIndex, setZoomIndex] = useState(FIT_ZOOM_INDEX)
+  const [showHidden, setShowHidden] = useState(true)
+  const [pendingJump, setPendingJump] = useState<number | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
+  const viewerRef = useRef<HTMLDivElement | null>(null)
 
   // Slides render at their natural (EMU-derived) pixel size, then scale down/up via CSS transform
   // to exactly fill the available panel width - keeping the preview responsive instead of a
@@ -181,6 +190,8 @@ export default function PptxViewer({ content }: Props) {
     setPresentation(null)
     setError(null)
     setVisibleIndices(new Set())
+    setShowHidden(true)
+    setPendingJump(null)
 
     let objectUrls: string[] = []
 
@@ -222,6 +233,22 @@ export default function PptxViewer({ content }: Props) {
     })
   }, [])
 
+  // Following a link to another slide scrolls it into view, first showing hidden slides if the
+  // target is one of them (runs after that re-render, so the target element exists).
+  const jumpToSlide = useCallback((index: number) => {
+    if (presentation?.slides[index]?.hidden) setShowHidden(true)
+    setPendingJump(index)
+  }, [presentation])
+
+  useEffect(() => {
+    if (pendingJump === null) return
+    setPendingJump(null)
+    const target = viewerRef.current?.querySelector<HTMLElement>(`[data-slide-index="${pendingJump}"]`)
+    if (!target) return
+    target.scrollIntoView?.({ block: 'start' })
+    target.focus({ preventScroll: true })
+  }, [pendingJump, showHidden])
+
   const visibleSlideIndex = visibleIndices.size > 0 ? Math.min(...visibleIndices) : 0
 
   if (error) {
@@ -238,28 +265,46 @@ export default function PptxViewer({ content }: Props) {
 
   const canvasWidthPx = presentation.widthPx
   const canvasHeightPx = presentation.heightPx
-  const scale = containerWidthPx > 0 ? containerWidthPx / canvasWidthPx : 1
+  const zoom = ZOOM_LEVELS[zoomIndex]
+  const scale = (containerWidthPx > 0 ? containerWidthPx / canvasWidthPx : 1) * zoom
+  const hiddenCount = presentation.slides.filter((slide) => slide.hidden).length
+  const shownSlides = showHidden ? presentation.slides : presentation.slides.filter((slide) => !slide.hidden)
 
   return (
-    <div className="pptx-viewer">
+    <div className="pptx-viewer" ref={viewerRef}>
       <div className="pptx-viewer-toolbar">
         <span className="pptx-viewer-slide-counter">
           Slide {visibleSlideIndex + 1} of {presentation.slides.length}
         </span>
+        {hiddenCount > 0 ? (
+          <label className="pptx-viewer-hidden-toggle">
+            <input type="checkbox" checked={showHidden} onChange={(event) => setShowHidden(event.target.checked)} />
+            Show hidden slides ({hiddenCount})
+          </label>
+        ) : null}
+        <div className="pptx-viewer-zoom" role="group" aria-label="Zoom">
+          <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoomIndex === 0} onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}>−</button>
+          <button type="button" className="pptx-viewer-zoom-level" title="Fit to width" aria-label={zoom === 1 ? 'Fit to width' : `${Math.round(zoom * 100)}%, reset to fit width`} onClick={() => setZoomIndex(FIT_ZOOM_INDEX)}>
+            {zoom === 1 ? 'Fit' : `${Math.round(zoom * 100)}%`}
+          </button>
+          <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => setZoomIndex((index) => Math.min(ZOOM_LEVELS.length - 1, index + 1))}>+</button>
+        </div>
       </div>
-      <div className="pptx-viewer-scroll-body" ref={scrollBodyRef}>
-        {presentation.slides.map((slide) => (
-          <PptxSlideItem
-            key={slide.index}
-            slide={slide}
-            totalSlides={presentation.slides.length}
-            widthPx={canvasWidthPx}
-            heightPx={canvasHeightPx}
-            scale={scale}
-            onVisibilityChange={handleSlideVisibilityChange}
-          />
-        ))}
-      </div>
+      <SlideJumpContext.Provider value={jumpToSlide}>
+        <div className={zoom > 1 ? 'pptx-viewer-scroll-body pptx-viewer-zoomed' : 'pptx-viewer-scroll-body'} ref={scrollBodyRef}>
+          {shownSlides.map((slide) => (
+            <PptxSlideItem
+              key={slide.index}
+              slide={slide}
+              totalSlides={presentation.slides.length}
+              widthPx={canvasWidthPx}
+              heightPx={canvasHeightPx}
+              scale={scale}
+              onVisibilityChange={handleSlideVisibilityChange}
+            />
+          ))}
+        </div>
+      </SlideJumpContext.Provider>
     </div>
   )
 }

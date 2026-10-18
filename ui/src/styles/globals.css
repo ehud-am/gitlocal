@@ -1670,6 +1670,42 @@ pre {
   font-size: 0.85rem;
 }
 
+.pptx-viewer-hidden-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.pptx-viewer-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.pptx-viewer-zoom button {
+  min-width: 1.75rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.pptx-viewer-zoom button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pptx-viewer-zoom .pptx-viewer-zoom-level {
+  min-width: 3.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .pptx-viewer-scroll-body {
   /* Scrolling happens on the ancestor .content-panel-selection-root (ContentPanel's own scroll
      wrapper, shared by every preview type) - this element intentionally does NOT set its own
@@ -1679,6 +1715,12 @@ pre {
   flex-direction: column;
   gap: 1.5rem;
   padding-bottom: 1rem;
+}
+
+/* Zoomed past the panel width: scroll sideways here. Only overflow-x is needed; the element has
+   no height limit, so it never scrolls vertically and the observers' root stays the ancestor. */
+.pptx-viewer-zoomed {
+  overflow-x: auto;
 }
 
 .pptx-viewer-slide-item {
@@ -1697,7 +1739,9 @@ pre {
    transform, so the preview stays responsive to the panel's width instead of a fixed px canvas. */
 .pptx-viewer-slide-frame {
   position: relative;
-  width: 100%;
+  flex: none;
+  max-width: none;
+  margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1708,6 +1752,20 @@ pre {
   top: 0;
   left: 0;
   transform-origin: top left;
+}
+
+.pptx-viewer-slide-hidden .pptx-viewer-slide-frame {
+  opacity: 0.55;
+}
+
+.pptx-viewer-hidden-tag {
+  align-self: flex-start;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
 }
 
 .pptx-viewer-slide-pending {
@@ -1729,6 +1787,34 @@ pre {
 
 .pptx-viewer-paragraph {
   margin: 0;
+}
+
+.pptx-viewer-columns > .pptx-viewer-paragraph {
+  break-inside: auto;
+}
+
+/* Linked text keeps the run's own color and underline. */
+.pptx-viewer-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pptx-viewer-shape-link {
+  display: block;
+  cursor: pointer;
+}
+
+.pptx-viewer-media-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  pointer-events: none;
 }
 
 .pptx-viewer-table {

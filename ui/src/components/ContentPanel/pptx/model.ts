@@ -75,6 +75,9 @@ export interface Box {
   flipV: boolean
 }
 
+// Where a hyperlink goes: a web/mail address (opened outside the app) or another slide of the deck.
+export type Link = { kind: 'url'; href: string } | { kind: 'slide'; index: number }
+
 export interface TextRun {
   text: string
   isBreak: boolean
@@ -89,11 +92,17 @@ export interface TextRun {
   caps: 'none' | 'all' | 'small'
   letterSpacingPt: number
   highlight: string | null
+  link: Link | null
 }
 
 export type Bullet =
   | { kind: 'char'; char: string; fontFamily: string | null; color: string | null; sizePct: number }
   | { kind: 'number'; text: string; fontFamily: string | null; color: string | null; sizePct: number }
+
+export interface TabStop {
+  posPx: number
+  align: 'l' | 'ctr' | 'r' | 'dec'
+}
 
 export interface Paragraph {
   align: 'left' | 'center' | 'right' | 'justify'
@@ -108,6 +117,9 @@ export interface Paragraph {
   // Font size used for an empty paragraph's line height and as the bullet's size base.
   baseSizePt: number
   rtl: boolean
+  // Custom tab stops (a:tabLst), in position order, then the default tab interval (defTabSz).
+  tabStops: TabStop[]
+  defaultTabPx: number
 }
 
 export interface TextBody {
@@ -119,6 +131,9 @@ export interface TextBody {
   vertical: 'horz' | 'vert' | 'vert270'
   fontScale: number
   lineSpacingReduction: number
+  // Text columns (bodyPr numCol/spcCol): filled one after the other, like PowerPoint.
+  columns: number
+  columnSpacingPx: number
 }
 
 export interface ShapeNode {
@@ -131,6 +146,7 @@ export interface ShapeNode {
   // SmartArt drawings position text in a box of its own (dsp:txXfrm), relative to the shape box.
   textBox: Box | null
   shadow: string | null
+  link: Link | null
 }
 
 export interface PictureNode {
@@ -140,6 +156,9 @@ export interface PictureNode {
   image: ImageRef
   line: Line | null
   shadow: string | null
+  link: Link | null
+  // A video or audio clip; the preview shows its poster frame with a badge, without playback.
+  media: 'video' | 'audio' | null
 }
 
 export interface GroupNode {
@@ -201,6 +220,8 @@ export interface SlideModel {
   background: Fill
   nodes: SlideNode[]
   notes: string | null
+  // Hidden in the slide show (p:sld show="0").
+  hidden: boolean
 }
 
 export interface PresentationModel {
