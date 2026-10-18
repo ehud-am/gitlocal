@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PartScope } from './fill'
-import { scopeFor, el } from './test-support'
-import { formatAutoNumber, parseTextBody, symbolBullet, type TextStyleChain } from './text'
+import { scopeFor, el, relsXml } from './test-support'
+import { formatAutoNumber, parseLink, parseTextBody, symbolBullet, type TextStyleChain } from './text'
 import { DEFAULT_THEME } from './theme'
 
 const theme = { ...DEFAULT_THEME, fonts: { majorLatin: 'Georgia', minorLatin: 'Arial', majorEa: '', minorEa: '' } }
@@ -168,5 +168,94 @@ describe('bullets', () => {
     expect(formatAutoNumber('alphaUcParenR', 2)).toBe('B)')
     expect(formatAutoNumber('romanLcPeriod', 1994)).toBe('mcmxciv.')
     expect(formatAutoNumber('romanUcPeriod', 9)).toBe('IX.')
+  })
+})
+
+describe('links', () => {
+  const slides = { count: 4, indexByPath: new Map([['ppt/slides/slide1.xml', 0], ['ppt/slides/slide3.xml', 2]]) }
+  async function linkScope() {
+    return scopeFor({
+      'ppt/slides/_rels/slide1.xml.rels': relsXml([
+        { id: 'rIdWeb', type: 'hyperlink', target: 'https://example.com/a?b=1', external: true },
+        { id: 'rIdMail', type: 'hyperlink', target: 'mailto:team@example.com', external: true },
+        { id: 'rIdJs', type: 'hyperlink', target: 'javascript:alert(1)', external: true },
+        { id: 'rIdFile', type: 'hyperlink', target: 'file:///etc/passwd', external: true },
+        { id: 'rIdSlide', type: 'slide', target: 'slide3.xml' },
+        { id: 'rIdOther', type: 'slide', target: 'slide9.xml' },
+      ]),
+    }, 'ppt/slides/slide1.xml', theme)
+  }
+  const link = (attrs: string) => el(`<a:hlinkClick ${attrs}/>`)
+
+  it('resolves web, mail and slide links and drops unsafe or dangling ones', async () => {
+    const scope = await linkScope()
+    const context = { scope, slideNumber: 2, slides }
+    expect(parseLink(null, context)).toBeNull()
+    expect(parseLink(link('r:id="rIdWeb"'), context)).toEqual({ kind: 'url', href: 'https://example.com/a?b=1' })
+    expect(parseLink(link('r:id="rIdMail"'), context)).toEqual({ kind: 'url', href: 'mailto:team@example.com' })
+    expect(parseLink(link('r:id="rIdJs"'), context)).toBeNull()
+    expect(parseLink(link('r:id="rIdFile"'), context)).toBeNull()
+    expect(parseLink(link('r:id="rIdMissing"'), context)).toBeNull()
+    expect(parseLink(link('r:id=""'), context)).toBeNull()
+    expect(parseLink(link('r:id="rIdSlide" action="ppaction://hlinksldjump"'), context)).toEqual({ kind: 'slide', index: 2 })
+    expect(parseLink(link('r:id="rIdOther" action="ppaction://hlinksldjump"'), context)).toBeNull()
+    expect(parseLink(link('r:id="rIdSlide"'), { scope, slideNumber: 2 })).toBeNull()
+  })
+
+  it('resolves first, last, next and previous slide jumps within the deck', async () => {
+    const scope = await linkScope()
+    const jump = (target: string, slideNumber = 2) => parseLink(link(`r:id="" action="ppaction://hlinkshowjump?jump=${target}"`), { scope, slideNumber, slides })
+    expect(jump('firstslide')).toEqual({ kind: 'slide', index: 0 })
+    expect(jump('lastslide')).toEqual({ kind: 'slide', index: 3 })
+    expect(jump('nextslide')).toEqual({ kind: 'slide', index: 2 })
+    expect(jump('previousslide')).toEqual({ kind: 'slide', index: 0 })
+    expect(jump('nextslide', 4)).toBeNull()
+    expect(jump('previousslide', 1)).toBeNull()
+    expect(jump('endshow')).toBeNull()
+    expect(parseLink(link('action="ppaction://hlinkshowjump"'), { scope, slideNumber: 1 })).toBeNull()
+  })
+
+  it('colors and underlines linked runs unless the link keeps the text color', async () => {
+    const scope = await linkScope()
+    const body = parseTextBody(el(`<p:txBody><a:bodyPr/><a:p>
+      <a:r><a:rPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:hlinkClick r:id="rIdWeb"/></a:rPr><a:t>web</a:t></a:r>
+      <a:r><a:rPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:hlinkClick r:id="rIdWeb"><a:extLst><a:ext uri="x"><a16:hlinkClr xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" val="tx"/></a:ext></a:extLst></a:hlinkClick></a:rPr><a:t>kept</a:t></a:r>
+      <a:r><a:rPr><a:hlinkClick r:id="rIdJs"/></a:rPr><a:t>unsafe</a:t></a:r>
+      <a:br><a:rPr><a:hlinkClick r:id="rIdWeb"/></a:rPr></a:br>
+    </a:p></p:txBody>`), EMPTY_CHAIN, { scope, slideNumber: 1, slides })
+    const runs = body?.paragraphs[0].runs ?? []
+    expect(runs[0]).toMatchObject({ link: { kind: 'url', href: 'https://example.com/a?b=1' }, color: '#0563c1', underline: true })
+    expect(runs[1]).toMatchObject({ link: { kind: 'url' }, color: '#ff0000', underline: true })
+    expect(runs[2]).toMatchObject({ link: null, color: '#000000', underline: false })
+    expect(runs[3]).toMatchObject({ isBreak: true, link: null })
+  })
+})
+
+describe('tabs and columns', () => {
+  it('reads tab stops in position order and the default tab size', async () => {
+    const body = await parse(`<a:bodyPr/>
+      <a:p><a:pPr defTabSz="457200"><a:tabLst><a:tab pos="1905000" algn="r"/><a:tab pos="952500"/><a:tab pos="2857500" algn="bogus"/><a:tab algn="ctr"/></a:tabLst></a:pPr><a:r><a:t>a	b</a:t></a:r></a:p>
+      <a:p><a:r><a:t>plain</a:t></a:r></a:p>`)
+    expect(body?.paragraphs[0].tabStops).toEqual([
+      { posPx: 0, align: 'ctr' },
+      { posPx: 100, align: 'l' },
+      { posPx: 200, align: 'r' },
+      { posPx: 300, align: 'l' },
+    ])
+    expect(body?.paragraphs[0].defaultTabPx).toBe(48)
+    expect(body?.paragraphs[1]).toMatchObject({ tabStops: [], defaultTabPx: 96 })
+  })
+
+  it('takes tab stops from the list style when the paragraph has none', async () => {
+    const lstStyle = el('<a:lstStyle><a:lvl1pPr defTabSz="0"><a:tabLst><a:tab pos="95250" algn="dec"/></a:tabLst></a:lvl1pPr></a:lstStyle>')
+    const body = await parse('<a:bodyPr/><a:p><a:r><a:t>x</a:t></a:r></a:p>', { ...EMPTY_CHAIN, lstStyles: [lstStyle] })
+    expect(body?.paragraphs[0]).toMatchObject({ tabStops: [{ posPx: 10, align: 'dec' }], defaultTabPx: 96 })
+  })
+
+  it('reads text columns, clamped to a sane count', async () => {
+    expect(await parse('<a:bodyPr/><a:p><a:r><a:t>x</a:t></a:r></a:p>')).toMatchObject({ columns: 1, columnSpacingPx: 0 })
+    expect(await parse('<a:bodyPr numCol="2" spcCol="190500"/><a:p><a:r><a:t>x</a:t></a:r></a:p>')).toMatchObject({ columns: 2, columnSpacingPx: 20 })
+    expect(await parse('<a:bodyPr numCol="99"/><a:p><a:r><a:t>x</a:t></a:r></a:p>')).toMatchObject({ columns: 16 })
+    expect(await parse('<a:bodyPr numCol="0"/><a:p><a:r><a:t>x</a:t></a:r></a:p>')).toMatchObject({ columns: 1 })
   })
 })

@@ -1,24 +1,24 @@
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { Box, ChartModel, Line, Paragraph, ShapeNode, SlideModel, SlideNode, TextBody, TextRun } from './model'
-import { NodeView, SlideView, TextBodyView } from './render'
+import { NodeView, SlideJumpContext, SlideView, tabAdvance, TextBodyView } from './render'
 
 const box = (overrides: Partial<Box> = {}): Box => ({ x: 1, y: 2, w: 100, h: 50, rot: 0, flipH: false, flipV: false, ...overrides })
 const run = (overrides: Partial<TextRun> = {}): TextRun => ({
   text: 'text', isBreak: false, sizePt: 18, bold: false, italic: false, underline: false, strike: false, color: '#000000',
-  fontFamily: 'Arial', baseline: 0, caps: 'none', letterSpacingPt: 0, highlight: null, ...overrides,
+  fontFamily: 'Arial', baseline: 0, caps: 'none', letterSpacingPt: 0, highlight: null, link: null, ...overrides,
 })
 const paragraph = (overrides: Partial<Paragraph> = {}): Paragraph => ({
   align: 'left', marginLeftPx: 0, indentPx: 0, lineSpacing: { kind: 'pct', value: 1 }, spaceBeforePt: 0, spaceAfterPt: 0,
-  bullet: null, runs: [run()], baseSizePt: 18, rtl: false, ...overrides,
+  bullet: null, runs: [run()], baseSizePt: 18, rtl: false, tabStops: [], defaultTabPx: 96, ...overrides,
 })
 const body = (overrides: Partial<TextBody> = {}): TextBody => ({
   paragraphs: [paragraph()], insets: { l: 1, t: 2, r: 3, b: 4 }, anchor: 'top', anchorCenter: false, wrap: true,
-  vertical: 'horz', fontScale: 1, lineSpacingReduction: 0, ...overrides,
+  vertical: 'horz', fontScale: 1, lineSpacingReduction: 0, columns: 1, columnSpacingPx: 0, ...overrides,
 })
 const line = (overrides: Partial<Line> = {}): Line => ({ color: '#ff0000', gradient: null, widthPx: 2, dash: null, cap: 'butt', join: 'round', head: null, tail: null, ...overrides })
 const shape = (overrides: Partial<ShapeNode> = {}): ShapeNode => ({
-  kind: 'shape', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, fill: null, line: null, text: null, textBox: null, shadow: null, ...overrides,
+  kind: 'shape', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, fill: null, line: null, text: null, textBox: null, shadow: null, link: null, ...overrides,
 })
 
 function renderNode(node: SlideNode) {
@@ -126,10 +126,10 @@ describe('node rendering', () => {
 
   it('draws pictures, their outlines and unavailable placeholders', () => {
     const image = { mediaPath: 'a.png', src: 'blob:a', crop: { l: 0, t: 0, r: 0, b: 0 }, opacity: 1, grayscale: false }
-    const container = renderNode({ kind: 'picture', box: box({ flipH: true }), geometry: { kind: 'preset', name: 'ellipse', adj: {} }, image, line: line(), shadow: null })
+    const container = renderNode({ kind: 'picture', box: box({ flipH: true }), geometry: { kind: 'preset', name: 'ellipse', adj: {} }, image, line: line(), shadow: null, link: null, media: null })
     expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:a')
     expect(container.querySelector('.pptx-viewer-outline')).not.toBeNull()
-    const missing = renderNode({ kind: 'picture', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, image: { ...image, src: null }, line: null, shadow: 'x' })
+    const missing = renderNode({ kind: 'picture', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, image: { ...image, src: null }, line: null, shadow: 'x', link: null, media: null })
     expect(missing.textContent).toBe('Image not available in this preview')
   })
 
@@ -173,10 +173,103 @@ describe('node rendering', () => {
 
 describe('SlideView', () => {
   it('draws the background and nodes in order', () => {
-    const slide: SlideModel = { index: 0, background: { type: 'solid', color: '#123456' }, nodes: [shape({ text: body() }), shape({ fill: { type: 'solid', color: '#fff' } })], notes: null }
+    const slide: SlideModel = { index: 0, background: { type: 'solid', color: '#123456' }, nodes: [shape({ text: body() }), shape({ fill: { type: 'solid', color: '#fff' } })], notes: null, hidden: false }
     const { container } = render(<SlideView slide={slide} widthPx={960} heightPx={540} />)
     expect((container.querySelector('.pptx-viewer-background') as HTMLElement).style.backgroundColor).toBe('rgb(18, 52, 86)')
     expect((container.querySelector('.pptx-viewer-slide-content') as HTMLElement).style).toMatchObject({ width: '960px', height: '540px' })
     expect(container.querySelectorAll('.pptx-viewer-shape')).toHaveLength(2)
+  })
+})
+
+describe('links', () => {
+  it('opens web links outside the app and jumps to slides through the context', () => {
+    const jump = vi.fn()
+    const { container } = render(
+      <SlideJumpContext.Provider value={jump}>
+        <TextBodyView body={body({ paragraphs: [paragraph({ runs: [
+          run({ text: 'web', link: { kind: 'url', href: 'https://example.com' } }),
+          run({ text: 'slide', link: { kind: 'slide', index: 4 } }),
+          run({ text: 'plain' }),
+        ] })] })} />
+      </SlideJumpContext.Provider>,
+    )
+    const links = Array.from(container.querySelectorAll('a.pptx-viewer-link')) as HTMLAnchorElement[]
+    expect(links).toHaveLength(2)
+    expect(links[0]).toMatchObject({ href: 'https://example.com/', target: '_blank', rel: 'noopener noreferrer', textContent: 'web' })
+    expect(links[1].getAttribute('href')).toBe('#slide-5')
+    expect(links[1].title).toBe('Go to slide 5')
+    fireEvent.click(links[1])
+    expect(jump).toHaveBeenCalledWith(4)
+  })
+
+  it('makes linked shapes and pictures clickable as a whole, and ignores slide links without a viewer', () => {
+    const shapeLink = renderNode(shape({ text: body(), link: { kind: 'url', href: 'mailto:a@b.c' } })).querySelector('a.pptx-viewer-shape-link') as HTMLAnchorElement
+    expect(shapeLink.getAttribute('aria-label')).toBe('mailto:a@b.c')
+    const image = { mediaPath: 'a.png', src: 'blob:a', crop: { l: 0, t: 0, r: 0, b: 0 }, opacity: 1, grayscale: false }
+    const pictureLink = renderNode({ kind: 'picture', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, image, line: null, shadow: null, link: { kind: 'slide', index: 0 }, media: null })
+      .querySelector('a.pptx-viewer-shape-link') as HTMLAnchorElement
+    expect(pictureLink.getAttribute('aria-label')).toBe('Go to slide 1')
+    expect(() => fireEvent.click(pictureLink)).not.toThrow()
+    expect(renderNode(shape({ text: body() })).querySelector('a')).toBeNull()
+  })
+})
+
+describe('media, columns and tabs', () => {
+  it('badges video and audio pictures', () => {
+    const image = { mediaPath: 'a.png', src: 'blob:a', crop: { l: 0, t: 0, r: 0, b: 0 }, opacity: 1, grayscale: false }
+    const picture = (media: 'video' | 'audio' | null) => renderNode({ kind: 'picture', box: box(), geometry: { kind: 'preset', name: 'rect', adj: {} }, image, line: null, shadow: null, link: null, media })
+    expect(picture('video').querySelector('.pptx-viewer-media-badge')?.textContent).toBe('▶ Video')
+    expect(picture('audio').querySelector('.pptx-viewer-media-badge')?.textContent).toBe('♪ Audio')
+    expect(picture(null).querySelector('.pptx-viewer-media-badge')).toBeNull()
+  })
+
+  it('flows multi-column text into CSS columns', () => {
+    const { container } = render(<TextBodyView body={body({ columns: 3, columnSpacingPx: 12 })} />)
+    const columns = container.querySelector('.pptx-viewer-columns') as HTMLElement
+    expect(columns.style.columnCount).toBe('3')
+    expect(columns.style.columnGap).toBe('12px')
+    expect(columns.style.columnFill).toBe('auto')
+    expect(render(<TextBodyView body={body()} />).container.querySelector('.pptx-viewer-columns')).toBeNull()
+  })
+
+  it('balances columns when the text overflows the box', () => {
+    const scrollWidth = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(500)
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200)
+    try {
+      const { container } = render(<TextBodyView body={body({ columns: 2 })} />)
+      const columns = container.querySelector('.pptx-viewer-columns') as HTMLElement
+      expect(columns.style.columnFill).toBe('balance')
+      expect(columns.style.height).toBe('auto')
+    } finally {
+      scrollWidth.mockRestore()
+      clientWidth.mockRestore()
+    }
+  })
+
+  it('lays tab characters out as gaps sized to the tab stops', () => {
+    const { container } = render(<TextBodyView body={body({ paragraphs: [paragraph({
+      tabStops: [{ posPx: 40, align: 'l' }],
+      runs: [run({ text: 'a\tb\t' }), run({ isBreak: true, text: '' }), run({ text: '\tc' })],
+    })] })} />)
+    const tabs = Array.from(container.querySelectorAll('.pptx-viewer-tab')) as HTMLElement[]
+    expect(tabs).toHaveLength(3)
+    // jsdom has no layout (every offset is 0), so each gap advances to the first stop.
+    expect(tabs.map((tab) => tab.style.width)).toEqual(['40px', '40px', '40px'])
+    expect(Array.from(container.querySelectorAll('.pptx-viewer-run')).map((node) => node.textContent)).toEqual(['a', 'b', 'c'])
+    expect(container.querySelector('[data-pptx-tab-end]')).not.toBeNull()
+    const plain = render(<TextBodyView body={body()} />).container
+    expect(plain.querySelector('[data-pptx-tab-end]')).toBeNull()
+  })
+
+  it('advances tabs to custom stops by alignment, then to the default interval', () => {
+    const stops = [{ posPx: 100, align: 'l' as const }, { posPx: 200, align: 'ctr' as const }, { posPx: 300, align: 'r' as const }, { posPx: 400, align: 'dec' as const }]
+    expect(tabAdvance(10, 50, stops, 96)).toBe(90)
+    expect(tabAdvance(100, 50, stops, 96)).toBe(75)
+    expect(tabAdvance(150, 60, stops, 96)).toBe(20)
+    expect(tabAdvance(250, 30, stops, 96)).toBe(20)
+    expect(tabAdvance(390, 80, stops, 96)).toBe(0)
+    expect(tabAdvance(410, 0, stops, 96)).toBe(70)
+    expect(tabAdvance(0, 0, [], 96)).toBe(96)
+    expect(tabAdvance(96, 0, [], 96)).toBe(96)
   })
 })

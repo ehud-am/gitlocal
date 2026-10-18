@@ -1,8 +1,14 @@
 # Changelog
 
-## 0.13.10 - 2026-10-11
+## 0.14.0 - 2026-10-18
 
-- Fixed PowerPoint slides whose text showed in black at the default size (invisible on dark slides) when the deck sets text formatting on the paragraph instead of on each run, as some generated decks do.
+- PowerPoint preview: links in slides now work. Web and email links open outside GitLocal; links to another slide (including "next", "previous", "first" and "last" slide actions) scroll to that slide. Linked text uses the theme's hyperlink color and underline, as in PowerPoint. Whole shapes and pictures can be links too.
+- PowerPoint preview: zoom controls (50% to 300% of fit-to-width) in the slide toolbar. Zooming past the panel width scrolls sideways; the zoom label resets to fit.
+- PowerPoint preview: hidden slides are marked "Hidden slide" and dimmed, and a "Show hidden slides" checkbox leaves them out. Following a link to a hidden slide shows them again.
+- PowerPoint preview: text boxes with two or more columns render as columns instead of one long column.
+- PowerPoint preview: tab stops (left, center, right; decimal treated as right) and the deck's default tab spacing are applied, so tab-aligned text lines up.
+- PowerPoint preview: video and audio clips show a "Video" or "Audio" badge on their poster image. Playback isn't available in the preview.
+- Fixed PowerPoint slides whose text showed in black at the default size (invisible on dark slides) when the deck sets text formatting on the paragraph instead of on each run, as some generated decks do. (Prepared as 0.13.10, which was not published.)
 
 ## 0.13.9 - 2026-10-11
 

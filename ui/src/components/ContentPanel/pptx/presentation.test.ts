@@ -227,6 +227,42 @@ describe('shapes', () => {
     expect(presentation.slides[0].nodes).toHaveLength(3)
   })
 
+  it('reads hidden slides, slide and web links on shapes and text, and video/audio pictures', async () => {
+    const linked = (shape: string, link: string) => shape.replace('name="Shape"/>', `name="Shape">${link}</p:cNvPr>`)
+    const media = (rId: string, tag: string) => pic(rId).replace('<p:nvPr/>', `<p:nvPr>${tag}</p:nvPr>`)
+    const deck = await buildDeck({
+      slides: [
+        {
+          shapes: [
+            linked(sp({ text: 'to three', box: [0, 0, 952500, 952500] }), '<a:hlinkClick r:id="rIdS3" action="ppaction://hlinksldjump"/>'),
+            sp({ box: [0, 0, 952500, 952500], body: '<a:bodyPr/><a:p><a:r><a:rPr><a:hlinkClick r:id="rIdWeb"/></a:rPr><a:t>site</a:t></a:r></a:p>' }),
+            media('rIdImg', '<a:videoFile r:link="rIdV"/>'),
+            media('rIdImg', '<a:quickTimeFile r:link="rIdV"/>'),
+            media('rIdImg', '<a:audioFile r:link="rIdA"/>'),
+            media('rIdImg', '<a:wavAudioFile r:embed="rIdA"/>'),
+            pic('rIdImg').replace('name="Picture"/>', 'name="Picture"><a:hlinkClick r:id="" action="ppaction://hlinkshowjump?jump=lastslide"/></p:cNvPr>'),
+          ].join(''),
+          rels: [
+            { id: 'rIdS3', type: 'slide', target: 'slide3.xml' },
+            { id: 'rIdWeb', type: 'hyperlink', target: 'https://example.com', external: true },
+            { id: 'rIdImg', type: 'image', target: '../media/image1.png' },
+          ],
+        },
+        { attrs: ' show="0"' },
+        { attrs: ' show="1"' },
+      ],
+      files: { 'ppt/media/image1.png': PNG_BYTES },
+    })
+    const presentation = await parsePresentation(deck)
+    expect(presentation.slides.map((slide) => slide.hidden)).toEqual([false, true, false])
+    const [toThree, site, ...pictures] = presentation.slides[0].nodes
+    expect((toThree as ShapeNode).link).toEqual({ kind: 'slide', index: 2 })
+    expect((site as ShapeNode).link).toBeNull()
+    expect((site as ShapeNode).text?.paragraphs[0].runs[0].link).toEqual({ kind: 'url', href: 'https://example.com' })
+    expect((pictures as PictureNode[]).map((node) => node.media)).toEqual(['video', 'video', 'audio', 'audio', null])
+    expect((pictures[4] as PictureNode).link).toEqual({ kind: 'slide', index: 2 })
+  })
+
   it('scales group children into the group box and skips hidden members', async () => {
     const group = (inner: string, xfrm: string, hidden = false) => `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="9" name="G"${hidden ? ' hidden="1"' : ''}/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr>${xfrm}<a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></p:grpSpPr>${inner}</p:grpSp>`
     const child = sp({ text: 'child', box: [95250, 95250, 95250, 95250], spPr: '<a:grpFill/>' })

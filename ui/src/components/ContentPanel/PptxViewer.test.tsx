@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
-import PptxViewer from './PptxViewer'
+import PptxViewer, { ZOOM_LEVELS } from './PptxViewer'
+import { buildDeck, sp } from './pptx/test-support'
 
 // See ExcelViewer.test.tsx: `new URL('...', import.meta.url)` is rewritten by Vite's import
 // analysis, breaking a plain Node fs read at test time — resolve against the Vitest cwd instead.
@@ -620,5 +621,86 @@ describe('PptxViewer', () => {
     expect(screen.getByText('Slide 1 of 60')).toBeInTheDocument()
     expect(document.querySelectorAll('.pptx-viewer-slide-item')).toHaveLength(60)
     expect(screen.getByText('Slide Number 60')).toBeInTheDocument()
+  })
+})
+
+describe('PptxViewer controls', () => {
+  const box: [number, number, number, number] = [0, 0, 952500, 952500]
+  const linkTo = (text: string, rId: string) => sp({ box, body: `<a:bodyPr/><a:p><a:r><a:rPr><a:hlinkClick r:id="${rId}" action="ppaction://hlinksldjump"/></a:rPr><a:t>${text}</a:t></a:r></a:p>` })
+  async function deck(): Promise<string> {
+    const bytes = await buildDeck({
+      slides: [
+        { shapes: linkTo('go hidden', 'rIdS2') + linkTo('go last', 'rIdS3'), rels: [{ id: 'rIdS2', type: 'slide', target: 'slide2.xml' }, { id: 'rIdS3', type: 'slide', target: 'slide3.xml' }] },
+        { attrs: ' show="0"', shapes: sp({ text: 'Secret', box }) },
+        { shapes: sp({ text: 'Last', box }) },
+      ],
+    })
+    return Buffer.from(bytes).toString('base64')
+  }
+
+  it('marks hidden slides and can leave them out', async () => {
+    render(<PptxViewer content={await deck()} />)
+    await waitFor(() => expect(screen.getByText('Secret')).toBeInTheDocument())
+    expect(slideItem(1)).toHaveClass('pptx-viewer-slide-hidden')
+    expect(slideItem(1).getAttribute('aria-label')).toBe('Slide 2 of 3 (hidden)')
+    expect(screen.getByText('Hidden slide')).toBeInTheDocument()
+    const toggle = screen.getByRole('checkbox', { name: 'Show hidden slides (1)' })
+    fireEvent.click(toggle)
+    expect(screen.queryByText('Secret')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.pptx-viewer-slide-item')).toHaveLength(2)
+    expect(screen.getByText('Slide 1 of 3')).toBeInTheDocument()
+  })
+
+  it('shows no hidden-slide toggle for a deck without hidden slides', async () => {
+    render(<PptxViewer content={sample} />)
+    await waitFor(() => expect(screen.getByText('Slide One Title')).toBeInTheDocument())
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('jumps to a linked slide, showing hidden slides again when the target is one', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      render(<PptxViewer content={await deck()} />)
+      await waitFor(() => expect(screen.getByText('go last')).toBeInTheDocument())
+      fireEvent.click(screen.getByText('go last'))
+      await waitFor(() => expect(document.activeElement).toBe(slideItem(2)))
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Show hidden slides (1)' }))
+      expect(screen.queryByText('Secret')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText('go hidden'))
+      await waitFor(() => expect(screen.getByText('Secret')).toBeInTheDocument())
+      await waitFor(() => expect(document.activeElement).toBe(slideItem(1)))
+    } finally {
+      // @ts-expect-error - restoring jsdom's missing implementation
+      delete Element.prototype.scrollIntoView
+    }
+  })
+
+  it('zooms relative to fit-to-width and resets to fit', async () => {
+    render(<PptxViewer content={sample} />)
+    await waitFor(() => expect(screen.getByText('Slide One Title')).toBeInTheDocument())
+    const frame = () => slideItem(0).querySelector('.pptx-viewer-slide-frame') as HTMLElement
+    const fitWidth = parseFloat(frame().style.width)
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' })
+    const zoomOut = screen.getByRole('button', { name: 'Zoom out' })
+    expect(screen.getByRole('button', { name: 'Fit to width' })).toHaveTextContent('Fit')
+
+    fireEvent.click(zoomIn)
+    expect(parseFloat(frame().style.width)).toBeCloseTo(fitWidth * 1.25)
+    expect(screen.getByRole('button', { name: '125%, reset to fit width' })).toBeInTheDocument()
+    expect(document.querySelector('.pptx-viewer-scroll-body')).toHaveClass('pptx-viewer-zoomed')
+
+    for (let step = 0; step < ZOOM_LEVELS.length; step += 1) fireEvent.click(zoomIn)
+    expect(zoomIn).toBeDisabled()
+    expect(screen.getByText('300%')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '300%, reset to fit width' }))
+    expect(parseFloat(frame().style.width)).toBeCloseTo(fitWidth)
+    for (let step = 0; step < ZOOM_LEVELS.length; step += 1) fireEvent.click(zoomOut)
+    expect(zoomOut).toBeDisabled()
+    expect(screen.getByText('50%')).toBeInTheDocument()
+    expect(document.querySelector('.pptx-viewer-scroll-body')).not.toHaveClass('pptx-viewer-zoomed')
   })
 })
