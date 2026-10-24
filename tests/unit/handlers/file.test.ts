@@ -25,6 +25,7 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   writeFileSync(join(dir, 'spec.pdf'), Buffer.from('%PDF-1.4\n%fake binary pdf bytes\n', 'utf-8'))
   writeFileSync(join(dir, 'data.csv'), 'Name,Role\nAda,Engineer\n')
   writeFileSync(join(dir, 'report.xlsx'), Buffer.from('PK\x03\x04fake xlsx bytes', 'utf-8'))
+  writeFileSync(join(dir, 'page.html'), '<!doctype html><title>Page</title><p>Hi</p>')
   writeFileSync(join(dir, 'deck.pptx'), Buffer.from('PK\x03\x04fake pptx bytes', 'utf-8'))
 
   spawnSync('git', ['add', '.'], { cwd: dir })
@@ -659,6 +660,24 @@ describe('fileHandler', () => {
     expect(body.content).toContain('Hello')
     expect(body.editable).toBe(true)
     expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns html type as editable utf-8 text and accepts inline updates', async () => {
+    const app = createApp(dir)
+    const readRes = await app.fetch(new Request(`http://localhost/api/file?path=page.html&branch=${branch}`))
+    const readBody = await readRes.json()
+    expect(readBody.type).toBe('html')
+    expect(readBody.language).toBe('html')
+    expect(readBody.encoding).toBe('utf-8')
+    expect(readBody.content).toContain('<p>Hi</p>')
+    expect(readBody.editable).toBe(true)
+
+    const updateRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'page.html', content: '<p>Updated</p>', revisionToken: readBody.revisionToken }),
+    }))
+    expect(updateRes.status).toBe(200)
   })
 
   it('returns text type with language for .ts files', async () => {

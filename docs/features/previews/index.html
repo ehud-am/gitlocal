@@ -87,10 +87,12 @@
         <li><strong>CSV.</strong> A scrollable table, with a toggle between the raw text and the formatted view.</li>
         <li><strong>Excel (<code>.xlsx</code>, <code>.xls</code>).</strong> A tab for each sheet, showing the values Excel last saved. GitLocal never recalculates formulas.</li>
         <li><strong>PowerPoint (<code>.pptx</code>).</strong> Slides scroll continuously with a &ldquo;Slide N of M&rdquo; indicator and zoom controls, and speaker notes appear inline. Links open web pages or jump to the linked slide, and hidden slides are marked and can be left out. Text (including multiple columns and tab stops), shapes, tables, simple charts, backgrounds (including gradients and theme backgrounds), and images, including EMF and WMF pictures, are rendered with the formatting inherited from the deck&rsquo;s layouts, masters, and theme.</li>
+        <li><strong>HTML.</strong> Rendered as a page in a locked-down frame: scripts, forms and links are off, and nothing the page links to is loaded, so opening a file never contacts a server. A toggle shows the source.</li>
+        <li><strong>JSON.</strong> Formatted and color-coded like a code editor, with each object and array foldable.</li>
         <li><strong>Images and Markdown</strong> open in the same viewer, so nothing changes as you move between file types.</li>
       </ul>
       <h2>Honest limits</h2>
-      <p>All of these previews are read-only, and the PowerPoint and Excel viewers are best-effort rather than pixel-perfect. Charts inside Excel worksheets are not drawn yet, video and audio clips don&rsquo;t play, and SmartArt without a saved drawing and a few EMF pictures drawn with scaling transforms show as missing or &ldquo;not available&rdquo;. If one of these gets in your way, the <a href="https://github.com/ehud-am/gitlocal/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">open help-wanted issues</a> are the place to weigh in or pick one up.</p>
+      <p>The PDF, SVG, CSV, Excel and PowerPoint previews are read-only (HTML and JSON can be edited as text), and the PowerPoint and Excel viewers are best-effort rather than pixel-perfect. Charts inside Excel worksheets are not drawn yet, video and audio clips don&rsquo;t play, and SmartArt without a saved drawing and a few EMF pictures drawn with scaling transforms show as missing or &ldquo;not available&rdquo;. If one of these gets in your way, the <a href="https://github.com/ehud-am/gitlocal/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">open help-wanted issues</a> are the place to weigh in or pick one up.</p>
       <section class="try-it" aria-labelledby="try-it-title">
         <h2 id="try-it-title">Try it in one command</h2>
         <div class="install-chip">

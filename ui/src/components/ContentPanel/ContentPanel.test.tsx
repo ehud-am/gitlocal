@@ -2194,8 +2194,8 @@ describe('ContentPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('JSON document structure')).toBeInTheDocument()
     })
-    expect(screen.getByText('name')).toBeInTheDocument()
-    expect(screen.getByText('gitlocal')).toBeInTheDocument()
+    expect(screen.getByText('"name"')).toBeInTheDocument()
+    expect(screen.getByText('"gitlocal"')).toBeInTheDocument()
     expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument()
     await expect(axe(container)).resolves.toMatchObject({ violations: [] })
   })

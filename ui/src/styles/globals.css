@@ -391,70 +391,116 @@ pre {
 }
 
 .json-viewer {
+  --json-key: #0550ae;
+  --json-string: #0a3069;
+  --json-number: #116329;
+  --json-literal: #cf222e;
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 0.8125rem;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-.json-tree-root,
-.json-tree-children {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.dark .json-viewer {
+  --json-key: #79c0ff;
+  --json-string: #a5d6ff;
+  --json-number: #7ee787;
+  --json-literal: #ff7b72;
 }
 
-.json-tree-children {
-  margin-top: 2px;
-  padding-left: 20px;
-  border-left: 2px solid var(--border);
-}
-
-.json-tree-entry {
-  min-width: 0;
-}
-
-.json-tree-row {
+.json-code-line {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px;
   min-width: 0;
+  white-space: pre-wrap;
 }
 
-.json-tree-toggle {
+.json-code-children {
+  margin-left: 7px;
+  padding-left: 13px;
+  border-left: 1px solid var(--border);
+}
+
+.json-code-toggle {
   flex-shrink: 0;
+  align-self: center;
   width: 16px;
+  margin-right: 4px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--muted-foreground);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   line-height: 1;
   cursor: pointer;
 }
 
-.json-tree-toggle-spacer {
+.json-code-toggle-spacer {
   flex-shrink: 0;
-  width: 16px;
+  width: 20px;
 }
 
-.json-tree-key,
-.json-tree-index {
+.json-code-punct,
+.json-code-ellipsis {
   color: var(--muted-foreground);
-  font-weight: 600;
+}
+
+.json-code-key {
+  color: var(--json-key);
   overflow-wrap: anywhere;
 }
 
-.json-tree-value {
+.json-code-value {
   min-width: 0;
-  color: var(--foreground);
   overflow-wrap: anywhere;
 }
 
-.json-tree-type-badge {
+.json-code-string {
+  color: var(--json-string);
+}
+
+.json-code-number {
+  color: var(--json-number);
+}
+
+.json-code-boolean,
+.json-code-null {
+  color: var(--json-literal);
+}
+
+.json-code-summary {
+  flex-shrink: 0;
+  margin-left: 1.5ch;
   color: var(--muted-foreground);
   font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.html-viewer {
+  display: grid;
+  gap: 8px;
+}
+
+.html-viewer-notice {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+/* A web page has its own light background whatever the app theme, like a browser tab. */
+.html-viewer-frame {
+  display: block;
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color-scheme: light;
 }
 
 .json-parse-notice {

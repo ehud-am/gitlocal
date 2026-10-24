@@ -60,6 +60,7 @@ describe('previewRegistry', () => {
       csv: { supportsRawToggle: true, editable: false },
       excel: { supportsRawToggle: false, editable: false },
       pptx: { supportsRawToggle: false, editable: false },
+      html: { supportsRawToggle: true, editable: true },
     }
 
     for (const [type, flags] of Object.entries(expectedFlags) as [FileContentType, { supportsRawToggle: boolean; editable: boolean }][]) {
@@ -121,7 +122,7 @@ describe('previewRegistry', () => {
     const Component = previewRegistry.json.Component
     render(<Component {...baseProps(data, { jsonRoot: parsed.root })} />)
     await waitFor(() => {
-      expect(screen.getByText('name')).toBeInTheDocument()
+      expect(screen.getByText('"name"')).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 
@@ -229,5 +230,27 @@ describe('previewRegistry', () => {
     await waitFor(() => {
       expect(screen.getByText('Slide One Title')).toBeInTheDocument()
     }, { timeout: 5000 })
+  })
+
+  it('renders HtmlViewer as a sandboxed frame for html', async () => {
+    const data = makeFileContent('html', { content: '<p>Hello page</p>', language: 'html' })
+    const Component = previewRegistry.html.Component
+    render(<Component {...baseProps(data, { showRaw: false })} />)
+    const frame = await screen.findByTitle('HTML preview', {}, { timeout: 5000 })
+    expect(frame).toHaveAttribute('sandbox', 'allow-same-origin')
+    expect(frame.getAttribute('srcdoc')).toContain('<p>Hello page</p>')
+  })
+
+  it('renders raw HTML source via CodeViewer for html when showRaw is true', async () => {
+    const data = makeFileContent('html', { content: '<p>Raw page</p>', language: 'html' })
+    const Component = previewRegistry.html.Component
+    render(<Component {...baseProps(data, { showRaw: true })} />)
+    await waitFor(() => {
+      expect(
+        screen.getByText((_, element) => element?.tagName.toLowerCase() === 'code'
+          && element.textContent?.includes('<p>Raw page</p>') === true),
+      ).toBeInTheDocument()
+    }, { timeout: 5000 })
+    expect(screen.queryByTitle('HTML preview')).not.toBeInTheDocument()
   })
 })
