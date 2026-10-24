@@ -253,7 +253,7 @@ export interface TreeNode {
 }
 
 export type FileEncoding = 'utf-8' | 'base64' | 'none'
-export type FileContentType = 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel' | 'pptx'
+export type FileContentType = 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel' | 'pptx' | 'html'
 
 export interface FileContent {
   path: string

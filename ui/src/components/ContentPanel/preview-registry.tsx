@@ -16,6 +16,7 @@ const SvgViewer = lazy(() => import('./SvgViewer'))
 const CsvViewer = lazy(() => import('./CsvViewer'))
 const ExcelViewer = lazy(() => import('./ExcelViewer'))
 const PptxViewer = lazy(() => import('./PptxViewer'))
+const HtmlViewer = lazy(() => import('./HtmlViewer'))
 
 const loadingFallback = <div className="content-skeleton" aria-label="loading content" />
 
@@ -171,6 +172,16 @@ function PptxPreview({ data, setSelectionRoot }: PreviewComponentProps) {
   )
 }
 
+function HtmlPreview({ data, showRaw, setSelectionRoot }: PreviewComponentProps) {
+  return (
+    <div ref={setSelectionRoot}>
+      <Suspense fallback={loadingFallback}>
+        {showRaw ? <CodeViewer content={data.content} language="html" /> : <HtmlViewer content={data.content} />}
+      </Suspense>
+    </div>
+  )
+}
+
 export const previewRegistry: Record<FileContentType, PreviewRegistryEntry> = {
   binary: { Component: BinaryPreview, supportsRawToggle: false, editable: false },
   image: { Component: ImagePreview, supportsRawToggle: false, editable: false },
@@ -185,4 +196,5 @@ export const previewRegistry: Record<FileContentType, PreviewRegistryEntry> = {
   csv: { Component: CsvPreview, supportsRawToggle: true, editable: false },
   excel: { Component: ExcelPreview, supportsRawToggle: false, editable: false },
   pptx: { Component: PptxPreview, supportsRawToggle: false, editable: false },
+  html: { Component: HtmlPreview, supportsRawToggle: true, editable: true },
 }

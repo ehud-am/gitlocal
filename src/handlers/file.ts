@@ -4,6 +4,7 @@ import {
   applyFileSyncStates,
   deleteWorkingTreeFile,
   detectFileType,
+  isInlineEditableType,
   getEditableState,
   getFileRevisionToken,
   getPathType,
@@ -269,7 +270,7 @@ export async function updateFileHandler(c: Context<{ Variables: Variables }>): P
   }
 
   const { type } = detectFileType(path)
-  if (type !== 'markdown' && type !== 'text') {
+  if (!isInlineEditableType(type)) {
     return mutationBlocked('update', path, 'Only text files can be edited inline.', 400)
   }
 

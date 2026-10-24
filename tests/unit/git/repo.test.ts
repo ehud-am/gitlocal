@@ -1133,6 +1133,11 @@ describe('detectFileType', () => {
     expect(result.language).toBe('json')
   })
 
+  it('detects html and htm as their own type', () => {
+    expect(detectFileType('index.html')).toEqual({ type: 'html', language: 'html' })
+    expect(detectFileType('page.HTM')).toEqual({ type: 'html', language: 'html' })
+  })
+
   it('detects text with language hint', () => {
     const ts = detectFileType('index.ts')
     expect(ts.type).toBe('text')

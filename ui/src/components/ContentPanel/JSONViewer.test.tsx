@@ -105,4 +105,21 @@ describe('JSONViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand' }))
     expect(screen.getByText('"item-0"')).toBeInTheDocument()
   })
+
+  it('tolerates hand-built nodes without optional counts, children or values', () => {
+    const { container } = render(<JSONViewer root={{
+      valueKind: 'object',
+      childCount: 2,
+      children: [
+        { key: 'list', valueKind: 'array', childCount: 1 },
+        { key: 'bare', valueKind: 'string' },
+      ],
+    }} />)
+
+    expect(container.querySelector('.json-viewer')?.textContent).toContain('"list": [')
+    expect(container.querySelector('.json-viewer')?.textContent).toContain('"bare": ')
+    render(<JSONViewer root={{ valueKind: 'array' }} />)
+    expect(screen.getByText('empty')).toBeInTheDocument()
+    render(<JSONViewer root={{ valueKind: 'number' }} />)
+  })
 })

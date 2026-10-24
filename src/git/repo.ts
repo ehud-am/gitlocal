@@ -10,6 +10,7 @@ import type {
   ChangedFileState,
   CommitChangesResponse,
   Commit,
+  FileContentType,
   FileSyncState,
   GeneratedLocalState,
   GitContext,
@@ -1842,9 +1843,13 @@ export function getEditableState(repoPath: string, filePath: string, branch: str
 
   const { type } = detectFileType(filePath)
   return {
-    editable: type === 'markdown' || type === 'text',
+    editable: isInlineEditableType(type),
     revisionToken: getFileRevisionToken(repoPath, filePath),
   }
+}
+
+export function isInlineEditableType(type: FileContentType): boolean {
+  return type === 'markdown' || type === 'text' || type === 'html'
 }
 
 export function getFileRevisionToken(repoPath: string, filePath: string): string | null {
@@ -1991,7 +1996,7 @@ export function listWorkingTreeDirectoryEntries(repoPath: string, subpath: strin
     })
 }
 
-export function detectFileType(filename: string): { type: 'markdown' | 'json' | 'text' | 'image' | 'binary' | 'svg' | 'pdf' | 'csv' | 'excel' | 'pptx'; language: string } {
+export function detectFileType(filename: string): { type: FileContentType; language: string } {
   /* v8 ignore next */
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   if (ext === 'svg') return { type: 'svg', language: 'xml' }
@@ -2006,6 +2011,9 @@ export function detectFileType(filename: string): { type: 'markdown' | 'json' | 
   // json gets its own FileContentType (unlike langMap entries below, which only affect highlighting)
   if (ext === 'json') return { type: 'json', language: 'json' }
 
+  // HTML is previewed as a rendered, sandboxed page and stays editable as text (#117).
+  if (ext === 'html' || ext === 'htm') return { type: 'html', language: 'html' }
+
   const langMap: Record<string, string> = {
     ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
     mjs: 'javascript', cjs: 'javascript', py: 'python', go: 'go',
@@ -2013,7 +2021,7 @@ export function detectFileType(filename: string): { type: 'markdown' | 'json' | 
     c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
     rb: 'ruby', php: 'php', sh: 'bash', bash: 'bash', zsh: 'bash',
     yaml: 'yaml', yml: 'yaml', toml: 'toml',
-    xml: 'xml', html: 'html', htm: 'html', css: 'css', scss: 'scss',
+    xml: 'xml', css: 'css', scss: 'scss',
     sql: 'sql', graphql: 'graphql', proto: 'protobuf', tf: 'hcl',
     r: 'r', lua: 'lua', ex: 'elixir', exs: 'elixir',
     hs: 'haskell', clj: 'clojure', scala: 'scala', dart: 'dart',

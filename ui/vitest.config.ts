@@ -32,6 +32,7 @@ export default defineConfig({
         'src/components/ContentPanel/CsvViewer.tsx',
         'src/components/ContentPanel/ExcelViewer.tsx',
         'src/components/ContentPanel/PptxViewer.tsx',
+        'src/components/ContentPanel/HtmlViewer.tsx',
         'src/components/ContentPanel/pptx/*.{ts,tsx}',
         'src/components/RepoContext/**/*.tsx',
         'src/components/Search/**/*.tsx',
