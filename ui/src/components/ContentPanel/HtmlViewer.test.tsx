@@ -76,7 +76,7 @@ describe('HtmlViewer', () => {
 
     root.scrollHeight = 20
     callback?.()
-    expect(frame.style.height).toBe('160px')
+    expect(frame.style.height).toBe('240px')
 
     unmount()
     expect(disconnect).toHaveBeenCalled()

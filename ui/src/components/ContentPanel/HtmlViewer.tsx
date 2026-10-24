@@ -14,7 +14,7 @@ interface Props {
 const PREVIEW_POLICY = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:"
 const PREVIEW_HEAD = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_POLICY}"><base target="_blank">`
 
-const MIN_FRAME_HEIGHT = 160
+const MIN_FRAME_HEIGHT = 240
 
 // The policy must come before anything that loads, so it goes right after the doctype (keeping
 // the document out of quirks mode) or at the very start. A <meta http-equiv="refresh"> would
@@ -43,6 +43,9 @@ export default function HtmlViewer({ content }: Props) {
     const frame = frameRef.current
     const root = frame?.contentDocument?.documentElement
     if (!frame || !root) return
+    // Shrink first: the document is never shorter than the frame, so measuring at the current
+    // height would only ever let the frame grow.
+    frame.style.height = `${MIN_FRAME_HEIGHT}px`
     frame.style.height = `${Math.max(MIN_FRAME_HEIGHT, root.scrollHeight)}px`
   }, [])
 
