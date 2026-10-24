@@ -121,7 +121,7 @@ describe('previewRegistry', () => {
     const Component = previewRegistry.json.Component
     render(<Component {...baseProps(data, { jsonRoot: parsed.root })} />)
     await waitFor(() => {
-      expect(screen.getByText('name')).toBeInTheDocument()
+      expect(screen.getByText('"name"')).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 
