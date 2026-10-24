@@ -578,7 +578,7 @@ describe('TerminalPanel', () => {
       expect(screen.getByRole('button', { name: 'Dock terminal to bottom' })).toHaveAttribute('aria-pressed', 'true')
     })
 
-    it('sizes by width — a third of the window — with a vertical (column-resize) handle when docked left or right', async () => {
+    it('sizes by width — half the window — with a vertical (column-resize) handle when docked left or right', async () => {
       const user = userEvent.setup()
       mockCreateSession.mockResolvedValue(runningSession)
       setInnerWidth(1260)
@@ -587,7 +587,7 @@ describe('TerminalPanel', () => {
       await openTerminal(user, { viaShortcut: true })
 
       const panel = screen.getByTestId('terminal-panel')
-      expect(panel).toHaveStyle({ width: '420px' })
+      expect(panel).toHaveStyle({ width: '630px' })
       const handle = screen.getByTestId('terminal-panel-resize-handle')
       expect(handle).toHaveAttribute('aria-orientation', 'vertical')
     })
@@ -620,7 +620,7 @@ describe('TerminalPanel', () => {
 
       fireEvent.mouseDown(handle, { clientX: 300 })
       fireEvent.mouseMove(window, { clientX: 400 })
-      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '520px' })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '730px' })
 
       fireEvent.mouseUp(window)
     })
@@ -636,7 +636,7 @@ describe('TerminalPanel', () => {
 
       fireEvent.mouseDown(handle, { clientX: 400 })
       fireEvent.mouseMove(window, { clientX: 300 })
-      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '520px' })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '730px' })
 
       fireEvent.mouseUp(window)
     })
@@ -651,10 +651,10 @@ describe('TerminalPanel', () => {
       const handle = screen.getByTestId('terminal-panel-resize-handle')
 
       fireEvent.keyDown(handle, { key: 'ArrowRight' })
-      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '444px' })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '654px' })
 
       fireEvent.keyDown(handle, { key: 'ArrowLeft' })
-      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '420px' })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '630px' })
     })
 
     it('reclamps the panel width on window resize so it never exceeds a shrunk viewport', async () => {
@@ -685,7 +685,7 @@ describe('TerminalPanel', () => {
 
       fireEvent.mouseDown(handle, { clientX: 0 })
       fireEvent.mouseMove(window, { clientX: 100 })
-      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '520px' })
+      expect(screen.getByTestId('terminal-panel')).toHaveStyle({ width: '730px' })
       fireEvent.mouseUp(window)
     })
 

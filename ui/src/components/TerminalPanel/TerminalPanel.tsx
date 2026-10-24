@@ -30,9 +30,9 @@ const MAX_PANEL_HEIGHT_RATIO = 0.9
 
 const MIN_PANEL_WIDTH = 240
 const MAX_PANEL_WIDTH_RATIO = 0.7
-// The default side-dock width is a third of the window, not a fixed pixel value, so it starts
-// out proportionate on both a small laptop screen and a large monitor.
-const DEFAULT_PANEL_WIDTH_RATIO = 1 / 3
+// The default side-dock width is half the window (#113), not a fixed pixel value, so a side dock
+// starts as an even split on both a small laptop screen and a large monitor.
+const DEFAULT_PANEL_WIDTH_RATIO = 1 / 2
 
 const RESIZE_KEY_STEP = 24
 
