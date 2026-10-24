@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { statSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import {
   listSshPrivateKeys,
   validateSshPrivateKeyPath,
@@ -211,6 +212,13 @@ function repoOpenResult(params: {
   }
 }
 
+// "~" and "~/..." mean the home folder, as in a shell, so a typed path like ~/notes opens.
+export function expandHomePath(path: string): string {
+  if (path === '~') return homedir()
+  if (path.startsWith('~/') || path.startsWith('~\\')) return join(homedir(), path.slice(2))
+  return path
+}
+
 export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
   let body: RepositoryOpenRequest
   try {
@@ -219,7 +227,7 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
     return c.json(repoOpenBlocked('Invalid JSON body'))
   }
 
-  const { path } = body
+  const path = body.path ? expandHomePath(body.path) : body.path
   const classification = classifyLocalPath(path ?? '')
 
   if (!path) {

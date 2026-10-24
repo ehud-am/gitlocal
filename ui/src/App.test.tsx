@@ -2067,4 +2067,119 @@ describe('App', () => {
       await waitFor(() => expect(tabNames()).toEqual(['Folder view: repo', 'README.md']))
     }, 15000)
   })
+
+  describe('go to path', () => {
+    function mockPathTypes(types: Record<string, 'file' | 'dir'>) {
+      vi.mocked(api.getSyncStatus).mockImplementation(async (path: string) => buildSyncStatus({
+        currentPath: path,
+        resolvedPath: path,
+        currentPathType: path ? types[path] ?? 'missing' : 'none',
+        resolvedPathType: path ? types[path] ?? 'missing' : 'none',
+      }))
+    }
+
+    async function goTo(user: ReturnType<typeof userEvent.setup>, value: string) {
+      await user.click(await screen.findByRole('button', { name: 'Go to path' }))
+      await user.type(await screen.findByLabelText('Path to go to'), value)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+    }
+
+    it('opens a file inside the repository from a relative path', async () => {
+      const user = userEvent.setup()
+      mockPathTypes({ 'docs/guide.md': 'file' })
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      await goTo(user, 'docs/guide.md')
+
+      await waitFor(() => expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false))
+      await waitFor(() => expect(screen.queryByLabelText('Path to go to')).not.toBeInTheDocument())
+      expect(api.openRepository).not.toHaveBeenCalled()
+    })
+
+    it('browses a folder inside the repository from an absolute path, and back to the root', async () => {
+      const user = userEvent.setup()
+      mockPathTypes({ docs: 'dir' })
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      await goTo(user, '/tmp/repo/docs/')
+      await waitFor(() => expect(window.location.search).toContain('path=docs'))
+
+      await goTo(user, '/tmp/repo')
+      await waitFor(() => expect(window.location.search).not.toContain('path=docs'))
+      expect(api.openRepository).not.toHaveBeenCalled()
+    })
+
+    it('reports a path that does not exist without closing the dialog', async () => {
+      const user = userEvent.setup()
+      mockPathTypes({})
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      await goTo(user, 'nope')
+
+      expect(await screen.findByText('Nothing found at nope.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Path to go to')).toBeInTheDocument()
+    })
+
+    it('opens a path outside the repository through the open-repository flow', async () => {
+      const user = userEvent.setup()
+      vi.mocked(api.openRepository).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        path: '/tmp/repo/docs/guide.md',
+        rootPath: '/tmp/repo',
+        selectedPath: 'docs/guide.md',
+        selectedPathType: 'file',
+        openMode: 'file',
+        gitState: 'inside-repository',
+        message: 'Opened docs/guide.md.',
+      })
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      await goTo(user, '~/elsewhere.md')
+
+      await waitFor(() => expect(api.openRepository).toHaveBeenCalledWith('~/elsewhere.md'))
+      await waitFor(() => expect(api.getFile).toHaveBeenCalledWith('docs/guide.md', 'main', false))
+    })
+
+    it('shows the server error for an outside path it cannot open', async () => {
+      const user = userEvent.setup()
+      vi.mocked(api.openRepository)
+        .mockResolvedValueOnce({ ok: false, error: 'Path does not exist: /nope' })
+        .mockResolvedValueOnce({ ok: false, error: '' })
+        .mockRejectedValueOnce(new Error('Server unavailable.'))
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      await goTo(user, '/nope')
+      expect(await screen.findByText('Path does not exist: /nope')).toBeInTheDocument()
+
+      await user.clear(screen.getByLabelText('Path to go to'))
+      await user.type(screen.getByLabelText('Path to go to'), '/other')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(await screen.findByText('GitLocal could not open /other.')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(await screen.findByText('Server unavailable.')).toBeInTheDocument()
+    })
+
+    it('opens from the Ctrl+Alt+G shortcut', async () => {
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      fireEvent.keyDown(window, { key: 'g', ctrlKey: true, altKey: true })
+      expect(await screen.findByLabelText('Path to go to')).toBeInTheDocument()
+    })
+
+    it('ignores G without both Ctrl and Alt', async () => {
+      renderWithClient()
+      expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+      fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
+      expect(screen.queryByLabelText('Path to go to')).not.toBeInTheDocument()
+    })
+  })
 })

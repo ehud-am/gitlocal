@@ -36,6 +36,15 @@ export function ParentFolderIcon() {
   )
 }
 
+export function GoToPathIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M2.5 4.5h4l1.5 1.5h5.5v6.5h-11Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M7 9.25h4M9.5 7.75l1.5 1.5-1.5 1.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function ThemeIcon({ darkMode }: { darkMode: boolean }) {
   return darkMode ? (
     <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">

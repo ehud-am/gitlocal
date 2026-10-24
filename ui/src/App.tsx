@@ -11,6 +11,8 @@ import { ContentTabStrip } from './components/ContentTabs/ContentTabStrip'
 import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPanel/TerminalPanel'
 import { useTerminalPanelPreference } from './hooks/useTerminalPanelPreference'
 import AppFooter from './components/AppFooter'
+import GoToPathDialog from './components/GoToPath/GoToPathDialog'
+import { resolveGoToPath } from './lib/go-to-path'
 import {
   FolderDeleteDialog,
   GitIdentityDialog,
@@ -18,7 +20,7 @@ import {
 } from './components/AppDialogs'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
-import { ParentFolderIcon, PanelToggleIcon, RefreshIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
+import { GoToPathIcon, ParentFolderIcon, PanelToggleIcon, RefreshIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -215,6 +217,7 @@ export default function App() {
   const [statusMessage, setStatusMessage] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showRepoBoundaryDialog, setShowRepoBoundaryDialog] = useState(false)
+  const [goToPathOpen, setGoToPathOpen] = useState(false)
   const [branchSwitchState, setBranchSwitchState] = useState<BranchSwitchDialogState | null>(null)
   const [branchSwitchCommitMessage, setBranchSwitchCommitMessage] = useState('')
   const [branchSwitchPending, setBranchSwitchPending] = useState(false)
@@ -711,6 +714,17 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [refreshCurrentView])
 
+  // Ctrl+Alt+G opens "Go to path", following the Ctrl+Alt+R refresh shortcut's pattern.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'g' || !event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      setGoToPathOpen(true)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   useEffect(() => {
     if (!nativeDefaultReaderAvailable) return
     api.getDefaultReaderPreference()
@@ -806,6 +820,36 @@ export default function App() {
         label: path.split('/').pop() || path,
         available: true,
       }))
+    }
+  }
+
+  // Paths inside the open root are browsed in place; anything else goes through the same
+  // open-repository flow as a file opened from Finder. Returns an error for the dialog, or null.
+  async function handleGoToPath(input: string): Promise<string | null> {
+    const target = resolveGoToPath(input, info?.path ?? '')
+    try {
+      if (target.kind === 'empty') return 'Enter a path to go to.'
+      if (target.kind === 'root') {
+        selectPath('', 'dir')
+        return null
+      }
+      if (target.kind === 'in-root') {
+        const status = await api.getSyncStatus(target.path, currentBranch)
+        if (status.currentPathType !== 'file' && status.currentPathType !== 'dir') {
+          return `Nothing found at ${target.path}.`
+        }
+        selectPath(target.path, status.currentPathType)
+        return null
+      }
+      if (!confirmDiscardChanges()) return null
+      const response = await api.openRepository(target.path)
+      if (!response.ok || !response.rootPath) {
+        return response.message || response.error || `GitLocal could not open ${target.path}.`
+      }
+      await applyLocalOpenResponse(response)
+      return null
+    } catch (error) {
+      return getErrorMessage(error, 'GitLocal could not open that path.')
     }
   }
 
@@ -1331,6 +1375,17 @@ export default function App() {
               type="button"
               variant="ghost"
               size="sm"
+              onClick={() => setGoToPathOpen(true)}
+              aria-label="Go to path"
+              title="Go to a file or folder by path (Ctrl+Alt+G)"
+            >
+              <GoToPathIcon />
+              Go to
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
               onClick={handleNavigateParent}
               aria-label="Parent Folder"
@@ -1626,6 +1681,13 @@ export default function App() {
 
         <AppFooter version={info?.version ?? ''} />
       </div>
+
+      <GoToPathDialog
+        open={goToPathOpen}
+        rootPath={info?.path ?? ''}
+        onOpenChange={setGoToPathOpen}
+        onGo={handleGoToPath}
+      />
 
       <RepoBoundaryDialog
         open={showRepoBoundaryDialog}

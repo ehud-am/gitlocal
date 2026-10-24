@@ -5,6 +5,7 @@ import { platform, tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { testClient } from 'hono/testing'
 import { createApp } from '../../../src/server.js'
+import { expandHomePath } from '../../../src/handlers/repo.js'
 import { writeStartupFolderPreference } from '../../../src/services/startup-preferences.js'
 
 const APP_VERSION = JSON.parse(
@@ -1539,6 +1540,39 @@ describe('repositoryOpenHandler', () => {
       }
     } finally {
       rmSync(folder, { recursive: true, force: true })
+    }
+  })
+
+  it('expands a leading ~ to the home folder', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'gitlocal-open-home-'))
+    writeFileSync(join(home, 'note.md'), '# Note')
+    const previousHome = process.env.HOME
+    const previousProfile = process.env.USERPROFILE
+    process.env.HOME = home
+    process.env.USERPROFILE = home
+
+    try {
+      expect(expandHomePath('~')).toBe(home)
+      expect(expandHomePath('~/note.md')).toBe(join(home, 'note.md'))
+      expect(expandHomePath('~\\note.md')).toBe(join(home, 'note.md'))
+      expect(expandHomePath('/abs/~/x')).toBe('/abs/~/x')
+      expect(expandHomePath('~other/x')).toBe('~other/x')
+
+      const app = createApp('')
+      const res = await app.fetch(new Request('http://localhost/api/repo/open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '~/note.md' }),
+      }))
+      const body = await res.json() as { ok: boolean; selectedPath: string }
+      expect(body.ok).toBe(true)
+      expect(body.selectedPath).toBe('note.md')
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME
+      else process.env.HOME = previousHome
+      if (previousProfile === undefined) delete process.env.USERPROFILE
+      else process.env.USERPROFILE = previousProfile
+      rmSync(home, { recursive: true, force: true })
     }
   })
 })
