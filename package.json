@@ -67,11 +67,11 @@
     "@emnapi/runtime": "^1.9.1",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "esbuild": "^0.28.1",
     "knip": "^6.32.2",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "postcss": "^8.5.10"

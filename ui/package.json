@@ -51,13 +51,13 @@
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.1.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "jest-axe": "^10.0.0",
     "jsdom": "^24.0.0",
     "knip": "^6.32.2",
     "typescript": "^5.4.5",
     "vite": "^8.3.5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "postcss": "^8.5.10",

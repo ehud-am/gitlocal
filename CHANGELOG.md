@@ -6,7 +6,7 @@
 - JSON files now look like code ([#114](https://github.com/ehud-am/gitlocal/issues/114)): formatted with quotes, commas and braces, color-coded keys, strings, numbers and `true`/`false`/`null`, and indent guides. Each object and array can still be folded (to `{…}`), and shows how many keys or items it has.
 - New "Go to" button in the top toolbar (also Ctrl+Alt+G) to open a file or folder by typing its path, from any page ([#118](https://github.com/ehud-am/gitlocal/issues/118)). Paths can be relative to the open folder (`src/index.ts`) or absolute (`/Users/me/notes`, `~/notes`); paths inside the open folder are browsed in place, others open like a folder chosen in the picker. `~` now also works in the picker's path box.
 - A terminal docked to the left or right now opens at half the window width instead of a third ([#113](https://github.com/ehud-am/gitlocal/issues/113)).
-- Updated hono (4.13.13) and vite (8.3.5) ([#124](https://github.com/ehud-am/gitlocal/pull/124)).
+- Updated hono (4.13.13) and vite (8.3.5) ([#124](https://github.com/ehud-am/gitlocal/pull/124)), and vitest (4.1.12) and zod (4.6.7, development only) to clear npm audit advisories.
 
 ## 0.14.1 - 2026-10-18
 
