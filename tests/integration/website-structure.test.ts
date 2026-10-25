@@ -4,7 +4,8 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 
 const docsDir = resolve(new URL('../../docs', import.meta.url).pathname)
 const ORIGIN = 'https://gitlocal.dev'
-const ANALYTICS_LOADER = '<script async src="/vizoalica-loader.js"></script>'
+// Replaced by the Vizoalica script tag at deploy time (.github/workflows/deploy-website.yml).
+const ANALYTICS_MARKER = '<!-- vizoalica -->'
 
 function listHtmlFiles(dir: string): string[] {
   const out: string[] = []
@@ -81,9 +82,9 @@ describe('gitlocal.dev multi-page site', () => {
     )
   })
 
-  it('loads the analytics loader on every page (including 404), so navigation between pages is measurable', () => {
+  it('marks the analytics tag position exactly once on every page (including 404), so navigation between pages is measurable', () => {
     for (const p of pages) {
-      expect(p.html, p.route).toContain(ANALYTICS_LOADER)
+      expect(p.html.split(ANALYTICS_MARKER).length - 1, p.route).toBe(1)
     }
   })
 
