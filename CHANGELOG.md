@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.1 - 2026-10-25
+
+- Website only (gitlocal.dev); the app is unchanged. Visit analytics now load as one script tag served by the Vizoalica backend, without a signed-token endpoint. The site no longer runs Cloudflare Pages Functions or hosts its own copy of the analytics script.
+
 ## 0.15.0 - 2026-10-24
 
 - HTML files (`.html`, `.htm`) now open as a rendered page instead of source ([#117](https://github.com/ehud-am/gitlocal/issues/117)). The page is shown in a locked-down frame: scripts, forms and links are turned off, and nothing the page links to (stylesheets, images, fonts) is loaded, so opening a file never contacts a server. Inline styles and embedded images still render. The raw toggle shows the highlighted source, and HTML files can still be edited inline.
