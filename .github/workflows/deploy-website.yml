@@ -15,6 +15,7 @@ name: Deploy website
 # Each setting is read from a repository secret or, if no secret of that name
 # exists, a repository variable:
 #   VIZOALICA_ENDPOINT     Vizoalica backend address, e.g. https://prod-vizoalica.<you>.workers.dev
+#                          (any path is ignored; only the origin is used)
 #   VIZOALICA_WEBSITE_KEY  The website key from the console's Install page
 #   CF_ACCOUNT_ID, CF_PAGES_PROJECT
 # CF_API_TOKEN (Cloudflare Pages: Edit scope only) must be a secret.
@@ -63,11 +64,13 @@ jobs:
             echo "::error::Missing required repository variables/secrets: ${missing[*]}"
             exit 1
           fi
+          # The backend serves the SDK at its root, so only the address's origin is used: a value
+          # that names a path (for example the events endpoint, /v1/events:batch) works too.
+          endpoint="$(node -e 'try { const u = new URL(process.env.VIZOALICA_ENDPOINT.trim()); if (u.protocol === "https:") console.log(u.origin) } catch {}')"
           # Both values are written into HTML, so each must match a strict pattern: no quote,
-          # angle bracket, ampersand, space or path beyond the backend's root.
-          endpoint="${VIZOALICA_ENDPOINT%/}"
+          # angle bracket, ampersand or space.
           if [[ ! "$endpoint" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
-            echo "::error::VIZOALICA_ENDPOINT must be the backend's https address with no path, e.g. https://prod-vizoalica.<you>.workers.dev"
+            echo "::error::VIZOALICA_ENDPOINT must be the backend's https address, e.g. https://prod-vizoalica.<you>.workers.dev"
             exit 1
           fi
           if [[ ! "$VIZOALICA_WEBSITE_KEY" =~ ^[A-Za-z0-9_-]{1,128}$ ]]; then
