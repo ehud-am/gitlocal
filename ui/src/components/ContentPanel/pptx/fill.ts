@@ -1,9 +1,9 @@
-import { resolveColor, toCss, type ColorContext, type Rgba } from './color'
+import { resolveColor, toCss, type ColorContext, type Rgba } from '../ooxml/color'
+import type { OpcPackage } from '../ooxml/package'
+import type { Theme } from '../ooxml/theme'
+import { attr, child, children, numAttr, relAttr } from '../ooxml/xml'
 import type { Fill, GradientStop, ImageRef, Line, LineEnd, LineEndType } from './model'
 import { EMU_PER_PX } from './model'
-import type { OpcPackage } from './package'
-import type { Theme } from './theme'
-import { attr, child, children, numAttr, relAttr } from './xml'
 
 // Collects every image the parse references so each media part is read (and converted, for
 // EMF/WMF) exactly once after the parse, however many slides reuse it (e.g. a logo on the master).

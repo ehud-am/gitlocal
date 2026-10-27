@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Preview PDF, Excel, PowerPoint and more — GitLocal</title>
-<meta name="description" content="Built-in local viewers for PDF, SVG, CSV, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
+<title>Preview PDF, Word, Excel, PowerPoint and more — GitLocal</title>
+<meta name="description" content="Built-in local viewers for PDF, SVG, CSV, Word, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://gitlocal.dev/features/previews/">
 <link rel="icon" type="image/svg+xml" href="../../assets/site/logo.svg">
@@ -14,13 +14,13 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gitlocal.dev/features/previews/">
 <meta property="og:site_name" content="GitLocal">
-<meta property="og:title" content="Preview PDF, Excel, PowerPoint and more — GitLocal">
-<meta property="og:description" content="Built-in local viewers for PDF, SVG, CSV, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
+<meta property="og:title" content="Preview PDF, Word, Excel, PowerPoint and more — GitLocal">
+<meta property="og:description" content="Built-in local viewers for PDF, SVG, CSV, Word, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
 <meta property="og:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Preview PDF, Excel, PowerPoint and more — GitLocal">
-<meta name="twitter:description" content="Built-in local viewers for PDF, SVG, CSV, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
+<meta name="twitter:title" content="Preview PDF, Word, Excel, PowerPoint and more — GitLocal">
+<meta name="twitter:description" content="Built-in local viewers for PDF, SVG, CSV, Word, Excel, and PowerPoint files alongside Markdown and images, where GitHub's web UI offers a raw download.">
 <meta name="twitter:image" content="https://gitlocal.dev/assets/site/screenshot-readme.jpg">
 
 <script type="application/ld+json">
@@ -78,13 +78,14 @@
     <div class="wrap topic-wrap">
       <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../">Home</a></li><li><a href="../">Features</a></li><li aria-current="page">Preview beyond code</li></ol></nav>
       <p class="eyebrow">FIND YOUR WAY AROUND</p>
-      <h1>Preview PDF, Excel, PowerPoint and more</h1>
+      <h1>Preview PDF, Word, Excel, PowerPoint and more</h1>
       <p class="lede">Agents produce more than code: reports, spreadsheets, decks, diagrams. GitLocal opens them in place, on your machine, where GitHub's web UI often offers only a download link.</p>
       <h2>What you get</h2>
       <ul class="topic-list">
         <li><strong>PDF.</strong> Rendered locally, and sharp on high-resolution (Retina) displays.</li>
         <li><strong>SVG.</strong> Shown as an inert image, so a script inside an SVG can never run.</li>
         <li><strong>CSV.</strong> A scrollable table, with a toggle between the raw text and the formatted view.</li>
+        <li><strong>Word (<code>.docx</code>).</strong> Shown as pages with the document&rsquo;s own page size, margins, headers and footers, and fonts. Headings, lists and numbering, tables (including merged cells and table styles), pictures, text boxes, simple charts, columns, links, and footnotes and endnotes are rendered; table of contents entries jump to their heading. Tracked changes show the document as if they were accepted.</li>
         <li><strong>Excel (<code>.xlsx</code>, <code>.xls</code>).</strong> A tab for each sheet, showing the values Excel last saved. GitLocal never recalculates formulas.</li>
         <li><strong>PowerPoint (<code>.pptx</code>).</strong> Slides scroll continuously with a &ldquo;Slide N of M&rdquo; indicator and zoom controls, and speaker notes appear inline. Links open web pages or jump to the linked slide, and hidden slides are marked and can be left out. Text (including multiple columns and tab stops), shapes, tables, simple charts, backgrounds (including gradients and theme backgrounds), and images, including EMF and WMF pictures, are rendered with the formatting inherited from the deck&rsquo;s layouts, masters, and theme.</li>
         <li><strong>HTML.</strong> Rendered as a page in a locked-down frame: scripts, forms and links are off, and nothing the page links to is loaded, so opening a file never contacts a server. A toggle shows the source.</li>
@@ -92,7 +93,7 @@
         <li><strong>Images and Markdown</strong> open in the same viewer, so nothing changes as you move between file types.</li>
       </ul>
       <h2>Honest limits</h2>
-      <p>The PDF, SVG, CSV, Excel and PowerPoint previews are read-only (HTML and JSON can be edited as text), and the PowerPoint and Excel viewers are best-effort rather than pixel-perfect. Charts inside Excel worksheets are not drawn yet, video and audio clips don&rsquo;t play, and SmartArt without a saved drawing and a few EMF pictures drawn with scaling transforms show as missing or &ldquo;not available&rdquo;. If one of these gets in your way, the <a href="https://github.com/ehud-am/gitlocal/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">open help-wanted issues</a> are the place to weigh in or pick one up.</p>
+      <p>The PDF, SVG, CSV, Word, Excel and PowerPoint previews are read-only (HTML and JSON can be edited as text), and the Word, PowerPoint and Excel viewers are best-effort rather than pixel-perfect. Word documents flow as continuous pages split only at page and section breaks, so page numbers won&rsquo;t match a printout, and comments are not shown. Charts inside Excel worksheets are not drawn yet, video and audio clips don&rsquo;t play, and SmartArt without a saved drawing and a few EMF pictures drawn with scaling transforms show as missing or &ldquo;not available&rdquo;. If one of these gets in your way, the <a href="https://github.com/ehud-am/gitlocal/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">open help-wanted issues</a> are the place to weigh in or pick one up.</p>
       <section class="try-it" aria-labelledby="try-it-title">
         <h2 id="try-it-title">Try it in one command</h2>
         <div class="install-chip">

@@ -1,10 +1,10 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_THEME } from '../ooxml/theme'
 import { parseChart } from './chart'
 import { ChartView, valueScale } from './chart-view'
 import type { Box, ChartModel, ChartSeries } from './model'
 import { el, scopeFor } from './test-support'
-import { DEFAULT_THEME } from './theme'
 
 const BOX: Box = { x: 10, y: 20, w: 400, h: 300, rot: 0, flipH: false, flipV: false }
 

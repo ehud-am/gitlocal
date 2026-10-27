@@ -1,9 +1,10 @@
-import { resolveColor, toCss } from './color'
+import { resolveColor, toCss } from '../ooxml/color'
+import { safeHref, toRoman } from '../ooxml/text'
+import { cssFontFamily, resolveTypeface } from '../ooxml/theme'
+import { attr, child, children, numAttr, relAttr } from '../ooxml/xml'
 import type { PartScope } from './fill'
 import type { Bullet, Link, Paragraph, TabStop, TextBody, TextRun } from './model'
 import { EMU_PER_PX } from './model'
-import { cssFontFamily, resolveTypeface } from './theme'
-import { attr, child, children, numAttr, relAttr } from './xml'
 
 // Where a text body's formatting can come from, highest priority first. Text formatting in OOXML
 // is inherited level by level: a paragraph at outline level N takes each property from the first
@@ -52,20 +53,6 @@ function spacingPt(element: Element | null, sizePt: number): number | undefined 
   const percent = numAttr(child(element, 'spcPct'), 'val')
   if (percent !== undefined) return (percent / 100000) * sizePt * 1.2
   return undefined
-}
-
-const ROMAN: [number, string][] = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]
-
-function toRoman(value: number): string {
-  let remaining = value
-  let result = ''
-  for (const [amount, numeral] of ROMAN) {
-    while (remaining >= amount) {
-      result += numeral
-      remaining -= amount
-    }
-  }
-  return result
 }
 
 function toAlpha(value: number): string {
@@ -141,9 +128,6 @@ function runFont(sources: RunSources, chain: TextStyleChain, context: TextContex
   return eastAsian && eastAsian !== latin ? family.replace(/^("[^"]*")/, `$1, "${eastAsian.replace(/"/g, '')}"`) : family
 }
 
-// Only web and mail links leave the preview; other schemes (file:, javascript:, ...) are dropped.
-const SAFE_URL = /^(https?:|mailto:)/i
-
 // Resolves an a:hlinkClick (on a run or a shape) to a web address or a slide of this deck.
 export function parseLink(hlinkClick: Element | null, context: TextContext): Link | null {
   if (!hlinkClick) return null
@@ -166,8 +150,8 @@ export function parseLink(hlinkClick: Element | null, context: TextContext): Lin
     const index = context.slides?.indexByPath.get(rel.target)
     return index === undefined ? null : { kind: 'slide', index }
   }
-  const href = rel.target.trim()
-  return SAFE_URL.test(href) ? { kind: 'url', href } : null
+  const href = safeHref(rel.target)
+  return href ? { kind: 'url', href } : null
 }
 
 // PowerPoint draws linked text in the theme's hyperlink color, underlined, unless the link is set

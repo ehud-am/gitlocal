@@ -1127,6 +1127,13 @@ describe('detectFileType', () => {
     expect(ppt.language).toBe('')
   })
 
+  it('detects Word documents and templates as docx, while legacy doc remains binary', () => {
+    for (const name of ['report.docx', 'macros.docm', 'letter.dotx', 'letter-macros.dotm', 'UPPER.DOCX']) {
+      expect(detectFileType(name)).toEqual({ type: 'docx', language: '' })
+    }
+    expect(detectFileType('legacy.doc')).toEqual({ type: 'binary', language: '' })
+  })
+
   it('detects json', () => {
     const result = detectFileType('package.json')
     expect(result.type).toBe('json')

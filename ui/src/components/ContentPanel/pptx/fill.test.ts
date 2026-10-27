@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { fillStyle, imageCropStyle } from './fill-css'
-import { hasFillElement, parseBackground, parseFill, parseLine, parseShadow, parseStyleFill } from './fill'
-import type { Fill, ImageRef } from './model'
-import { openPackage } from './package'
-import { el, relsXml, scopeFor, THEME_XML } from './test-support'
-import { loadTheme } from './theme'
 import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
+import { openPackage } from '../ooxml/package'
+import { loadTheme } from '../ooxml/theme'
+import { hasFillElement, parseBackground, parseFill, parseLine, parseShadow, parseStyleFill } from './fill'
+import { fillStyle, imageCropStyle } from './fill-css'
+import type { Fill, ImageRef } from './model'
+import { el, relsXml, scopeFor, THEME_XML } from './test-support'
 
 async function themedScope() {
   const zip = new JSZip()

@@ -1,6 +1,6 @@
-import type { ImageRef } from './model'
-import type { OpcPackage } from './package'
+import type { OpcPackage } from '../ooxml/package'
 import { detectMetafile, metafileToSvg } from './metafile'
+import type { ImageRef } from './model'
 
 // Raster formats every mainstream browser (and the macOS app's WKWebView) decodes in an <img>.
 const RASTER_MIME: Record<string, string> = {

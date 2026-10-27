@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { DataTable } from './preview-shared/DataTable'
 
 interface Props {
   /** Base64-encoded workbook bytes, as delivered by the server. */
@@ -85,26 +86,7 @@ export default function ExcelViewer({ content }: Props) {
       {headerRow === undefined ? (
         <p className="binary-placeholder">This worksheet is empty.</p>
       ) : (
-        <div className="csv-viewer-table-wrap">
-          <table className="csv-viewer-table">
-            <thead>
-              <tr>
-                {headerRow.map((header, index) => (
-                  <th key={index}>{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bodyRows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {headerRow.map((_, cellIndex) => (
-                    <td key={cellIndex}>{row[cellIndex] ?? ''}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable headers={headerRow} rows={bodyRows} />
       )}
     </div>
   )
