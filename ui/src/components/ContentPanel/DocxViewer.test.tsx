@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import DocxViewer, { ZOOM_LEVELS } from './DocxViewer'
+import DocxViewer from './DocxViewer'
+import { ZOOM_LEVELS } from './preview-shared/ZoomControls'
 import { buildDocx, para, toBase64 } from './docx/test-support'
 
 // See ExcelViewer.test.tsx: resolve fixtures against the Vitest cwd.

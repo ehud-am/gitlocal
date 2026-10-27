@@ -1,8 +1,9 @@
 // Renders a parsed .docx as flowing HTML: paragraphs, runs, lists, tables, pictures, charts and
 // text boxes, with Word's own colors and fonts (independent of the app theme).
 import { createContext, useContext, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { toRoman } from '../ooxml/text'
+import { cssFontFamily } from '../ooxml/theme'
 import { ChartView } from '../pptx/chart-view'
-import { cssFontFamily } from '../pptx/theme'
 import { SINGLE_LINE, type Block, type Border, type Borders, type Inline, type Link, type ParagraphNode, type RunStyle, type TableCell, type TableNode, type TabStop } from './model'
 
 // Jumps to a bookmark (internal links, table of contents entries) or a note inside the viewer.
@@ -197,29 +198,19 @@ function NoteRefView({ inline }: { inline: Extract<Inline, { kind: 'noteRef' }> 
   )
 }
 
-function toRoman(value: number): string {
-  const numerals: [number, string][] = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]
-  let remaining = value
-  let result = ''
-  for (const [amount, numeral] of numerals) {
-    while (remaining >= amount) {
-      result += numeral
-      remaining -= amount
-    }
-  }
-  return result
-}
-
 // How far a tab at `x` (px from the paragraph's left edge, which is the page margin) advances:
 // to the next custom stop past it, or else to the next default interval. Right and center stops
 // end or center the following text (`segmentPx` wide) on the stop; decimal is treated as right.
-export function docxTabAdvance(x: number, segmentPx: number, stops: TabStop[], defaultTabPx: number): { width: number; leader: TabStop['leader'] } {
+// A right or center stop past the line's end (`limitPx`, 0 when unknown) is pulled back to it, so
+// the text after it stays on the line.
+export function docxTabAdvance(x: number, segmentPx: number, stops: TabStop[], defaultTabPx: number, limitPx = 0): { width: number; leader: TabStop['leader'] } {
   const stop = stops.find((candidate) => candidate.posPx > x + 0.5)
   if (!stop) return { width: (Math.floor((x + 0.5) / defaultTabPx) + 1) * defaultTabPx - x, leader: 'none' }
+  const posPx = stop.align !== 'left' && limitPx > 0 ? Math.min(stop.posPx, limitPx) : stop.posPx
   // Measured offsets are whole pixels, so text ending on a right stop near the margin keeps a
   // pixel of slack instead of wrapping onto the next line.
   const shift = stop.align === 'left' ? 0 : stop.align === 'center' ? segmentPx / 2 : segmentPx + 1
-  return { width: Math.max(0, stop.posPx - x - shift), leader: stop.leader }
+  return { width: Math.max(0, posPx - x - shift), leader: stop.leader }
 }
 
 function useTabLayout(paragraph: ParagraphNode, stops: TabStop[], hasTabs: boolean) {
@@ -232,12 +223,13 @@ function useTabLayout(paragraph: ParagraphNode, stops: TabStop[], hasTabs: boole
       const tabs = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-docx-tab]'))
       const end = element.querySelector<HTMLElement>(':scope > [data-docx-tab-end]')
       for (const tab of tabs) tab.style.width = '0px'
+      const limit = element.clientWidth > 0 ? paragraph.indentLeftPx + element.clientWidth : 0
       tabs.forEach((tab, index) => {
         const next = tabs[index + 1] ?? end
         // offsetLeft is from the paragraph's own edge, which sits at its left indent.
         const x = tab.offsetLeft + paragraph.indentLeftPx
         const segment = next ? Math.max(0, next.offsetLeft - tab.offsetLeft) : 0
-        const { width, leader } = docxTabAdvance(x, segment, stops, defaultTabPx)
+        const { width, leader } = docxTabAdvance(x, segment, stops, defaultTabPx, limit)
         tab.style.width = `${width}px`
         tab.dataset.leader = leader
       })

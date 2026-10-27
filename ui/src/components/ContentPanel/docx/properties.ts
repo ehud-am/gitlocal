@@ -1,10 +1,10 @@
 // Reads WordprocessingML run (w:rPr) and paragraph (w:pPr) properties into partial layers that
 // are merged in Word's order: document defaults, table style, paragraph style chain, numbering
 // level, character style, then direct formatting.
-import { DEFAULT_SCHEME } from '../pptx/color'
-import type { Theme } from '../pptx/theme'
-import { resolveTypeface } from '../pptx/theme'
-import { attr, child, children, numAttr } from '../pptx/xml'
+import { DEFAULT_SCHEME } from '../ooxml/color'
+import type { Theme } from '../ooxml/theme'
+import { resolveTypeface } from '../ooxml/theme'
+import { attr, child, children, numAttr } from '../ooxml/xml'
 import type { Border, Borders, RunStyle } from './model'
 
 // w:val on a toggle property: absent or anything but an explicit "off" turns it on.

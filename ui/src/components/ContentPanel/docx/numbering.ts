@@ -2,8 +2,9 @@
 // level; the instance points at an abstract definition holding each level's format, text
 // template ("%1.%2."), indents and marker formatting. Counters advance as list paragraphs are
 // read in document order.
-import type { Theme } from '../pptx/theme'
-import { attr, child, children, numAttr, path } from '../pptx/xml'
+import { toRoman } from '../ooxml/text'
+import type { Theme } from '../ooxml/theme'
+import { attr, child, children, numAttr, path } from '../ooxml/xml'
 import type { RunStyle } from './model'
 import { parseParaProps, parseRunProps, type ParaProps } from './properties'
 
@@ -43,23 +44,6 @@ function parseLevel(lvl: Element, theme: Theme): Level {
   }
 }
 
-function roman(value: number): string {
-  if (value <= 0 || value >= 4000) return String(value)
-  const numerals: [number, string][] = [
-    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
-    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
-  ]
-  let remaining = value
-  let result = ''
-  for (const [amount, numeral] of numerals) {
-    while (remaining >= amount) {
-      result += numeral
-      remaining -= amount
-    }
-  }
-  return result
-}
-
 // Word's letter numbering repeats the letter past z: a..z, aa..zz, aaa...
 function letters(value: number): string {
   if (value <= 0) return String(value)
@@ -76,8 +60,8 @@ function ordinalSuffix(value: number): string {
 export function formatNumber(value: number, format: string): string {
   switch (format) {
     case 'none': return ''
-    case 'upperRoman': return roman(value).toUpperCase()
-    case 'lowerRoman': return roman(value)
+    case 'upperRoman': return toRoman(value).toUpperCase()
+    case 'lowerRoman': return toRoman(value)
     case 'upperLetter': return letters(value).toUpperCase()
     case 'lowerLetter': return letters(value)
     case 'decimalZero': return value < 10 && value >= 0 ? `0${value}` : String(value)

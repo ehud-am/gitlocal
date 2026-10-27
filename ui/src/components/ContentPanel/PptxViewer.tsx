@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { base64ToBytes, revokeObjectUrls } from './preview-shared/bytes'
+import { useObservedSize } from './preview-shared/use-observed-size'
+import { FIT_ZOOM_INDEX, ZOOM_LEVELS, ZoomControls } from './preview-shared/ZoomControls'
 import type { PresentationModel, SlideModel } from './pptx/model'
 import { SlideJumpContext, SlideView } from './pptx/render'
 
@@ -6,19 +9,6 @@ interface Props {
   /** Base64-encoded .pptx (OOXML zip) bytes, as delivered by the server. */
   content: string
 }
-
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let index = 0; index < binaryString.length; index += 1) {
-    bytes[index] = binaryString.charCodeAt(index)
-  }
-  return bytes
-}
-
-// Zoom is relative to "fit to width"; 1 is the default.
-export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3]
-const FIT_ZOOM_INDEX = ZOOM_LEVELS.indexOf(1)
 
 interface SlideCanvasProps {
   slide: SlideModel
@@ -143,47 +133,19 @@ function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibil
   )
 }
 
-function revokeObjectUrls(urls: string[]): void {
-  for (const url of urls) URL.revokeObjectURL(url)
-}
-
 export default function PptxViewer({ content }: Props) {
   const [presentation, setPresentation] = useState<PresentationModel | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [visibleIndices, setVisibleIndices] = useState<ReadonlySet<number>>(() => new Set())
-  const [containerWidthPx, setContainerWidthPx] = useState(0)
   const [zoomIndex, setZoomIndex] = useState(FIT_ZOOM_INDEX)
   const [showHidden, setShowHidden] = useState(true)
   const [pendingJump, setPendingJump] = useState<number | null>(null)
-  const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const viewerRef = useRef<HTMLDivElement | null>(null)
 
   // Slides render at their natural (EMU-derived) pixel size, then scale down/up via CSS transform
   // to exactly fill the available panel width - keeping the preview responsive instead of a
   // fixed-size canvas that overflows (needing a horizontal scrollbar) in a narrower panel.
-  // A callback ref (not useRef + useEffect) because the scroll-body element doesn't exist on the
-  // very first render (parsing hasn't finished, so the loading skeleton renders instead) - a
-  // plain useEffect with an empty dependency array would run once against a still-null ref and
-  // never observe anything; a callback ref fires again once the real element actually mounts.
-  const scrollBodyRef = useCallback((element: HTMLDivElement | null) => {
-    resizeObserverRef.current?.disconnect()
-    resizeObserverRef.current = null
-    if (!element) return
-
-    if (typeof ResizeObserver === 'undefined') {
-      setContainerWidthPx(element.clientWidth)
-      return
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) setContainerWidthPx(entry.contentRect.width)
-    })
-    observer.observe(element)
-    resizeObserverRef.current = observer
-  }, [])
-
-  useEffect(() => () => resizeObserverRef.current?.disconnect(), [])
+  const [scrollBodyRef, containerWidthPx] = useObservedSize('width')
 
   useEffect(() => {
     let cancelled = false
@@ -197,7 +159,7 @@ export default function PptxViewer({ content }: Props) {
 
     async function run(): Promise<void> {
       try {
-        const bytes = base64ToUint8Array(content)
+        const bytes = base64ToBytes(content)
         // The parser (and the libraries it uses) only load once a .pptx is actually opened.
         const { parsePresentation } = await import('./pptx/presentation')
         const parsed = await parsePresentation(bytes)
@@ -282,13 +244,7 @@ export default function PptxViewer({ content }: Props) {
             Show hidden slides ({hiddenCount})
           </label>
         ) : null}
-        <div className="pptx-viewer-zoom" role="group" aria-label="Zoom">
-          <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoomIndex === 0} onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}>−</button>
-          <button type="button" className="pptx-viewer-zoom-level" title="Fit to width" aria-label={zoom === 1 ? 'Fit to width' : `${Math.round(zoom * 100)}%, reset to fit width`} onClick={() => setZoomIndex(FIT_ZOOM_INDEX)}>
-            {zoom === 1 ? 'Fit' : `${Math.round(zoom * 100)}%`}
-          </button>
-          <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => setZoomIndex((index) => Math.min(ZOOM_LEVELS.length - 1, index + 1))}>+</button>
-        </div>
+        <ZoomControls zoomIndex={zoomIndex} onZoomIndexChange={setZoomIndex} />
       </div>
       <SlideJumpContext.Provider value={jumpToSlide}>
         <div className={zoom > 1 ? 'pptx-viewer-scroll-body pptx-viewer-zoomed' : 'pptx-viewer-scroll-body'} ref={scrollBodyRef}>

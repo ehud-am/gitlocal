@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
-import PptxViewer, { ZOOM_LEVELS } from './PptxViewer'
+import PptxViewer from './PptxViewer'
+import { ZOOM_LEVELS } from './preview-shared/ZoomControls'
 import { buildDeck, sp } from './pptx/test-support'
 
 // See ExcelViewer.test.tsx: `new URL('...', import.meta.url)` is rewritten by Vite's import

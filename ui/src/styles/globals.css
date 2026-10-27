@@ -1724,14 +1724,14 @@ pre {
   font-size: 0.85rem;
 }
 
-.pptx-viewer-zoom {
+.preview-zoom {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   margin-left: auto;
 }
 
-.pptx-viewer-zoom button {
+.preview-zoom button {
   min-width: 1.75rem;
   padding: 0.15rem 0.45rem;
   border: 1px solid var(--border);
@@ -1742,12 +1742,12 @@ pre {
   cursor: pointer;
 }
 
-.pptx-viewer-zoom button:disabled {
+.preview-zoom button:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.pptx-viewer-zoom .pptx-viewer-zoom-level {
+.preview-zoom .preview-zoom-level {
   min-width: 3.25rem;
   font-variant-numeric: tabular-nums;
 }

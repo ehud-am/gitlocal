@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_THEME } from '../ooxml/theme'
 import type { PartScope } from './fill'
 import { scopeFor, el, relsXml } from './test-support'
 import { formatAutoNumber, parseLink, parseTextBody, symbolBullet, type TextStyleChain } from './text'
-import { DEFAULT_THEME } from './theme'
 
 const theme = { ...DEFAULT_THEME, fonts: { majorLatin: 'Georgia', minorLatin: 'Arial', majorEa: '', minorEa: '' } }
 const EMPTY_CHAIN: TextStyleChain = { lstStyles: [], bodyPrs: [], fontRef: null }

@@ -1,7 +1,7 @@
 // The document's style sheet (word/styles.xml): document defaults plus named paragraph,
 // character and table styles, each resolved through its w:basedOn chain.
-import type { Theme } from '../pptx/theme'
-import { attr, child, children } from '../pptx/xml'
+import type { Theme } from '../ooxml/theme'
+import { attr, child, children } from '../ooxml/xml'
 import type { RunStyle } from './model'
 import { mergePara, mergeRun, parseParaProps, parseRunProps, type ParaProps } from './properties'
 

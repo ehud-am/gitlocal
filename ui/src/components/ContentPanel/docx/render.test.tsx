@@ -55,6 +55,13 @@ describe('docxTabAdvance', () => {
     expect(docxTabAdvance(290, 40, stops, 48)).toEqual({ width: 0, leader: 'hyphen' })
     expect(docxTabAdvance(310, 0, stops, 48)).toEqual({ width: 26, leader: 'none' })
   })
+
+  it('pulls right and center stops past the line end back to it, but not left stops', () => {
+    expect(docxTabAdvance(250, 40, stops, 48, 280)).toEqual({ width: 0, leader: 'hyphen' })
+    expect(docxTabAdvance(200, 40, stops, 48, 280)).toEqual({ width: 39, leader: 'hyphen' })
+    expect(docxTabAdvance(120, 40, stops, 48, 150)).toEqual({ width: 10, leader: 'dot' })
+    expect(docxTabAdvance(10, 20, stops, 48, 50)).toEqual({ width: 90, leader: 'none' })
+  })
 })
 
 describe('BlocksView', () => {
@@ -112,6 +119,17 @@ describe('BlocksView', () => {
     expect(jump).toHaveBeenCalledWith(noteAnchor('footnote', 3))
     expect(screen.getByRole('link', { name: 'Endnote 4' })).toHaveTextContent('iv')
     expect(screen.getByText('SmartArt graphic not available')).toBeInTheDocument()
+  })
+
+  it('keeps a right stop past the line end on the line', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(150)
+    try {
+      renderBlocks([paragraph([text('a'), { kind: 'tab', style: {} }, text('1')], { tabStops: [{ posPx: 400, align: 'right', leader: 'dot' }] })])
+      // jsdom has no layout: offsets are 0, so the tab spans the line minus the 1px slack.
+      expect(document.querySelector<HTMLElement>('[data-docx-tab]')?.style.width).toBe('149px')
+    } finally {
+      width.mockRestore()
+    }
   })
 
   it('renders pictures: plain, cropped, linked, floating and unavailable', () => {

@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { DataTable } from './preview-shared/DataTable'
 
 interface Props {
   /** Raw UTF-8 CSV source, as delivered by the server (never base64 on the wire). */
@@ -37,13 +38,7 @@ function parseCsv(content: string): CsvTable {
   }
 
   const [headers, ...rows] = data
-  const paddedRows = rows.map((row) => (
-    row.length >= headers.length
-      ? row
-      : [...row, ...Array<string>(headers.length - row.length).fill('')]
-  ))
-
-  return { headers, rows: paddedRows, parseError: null }
+  return { headers, rows, parseError: null }
 }
 
 export default function CsvViewer({ content }: Props) {
@@ -57,26 +52,5 @@ export default function CsvViewer({ content }: Props) {
     return <p className="binary-placeholder">This CSV file is empty.</p>
   }
 
-  return (
-    <div className="csv-viewer-table-wrap">
-      <table className="csv-viewer-table">
-        <thead>
-          <tr>
-            {table.headers.map((header, index) => (
-              <th key={index}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+  return <DataTable headers={table.headers} rows={table.rows} />
 }

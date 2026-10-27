@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { base64ToBytes, revokeObjectUrls } from './preview-shared/bytes'
+import { useObservedSize } from './preview-shared/use-observed-size'
+import { FIT_ZOOM_INDEX, ZOOM_LEVELS, ZoomControls } from './preview-shared/ZoomControls'
 import type { DocumentModel, Note, Sheet } from './docx/model'
 import { AnchorJumpContext, BlocksView, DefaultTabContext, noteAnchor } from './docx/render'
 
@@ -7,18 +10,7 @@ interface Props {
   content: string
 }
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let index = 0; index < binaryString.length; index += 1) {
-    bytes[index] = binaryString.charCodeAt(index)
-  }
-  return bytes
-}
-
 // Zoom is relative to "fit": the page at its real size, or smaller when the panel is narrower.
-export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3]
-const FIT_ZOOM_INDEX = ZOOM_LEVELS.indexOf(1)
 // Room left beside the page in the scroll body, so the page's shadow shows.
 const PAGE_GUTTER_PX = 24
 
@@ -80,55 +72,16 @@ function SheetView({ sheet, index, total, notes }: { sheet: Sheet; index: number
   )
 }
 
-function revokeObjectUrls(urls: string[]): void {
-  for (const url of urls) URL.revokeObjectURL(url)
-}
-
 export default function DocxViewer({ content }: Props) {
   const [doc, setDoc] = useState<DocumentModel | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [containerWidthPx, setContainerWidthPx] = useState(0)
-  const [contentHeightPx, setContentHeightPx] = useState(0)
   const [zoomIndex, setZoomIndex] = useState(FIT_ZOOM_INDEX)
   const viewerRef = useRef<HTMLDivElement | null>(null)
-  const widthObserverRef = useRef<ResizeObserver | null>(null)
-  const heightObserverRef = useRef<ResizeObserver | null>(null)
 
-  // Callback refs, because the elements only mount once parsing has finished (see PptxViewer).
-  const scrollBodyRef = useCallback((element: HTMLDivElement | null) => {
-    widthObserverRef.current?.disconnect()
-    widthObserverRef.current = null
-    if (!element) return
-    if (typeof ResizeObserver === 'undefined') {
-      setContainerWidthPx(element.clientWidth)
-      return
-    }
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) setContainerWidthPx(entry.contentRect.width)
-    })
-    observer.observe(element)
-    widthObserverRef.current = observer
-  }, [])
-
+  const [scrollBodyRef, containerWidthPx] = useObservedSize('width')
   // The pages are laid out at their real size and scaled with a CSS transform, which doesn't
   // change their layout size, so the frame around them is sized to the scaled height.
-  const pagesRef = useCallback((element: HTMLDivElement | null) => {
-    heightObserverRef.current?.disconnect()
-    heightObserverRef.current = null
-    if (!element || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) setContentHeightPx(entry.contentRect.height)
-    })
-    observer.observe(element)
-    heightObserverRef.current = observer
-  }, [])
-
-  useEffect(() => () => {
-    widthObserverRef.current?.disconnect()
-    heightObserverRef.current?.disconnect()
-  }, [])
+  const [pagesRef, contentHeightPx] = useObservedSize('height')
 
   useEffect(() => {
     let cancelled = false
@@ -138,7 +91,7 @@ export default function DocxViewer({ content }: Props) {
 
     async function run(): Promise<void> {
       try {
-        const bytes = base64ToUint8Array(content)
+        const bytes = base64ToBytes(content)
         // The parser (and the libraries it uses) only load once a .docx is actually opened.
         const { parseDocument } = await import('./docx/document')
         const parsed = await parseDocument(bytes)
@@ -190,13 +143,7 @@ export default function DocxViewer({ content }: Props) {
   return (
     <div className="docx-viewer" ref={viewerRef}>
       <div className="docx-viewer-toolbar">
-        <div className="pptx-viewer-zoom" role="group" aria-label="Zoom">
-          <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoomIndex === 0} onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}>−</button>
-          <button type="button" className="pptx-viewer-zoom-level" title="Fit to width" aria-label={zoom === 1 ? 'Fit to width' : `${Math.round(zoom * 100)}%, reset to fit width`} onClick={() => setZoomIndex(FIT_ZOOM_INDEX)}>
-            {zoom === 1 ? 'Fit' : `${Math.round(zoom * 100)}%`}
-          </button>
-          <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoomIndex === ZOOM_LEVELS.length - 1} onClick={() => setZoomIndex((index) => Math.min(ZOOM_LEVELS.length - 1, index + 1))}>+</button>
-        </div>
+        <ZoomControls zoomIndex={zoomIndex} onZoomIndexChange={setZoomIndex} />
       </div>
       <AnchorJumpContext.Provider value={jumpToAnchor}>
         <DefaultTabContext.Provider value={doc.defaultTabPx}>

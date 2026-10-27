@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { relsXml } from '../pptx/test-support'
-import { parseDocument, safeHref } from './document'
+import { relsXml } from '../ooxml/test-support'
+import { parseDocument } from './document'
 import type { Block, Inline, ParagraphNode, TableNode } from './model'
 import { buildDocx, para, parseDocx, PNG_BYTES, wrap } from './test-support'
 
@@ -34,16 +34,6 @@ const anchorDrawing = (wrapElement: string, position = '<wp:positionH relativeFr
 </wp:anchor></w:drawing></w:r></w:p>`
 
 const imageParts = { parts: { 'word/media/image1.png': PNG_BYTES }, rels: [{ id: 'rIdImg', type: 'image', target: 'media/image1.png' }] }
-
-describe('safeHref', () => {
-  it('only allows web and mail links', () => {
-    expect(safeHref('https://example.com')).toBe('https://example.com')
-    expect(safeHref(' mailto:a@b.c ')).toBe('mailto:a@b.c')
-    expect(safeHref('javascript:alert(1)')).toBeNull()
-    expect(safeHref('file:///etc/passwd')).toBeNull()
-    expect(safeHref(null)).toBeNull()
-  })
-})
 
 describe('parseDocument', () => {
   it('rejects packages without a Word document', async () => {

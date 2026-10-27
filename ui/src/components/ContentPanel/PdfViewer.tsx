@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { base64ToBytes } from './preview-shared/bytes'
 
 interface Props {
   content: string
@@ -6,15 +7,6 @@ interface Props {
 
 interface PageRenderState {
   pageNumber: number
-}
-
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let index = 0; index < binaryString.length; index += 1) {
-    bytes[index] = binaryString.charCodeAt(index)
-  }
-  return bytes
 }
 
 function getEffectiveDevicePixelRatio(): number {
@@ -51,7 +43,7 @@ export default function PdfViewer({ content }: Props) {
         ])
         pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
 
-        const data = base64ToUint8Array(content)
+        const data = base64ToBytes(content)
         const task = pdfjs.getDocument({ data })
         loadingTask = task
         const pdfDocument = await task.promise

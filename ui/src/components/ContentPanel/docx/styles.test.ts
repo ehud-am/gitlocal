@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_THEME } from '../pptx/theme'
-import { parseXml } from '../pptx/xml'
+import { DEFAULT_THEME } from '../ooxml/theme'
+import { parseXml } from '../ooxml/xml'
 import { loadStyles } from './styles'
 import { W_NS } from './test-support'
 

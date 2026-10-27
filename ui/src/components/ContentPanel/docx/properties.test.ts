@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_THEME } from '../pptx/theme'
-import { parseXml } from '../pptx/xml'
-import { W_NS } from './test-support'
+import { DEFAULT_THEME } from '../ooxml/theme'
+import { parseXml } from '../ooxml/xml'
 import { mergePara, mergeRun, onOff, parseBorder, parseParaProps, parseRunProps, shadingColor, wordColor } from './properties'
+import { W_NS } from './test-support'
 
 function w(fragment: string): Element {
   const root = parseXml(`<root ${W_NS}>${fragment}</root>`)

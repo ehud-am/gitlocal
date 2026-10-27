@@ -1,6 +1,6 @@
 // Test helpers for the DOCX preview: assemble small in-memory .docx packages part by part.
 import JSZip from 'jszip'
-import { relsXml, THEME_XML, type Rel } from '../pptx/test-support'
+import { relsXml, THEME_XML, type Rel } from '../ooxml/test-support'
 import { parseDocument } from './document'
 import type { DocumentModel } from './model'
 

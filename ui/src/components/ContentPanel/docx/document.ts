@@ -2,13 +2,14 @@
 // and tables grouped into sheets at page and section breaks, with each section's page setup,
 // header and footer, plus footnotes and endnotes. Images, charts and text boxes are kept inline
 // where the document anchors them.
+import { DEFAULT_CLR_MAP, resolveColor, toCss } from '../ooxml/color'
+import { openPackage, type OpcPackage } from '../ooxml/package'
+import { safeHref } from '../ooxml/text'
+import { DEFAULT_THEME, loadTheme, type Theme } from '../ooxml/theme'
+import { attr, child, children, numAttr, path, relAttr } from '../ooxml/xml'
 import { parseChart } from '../pptx/chart'
-import { DEFAULT_CLR_MAP, resolveColor, toCss } from '../pptx/color'
 import { MediaRegistry, type PartScope } from '../pptx/fill'
 import { loadMedia } from '../pptx/media'
-import { openPackage, type OpcPackage } from '../pptx/package'
-import { DEFAULT_THEME, loadTheme, type Theme } from '../pptx/theme'
-import { attr, child, children, numAttr, path, relAttr } from '../pptx/xml'
 import {
   EMU_PER_PX,
   TWIPS_PER_PX,
@@ -63,12 +64,6 @@ interface Context {
 
 const px = (twips: number | undefined, fallback = 0) => (twips ?? fallback) / TWIPS_PER_PX
 
-// Only links that leave the app for a web page or a mail client are followed.
-export function safeHref(target: string | null | undefined): string | null {
-  if (!target) return null
-  const trimmed = target.trim()
-  return /^(https?:|mailto:)/i.test(trimmed) ? trimmed : null
-}
 
 // The content of an mc:AlternateContent block: a Choice in a namespace this preview reads, or
 // else the Fallback (VML for older readers).
