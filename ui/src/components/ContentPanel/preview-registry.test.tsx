@@ -60,6 +60,7 @@ describe('previewRegistry', () => {
       csv: { supportsRawToggle: true, editable: false },
       excel: { supportsRawToggle: false, editable: false },
       pptx: { supportsRawToggle: false, editable: false },
+      docx: { supportsRawToggle: false, editable: false },
       html: { supportsRawToggle: true, editable: true },
     }
 
@@ -229,6 +230,15 @@ describe('previewRegistry', () => {
     render(<Component {...baseProps(data)} />)
     await waitFor(() => {
       expect(screen.getByText('Slide One Title')).toBeInTheDocument()
+    }, { timeout: 5000 })
+  })
+
+  it('renders DocxViewer as a formatted document view for docx', async () => {
+    const data = makeFileContent('docx', { content: fixtureBase64('sample.docx'), encoding: 'base64' })
+    const Component = previewRegistry.docx.Component
+    render(<Component {...baseProps(data)} />)
+    await waitFor(() => {
+      expect(screen.getByText('Project Overview')).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 

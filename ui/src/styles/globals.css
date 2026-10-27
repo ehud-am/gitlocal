@@ -1912,6 +1912,217 @@ pre {
   white-space: pre-wrap;
 }
 
+.docx-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.docx-viewer-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Like .pptx-viewer-scroll-body: no overflow of its own, so vertical scrolling stays on
+   ContentPanel's shared scroll wrapper. */
+.docx-viewer-scroll-body {
+  padding-bottom: 1rem;
+}
+
+.docx-viewer-zoomed {
+  overflow-x: auto;
+}
+
+.docx-viewer-frame {
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.docx-viewer-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  transform-origin: top left;
+}
+
+/* Pages are drawn with the document's own colors and fonts, independent of the app's
+   light/dark theme, like Word's print layout. */
+.docx-sheet {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-width: none;
+  background: #ffffff;
+  color: #000000;
+  font-family: "Times New Roman", "Liberation Serif", Tinos, Times, serif;
+  font-size: 10pt;
+  line-height: 1.15;
+  font-kerning: normal;
+  overflow-wrap: break-word;
+  /* An outline-style shadow instead of a border, so the page keeps its exact content width. */
+  box-shadow: 0 0 0 1px var(--border), 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.docx-header {
+  box-sizing: border-box;
+  flex: none;
+}
+
+.docx-body {
+  flex: 1 0 auto;
+}
+
+.docx-body::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+.docx-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: none;
+}
+
+.docx-paragraph {
+  margin-top: 0;
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+.docx-columns > .docx-paragraph,
+.docx-columns > .docx-table-wrapper {
+  break-inside: avoid-column;
+}
+
+.docx-tab {
+  white-space: pre;
+}
+
+.docx-tab[data-leader="dot"],
+.docx-tab[data-leader="middleDot"] {
+  border-bottom: 0.12em dotted currentColor;
+}
+
+.docx-tab[data-leader="hyphen"] {
+  border-bottom: 0.08em dashed currentColor;
+}
+
+.docx-tab[data-leader="underscore"] {
+  border-bottom: 0.06em solid currentColor;
+}
+
+/* Linked text keeps the run's own color and underline (Word's Hyperlink style sets them). */
+.docx-link {
+  color: inherit;
+  text-decoration: inherit;
+  cursor: pointer;
+}
+
+.docx-note-ref {
+  text-decoration: none;
+}
+
+.docx-page-break {
+  display: block;
+  margin: 0.75em 0;
+  border-top: 1px dashed #b0b0b0;
+}
+
+.docx-column-break {
+  display: block;
+  break-after: column;
+}
+
+.docx-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.docx-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.docx-table td {
+  white-space: normal;
+}
+
+.docx-image {
+  max-width: 100%;
+  height: auto;
+  vertical-align: bottom;
+}
+
+.docx-image-crop {
+  overflow: hidden;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.docx-image-placeholder {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  border: 1px dashed #b0b0b0;
+  color: #6b6b6b;
+  font: 12px/1.4 system-ui, sans-serif;
+  text-align: center;
+  text-indent: 0;
+  vertical-align: bottom;
+}
+
+.docx-object-placeholder {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px dashed #b0b0b0;
+  border-radius: 4px;
+  color: #6b6b6b;
+  font: 12px/1.4 system-ui, sans-serif;
+  text-indent: 0;
+}
+
+.docx-chart {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  text-indent: 0;
+}
+
+.docx-textbox {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0.05in 0.1in;
+  text-indent: 0;
+  vertical-align: top;
+}
+
+.docx-notes {
+  margin-top: 1.5em;
+}
+
+/* Word's short separator line above the notes. */
+.docx-notes::before {
+  content: "";
+  display: block;
+  width: 33%;
+  margin-bottom: 0.5em;
+  border-top: 1px solid #000000;
+}
+
 .manual-editor-card {
   border: 1px solid var(--border);
   border-radius: 8px;
