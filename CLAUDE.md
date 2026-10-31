@@ -33,6 +33,8 @@ npm run lint  # tsc --noEmit type check
 npm run build # Build server + UI bundles
 ```
 
+Releases: `.github/workflows/publish.yml` runs on a `vX.Y.Z` tag push or on `workflow_dispatch` from `main`. The manual run tags the head of `main` as `v<package.json version>` (fails if that tag exists elsewhere) and publishes in the same run, so a release can be started through the GitHub API (e.g. the GitHub MCP `actions_run_trigger` `run_workflow`) without pushing a tag. Bump the version and merge first.
+
 ## Product Direction
 
 GitLocal is for less-technical builders working in an AI-driven development lifecycle. The product should optimize for codebase browsing, Markdown reading, review, and lightweight human intervention rather than full-IDE workflows.
