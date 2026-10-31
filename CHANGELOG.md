@@ -3,6 +3,7 @@
 ## 0.16.0 - 2026-10-31
 
 - Word documents (`.docx`, plus `.docm`, `.dotx` and `.dotm`) now open as a formatted preview instead of "Binary file" ([#115](https://github.com/ehud-am/gitlocal/issues/115)). Each page is drawn with the document's own page size, margins, header and footer, fonts and colors, with headings, bulleted and numbered lists, tables (merged cells, shading, borders and table styles), pictures (including EMF and WMF), text boxes, simple charts, multiple columns, links and footnotes and endnotes. Table of contents entries and links to bookmarks jump within the document; web links open outside GitLocal. Tracked changes show the document as if they were accepted. Zoom controls work as in the PowerPoint preview. The preview is read-only and best-effort: pages split only at page and section breaks, and comments are not shown. Legacy `.doc` files still show as binary.
+- Security: updated `@hono/node-server` to 2.1.5 for a moderate advisory where `serveStatic` decoded the request path twice, which could bypass middleware on static paths ([GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f)).
 
 ## 0.15.1 - 2026-10-25
 
