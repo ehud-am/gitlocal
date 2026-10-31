@@ -1,10 +1,10 @@
+import { openPackage } from '../ooxml/package'
+import { child, children, numAttr, relAttr } from '../ooxml/xml'
 import { MediaRegistry } from './fill'
 import { loadMedia } from './media'
 import type { PresentationModel, SlideModel } from './model'
 import { EMU_PER_PX } from './model'
-import { openPackage } from './package'
 import { parseSlide, type DeckContext } from './slide'
-import { child, children, numAttr, relAttr } from './xml'
 
 const DEFAULT_WIDTH_EMU = 9144000
 const DEFAULT_HEIGHT_EMU = 6858000

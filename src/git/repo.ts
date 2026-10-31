@@ -2032,11 +2032,14 @@ export function detectFileType(filename: string): { type: FileContentType; langu
   if (ext === 'pdf') return { type: 'pdf', language: '' }
   if (ext === 'xlsx' || ext === 'xls') return { type: 'excel', language: '' }
   if (ext === 'pptx') return { type: 'pptx', language: '' }
+  // Word documents and templates share one OOXML format; macro-enabled ones are previewed too,
+  // since the preview only reads the document and never runs anything in it.
+  if (ext === 'docx' || ext === 'docm' || ext === 'dotx' || ext === 'dotm') return { type: 'docx', language: '' }
 
   const binaryExts = new Set([
     'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'o', 'a',
     'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
-    'doc', 'docx', 'ppt',
+    'doc', 'ppt',
     'mp3', 'mp4', 'wav', 'mov', 'avi', 'mkv',
     'ttf', 'woff', 'woff2', 'eot',
     'pyc', 'class', 'jar', 'war',

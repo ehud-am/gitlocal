@@ -1,8 +1,8 @@
-import { resolveColor, toCss } from './color'
+import { resolveColor, toCss } from '../ooxml/color'
+import { attr, child, children, contentChildren, path } from '../ooxml/xml'
 import type { PartScope } from './fill'
 import { parseFill } from './fill'
 import type { ChartModel, ChartSeries } from './model'
-import { attr, child, children, contentChildren, path } from './xml'
 
 // Chart parts cache the values they were last drawn with (c:strCache / c:numCache), so a chart
 // can be redrawn from the .pptx alone without the embedded workbook.

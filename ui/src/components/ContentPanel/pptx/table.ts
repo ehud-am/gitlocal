@@ -1,9 +1,9 @@
+import { attr, child, children, numAttr, parseXml } from '../ooxml/xml'
 import type { PartScope } from './fill'
 import { parseFill, parseLine, parseStyleFill } from './fill'
 import type { Box, Fill, Line, TableCell, TableNode } from './model'
 import { EMU_PER_PX } from './model'
 import { parseTextBody, type SlideIndex } from './text'
-import { attr, child, children, numAttr, parseXml } from './xml'
 
 export interface TableContext {
   scope: PartScope

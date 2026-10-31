@@ -1,13 +1,13 @@
-import { DEFAULT_CLR_MAP, type ColorContext } from './color'
+import { DEFAULT_CLR_MAP, type ColorContext } from '../ooxml/color'
+import type { OpcPackage } from '../ooxml/package'
+import { loadTheme, type Theme } from '../ooxml/theme'
+import { attr, boolAttr, child, children, contentChildren, numAttr, path, relAttr } from '../ooxml/xml'
 import { parseChart } from './chart'
 import { MediaRegistry, parseBackground, parseFill, parseLine, parseShadow, parseStyleFill, type PartScope } from './fill'
 import type { Box, CustomPath, Fill, Geometry, GeometryCommand, ImageRef, Link, PictureNode, SlideModel, SlideNode } from './model'
 import { EMU_PER_PX } from './model'
-import type { OpcPackage } from './package'
 import { parseTable } from './table'
 import { parseLink, parseTextBody, type SlideIndex, type TextContext, type TextStyleChain } from './text'
-import { loadTheme, type Theme } from './theme'
-import { attr, boolAttr, child, children, contentChildren, numAttr, path, relAttr } from './xml'
 
 interface Placeholder {
   type: string | null

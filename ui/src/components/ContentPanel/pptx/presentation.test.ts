@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { gzipSync } from 'node:zlib'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GroupNode, PictureNode, ShapeNode, SlideModel, TableNode } from './model'
 import { parsePresentation } from './presentation'
 import { buildDeck, emf, NS, PNG_BYTES, relsXml, sp, wmf } from './test-support'

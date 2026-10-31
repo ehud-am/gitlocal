@@ -167,25 +167,13 @@ export async function fileHandler(c: Context<{ Variables: Variables }>): Promise
     return c.json(response)
   }
 
-  if (type === 'excel') {
+  // Office documents are zip packages, parsed in the browser.
+  if (type === 'excel' || type === 'pptx' || type === 'docx') {
     const response: FileContent = {
       path,
       content: rawBytes.toString('base64'),
       encoding: 'base64',
-      type: 'excel',
-      language: '',
-      editable: false,
-      revisionToken: editableState.revisionToken,
-    }
-    return c.json(response)
-  }
-
-  if (type === 'pptx') {
-    const response: FileContent = {
-      path,
-      content: rawBytes.toString('base64'),
-      encoding: 'base64',
-      type: 'pptx',
+      type,
       language: '',
       editable: false,
       revisionToken: editableState.revisionToken,

@@ -27,6 +27,7 @@ function makeGitRepo(): { dir: string; branch: string; cleanup: () => void } {
   writeFileSync(join(dir, 'report.xlsx'), Buffer.from('PK\x03\x04fake xlsx bytes', 'utf-8'))
   writeFileSync(join(dir, 'page.html'), '<!doctype html><title>Page</title><p>Hi</p>')
   writeFileSync(join(dir, 'deck.pptx'), Buffer.from('PK\x03\x04fake pptx bytes', 'utf-8'))
+  writeFileSync(join(dir, 'notes.docx'), Buffer.from('PK\x03\x04fake docx bytes', 'utf-8'))
 
   spawnSync('git', ['add', '.'], { cwd: dir })
   spawnSync('git', ['commit', '-m', 'init'], { cwd: dir })
@@ -320,6 +321,19 @@ describe('manual file operation handlers', () => {
     expect(pptxRes.status).toBe(400)
     const pptxBody = await pptxRes.json()
     expect(pptxBody.message).toContain('Only text files can be edited inline.')
+
+    const docxRes = await app.fetch(new Request('http://localhost/api/file', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'notes.docx',
+        content: 'not a docx',
+        revisionToken: 'whatever',
+      }),
+    }))
+    expect(docxRes.status).toBe(400)
+    const docxBody = await docxRes.json()
+    expect(docxBody.message).toContain('Only text files can be edited inline.')
   })
 
   it('rejects stale updates through PUT /api/file', async () => {
@@ -761,6 +775,19 @@ describe('fileHandler', () => {
     expect(body.encoding).toBe('base64')
     expect(body.language).toBe('')
     expect(body.content.length).toBeGreaterThan(0)
+    expect(body.editable).toBe(false)
+    expect(body.revisionToken).toBeTruthy()
+  })
+
+  it('returns docx type with base64 encoding and forces editable false', async () => {
+    const app = createApp(dir)
+    const client = testClient(app)
+    const res = await client.api.file.$get({ query: { path: 'notes.docx', branch } })
+    const body = await res.json()
+    expect(body.type).toBe('docx')
+    expect(body.encoding).toBe('base64')
+    expect(body.language).toBe('')
+    expect(Buffer.from(body.content, 'base64').toString('utf-8')).toContain('fake docx bytes')
     expect(body.editable).toBe(false)
     expect(body.revisionToken).toBeTruthy()
   })
