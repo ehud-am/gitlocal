@@ -4,9 +4,64 @@ on:
   push:
     tags:
       - "v*"
+  # Manual release: tags the head of main with v<package.json version>, then
+  # publishes. Lets a release be started through the GitHub API without a tag
+  # push. Tags created with GITHUB_TOKEN don't start other workflows, so the
+  # publish jobs run in this same run instead of from the tag push.
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Pushes the release tag on workflow_dispatch
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - name: Require main for manual releases
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "Manual releases run only from main (got ${GITHUB_REF})." >&2
+          exit 1
+
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          VERSION="$(node -p 'require("./package.json").version')"
+          TAG="v${VERSION}"
+          git fetch --tags --force origin
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TAG_SHA="$(git rev-list -n 1 "${TAG}")"
+            if [[ "${TAG_SHA}" != "${GITHUB_SHA}" ]]; then
+              echo "Tag ${TAG} already exists at ${TAG_SHA}, not at main (${GITHUB_SHA}). Bump the version in package.json first." >&2
+              exit 1
+            fi
+            echo "Tag ${TAG} already points at ${GITHUB_SHA}; continuing (rerun)."
+          else
+            git tag "${TAG}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${TAG}"
+            echo "Created tag ${TAG} at ${GITHUB_SHA}."
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
   publish-npm:
+    needs: prepare-release
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -18,6 +73,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.prepare-release.outputs.tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -37,11 +94,13 @@ jobs:
 
       - name: Read package version
         id: version
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           if [[ "${VERSION}" != "${TAG_VERSION}" ]]; then
-            echo "Release tag ${GITHUB_REF_NAME} does not match package version ${VERSION}" >&2
+            echo "Release tag ${RELEASE_TAG} does not match package version ${VERSION}" >&2
             exit 1
           fi
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
@@ -53,18 +112,21 @@ jobs:
         run: npm publish --access public
 
   publish-homebrew:
-    needs: publish-npm
+    needs: [prepare-release, publish-npm]
     runs-on: macos-latest
     environment: release
     permissions:
       contents: write
     env:
+      RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
       HOMEBREW_TAP_REPOSITORY: ehud-am/homebrew-gitlocal
       HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.prepare-release.outputs.tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -100,7 +162,7 @@ jobs:
           VERSION="${{ needs.publish-npm.outputs.version }}"
           ARTIFACT="packaging/macos/release/artifacts/GitLocal-${VERSION}-macos.zip"
           SHA256="$(shasum -a 256 "${ARTIFACT}" | awk '{print $1}')"
-          URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/GitLocal-${VERSION}-macos.zip"
+          URL="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/GitLocal-${VERSION}-macos.zip"
 
           packaging/macos/cask/update-cask.sh \
             --version "${VERSION}" \
@@ -118,14 +180,14 @@ jobs:
         run: |
           ARTIFACT="${{ steps.cask.outputs.artifact }}"
 
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "Release ${GITHUB_REF_NAME} already exists; ensuring the macOS artifact is attached (idempotent rerun)."
-            gh release upload "${GITHUB_REF_NAME}" "${ARTIFACT}" "${ARTIFACT}.sha256" --clobber
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; ensuring the macOS artifact is attached (idempotent rerun)."
+            gh release upload "${RELEASE_TAG}" "${ARTIFACT}" "${ARTIFACT}.sha256" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" \
+            gh release create "${RELEASE_TAG}" \
               "${ARTIFACT}" \
               "${ARTIFACT}.sha256" \
-              --title "GitLocal ${GITHUB_REF_NAME}" \
+              --title "GitLocal ${RELEASE_TAG}" \
               --generate-notes
           fi
 
