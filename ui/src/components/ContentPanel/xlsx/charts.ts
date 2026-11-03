@@ -10,6 +10,9 @@ import type { ChartModel } from '../pptx/model'
 // none): workbook sheet -> drawing part -> graphicFrame -> chart part, drawn from the chart's
 // cached values like PPTX and DOCX charts. Formulas are never recalculated.
 
+/** Cell values of a reference such as `'Sales'!$B$2:$B$5`, in order, or null when unknown. */
+export type RangeResolver = (reference: string) => { text: string; number: number | null }[] | null
+
 export interface WorkbookChart {
   /** Parsed chart, or null when its type isn't supported. */
   chart: ChartModel | null
@@ -74,9 +77,40 @@ export function anchorLayout(anchor: Element): { cell: string | null; widthPx: n
   return { cell, ...(extentSize(child(anchor, 'ext')) ?? DEFAULT_SIZE) }
 }
 
+// Files written by some tools (openpyxl, for one) leave out a chart's cached values and keep only
+// the cell references. Those caches are filled in from the sheet's own cell values before parsing.
+export function fillMissingCaches(chartSpace: Element, resolve: RangeResolver): void {
+  for (const ref of Array.from(chartSpace.getElementsByTagNameNS('*', '*')).filter((element) => element.localName === 'numRef' || element.localName === 'strRef')) {
+    const numeric = ref.localName === 'numRef'
+    if (child(ref, numeric ? 'numCache' : 'strCache')) continue
+    const formula = child(ref, 'f')?.textContent?.trim()
+    const values = formula ? resolve(formula) : null
+    if (!values) continue
+    const doc = ref.ownerDocument
+    const ns = ref.namespaceURI
+    const make = (name: string) => doc.createElementNS(ns, ref.prefix ? `${ref.prefix}:${name}` : name)
+    const cache = make(numeric ? 'numCache' : 'strCache')
+    const count = make('ptCount')
+    count.setAttribute('val', String(values.length))
+    cache.appendChild(count)
+    values.forEach((value, index) => {
+      // A numeric reference over text cells (categories often are) keeps the text.
+      const content = numeric && value.number !== null ? String(value.number) : value.text
+      if (numeric && content === '') return
+      const pt = make('pt')
+      pt.setAttribute('idx', String(index))
+      const v = make('v')
+      v.textContent = content
+      pt.appendChild(v)
+      cache.appendChild(pt)
+    })
+    ref.appendChild(cache)
+  }
+}
+
 const ANCHORS = new Set(['twoCellAnchor', 'oneCellAnchor', 'absoluteAnchor'])
 
-function chartsInDrawing(pkg: OpcPackage, drawingPath: string, theme: Theme): WorkbookChart[] {
+function chartsInDrawing(pkg: OpcPackage, drawingPath: string, theme: Theme, resolve: RangeResolver | null): WorkbookChart[] {
   const drawing = pkg.xml(drawingPath)
   if (!drawing) return []
   const charts: WorkbookChart[] = []
@@ -90,6 +124,7 @@ function chartsInDrawing(pkg: OpcPackage, drawingPath: string, theme: Theme): Wo
       if (!rel || rel.external) continue
       const chartSpace = pkg.xml(rel.target)
       if (!chartSpace) continue
+      if (resolve) fillMissingCaches(chartSpace, resolve)
       const scope: PartScope = { pkg, partPath: rel.target, colors: { scheme: theme.scheme, clrMap: DEFAULT_CLR_MAP }, theme, media: new MediaRegistry() }
       const name = attr(path(frame, 'nvGraphicFramePr', 'cNvPr'), 'name')
       charts.push({ chart: parseChart(chartSpace, scope), name: name && name.trim() ? name : null, ...layout })
@@ -99,7 +134,7 @@ function chartsInDrawing(pkg: OpcPackage, drawingPath: string, theme: Theme): Wo
 }
 
 /** Charts per sheet name, in drawing order. Sheets without charts are left out. */
-export function chartsByPackage(pkg: OpcPackage): Map<string, WorkbookChart[]> {
+export function chartsByPackage(pkg: OpcPackage, resolve: RangeResolver | null = null): Map<string, WorkbookChart[]> {
   const result = new Map<string, WorkbookChart[]>()
   const workbookPath = pkg.relByType('', '/officeDocument')?.target ?? 'xl/workbook.xml'
   const workbook = pkg.xml(workbookPath)
@@ -116,16 +151,16 @@ export function chartsByPackage(pkg: OpcPackage): Map<string, WorkbookChart[]> {
     const drawingId = drawingRef?.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
     const drawingRel = drawingId ? pkg.rels(sheetRel.target).get(drawingId) : undefined
     if (!drawingRel || drawingRel.external) continue
-    const charts = chartsInDrawing(pkg, drawingRel.target, theme)
+    const charts = chartsInDrawing(pkg, drawingRel.target, theme, resolve)
     if (charts.length > 0) result.set(name, charts)
   }
   return result
 }
 
 /** Charts of a workbook's bytes; empty for a file that isn't an OOXML package (e.g. legacy .xls). */
-export async function loadWorkbookCharts(bytes: Uint8Array): Promise<Map<string, WorkbookChart[]>> {
+export async function loadWorkbookCharts(bytes: Uint8Array, resolve: RangeResolver | null = null): Promise<Map<string, WorkbookChart[]>> {
   try {
-    return chartsByPackage(await openPackage(bytes))
+    return chartsByPackage(await openPackage(bytes), resolve)
   } catch {
     return new Map()
   }

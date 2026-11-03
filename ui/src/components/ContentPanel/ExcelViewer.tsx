@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { ChartView } from './pptx/chart-view'
 import { base64ToBytes } from './preview-shared/bytes'
 import { DataTable } from './preview-shared/DataTable'
-import { loadWorkbookCharts, type WorkbookChart } from './xlsx/charts'
+import { loadWorkbookCharts, type RangeResolver, type WorkbookChart } from './xlsx/charts'
 
 interface Props {
   /** Base64-encoded workbook bytes, as delivered by the server. */
@@ -24,6 +24,27 @@ interface Worksheet {
 interface ExcelWorkbook {
   sheets: Worksheet[]
   parseError: string | null
+  /** Cell values of a chart's range reference, for charts saved without cached values. */
+  resolveRange: RangeResolver | null
+}
+
+// `'My Sheet'!$B$2:$B$5` or `Sheet1!A1`: the sheet's cells in row-major order.
+export function resolveRangeFor(workbook: XLSX.WorkBook): RangeResolver {
+  return (reference) => {
+    const match = /^(?:'((?:[^']|'')+)'|([^!]+))!(.+)$/.exec(reference)
+    if (!match) return null
+    const sheet = workbook.Sheets[match[1] !== undefined ? match[1].replace(/''/g, "'") : match[2]]
+    if (!sheet) return null
+    const range = XLSX.utils.decode_range(match[3].replace(/\$/g, ''))
+    const values: { text: string; number: number | null }[] = []
+    for (let row = range.s.r; row <= range.e.r; row += 1) {
+      for (let col = range.s.c; col <= range.e.c; col += 1) {
+        const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })] as XLSX.CellObject | undefined
+        values.push({ text: cell ? String(cell.w ?? cell.v ?? '') : '', number: typeof cell?.v === 'number' ? cell.v : null })
+      }
+    }
+    return values
+  }
 }
 
 function parseWorkbook(content: string): ExcelWorkbook {
@@ -38,9 +59,9 @@ function parseWorkbook(content: string): ExcelWorkbook {
       return { name, rows: rows.map((row) => row.map((cell) => String(cell))), hasChart }
     })
 
-    return { sheets, parseError: null }
+    return { sheets, parseError: null, resolveRange: resolveRangeFor(workbook) }
   } catch {
-    return { sheets: [], parseError: "This file can't be previewed as an Excel workbook." }
+    return { sheets: [], parseError: "This file can't be previewed as an Excel workbook.", resolveRange: null }
   }
 }
 
@@ -71,13 +92,13 @@ export default function ExcelViewer({ content }: Props) {
     let cancelled = false
     setCharts(null)
     if (workbook.parseError) return undefined
-    void loadWorkbookCharts(base64ToBytes(content)).then((result) => {
+    void loadWorkbookCharts(base64ToBytes(content), workbook.resolveRange).then((result) => {
       if (!cancelled) setCharts(result)
     })
     return () => {
       cancelled = true
     }
-  }, [content, workbook.parseError])
+  }, [content, workbook])
 
   // The registry renders one long-lived ExcelViewer instance across file switches, so the active
   // tab must reset explicitly whenever a new file's content arrives (mirrors PdfViewer's [content]

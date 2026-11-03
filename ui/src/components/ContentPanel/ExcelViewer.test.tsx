@@ -82,7 +82,11 @@ describe('ExcelViewer', () => {
     expect(chartTabIndex).toBeGreaterThan(-1)
     fireEvent.click(tabs[chartTabIndex])
 
-    expect(await screen.findByRole('img', { name: 'Chart: Quarterly Revenue' })).toBeInTheDocument()
+    const chart = await screen.findByRole('img', { name: 'Chart: Quarterly Revenue' })
+    // The fixture's chart has no cached values; they come from the Data sheet's cells.
+    expect(chart).toHaveTextContent('Revenue')
+    expect(chart).toHaveTextContent('Feb')
+    expect(chart.querySelectorAll('rect').length).toBeGreaterThan(3)
     expect(screen.getByText('Chart 1')).toBeInTheDocument()
     expect(screen.queryByText(/contains a chart/)).not.toBeInTheDocument()
     expect(screen.queryByText('This worksheet is empty.')).not.toBeInTheDocument()
@@ -95,6 +99,19 @@ describe('ExcelViewer', () => {
     expect(await screen.findByRole('img', { name: 'Chart: Sales' })).toBeInTheDocument()
     expect(screen.getByText('Sales chart at D2')).toBeInTheDocument()
     expect(screen.getByText("This chart type can't be shown in the preview.")).toBeInTheDocument()
+  })
+
+  it('resolves chart references against quoted sheet names, and ignores unknown sheets or bad references', async () => {
+    const { resolveRangeFor } = await import('./ExcelViewer')
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Name', 2], ['x', 'y']]), "Bob's data")
+    const resolve = resolveRangeFor(workbook)
+    expect(resolve("'Bob''s data'!$A$1:$B$2")).toEqual([
+      { text: 'Name', number: null }, { text: '2', number: 2 }, { text: 'x', number: null }, { text: 'y', number: null },
+    ])
+    expect(resolve("'Bob''s data'!C3")).toEqual([{ text: '', number: null }])
+    expect(resolve('Missing!A1')).toBeNull()
+    expect(resolve('A1:B2')).toBeNull()
   })
 
   it("keeps the chartsheet note when the chart can't be read from the package", async () => {

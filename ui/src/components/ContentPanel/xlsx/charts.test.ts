@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { relsXml, THEME_XML, type Rel } from '../ooxml/test-support'
-import { anchorLayout, columnName, loadWorkbookCharts } from './charts'
+import { anchorLayout, columnName, fillMissingCaches, loadWorkbookCharts } from './charts'
 
 const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -132,5 +132,30 @@ describe('xlsx charts', () => {
       'application/xml',
     )
     expect(anchorLayout(doc.documentElement.firstElementChild as Element)).toEqual({ cell: null, widthPx: 1200, heightPx: 160 })
+  })
+
+  it('fills caches missing from a chart from the referenced cells, and keeps existing caches', () => {
+    const doc = new DOMParser().parseFromString(
+      `<c:chartSpace xmlns:c="${C}"><c:ser><c:tx><c:strRef><c:f>'Q''s'!B1</c:f></c:strRef></c:tx>
+        <c:cat><c:strRef><c:f>Data!$A$2:$A$3</c:f></c:strRef></c:cat>
+        <c:val><c:numRef><c:f>Data!$B$2:$B$3</c:f></c:numRef></c:val>
+        <c:x><c:numRef><c:f>Unknown!A1</c:f></c:numRef></c:x>
+        <c:y><c:numRef><c:f/></c:numRef></c:y>
+        <c:z><c:numRef><c:f>Data!C1</c:f><c:numCache><c:ptCount val="0"/></c:numCache></c:numRef></c:z></c:ser></c:chartSpace>`,
+      'application/xml',
+    )
+    const cells: Record<string, { text: string; number: number | null }[]> = {
+      "'Q''s'!B1": [{ text: 'Sales', number: null }],
+      'Data!$A$2:$A$3': [{ text: 'Jan', number: null }, { text: 'Feb', number: null }],
+      'Data!$B$2:$B$3': [{ text: '10', number: 10 }, { text: '', number: null }],
+    }
+    fillMissingCaches(doc.documentElement, (reference) => cells[reference] ?? null)
+    const caches = Array.from(doc.getElementsByTagNameNS(C, '*')).filter((element) => element.localName.endsWith('Cache'))
+    expect(caches.map((cache) => new XMLSerializer().serializeToString(cache).replace(/ xmlns:c="[^"]+"/g, ''))).toEqual([
+      '<c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Sales</c:v></c:pt></c:strCache>',
+      '<c:strCache><c:ptCount val="2"/><c:pt idx="0"><c:v>Jan</c:v></c:pt><c:pt idx="1"><c:v>Feb</c:v></c:pt></c:strCache>',
+      '<c:numCache><c:ptCount val="2"/><c:pt idx="0"><c:v>10</c:v></c:pt></c:numCache>',
+      '<c:numCache><c:ptCount val="0"/></c:numCache>',
+    ])
   })
 })
