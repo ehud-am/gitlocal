@@ -1,0 +1,59 @@
+name: README pixel
+
+# Fills the GitHub README's Vizoalica view-counting pixel (a 1x1 image, since a README cannot
+# run scripts) from the repository's settings, so the repository holds no endpoint or key.
+# Uses the same settings as the website deploy: VIZOALICA_ENDPOINT and VIZOALICA_WEBSITE_KEY,
+# or VIZOALICA_PIXEL_WEBSITE_KEY to count README views under a separate Vizoalica website
+# (recommended by Vizoalica, since anyone who knows a public key can request the image).
+# The website must have the pixel switched on in the Vizoalica console. Without the settings
+# the block stays empty. The npm README is filled at publish time (publish.yml).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - packaging/npm/readme-pixel.mjs
+      - .github/workflows/readme-pixel.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme-pixel
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    name: Fill the README pixel
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Fill the pixel block
+        run: node packaging/npm/readme-pixel.mjs README.md /github/readme
+        env:
+          VIZOALICA_ENDPOINT: ${{ secrets.VIZOALICA_ENDPOINT || vars.VIZOALICA_ENDPOINT }}
+          VIZOALICA_WEBSITE_KEY: ${{ secrets.VIZOALICA_WEBSITE_KEY || vars.VIZOALICA_WEBSITE_KEY }}
+          VIZOALICA_PIXEL_WEBSITE_KEY: ${{ secrets.VIZOALICA_PIXEL_WEBSITE_KEY || vars.VIZOALICA_PIXEL_WEBSITE_KEY }}
+
+      # Pushed with the workflow's own token, which does not start another run.
+      - name: Commit the README when it changed
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "README unchanged"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "docs: update the README pixel"
+            git push
+          fi

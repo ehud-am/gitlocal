@@ -351,6 +351,29 @@ describe('parseDocument', () => {
     expect(doc.endnotes.map((note) => text(note.blocks[0] as ParagraphNode))).toEqual(['1 End'])
   })
 
+  it('reads reviewer comments: marks their ranges across paragraphs, numbers them in order, parses author, date and text', async () => {
+    const doc = await parseDocx({
+      comments: `<w:comment w:id="7" w:author=" Ada " w:date="2026-10-01T09:30:00Z"><w:p><w:r><w:t>Check this</w:t></w:r></w:p></w:comment>
+        <w:comment w:id="3" w:date="bad"><w:p><w:r><w:t>Reply</w:t></w:r></w:p></w:comment><w:comment/>`,
+      body: `<w:p><w:r><w:t xml:space="preserve">before </w:t></w:r><w:commentRangeStart w:id="7"/><w:r><w:t>inside</w:t></w:r></w:p>
+        <w:p><w:r><w:t>still</w:t></w:r><w:commentRangeEnd w:id="7"/><w:r><w:commentReference w:id="7"/></w:r><w:r><w:t xml:space="preserve"> after</w:t></w:r>
+        <w:r><w:commentReference w:id="3"/></w:r><w:r><w:commentReference w:id="9"/></w:r><w:r><w:commentReference/></w:r><w:commentRangeStart/><w:commentRangeEnd/></w:p>`,
+    })
+    const [first, second] = paragraphs(blocksOf(doc))
+    expect(first.inlines.map((inline) => (inline.kind === 'text' ? [inline.text, inline.comment ?? false] : inline.kind))).toEqual([['before ', false], ['inside', true]])
+    expect(second.inlines.map((inline) => (inline.kind === 'text' ? [inline.text, inline.comment ?? false] : inline.kind === 'commentRef' ? `ref${inline.number}` : inline.kind)))
+      .toEqual([['still', true], 'ref1', [' after', false], 'ref2', 'ref3'])
+    expect(doc.comments.map((comment) => [comment.number, comment.author, comment.date, text(comment.blocks[0] as ParagraphNode)])).toEqual([
+      [1, 'Ada', '2026-10-01', 'Check this'],
+      [2, null, null, 'Reply'],
+    ])
+  })
+
+  it('ignores comment references when the document has no comments part', async () => {
+    const doc = await parseDocx({ body: '<w:p><w:r><w:commentReference w:id="1"/></w:r></w:p>' })
+    expect(doc.comments).toEqual([])
+  })
+
   it('ignores note references when the document has no notes part', async () => {
     const doc = await parseDocx({ body: '<w:p><w:r><w:footnoteReference w:id="1"/></w:r></w:p>' })
     expect(doc.footnotes).toEqual([])

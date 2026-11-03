@@ -37,6 +37,7 @@ export default defineConfig({
         'src/components/ContentPanel/pptx/*.{ts,tsx}',
         'src/components/ContentPanel/docx/*.{ts,tsx}',
         'src/components/ContentPanel/ooxml/*.{ts,tsx}',
+        'src/components/ContentPanel/xlsx/*.{ts,tsx}',
         'src/components/ContentPanel/preview-shared/*.{ts,tsx}',
         'src/components/RepoContext/**/*.tsx',
         'src/components/Search/**/*.tsx',
@@ -58,7 +59,7 @@ export default defineConfig({
         'src/lib/go-to-path.ts',
         'src/lib/sync.ts',
       ],
-      exclude: ['**/*.test.tsx', '**/*.test.ts', 'src/components/ContentPanel/pptx/test-support.ts', 'src/components/ContentPanel/docx/test-support.ts', 'src/components/ContentPanel/ooxml/test-support.ts'],
+      exclude: ['**/*.test.tsx', '**/*.test.ts', 'src/components/ContentPanel/pptx/test-support.ts', 'src/components/ContentPanel/docx/test-support.ts', 'src/components/ContentPanel/ooxml/test-support.ts', 'src/components/ContentPanel/xlsx/test-support.ts'],
       thresholds: {
         perFile: true,
         lines: 90,

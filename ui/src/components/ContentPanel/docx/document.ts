@@ -16,6 +16,7 @@ import {
   type Block,
   type Border,
   type Borders,
+  type Comment,
   type DocumentModel,
   type Inline,
   type Link,
@@ -58,6 +59,9 @@ interface Context {
   endnotes: NoteState
   // The number shown by w:footnoteRef/w:endnoteRef while a note's own text is parsed.
   currentNote: number | null
+  comments: NoteState
+  // Comments whose range (w:commentRangeStart .. w:commentRangeEnd) is open; ranges can span paragraphs.
+  openComments: Set<string>
   // Formatting a table style contributes to the paragraphs of the cell being parsed.
   tableLayer: { para: ParaProps; run: RunStyle } | null
 }
@@ -297,12 +301,15 @@ function noteNumber(state: NoteState, id: string): number {
 
 class InlineBuilder {
   readonly inlines: Inline[] = []
+  // Whether text added now is inside a comment's range.
+  comment = false
 
   text(text: string, style: RunStyle, link: Link | null): void {
     if (!text) return
     const last = this.inlines[this.inlines.length - 1]
-    if (last?.kind === 'text' && last.style === style && last.link === link) last.text += text
-    else this.inlines.push({ kind: 'text', text, style, link })
+    const comment = this.comment || undefined
+    if (last?.kind === 'text' && last.style === style && last.link === link && last.comment === comment) last.text += text
+    else this.inlines.push(comment ? { kind: 'text', text, style, link, comment } : { kind: 'text', text, style, link })
   }
 
   push(...inlines: Inline[]): void {
@@ -314,6 +321,7 @@ function parseRun(run: Element, base: RunStyle, link: Link | null, ctx: Context,
   const rPr = child(run, 'rPr')
   const style = mergeRun(base, ctx.styles.character(attr(child(rPr, 'rStyle'), 'val')), parseRunProps(rPr, ctx.theme))
   const elements = children(run).flatMap((element) => (element.localName === 'AlternateContent' ? alternateContent(element) : [element]))
+  out.comment = ctx.openComments.size > 0
   for (const element of elements) {
     // Field codes are tracked even inside hidden runs, so the field structure stays balanced.
     if (element.localName === 'fldChar') {
@@ -369,6 +377,11 @@ function parseRun(run: Element, base: RunStyle, link: Link | null, ctx: Context,
       case 'footnoteRef': case 'endnoteRef':
         if (ctx.currentNote !== null) out.text(String(ctx.currentNote), style, null)
         break
+      case 'commentReference': {
+        const id = attr(element, 'id')
+        if (id !== null) out.push({ kind: 'commentRef', number: noteNumber(ctx.comments, id), style })
+        break
+      }
       default: break
     }
   }
@@ -400,6 +413,19 @@ function parseInlineContent(container: Element, base: RunStyle, link: Link | nul
           if (chosen.localName === 'r') parseRun(chosen, base, link, ctx, out)
         }
         break
+      case 'commentRangeStart': {
+        const id = attr(element, 'id')
+        if (id !== null) {
+          noteNumber(ctx.comments, id)
+          ctx.openComments.add(id)
+        }
+        break
+      }
+      case 'commentRangeEnd': {
+        const id = attr(element, 'id')
+        if (id !== null) ctx.openComments.delete(id)
+        break
+      }
       case 'bookmarkStart': {
         const name = attr(element, 'name')
         if (name && fieldVisible(ctx)) out.push({ kind: 'bookmark', name })
@@ -410,7 +436,7 @@ function parseInlineContent(container: Element, base: RunStyle, link: Link | nul
         if (text && fieldVisible(ctx)) out.push({ kind: 'text', text, style: { ...base, italic: true, font: 'Cambria Math' }, link })
         break
       }
-      default: break // w:del, w:moveFrom (deleted text), comments, proofing marks, ...
+      default: break // w:del, w:moveFrom (deleted text), proofing marks, ...
     }
   }
 }
@@ -913,6 +939,25 @@ function parseNotes(partPath: string | undefined, kind: 'footnote' | 'endnote', 
   return notes
 }
 
+function parseComments(partPath: string | undefined, ctx: Context): Comment[] {
+  if (!partPath) return []
+  const byId = new Map<string, Element>()
+  for (const comment of children(ctx.pkg.xml(partPath), 'comment')) {
+    const id = attr(comment, 'id')
+    if (id !== null) byId.set(id, comment)
+  }
+  const comments: Comment[] = []
+  ctx.comments.order.forEach((id, index) => {
+    const element = byId.get(id)
+    if (!element) return
+    const author = attr(element, 'author')?.trim() || null
+    const date = /^\d{4}-\d{2}-\d{2}/.exec(attr(element, 'date') ?? '')?.[0] ?? null
+    const commentCtx: Context = { ...ctx, partPath, fields: [], tableLayer: null, openComments: new Set() }
+    comments.push({ number: index + 1, author, date, blocks: parseBlocks(element, commentCtx) })
+  })
+  return comments
+}
+
 export async function parseDocument(bytes: Uint8Array): Promise<DocumentModel> {
   const pkg = await openPackage(bytes)
   const main = pkg.relByType('', '/officeDocument')
@@ -945,12 +990,15 @@ export async function parseDocument(bytes: Uint8Array): Promise<DocumentModel> {
     footnotes: { numbers: new Map(), order: [] },
     endnotes: { numbers: new Map(), order: [] },
     currentNote: null,
+    comments: { numbers: new Map(), order: [] },
+    openComments: new Set(),
     tableLayer: null,
   }
 
   const sheets = buildSheets(parseBody(body, ctx), ctx)
   const footnotes = parseNotes(pkg.relByType(documentPath, '/footnotes')?.target, 'footnote', ctx.footnotes, ctx)
   const endnotes = parseNotes(pkg.relByType(documentPath, '/endnotes')?.target, 'endnote', ctx.endnotes, ctx)
+  const comments = parseComments(pkg.relByType(documentPath, '/comments')?.target, ctx)
   const objectUrls = await loadMedia(pkg, ctx.media.refs)
-  return { sheets, footnotes, endnotes, defaultTabPx: ctx.defaultTabPx, objectUrls }
+  return { sheets, footnotes, endnotes, comments, defaultTabPx: ctx.defaultTabPx, objectUrls }
 }

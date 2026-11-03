@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.0 - 2026-11-03
+
+- Excel preview: charts are now drawn ([#98](https://github.com/ehud-am/gitlocal/issues/98)). Charts inside a worksheet appear above the sheet's table, labeled with their name and top-left cell; a chart sheet shows its chart. Bar, column, line, area, pie, doughnut and scatter charts are drawn from the values saved in the file, or from the referenced cells when the file has none (as files written by openpyxl do). Other chart types show a note. Formulas are still never recalculated.
+- Word preview: reviewer comments are shown. Commented text is highlighted, a numbered marker links to each comment, and the comments (author, date, text) are listed after the document's notes.
+- The GitHub and npm READMEs carry a 1x1 Vizoalica image to count README views. It is filled in by CI from the repository's Vizoalica settings and is empty in the source. The app itself still sends no telemetry.
+- Updated `hono` to 4.13.16 and `@hono/node-server` to 2.1.6.
+
 ## 0.16.0 - 2026-10-31
 
 - Word documents (`.docx`, plus `.docm`, `.dotx` and `.dotm`) now open as a formatted preview instead of "Binary file" ([#115](https://github.com/ehud-am/gitlocal/issues/115)). Each page is drawn with the document's own page size, margins, header and footer, fonts and colors, with headings, bulleted and numbered lists, tables (merged cells, shading, borders and table styles), pictures (including EMF and WMF), text boxes, simple charts, multiple columns, links and footnotes and endnotes. Table of contents entries and links to bookmarks jump within the document; web links open outside GitLocal. Tracked changes show the document as if they were accepted. Zoom controls work as in the PowerPoint preview. The preview is read-only and best-effort: pages split only at page and section breaks, and comments are not shown. Legacy `.doc` files still show as binary.

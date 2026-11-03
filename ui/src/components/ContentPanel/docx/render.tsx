@@ -11,7 +11,7 @@ export const AnchorJumpContext = createContext<(name: string) => void>(() => {})
 // The document's default tab interval, in pixels.
 export const DefaultTabContext = createContext(48)
 
-export const noteAnchor = (note: 'footnote' | 'endnote', number: number) => `__gitlocal-${note}-${number}`
+export const noteAnchor = (note: 'footnote' | 'endnote' | 'comment', number: number) => `__gitlocal-${note}-${number}`
 
 const px = (value: number) => `${Math.round(value * 100) / 100}px`
 const pt = (value: number) => `${Math.round(value * 100) / 100}pt`
@@ -132,7 +132,7 @@ function ImageView({ inline }: { inline: Extract<Inline, { kind: 'image' }> }) {
 function InlineView({ inline }: { inline: Inline }) {
   switch (inline.kind) {
     case 'text':
-      return withLink(inline.link, <span style={runCss(inline.style)}>{inline.text}</span>)
+      return withLink(inline.link, <span className={inline.comment ? 'docx-commented' : undefined} style={runCss(inline.style)}>{inline.text}</span>)
     case 'tab':
       return <span data-docx-tab="" className="docx-tab" style={{ ...runCss(inline.style), display: 'inline-block' }} />
     case 'break':
@@ -171,6 +171,8 @@ function InlineView({ inline }: { inline: Inline }) {
       )
     case 'noteRef':
       return <NoteRefView inline={inline} />
+    case 'commentRef':
+      return <CommentRefView inline={inline} />
     case 'bookmark':
       return <span data-docx-anchor={inline.name} />
     case 'placeholder':
@@ -194,6 +196,26 @@ function NoteRefView({ inline }: { inline: Extract<Inline, { kind: 'noteRef' }> 
       }}
     >
       {inline.note === 'endnote' ? toRoman(inline.number) : inline.number}
+    </a>
+  )
+}
+
+function CommentRefView({ inline }: { inline: Extract<Inline, { kind: 'commentRef' }> }) {
+  const jump = useContext(AnchorJumpContext)
+  const label = `Comment ${inline.number}`
+  return (
+    <a
+      className="docx-link docx-comment-ref"
+      href={`#${noteAnchor('comment', inline.number)}`}
+      aria-label={label}
+      title={label}
+      style={runCss({ ...inline.style, vertAlign: 'superscript', underline: 'none', color: undefined, highlight: undefined, shading: undefined })}
+      onClick={(event) => {
+        event.preventDefault()
+        jump(noteAnchor('comment', inline.number))
+      }}
+    >
+      [{inline.number}]
     </a>
   )
 }

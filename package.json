@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Browse local folders and git repositories in your browser",
   "keywords": [
     "git",
@@ -56,8 +56,8 @@
     "prepublishOnly": "npm run verify"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.11",
-    "hono": "^4.13.7",
+    "@hono/node-server": "^2.1.6",
+    "hono": "^4.13.16",
     "node-pty": "^1.1.0",
     "open": "^10.1.0",
     "ws": "^8.21.3"

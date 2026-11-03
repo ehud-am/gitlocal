@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { base64ToBytes, revokeObjectUrls } from './preview-shared/bytes'
 import { useObservedSize } from './preview-shared/use-observed-size'
 import { FIT_ZOOM_INDEX, ZOOM_LEVELS, ZoomControls } from './preview-shared/ZoomControls'
-import type { DocumentModel, Note, Sheet } from './docx/model'
+import type { Comment, DocumentModel, Note, Sheet } from './docx/model'
 import { AnchorJumpContext, BlocksView, DefaultTabContext, noteAnchor } from './docx/render'
 
 interface Props {
@@ -31,7 +31,23 @@ function NotesView({ notes, kind }: { notes: Note[]; kind: 'footnote' | 'endnote
   )
 }
 
-function SheetView({ sheet, index, total, notes }: { sheet: Sheet; index: number; total: number; notes: { footnotes: Note[]; endnotes: Note[] } | null }) {
+function CommentsView({ comments }: { comments: Comment[] }) {
+  if (comments.length === 0) return null
+  return (
+    <section className="docx-comments" aria-label="Comments">
+      {comments.map((comment) => (
+        <div key={comment.number} className="docx-comment" data-docx-anchor={noteAnchor('comment', comment.number)}>
+          <div className="docx-comment-meta">
+            [{comment.number}] {comment.author ?? 'Unknown author'}{comment.date ? `, ${comment.date}` : ''}
+          </div>
+          <BlocksView blocks={comment.blocks} />
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function SheetView({ sheet, index, total, notes }: { sheet: Sheet; index: number; total: number; notes: { footnotes: Note[]; endnotes: Note[]; comments: Comment[] } | null }) {
   const { page } = sheet
   return (
     <div
@@ -62,6 +78,7 @@ function SheetView({ sheet, index, total, notes }: { sheet: Sheet; index: number
           <>
             <NotesView notes={notes.footnotes} kind="footnote" />
             <NotesView notes={notes.endnotes} kind="endnote" />
+            <CommentsView comments={notes.comments} />
           </>
         ) : null}
       </div>
@@ -138,7 +155,7 @@ export default function DocxViewer({ content }: Props) {
   const fit = Math.min(1, Math.max(0.1, available / pageWidthPx))
   const zoom = ZOOM_LEVELS[zoomIndex]
   const scale = fit * zoom
-  const notes = { footnotes: doc.footnotes, endnotes: doc.endnotes }
+  const notes = { footnotes: doc.footnotes, endnotes: doc.endnotes, comments: doc.comments }
 
   return (
     <div className="docx-viewer" ref={viewerRef}>

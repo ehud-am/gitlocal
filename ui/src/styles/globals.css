@@ -2033,6 +2033,35 @@ pre {
   text-decoration: none;
 }
 
+/* Text a reviewer comment refers to, marked like Word's comment highlight. */
+.docx-commented {
+  background-color: #fff2a8;
+}
+
+.docx-comment-ref {
+  color: #8a6d00;
+  font-weight: 600;
+}
+
+.docx-comments {
+  margin-top: 1.5em;
+  padding-top: 0.5em;
+  border-top: 1px solid #c8c8c8;
+}
+
+.docx-comment {
+  margin-bottom: 0.75em;
+  padding-left: 0.6em;
+  border-left: 3px solid #f0c000;
+}
+
+.docx-comment-meta {
+  margin-bottom: 0.2em;
+  color: #595959;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
 .docx-page-break {
   display: block;
   margin: 0.75em 0;
@@ -2443,4 +2472,41 @@ pre {
 .content-with-tabs .content-panel {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
+}
+
+.excel-viewer-charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.excel-viewer-chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Chart colors come from the workbook theme (dark text), so the chart keeps a light card in dark mode. */
+.excel-viewer-chart-frame {
+  position: relative;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.excel-viewer-chart-unavailable {
+  margin: 0;
+  padding: 1rem;
+  color: #595959;
+  font-size: 0.85rem;
+}
+
+.excel-viewer-chart figcaption {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
 }

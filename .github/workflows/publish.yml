@@ -110,6 +110,12 @@ jobs:
 
       - name: Publish package to npm
         run: npm publish --access public
+        env:
+          # The prepack hook fills the npm README's view-counting pixel from these public
+          # values (packaging/npm/readme-pixel.mjs); without them the block stays empty.
+          VIZOALICA_ENDPOINT: ${{ secrets.VIZOALICA_ENDPOINT || vars.VIZOALICA_ENDPOINT }}
+          VIZOALICA_WEBSITE_KEY: ${{ secrets.VIZOALICA_WEBSITE_KEY || vars.VIZOALICA_WEBSITE_KEY }}
+          VIZOALICA_PIXEL_WEBSITE_KEY: ${{ secrets.VIZOALICA_PIXEL_WEBSITE_KEY || vars.VIZOALICA_PIXEL_WEBSITE_KEY }}
 
   publish-homebrew:
     needs: [prepare-release, publish-npm]
