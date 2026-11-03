@@ -59,3 +59,6 @@ Taking part happens on GitHub and needs a free GitHub account. GitLocal itself s
 ## License
 
 MIT
+
+<!-- readme-pixel:start -->
+<!-- readme-pixel:end -->

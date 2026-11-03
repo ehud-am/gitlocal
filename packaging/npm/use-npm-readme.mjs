@@ -1,6 +1,7 @@
 import { copyFileSync, existsSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { fillReadmePixel } from './readme-pixel.mjs'
 
 const mode = process.argv[2]
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -17,6 +18,8 @@ if (mode === 'prepack') {
     copyFileSync(githubReadme, backupReadme)
   }
   copyFileSync(npmReadme, githubReadme)
+  // Only the packed copy gets the pixel; the committed npm README keeps an empty block.
+  fillReadmePixel(githubReadme, '/npm/readme')
 } else if (mode === 'postpack') {
   if (existsSync(backupReadme)) {
     copyFileSync(backupReadme, githubReadme)

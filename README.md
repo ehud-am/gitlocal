@@ -381,3 +381,6 @@ MIT — see [LICENSE](LICENSE).
 ## Contributing
 
 Ideas, questions, bug reports, and pull requests are all welcome. See [Help Shape GitLocal](#help-shape-gitlocal) for where to start, and [CONTRIBUTING.md](CONTRIBUTING.md) for how to make a code change. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report security problems privately per [SECURITY.md](SECURITY.md). Code changes follow the [GitLocal constitution](.specify/memory/constitution.md), including ≥90% branch coverage per file, which CI checks for you.
+
+<!-- readme-pixel:start -->
+<!-- readme-pixel:end -->
