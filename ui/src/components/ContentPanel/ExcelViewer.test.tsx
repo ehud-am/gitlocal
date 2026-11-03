@@ -73,17 +73,35 @@ describe('ExcelViewer', () => {
     fetchSpy.mockRestore()
   })
 
-  it('shows a chart indicator only on the sheet SheetJS flags as chart-typed, and no indicator elsewhere', () => {
+  it('draws the chart of a chartsheet from the workbook package, and no chart on other sheets', async () => {
     render(<ExcelViewer content={chartXlsx} />)
-    // Active (first) sheet has no chart.
-    expect(screen.queryByText(/contains a chart/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /Chart/ })).not.toBeInTheDocument()
 
     const tabs = screen.getAllByRole('tab')
     const chartTabIndex = tabs.findIndex((tab) => tab.textContent === 'ChartSheet')
     expect(chartTabIndex).toBeGreaterThan(-1)
     fireEvent.click(tabs[chartTabIndex])
 
-    expect(screen.getByText(/contains a chart/)).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Chart: Quarterly Revenue' })).toBeInTheDocument()
+    expect(screen.getByText('Chart 1')).toBeInTheDocument()
+    expect(screen.queryByText(/contains a chart/)).not.toBeInTheDocument()
+    expect(screen.queryByText('This worksheet is empty.')).not.toBeInTheDocument()
+  })
+
+  it('shows a chart embedded in a normal worksheet above its table, and a note for an unsupported one', async () => {
+    const { buildEmbeddedChartWorkbook } = await import('./xlsx/test-support')
+    render(<ExcelViewer content={await buildEmbeddedChartWorkbook()} />)
+    expect(screen.getByRole('cell', { name: 'Jan' })).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Chart: Sales' })).toBeInTheDocument()
+    expect(screen.getByText('Sales chart at D2')).toBeInTheDocument()
+    expect(screen.getByText("This chart type can't be shown in the preview.")).toBeInTheDocument()
+  })
+
+  it("keeps the chartsheet note when the chart can't be read from the package", async () => {
+    const { buildEmbeddedChartWorkbook } = await import('./xlsx/test-support')
+    render(<ExcelViewer content={await buildEmbeddedChartWorkbook({ chartsheetWithoutDrawing: true })} />)
+    fireEvent.click(screen.getAllByRole('tab')[1])
+    expect(await screen.findByText(/contains a chart that can't be shown/)).toBeInTheDocument()
   })
 
   it('shows no chart indicator on any sheet of a chart-free workbook', () => {
