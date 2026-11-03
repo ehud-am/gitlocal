@@ -53,13 +53,15 @@ export interface TabStop {
 }
 
 export type Inline =
-  | { kind: 'text'; text: string; style: RunStyle; link: Link | null }
+  // `comment` marks text inside a comment's range.
+  | { kind: 'text'; text: string; style: RunStyle; link: Link | null; comment?: boolean }
   | { kind: 'tab'; style: RunStyle }
   | { kind: 'break'; type: 'line' | 'page' | 'column' }
   | { kind: 'image'; image: ImageRef; widthPx: number; heightPx: number; float: 'left' | 'right' | null; block: boolean; alt: string; link: Link | null }
   | { kind: 'chart'; chart: ChartModel | null; widthPx: number; heightPx: number; float: 'left' | 'right' | null }
   | { kind: 'textbox'; blocks: Block[]; widthPx: number | null; heightPx: number | null; float: 'left' | 'right' | null; fill: string | null; border: Border | null }
   | { kind: 'noteRef'; note: 'footnote' | 'endnote'; number: number; style: RunStyle }
+  | { kind: 'commentRef'; number: number; style: RunStyle }
   | { kind: 'bookmark'; name: string }
   | { kind: 'placeholder'; label: string }
 
@@ -153,10 +155,20 @@ export interface Note {
   blocks: Block[]
 }
 
+// A reviewer comment (word/comments.xml), numbered in the order the document first refers to it.
+export interface Comment {
+  number: number
+  author: string | null
+  // The date part (YYYY-MM-DD) of the comment's timestamp, when it has one.
+  date: string | null
+  blocks: Block[]
+}
+
 export interface DocumentModel {
   sheets: Sheet[]
   footnotes: Note[]
   endnotes: Note[]
+  comments: Comment[]
   defaultTabPx: number
   objectUrls: string[]
 }

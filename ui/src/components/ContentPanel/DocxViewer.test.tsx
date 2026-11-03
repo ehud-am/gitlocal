@@ -142,6 +142,33 @@ describe('DocxViewer', () => {
     }
   })
 
+  it('highlights commented text and lists comments, with references that jump to them', async () => {
+    const scrolled: string[] = []
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = function scrollIntoView(this: HTMLElement) {
+      scrolled.push(this.dataset.docxAnchor ?? '')
+    }
+    try {
+      const content = await docxBase64(
+        '<w:p><w:commentRangeStart w:id="0"/><w:r><w:t>Reviewed text</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r><w:r><w:commentReference w:id="1"/></w:r></w:p>',
+        {
+          body: '',
+          comments: `<w:comment w:id="0" w:author="Ada" w:date="2026-10-01T09:30:00Z"><w:p><w:r><w:t>Please rephrase.</w:t></w:r></w:p></w:comment>
+            <w:comment w:id="1"><w:p><w:r><w:t>No author.</w:t></w:r></w:p></w:comment>`,
+        },
+      )
+      render(<DocxViewer content={content} />)
+      expect((await screen.findByText('Reviewed text')).className).toBe('docx-commented')
+      const comments = screen.getByRole('region', { name: 'Comments' })
+      expect(comments).toHaveTextContent('[1] Ada, 2026-10-01Please rephrase.')
+      expect(comments).toHaveTextContent('[2] Unknown authorNo author.')
+      fireEvent.click(screen.getByRole('link', { name: 'Comment 2' }))
+      expect(scrolled).toEqual(['__gitlocal-comment-2'])
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
   it('shows columns from the section properties', async () => {
     render(<DocxViewer content={await docxBase64(`${para('In columns')}<w:sectPr><w:cols w:num="2" w:space="720"/></w:sectPr>`)} />)
     const columns = (await screen.findByText('In columns')).closest('.docx-columns') as HTMLElement

@@ -2033,6 +2033,35 @@ pre {
   text-decoration: none;
 }
 
+/* Text a reviewer comment refers to, marked like Word's comment highlight. */
+.docx-commented {
+  background-color: #fff2a8;
+}
+
+.docx-comment-ref {
+  color: #8a6d00;
+  font-weight: 600;
+}
+
+.docx-comments {
+  margin-top: 1.5em;
+  padding-top: 0.5em;
+  border-top: 1px solid #c8c8c8;
+}
+
+.docx-comment {
+  margin-bottom: 0.75em;
+  padding-left: 0.6em;
+  border-left: 3px solid #f0c000;
+}
+
+.docx-comment-meta {
+  margin-bottom: 0.2em;
+  color: #595959;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
 .docx-page-break {
   display: block;
   margin: 0.75em 0;

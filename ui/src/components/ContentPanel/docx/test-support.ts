@@ -30,6 +30,7 @@ export interface DocxParts {
   settings?: string
   footnotes?: string
   endnotes?: string
+  comments?: string
   theme?: boolean
   // Extra parts by zip path, e.g. headers, charts and media.
   parts?: Record<string, string | Uint8Array>
@@ -59,6 +60,7 @@ export async function buildDocx(parts: DocxParts): Promise<Uint8Array> {
   add('settings.xml', 'settings', parts.settings, 'settings')
   add('footnotes.xml', 'footnotes', parts.footnotes, 'footnotes')
   add('endnotes.xml', 'endnotes', parts.endnotes, 'endnotes')
+  add('comments.xml', 'comments', parts.comments, 'comments')
   if (parts.theme) {
     zip.file('word/theme/theme1.xml', THEME_XML)
     rels.push({ id: 'rIdTheme', type: 'theme', target: 'theme/theme1.xml' })
