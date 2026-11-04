@@ -4,7 +4,7 @@
 
 - Excel preview: charts are now drawn ([#98](https://github.com/ehud-am/gitlocal/issues/98)). Charts inside a worksheet appear above the sheet's table, labeled with their name and top-left cell; a chart sheet shows its chart. Bar, column, line, area, pie, doughnut and scatter charts are drawn from the values saved in the file, or from the referenced cells when the file has none (as files written by openpyxl do). Other chart types show a note. Formulas are still never recalculated.
 - Word preview: reviewer comments are shown. Commented text is highlighted, a numbered marker links to each comment, and the comments (author, date, text) are listed after the document's notes.
-- The GitHub and npm READMEs carry a 1x1 Vizoalica image to count README views. It is filled in by CI from the repository's Vizoalica settings and is empty in the source. The app itself still sends no telemetry.
+- The GitHub and npm READMEs carry a 1x1 Vizoalica image to count README views. The npm one is filled in when the package is published, from the repository's Vizoalica settings. The app itself still sends no telemetry.
 - Updated `hono` to 4.13.16 and `@hono/node-server` to 2.1.6.
 
 ## 0.16.0 - 2026-10-31

@@ -10,12 +10,20 @@ const endpoint = 'https://prod.example.workers.dev/ignored/path'
 const block = `${PIXEL_START}\n${PIXEL_END}`
 
 describe('README view-counting pixel', () => {
-  it('keeps an empty pixel block in both committed READMEs', () => {
-    for (const file of ['README.md', 'packaging/npm/README.md']) {
-      const text = readFileSync(resolve(root, file), 'utf-8')
-      expect(text).toContain(block)
-      expect(text).not.toContain('pixel.gif')
-    }
+  it('keeps an empty pixel block in the committed npm README, filled only when packed', () => {
+    const text = readFileSync(resolve(root, 'packaging/npm/README.md'), 'utf-8')
+    expect(text).toContain(block)
+    expect(text).not.toContain('pixel.gif')
+  })
+
+  it('carries a committed pixel for the GitHub README, with a path other than the npm one', () => {
+    // main's ruleset blocks workflow pushes, so the GitHub README holds the line itself.
+    const text = readFileSync(resolve(root, 'README.md'), 'utf-8')
+    const start = text.indexOf(PIXEL_START)
+    const end = text.indexOf(PIXEL_END)
+    expect(start).toBeGreaterThan(-1)
+    expect(text.slice(start, end)).not.toContain('path=/npm/readme')
+    expect(text.slice(start, end)).toMatch(/!\[\]\(https:\/\/[A-Za-z0-9.-]+\/v1\/pixel\.gif\?website=[A-Za-z0-9_-]+&path=\/[A-Za-z0-9/_.-]+\)/)
   })
 
   it('builds the image from the endpoint origin, key and path', () => {
@@ -73,7 +81,5 @@ describe('README view-counting pixel', () => {
     expect(script).toContain("fillReadmePixel(githubReadme, '/npm/readme')")
     const publish = readFileSync(resolve(root, '.github/workflows/publish.yml'), 'utf-8')
     expect(publish).toMatch(/npm publish --access public\n\s+env:\n(\s+#.*\n)*\s+VIZOALICA_ENDPOINT:/)
-    const workflow = readFileSync(resolve(root, '.github/workflows/readme-pixel.yml'), 'utf-8')
-    expect(workflow).toContain('node packaging/npm/readme-pixel.mjs README.md /github/readme')
   })
 })
