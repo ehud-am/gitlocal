@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.17.0 - 2026-11-03
+## 0.17.0 - 2026-11-05
 
 - Excel preview: charts are now drawn ([#98](https://github.com/ehud-am/gitlocal/issues/98)). Charts inside a worksheet appear above the sheet's table, labeled with their name and top-left cell; a chart sheet shows its chart. Bar, column, line, area, pie, doughnut and scatter charts are drawn from the values saved in the file, or from the referenced cells when the file has none (as files written by openpyxl do). Other chart types show a note. Formulas are still never recalculated.
 - Word preview: reviewer comments are shown. Commented text is highlighted, a numbered marker links to each comment, and the comments (author, date, text) are listed after the document's notes.
