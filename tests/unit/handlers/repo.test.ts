@@ -192,7 +192,7 @@ describe('infoHandler', () => {
     }
   })
 
-  it('returns folder metadata for a nested folder inside a repository', async () => {
+  it('opens the repository with the folder selected when started on a nested folder inside it', async () => {
     const repo = makeGitRepo()
     const nested = join(repo.dir, 'docs')
     mkdirSync(nested, { recursive: true })
@@ -204,11 +204,18 @@ describe('infoHandler', () => {
       const res = await client.api.info.$get()
       const body = await res.json()
 
-      expect(body.path).toBe(realpathSync(nested))
-      expect(body.isGitRepo).toBe(false)
-      expect(body.currentBranch).toBe('')
-      expect(body.hasCommits).toBe(false)
-      expect(body.gitContext).toBeNull()
+      expect(body.path).toBe(realpathSync(repo.dir))
+      expect(body.isGitRepo).toBe(true)
+      expect(body.hasCommits).toBe(true)
+      const targetRes = await client.api['startup-open-target'].$get()
+      const { target } = await targetRes.json()
+      expect(target).toMatchObject({
+        status: 'accepted',
+        rootPath: realpathSync(repo.dir),
+        selectedPath: 'docs',
+        selectedPathType: 'dir',
+        gitState: 'inside-repository',
+      })
     } finally {
       repo.cleanup()
     }
@@ -494,6 +501,51 @@ describe('repositoryParentFolderHandler', () => {
     }
   })
 
+  it('returns to the outer repository, with nothing selected, when leaving a nested repository root', async () => {
+    const outer = makeGitRepo()
+    const innerDir = join(outer.dir, 'inner')
+    mkdirSync(innerDir)
+    spawnSync('git', ['init'], { cwd: innerDir })
+
+    try {
+      const app = createApp(innerDir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+      expect(await res.json()).toMatchObject({
+        ok: true,
+        rootPath: realpathSync(outer.dir),
+        selectedPath: '',
+        selectedPathType: 'none',
+        openMode: 'repository',
+        gitState: 'repository-root',
+      })
+      const info = await (await app.fetch(new Request('http://localhost/api/info'))).json() as { path: string; isGitRepo: boolean; pickerMode: boolean }
+      expect(info).toMatchObject({ path: realpathSync(outer.dir), isGitRepo: true, pickerMode: false })
+    } finally {
+      outer.cleanup()
+    }
+  })
+
+  it('selects the parent folder inside the outer repository when leaving a repository nested deeper in it', async () => {
+    const outer = makeGitRepo()
+    const innerDir = join(outer.dir, 'vendor', 'inner')
+    mkdirSync(innerDir, { recursive: true })
+    spawnSync('git', ['init'], { cwd: innerDir })
+
+    try {
+      const app = createApp(innerDir)
+      const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
+      expect(await res.json()).toMatchObject({
+        ok: true,
+        rootPath: realpathSync(outer.dir),
+        selectedPath: 'vendor',
+        selectedPathType: 'dir',
+        gitState: 'inside-repository',
+      })
+    } finally {
+      outer.cleanup()
+    }
+  })
+
   it('refuses to navigate above the true filesystem root', async () => {
     const app = createApp('/')
     const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
@@ -598,6 +650,29 @@ describe('repositoryLocationHandler', () => {
       const body = await res.json() as { repositoryRootPath: string; isRepositoryRoot: boolean; homeReadmePath: string }
       expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(innerDir))
       expect(body.isRepositoryRoot).toBe(true)
+      expect(body.homeReadmePath).toBe('README.md')
+    } finally {
+      outer.cleanup()
+    }
+  })
+
+  it("reads a nested repository's README from its own branch, not the open repository's branch", async () => {
+    const outer = makeGitRepo()
+    const outerBranch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: outer.dir, encoding: 'utf-8' }).stdout.trim()
+    const innerDir = join(outer.dir, 'inner')
+    mkdirSync(innerDir)
+    spawnSync('git', ['init', '-b', 'inner-only-branch'], { cwd: innerDir })
+    spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: innerDir })
+    spawnSync('git', ['config', 'user.name', 'Test User'], { cwd: innerDir })
+    writeFileSync(join(innerDir, 'README.md'), '# Inner')
+    spawnSync('git', ['add', '.'], { cwd: innerDir })
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: innerDir })
+
+    try {
+      const app = createApp(outer.dir)
+      const res = await app.fetch(new Request(`http://localhost/api/repo/location?path=inner&branch=${encodeURIComponent(outerBranch)}`))
+      const body = await res.json() as { repositoryRootPath: string; homeReadmePath: string }
+      expect(realpathSync(body.repositoryRootPath)).toBe(realpathSync(innerDir))
       expect(body.homeReadmePath).toBe('README.md')
     } finally {
       outer.cleanup()
@@ -904,7 +979,7 @@ describe('gitIdentityUpdateHandler', () => {
 })
 
 describe('gitContextHandler', () => {
-  it('returns null for an active folder inside a repository', async () => {
+  it('returns the repository context when started on a folder inside a repository', async () => {
     const repo = makeGitRepo()
     const nested = join(repo.dir, 'docs')
     mkdirSync(nested)
@@ -914,7 +989,7 @@ describe('gitContextHandler', () => {
       const client = testClient(app)
       const res = await client.api.git.context.$get()
       expect(res.status).toBe(200)
-      expect(await res.json()).toBeNull()
+      expect(await res.json()).not.toBeNull()
     } finally {
       repo.cleanup()
     }

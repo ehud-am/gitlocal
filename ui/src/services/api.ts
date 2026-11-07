@@ -26,6 +26,7 @@ import type {
   LocalActionResponse,
   RepoInfo,
   RepoLocationResponse,
+  PathCompletionResponse,
   RepoSummaryResponse,
   RemoteSyncResponse,
   SearchContentKind,
@@ -250,6 +251,9 @@ export const api = {
     if (path) params.set('path', path)
     return request(`/api/folder/browse${buildQuery(params)}`)
   },
+
+  completePath: (input: string): Promise<PathCompletionResponse> =>
+    request<PathCompletionResponse>(`/api/path/complete${buildQuery(new URLSearchParams({ input }))}`),
 
   openRepository: (path: string): Promise<LocalActionResponse> =>
     mutate('/api/repo/open', 'POST', { path }),

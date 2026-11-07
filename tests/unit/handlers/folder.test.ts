@@ -284,7 +284,7 @@ describe('folder and repository open handlers', () => {
     }
   })
 
-  it('opens a nested folder inside a repository as a folder root', async () => {
+  it('opens a nested folder inside a repository at the repository root with the folder selected', async () => {
     const nestedDir = join(validDir, 'docs')
     const app = createApp('')
     const client = testClient(app)
@@ -293,11 +293,13 @@ describe('folder and repository open handlers', () => {
 
     expect(body.ok).toBe(true)
     expect(body.error).toBe('')
-    expect(body.rootPath).toBe(realpathSync(nestedDir))
+    expect(body.rootPath).toBe(realpathSync(validDir))
+    expect(body.selectedPath).toBe('docs')
+    expect(body.selectedPathType).toBe('dir')
     expect(body.gitState).toBe('inside-repository')
-    expect(body.openMode).toBe('folder')
+    expect(body.openMode).toBe('repository')
     expect(body.repositoryRootPath).toBe(realpathSync(validDir))
-    expect(getRepoPath()).toBe(realpathSync(nestedDir))
+    expect(getRepoPath()).toBe(realpathSync(validDir))
   })
 
   it('returns browse results when loading folders', async () => {
