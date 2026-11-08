@@ -11,11 +11,32 @@ import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const require = createRequire(import.meta.url)
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 
+// node-pty 1.1.0 ships its prebuilt macOS spawn-helper without the execute bit, so every spawn
+// fails with "posix_spawnp failed" (the server repeats this repair at runtime, see
+// src/terminal/spawn-helper.ts). Fix the mode first so a working prebuild isn't rebuilt.
+function ensureSpawnHelperExecutable() {
+  if (process.platform === 'win32') return
+  const ptyDir = path.dirname(require.resolve('node-pty/package.json'))
+  for (const helper of [
+    path.join(ptyDir, 'build', 'Release', 'spawn-helper'),
+    path.join(ptyDir, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper'),
+  ]) {
+    try {
+      const { mode } = fs.statSync(helper)
+      if ((mode & 0o111) !== 0o111) fs.chmodSync(helper, mode | 0o111)
+    } catch {
+      // Missing helper (other platform or source build layout) or read-only install.
+    }
+  }
+}
+
 function verifyPtyLoads() {
+  ensureSpawnHelperExecutable()
   delete require.cache[require.resolve('node-pty')]
   const pty = require('node-pty')
   const shell = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/sh'

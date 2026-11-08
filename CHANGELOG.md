@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.1 - 2026-11-08
+
+- The integrated terminal starts again on macOS ([#137](https://github.com/ehud-am/gitlocal/issues/137)). `node-pty` 1.1.0 ships its prebuilt macOS `spawn-helper` without the execute permission, so every terminal failed with "Failed to start a terminal session on this platform." when the install-time rebuild did not run or could not build. GitLocal now restores the permission at install time and again before the first terminal starts.
+- The folder view lists a ".." row first, which opens the parent folder ([#136](https://github.com/ehud-am/gitlocal/issues/136)). It does the same as the Parent Folder button, which stays. The row is left out at the filesystem root.
+
 ## 0.18.0 - 2026-11-08
 
 - Folder navigation now switches into and out of Git repositories consistently ([#130](https://github.com/ehud-am/gitlocal/issues/130)):

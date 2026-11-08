@@ -138,6 +138,29 @@ describe('ContentPanel', () => {
     expect(cell).toBeInTheDocument()
   })
 
+  it('shows the ".." row even in an empty folder and opens the parent from it', async () => {
+    vi.mocked(api.getTree).mockResolvedValue([])
+    const onOpenParent = vi.fn()
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles={false}
+        refreshToken={0}
+        selectedPath="docs"
+        selectedPathType="dir"
+        branch="main"
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onOpenParent={onOpenParent}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open parent folder' }))
+    expect(onOpenParent).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Parent folder')).toBeInTheDocument()
+    expect(screen.getByText(/does not have any visible files or folders yet/i)).toBeInTheDocument()
+  })
+
   it('shows a failure message instead of an empty-folder message when the root listing fails to load', async () => {
     vi.mocked(api.getTree).mockRejectedValue(new Error('boom'))
 

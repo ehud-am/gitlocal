@@ -78,6 +78,9 @@ interface Props {
   // Folder actions the folder picker also offers, so both pages can do the same things.
   onInitGit?: (path: string) => void
   onCloneInto?: (path: string) => void
+  // The folder list's ".." row. Same action as the toolbar's Parent Folder button; left out when
+  // there is no parent (filesystem root).
+  onOpenParent?: () => void
   placeholder?: string
   emptyStateTitle?: string
   emptyStateDetail?: string
@@ -216,6 +219,7 @@ export default function ContentPanel({
   onDeleteFolder,
   onInitGit,
   onCloneInto,
+  onOpenParent,
   placeholder,
   emptyStateTitle,
   emptyStateDetail,
@@ -758,7 +762,7 @@ export default function ContentPanel({
               <div className="content-skeleton" aria-label="loading content" />
             ) : (
               <>
-                {rows.length > 0 ? (
+                {rows.length > 0 || onOpenParent ? (
                   <div className="content-directory-table-wrap">
                   <table className="content-directory-table" aria-label={path ? `Contents of ${path}` : 'Current folder contents'}>
                     <thead>
@@ -769,6 +773,28 @@ export default function ContentPanel({
                       </tr>
                     </thead>
                     <tbody>
+                      {onOpenParent ? (
+                        <tr className="content-directory-row content-directory-row-parent" onDoubleClick={onOpenParent}>
+                          <td className="content-directory-cell content-directory-cell-name">
+                            <div className="content-directory-entry">
+                              <button
+                                type="button"
+                                className="content-directory-link"
+                                onClick={onOpenParent}
+                                aria-label="Open parent folder"
+                                title="Go to parent folder"
+                              >
+                                <span className="content-directory-badge content-directory-badge-dir">Folder</span>
+                                <span className="content-directory-name">..</span>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="content-directory-cell">
+                            <span className="content-directory-kind">Parent folder</span>
+                          </td>
+                          <td className="content-directory-cell content-directory-cell-path" />
+                        </tr>
+                      ) : null}
                       {rows.map((entry) => {
                         const syncBadge = describeFileSyncState(entry.syncState)
                         return (
