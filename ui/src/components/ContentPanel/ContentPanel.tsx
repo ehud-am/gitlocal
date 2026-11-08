@@ -584,7 +584,9 @@ export default function ContentPanel({
   }
 
   function renderRootDashboard(entries: TreeNode[]): JSX.Element | null {
-    if (selectedPathType !== 'none') return null
+    // The dashboard summarizes a repository (status, key documents, changes); a plain folder has
+    // none of that, and its contents are already listed in the table above.
+    if (selectedPathType !== 'none' || !isGitRepo) return null
     const keyDocuments = navigationHints?.keyDocuments ?? repoSummary?.keyDocuments ?? []
     const changedItems = navigationHints?.changedItems ?? []
     const recent = recentItems.length > 0 ? recentItems : navigationHints?.recentItems ?? repoSummary?.recentItems ?? []
@@ -655,7 +657,7 @@ export default function ContentPanel({
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
     const isRootView = selectedPathType === 'none'
     const emptyMessage = isRootView
-      ? (emptyStateDetail ?? placeholder ?? 'This repository does not have any visible files yet.')
+      ? (emptyStateDetail ?? placeholder ?? `This ${isGitRepo ? 'repository' : 'folder'} does not have any visible files yet.`)
       : `This folder does not have any visible files or folders yet.`
     const visibleEntries = filterVisibleEntries(entries)
     const hiddenDotfileCount = hideDotfiles
