@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { dirname } from 'node:path'
 import { isPtySupported } from './pty-support.js'
+import { ensureSpawnHelperExecutable } from './spawn-helper.js'
 import type { TerminalExitInfo, TerminalSession, TerminalSessionStatus } from './types.js'
 
 const MAX_BUFFERED_OUTPUT_CHARS = 200_000
@@ -31,8 +34,18 @@ export type PtyFactory = (options: SpawnPtyOptions) => Promise<PtyLike>
 // every consumer of this module — including unit tests that inject a fake PtyFactory — to load
 // the native binary. The dynamic import here confines that requirement to real PTY spawns only.
 /* v8 ignore start -- native node-pty binary is not loadable in unit tests by design; only exercised via a real shell in integration tests */
+let spawnHelperChecked = false
 const spawnRealPty: PtyFactory = async ({ shell, cwd, cols, rows }) => {
   const nodePty = await import('node-pty')
+  if (!spawnHelperChecked) {
+    spawnHelperChecked = true
+    try {
+      const packageDir = dirname(createRequire(import.meta.url).resolve('node-pty/package.json'))
+      ensureSpawnHelperExecutable(packageDir)
+    } catch (error) {
+      console.error('Could not check node-pty spawn-helper permissions:', error)
+    }
+  }
   return nodePty.spawn(shell, [], {
     name: TERMINAL_NAME,
     cols,

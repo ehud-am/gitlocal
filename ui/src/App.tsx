@@ -1767,6 +1767,7 @@ export default function App() {
                     onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
                     onInitGit={(path) => { void handleInitGitHere(path) }}
                     onCloneInto={(path) => { void handleCloneIntoHere(path) }}
+                    onOpenParent={repoLocation?.atFilesystemRoot ? undefined : handleNavigateParent}
                     emptyStateTitle={emptyStateTitle}
                     emptyStateDetail={emptyStateDetail}
                     emptyStateActions={emptyStateActions}

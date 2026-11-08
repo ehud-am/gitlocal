@@ -587,6 +587,55 @@ describe('App', () => {
     })
   })
 
+  it('shows a ".." row in the folder list that leaves the repository from its root', async () => {
+    vi.mocked(api.showParentFolder).mockResolvedValueOnce({ ok: false, error: 'Parent folder unavailable.' })
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+
+    renderWithClient()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open parent folder' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: /leave this repository/i })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /open parent folder/i }))
+    await waitFor(() => {
+      expect(api.showParentFolder).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('opens the containing folder from the ".." row of a subfolder', async () => {
+    window.history.replaceState(null, '', '/?branch=main&path=docs&pathType=dir')
+
+    renderWithClient()
+
+    const parentRow = await screen.findByRole('button', { name: 'Open parent folder' })
+    vi.mocked(api.getTree).mockClear()
+    fireEvent.doubleClick(parentRow.closest('tr')!)
+
+    await waitFor(() => {
+      expect(api.getTree).toHaveBeenCalledWith('', 'main')
+    })
+    expect(api.showParentFolder).not.toHaveBeenCalled()
+  })
+
+  it('leaves out the ".." row at the filesystem root', async () => {
+    vi.mocked(api.getRepoLocation).mockResolvedValue({
+      repositoryRootPath: '/tmp/repo',
+      isRepositoryRoot: true,
+      homeReadmePath: 'README.md',
+      atFilesystemRoot: true,
+    })
+    vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+
+    renderWithClient()
+
+    const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+    await waitFor(() => {
+      parentFolderButtons.forEach((button) => expect(button).toBeDisabled())
+    })
+    expect(screen.queryByRole('button', { name: 'Open parent folder' })).not.toBeInTheDocument()
+  })
+
   it('navigates to the containing folder when the Parent Folder button is clicked from a selected file', async () => {
     window.history.replaceState(null, '', '/?branch=main&path=docs/guide.md&pathType=file')
 
