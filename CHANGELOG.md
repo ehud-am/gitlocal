@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 - 2026-11-08
 
 - Folder navigation now switches into and out of Git repositories consistently ([#130](https://github.com/ehud-am/gitlocal/issues/130)):
   - Opening a folder inside a repository (from the picker, Go to, or the command line) opens the repository with that folder selected. Before, the folder became its own root and showed no branch, sync or change state, and Root and Readme pointed at the wrong place.
