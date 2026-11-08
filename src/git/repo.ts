@@ -18,6 +18,7 @@ import type {
   GitUserIdentity,
   KeyDocumentItem,
   LocalPathClassification,
+  LocalGitState,
   RemoteSyncResponse,
   RepoSyncState,
   RepoInfo,
@@ -362,8 +363,11 @@ function normalizePlatformPath(path: string): string {
 // Deliberately unguarded: a realpathSync failure here must propagate to the global onError
 // handler (src/server.ts) so classifyLocalPath's many callers (getInfo, treeHandler, etc.) see
 // a real failure rather than a classification that silently substitutes a fallback path.
+// realpathSync.native also returns the on-disk letter case on case-insensitive file systems
+// (macOS, Windows). `git rev-parse --show-toplevel` reports that case too, so a typed path in
+// another case (~/projects/app for ~/Projects/app) still compares equal to its repository root.
 function canonicalizeExistingPath(path: string): string {
-  return normalizePlatformPath(realpathSync(path))
+  return normalizePlatformPath(realpathSync.native(path))
 }
 
 function getContainingGitRoot(existingPath: string, isFile: boolean): string {
@@ -466,6 +470,30 @@ export function resolveDirectOpenTarget(canonicalFilePath: string, repositoryRoo
     selectedPath,
     selectedPathType: 'file',
     isGitRepo: Boolean(repositoryRootPath),
+  }
+}
+
+export interface DirectoryOpenTarget {
+  rootPath: string
+  selectedPath: string
+  selectedPathType: ViewerPathType
+}
+
+// The rule for a directly-opened folder: a folder inside a git repository opens the repository
+// (so branch, sync and change state apply) with that folder selected; any other folder is its
+// own root. Shared by startup, the open API, and the parent-folder walk.
+export function resolveDirectoryOpenTarget(canonicalDirPath: string, gitState: LocalGitState, repositoryRootPath?: string): DirectoryOpenTarget {
+  if (repositoryRootPath && gitState === 'inside-repository') {
+    return {
+      rootPath: repositoryRootPath,
+      selectedPath: relative(repositoryRootPath, canonicalDirPath).split('\\').join('/'),
+      selectedPathType: 'dir',
+    }
+  }
+  return {
+    rootPath: gitState === 'repository-root' && repositoryRootPath ? repositoryRootPath : canonicalDirPath,
+    selectedPath: '',
+    selectedPathType: 'none',
   }
 }
 

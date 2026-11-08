@@ -20,6 +20,7 @@ import {
   findReadme,
   findKeyDocuments,
   resolveDirectOpenTarget,
+  resolveDirectoryOpenTarget,
   resolveRepoPath,
   summarizeChangedFiles,
   setRepoGitIdentity,
@@ -262,18 +263,22 @@ export async function repositoryOpenHandler(c: Context<{ Variables: Variables }>
     return c.json(repoOpenBlocked(`Not a folder or file: ${path}`))
   }
 
-  const rootPath = classification.gitState === 'repository-root'
-    ? classification.repositoryRootPath!
-    : resolvedInputPath
+  // A folder inside a repository opens the repository with that folder selected, the same way
+  // a file inside one does, so git state applies wherever the user lands.
+  const { rootPath, selectedPath, selectedPathType } = resolveDirectoryOpenTarget(
+    resolvedInputPath,
+    classification.gitState,
+    classification.repositoryRootPath,
+  )
   setRepoPath(rootPath)
   setPickerPath('')
   rememberStartupFolder(rootPath, 'repo-open')
   return c.json(repoOpenResult({
     path: rootPath,
     rootPath,
-    selectedPath: '',
-    selectedPathType: 'none',
-    openMode: classification.openMode,
+    selectedPath,
+    selectedPathType,
+    openMode: selectedPathType === 'dir' ? 'repository' : classification.openMode,
     gitState: classification.gitState,
     repositoryRootPath: classification.repositoryRootPath,
   }))
@@ -323,10 +328,43 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
   }
   /* v8 ignore stop */
 
-  setRepoPath('')
-  setPickerPath(candidate)
-  rememberStartupFolder(candidate, 'picker-open')
-  return c.json({ ok: true, error: '' })
+  // Leaving a repository nested inside another one (a submodule, or a repository cloned into a
+  // subfolder) returns to the outer repository with the parent folder selected.
+  const parentClassification = classifyLocalPath(candidate)
+  if (parentClassification.repositoryRootPath && parentClassification.gitState !== 'outside-repository') {
+    const target = resolveDirectoryOpenTarget(
+      parentClassification.canonicalPath,
+      parentClassification.gitState,
+      parentClassification.repositoryRootPath,
+    )
+    setRepoPath(target.rootPath)
+    setPickerPath('')
+    rememberStartupFolder(target.rootPath, 'repo-open')
+    return c.json(repoOpenResult({
+      path: target.rootPath,
+      rootPath: target.rootPath,
+      selectedPath: target.selectedPath,
+      selectedPathType: target.selectedPathType,
+      openMode: 'repository',
+      gitState: parentClassification.gitState,
+      repositoryRootPath: parentClassification.repositoryRootPath,
+    }))
+  }
+
+  // Any other parent opens in the folder view, the same view the user just left, rather than the
+  // folder picker. Moving up never changes which kind of page GitLocal shows.
+  const parentPath = parentClassification.canonicalPath
+  setRepoPath(parentPath)
+  setPickerPath('')
+  rememberStartupFolder(parentPath, 'repo-open')
+  return c.json(repoOpenResult({
+    path: parentPath,
+    rootPath: parentPath,
+    selectedPath: '',
+    selectedPathType: 'none',
+    openMode: 'folder',
+    gitState: 'outside-repository',
+  }))
 }
 
 export async function repositoryLocationHandler(c: Context<{ Variables: Variables }>): Promise<Response> {
@@ -350,7 +388,10 @@ export async function repositoryLocationHandler(c: Context<{ Variables: Variable
     return c.json({ ...emptyResponse, atFilesystemRoot })
   }
 
-  const requestedBranch = c.req.query('branch') ?? ''
+  // The requested branch belongs to the open repository. A different (nested) repository has
+  // its own branches, so its README is read from its own current branch.
+  const isOpenRepository = classifyLocalPath(repoPath).canonicalPath === repositoryRootPath
+  const requestedBranch = isOpenRepository ? c.req.query('branch') ?? '' : ''
   const readmeBranch = requestedBranch || getCurrentBranch(repositoryRootPath) || 'HEAD'
   const homeReadmePath = findReadme(repositoryRootPath, readmeBranch, '')
 

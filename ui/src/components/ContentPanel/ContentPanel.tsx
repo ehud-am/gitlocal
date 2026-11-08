@@ -18,6 +18,7 @@ import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
+import { FolderPlusIcon } from '../ui/icons'
 import { describeFileSyncState } from '../../lib/sync'
 import { basenameOf, parentPathOf } from '../../lib/utils'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
@@ -74,6 +75,9 @@ interface Props {
   onMutationComplete?: (event: FileMutationEvent) => void
   onCreateFolderComplete?: (event: FolderMutationEvent) => void
   onDeleteFolder?: (path: string) => void
+  // Folder actions the folder picker also offers, so both pages can do the same things.
+  onInitGit?: (path: string) => void
+  onCloneInto?: (path: string) => void
   placeholder?: string
   emptyStateTitle?: string
   emptyStateDetail?: string
@@ -210,6 +214,8 @@ export default function ContentPanel({
   onMutationComplete,
   onCreateFolderComplete,
   onDeleteFolder,
+  onInitGit,
+  onCloneInto,
   placeholder,
   emptyStateTitle,
   emptyStateDetail,
@@ -578,7 +584,9 @@ export default function ContentPanel({
   }
 
   function renderRootDashboard(entries: TreeNode[]): JSX.Element | null {
-    if (selectedPathType !== 'none') return null
+    // The dashboard summarizes a repository (status, key documents, changes); a plain folder has
+    // none of that, and its contents are already listed in the table above.
+    if (selectedPathType !== 'none' || !isGitRepo) return null
     const keyDocuments = navigationHints?.keyDocuments ?? repoSummary?.keyDocuments ?? []
     const changedItems = navigationHints?.changedItems ?? []
     const recent = recentItems.length > 0 ? recentItems : navigationHints?.recentItems ?? repoSummary?.recentItems ?? []
@@ -649,7 +657,7 @@ export default function ContentPanel({
     const hasIntro = Boolean(emptyStateTitle || emptyStateDetail)
     const isRootView = selectedPathType === 'none'
     const emptyMessage = isRootView
-      ? (emptyStateDetail ?? placeholder ?? 'This repository does not have any visible files yet.')
+      ? (emptyStateDetail ?? placeholder ?? `This ${isGitRepo ? 'repository' : 'folder'} does not have any visible files yet.`)
       : `This folder does not have any visible files or folders yet.`
     const visibleEntries = filterVisibleEntries(entries)
     const hiddenDotfileCount = hideDotfiles
@@ -699,6 +707,12 @@ export default function ContentPanel({
                   <span className="dotfile-toggle-count">{hiddenDotfileCount} hidden</span>
                 ) : null}
                 {canMutateFiles ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={beginCreateFolderMode} title="Create a folder here">
+                    <FolderPlusIcon />
+                    New folder
+                  </Button>
+                ) : null}
+                {canMutateFiles ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -716,6 +730,16 @@ export default function ContentPanel({
                       <DropdownMenuItem onSelect={() => { void beginCreateFolderMode() }}>
                         {path ? 'New folder here' : 'New folder'}
                       </DropdownMenuItem>
+                      {onInitGit && !isGitRepo ? (
+                        <DropdownMenuItem onSelect={() => onInitGit(path)}>
+                          Run git init
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onCloneInto ? (
+                        <DropdownMenuItem onSelect={() => onCloneInto(path)}>
+                          Clone into subfolder
+                        </DropdownMenuItem>
+                      ) : null}
                       {canDeleteCurrentFolder ? (
                         <DropdownMenuItem
                           className="dropdown-danger"
@@ -882,7 +906,7 @@ export default function ContentPanel({
           <div className="content-directory-header">
             <div>
               <p className="content-directory-kicker">New folder</p>
-              <h2 className="content-directory-heading">{parentPath || 'repository root'}</h2>
+              <h2 className="content-directory-heading">{parentPath || (isGitRepo ? 'repository root' : 'top folder')}</h2>
             </div>
           </div>
           <div className="grid max-w-lg gap-4 p-4">

@@ -157,6 +157,42 @@ describe('ContentPanel', () => {
     expect(screen.queryByText(/does not have any visible files yet/i)).not.toBeInTheDocument()
   })
 
+  it('shows no repository dashboard for a plain folder, and offers the folder actions', async () => {
+    const onInitGit = vi.fn()
+    const onCloneInto = vi.fn()
+    vi.mocked(api.getTree).mockResolvedValue([{ name: 'notes', path: 'notes', type: 'dir', localOnly: false }])
+
+    renderWithClient(
+      <ContentPanel
+        canMutateFiles
+        refreshToken={0}
+        selectedPath=""
+        selectedPathType="none"
+        branch=""
+        recentItems={[{ path: 'elsewhere.md', type: 'file', label: 'elsewhere.md', available: true }]}
+        onNavigate={vi.fn()}
+        onOpenPath={vi.fn()}
+        onInitGit={onInitGit}
+        onCloneInto={onCloneInto}
+      />,
+    )
+
+    expect((await screen.findAllByText('notes')).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('region', { name: /repository dashboard/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/browse repository files/i)).not.toBeInTheDocument()
+
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Run git init' }))
+    expect(onInitGit).toHaveBeenCalledWith('')
+    await openFolderActionsMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Clone into subfolder' }))
+    expect(onCloneInto).toHaveBeenCalledWith('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'New folder' }))
+    expect(screen.getByLabelText('Folder name')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'top folder' })).toBeInTheDocument()
+  })
+
   it('renders root dashboard sections with key, recent, changed, and raw browsing shortcuts', async () => {
     const onOpenPath = vi.fn()
     vi.mocked(api.getTree).mockResolvedValue([

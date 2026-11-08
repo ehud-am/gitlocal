@@ -148,7 +148,10 @@ const WORKSPACE_QUERY_KEYS = [
   'sync',
   'repo-summary',
   'navigation-hints',
+  'repo-location',
 ] as const
+
+const GIT_STATE_QUERY_KEYS = ['git-context', 'branches', 'sync', 'repo-summary', 'navigation-hints'] as const
 
 function invalidateQueryKeys(queryClient: QueryClient, keys: readonly string[]): Promise<unknown> {
   return Promise.all(keys.map((key) => queryClient.invalidateQueries({ queryKey: [key] })))
@@ -197,6 +200,8 @@ export default function App() {
   const savedInitialViewerStateAppliedRef = useRef(false)
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme())
   const [viewerRepoPath, setViewerRepoPath] = useState(initialViewerState.repoPath)
+  // Root of the open GitLocal is applying right now; see the repository-change effect below.
+  const acceptedOpenRootRef = useRef('')
   const [selectedPath, setSelectedPath] = useState('')
   const [selectedPathType, setSelectedPathType] = useState<ViewerPathType>('none')
   const [selectedPathLocalOnly, setSelectedPathLocalOnly] = useState(false)
@@ -321,7 +326,7 @@ export default function App() {
   })
 
   const { data: repoLocation } = useQuery<RepoLocationResponse>({
-    queryKey: ['repo-location', selectedPath, currentBranch],
+    queryKey: ['repo-location', info?.path ?? '', selectedPath, currentBranch],
     queryFn: () => api.getRepoLocation(selectedPath, currentBranch),
     enabled: !!info && !hasRepoMismatch,
   })
@@ -378,7 +383,21 @@ export default function App() {
       return
     }
 
-    if (viewerRepoPath === info.path) return
+    if (viewerRepoPath === info.path) {
+      if (acceptedOpenRootRef.current === info.path) acceptedOpenRootRef.current = ''
+      return
+    }
+
+    // The server root changed because GitLocal itself just opened a path there (Go to, a native
+    // open, entering a repository): keep the selection that open is applying, and take the new
+    // root's branch. The refreshed info can render before or after that selection lands.
+    if (acceptedOpenRootRef.current === info.path) {
+      acceptedOpenRootRef.current = ''
+      setViewerRepoPath(info.path)
+      // Cleared here; the branch effect then picks the new root's current branch.
+      setCurrentBranch('')
+      return
+    }
 
     setViewerRepoPath(info.path)
     setSelectedPath('')
@@ -562,7 +581,16 @@ export default function App() {
     await invalidateQueryKeys(queryClient, WORKSPACE_QUERY_KEYS)
   }, [queryClient])
 
+  const viewerRepoPathRef = useRef(viewerRepoPath)
+  viewerRepoPathRef.current = viewerRepoPath
+
   const applyAcceptedOpenTarget = useCallback((target: Pick<StartupOpenTarget, 'rootPath' | 'selectedPath' | 'selectedPathType' | 'message'>): void => {
+    // A different root has its own branches: drop the old one so the new root's current branch
+    // is picked up, instead of carrying a branch name that may not exist there.
+    if (viewerRepoPathRef.current && viewerRepoPathRef.current !== target.rootPath) {
+      setCurrentBranch('')
+      acceptedOpenRootRef.current = target.rootPath
+    }
     setViewerRepoPath(target.rootPath)
     setSelectedPath(target.selectedPath)
     setSelectedPathType(target.selectedPathType)
@@ -601,6 +629,12 @@ export default function App() {
     // Opening a file in another repository switches the server's root. Refresh the repository
     // info first: otherwise the stale info.path makes the repository-mismatch reset above clear
     // the file we are about to select, and the view lands on the new root without it.
+    if (response.rootPath !== viewerRepoPathRef.current) {
+      acceptedOpenRootRef.current = response.rootPath
+      // Git queries are disabled for a plain folder, and a disabled query keeps its last data, so
+      // drop the old root's repository state rather than show it under the new root.
+      for (const key of GIT_STATE_QUERY_KEYS) queryClient.removeQueries({ queryKey: [key] })
+    }
     await queryClient.refetchQueries({ queryKey: ['info'] })
     applyAcceptedOpenTarget({
       rootPath: response.rootPath,
@@ -610,6 +644,29 @@ export default function App() {
     })
     await invalidateWorkspaceQueries()
   }, [applyAcceptedOpenTarget, applyOpenFailure, invalidateWorkspaceQueries, queryClient])
+
+  // Entering a Git repository from a plain folder (or a repository nested in another one) makes
+  // that repository the open root, so its branch, sync and change state apply (#130). The
+  // location query reports the repository that contains the current selection; when that is
+  // not the open root, reopen at the selection's absolute path, which the server roots at the
+  // repository with the same folder or file selected.
+  const enteredRepositoryRef = useRef('')
+  useEffect(() => {
+    const repositoryRootPath = repoLocation?.repositoryRootPath
+    if (!info || info.pickerMode || !info.path || !repositoryRootPath) return
+    if (hasRepoMismatch || viewerRepoPath !== info.path || repositoryRootPath === info.path) return
+    const absolutePath = selectedPath ? `${info.path}/${selectedPath}` : info.path
+    const attemptKey = `${info.path}|${absolutePath}`
+    if (enteredRepositoryRef.current === attemptKey) return
+    enteredRepositoryRef.current = attemptKey
+    const repositoryName = repositoryRootPath.split(/[\\/]/).pop()
+    void api.openRepository(absolutePath)
+      .then((response) => applyLocalOpenResponse({
+        ...response,
+        message: response.ok && response.rootPath ? `Opened the Git repository ${repositoryName}.` : response.message,
+      }))
+      .catch((error) => applyOpenFailure(getErrorMessage(error, 'GitLocal could not open the Git repository.'), false))
+  }, [applyLocalOpenResponse, applyOpenFailure, hasRepoMismatch, info, repoLocation, selectedPath, viewerRepoPath])
 
   const openNativeFile = useCallback(async (path: string): Promise<void> => {
     if (!path.trim()) {
@@ -948,6 +1005,13 @@ export default function App() {
     setPickerLoading(true)
     try {
       const result = await api.showParentFolder()
+      if (result.ok && result.rootPath) {
+        // The parent opens in this same view: as a plain folder, or as the repository it is in.
+        const name = result.selectedPath || result.rootPath.split(/[\\/]/).pop() || result.rootPath
+        await applyLocalOpenResponse({ ...result, message: result.message || `Opened ${name}.` })
+        return
+      }
+      // No readable parent: the server fell back to its default location in the folder picker.
       if (result.ok) {
         resetViewerState()
         window.location.reload()
@@ -961,7 +1025,53 @@ export default function App() {
 
   function handleBrowseParentRequest(): void {
     if (!confirmDiscardChanges()) return
-    setShowRepoBoundaryDialog(true)
+    // Only leaving a repository needs a warning; a plain folder just opens its parent.
+    if (info?.isGitRepo) {
+      setShowRepoBoundaryDialog(true)
+      return
+    }
+    void handleBrowseParentFolder()
+  }
+
+  function absolutePathInRoot(path: string): string {
+    return path ? `${info!.path}/${path}` : info!.path
+  }
+
+  // Shared end of "Run git init" and "Clone into subfolder": open the repository they made.
+  async function openCreatedRepository(result: LocalActionResponse, message: string): Promise<void> {
+    if (!result.ok || !result.path) {
+      setStatusMessage(result.error)
+      return
+    }
+    const response = await api.openRepository(result.path)
+    await applyLocalOpenResponse(response.ok ? { ...response, message } : response)
+  }
+
+  // The folder picker's "Run git init" and "Clone into subfolder", available in the folder view
+  // too now that Parent Folder no longer passes through the picker. Both open the new repository.
+  async function handleInitGitHere(path: string): Promise<void> {
+    if (!confirmDiscardChanges()) return
+    try {
+      const result = await api.initFolderRepository({ path: absolutePathInRoot(path) })
+      await openCreatedRepository(result, `Initialized Git in ${result.path}.`)
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error, 'GitLocal could not initialize Git in this folder.'))
+    }
+  }
+
+  async function handleCloneIntoHere(path: string): Promise<void> {
+    const repositoryUrl = window.prompt('Repository URL to clone')?.trim()
+    if (!repositoryUrl) return
+    const suggestedName = repositoryUrl.split('/').pop()!.replace(/\.git$/i, '')
+    const name = window.prompt('Clone into subfolder', suggestedName)?.trim()
+    if (!name || !confirmDiscardChanges()) return
+    setStatusMessage(`Cloning ${repositoryUrl}...`)
+    try {
+      const result = await api.cloneRepositoryIntoFolder({ parentPath: absolutePathInRoot(path), name, repositoryUrl })
+      await openCreatedRepository(result, `Cloned ${repositoryUrl} into ${name}.`)
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error, 'GitLocal could not clone the repository.'))
+    }
   }
 
   function handleNavigateParent(): void {
@@ -1389,7 +1499,7 @@ export default function App() {
               disabled={Boolean(repoLocation?.atFilesystemRoot)}
               onClick={handleNavigateParent}
               aria-label="Parent Folder"
-              title={parentFolderLeavesRepository ? 'Leave this repository and browse its parent folder' : 'Go to parent folder'}
+              title={parentFolderLeavesRepository && info?.isGitRepo ? 'Leave this repository and open its parent folder' : 'Go to parent folder'}
             >
               <ParentFolderIcon />
               Parent Folder
@@ -1655,6 +1765,8 @@ export default function App() {
                     onMutationComplete={(event) => { void handleMutationComplete(event) }}
                     onCreateFolderComplete={(event) => { void handleMutationComplete(event) }}
                     onDeleteFolder={(path) => { void openFolderDeleteDialog(path) }}
+                    onInitGit={(path) => { void handleInitGitHere(path) }}
+                    onCloneInto={(path) => { void handleCloneIntoHere(path) }}
                     emptyStateTitle={emptyStateTitle}
                     emptyStateDetail={emptyStateDetail}
                     emptyStateActions={emptyStateActions}
@@ -1687,6 +1799,7 @@ export default function App() {
         rootPath={info?.path ?? ''}
         onOpenChange={setGoToPathOpen}
         onGo={handleGoToPath}
+        onComplete={(input) => api.completePath(input).then((response) => response.suggestions)}
       />
 
       <RepoBoundaryDialog

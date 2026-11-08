@@ -24,6 +24,7 @@ vi.mock('./services/api', () => ({
     getGitContext: vi.fn(),
     getReadme: vi.fn(),
     getRepoLocation: vi.fn(),
+    completePath: vi.fn(),
     getSyncStatus: vi.fn(),
     showParentFolder: vi.fn(),
     getTree: vi.fn(),
@@ -352,6 +353,7 @@ describe('App', () => {
       canCloneIntoChild: true,
     })
     vi.mocked(api.openRepository).mockResolvedValue({ ok: true, error: '' })
+    vi.mocked(api.completePath).mockResolvedValue({ suggestions: [] })
     vi.mocked(api.updateGitIdentity).mockResolvedValue({
       ok: true,
       message: 'Repository git identity updated.',
@@ -2181,5 +2183,284 @@ describe('App', () => {
       fireEvent.keyDown(window, { key: 'g', ctrlKey: true })
       expect(screen.queryByLabelText('Path to go to')).not.toBeInTheDocument()
     })
+  })
+
+  describe('entering and leaving Git repositories (#130)', () => {
+    const plainInfo = {
+      ...buildInfo(''),
+      name: 'plain',
+      path: '/tmp/plain',
+      isGitRepo: false,
+      hasCommits: false,
+      gitContext: null,
+    }
+
+    function startInPlainFolder(selection: string) {
+      let serverRoot = '/tmp/plain'
+      window.history.replaceState(null, '', `/?path=${encodeURIComponent(selection)}&pathType=dir`)
+      vi.mocked(api.getInfo).mockImplementation(async () => (serverRoot === '/tmp/plain' ? plainInfo : { ...buildInfo('trunk'), name: 'app', path: '/tmp/plain/app' }))
+      vi.mocked(api.getBranches).mockResolvedValue(buildBranches('trunk'))
+      vi.mocked(api.getRepoLocation).mockImplementation(async (path?: string) => (
+        serverRoot === '/tmp/plain' && path?.startsWith('app')
+          ? { repositoryRootPath: '/tmp/plain/app', isRepositoryRoot: path === 'app', homeReadmePath: 'README.md', atFilesystemRoot: false }
+          : serverRoot === '/tmp/plain'
+            ? { repositoryRootPath: '', isRepositoryRoot: false, homeReadmePath: '', atFilesystemRoot: false }
+            : { repositoryRootPath: '/tmp/plain/app', isRepositoryRoot: !path, homeReadmePath: 'README.md', atFilesystemRoot: false }
+      ))
+      return {
+        switchRoot: () => { serverRoot = '/tmp/plain/app' },
+      }
+    }
+
+    it('opens the repository, with the same folder selected, when a plain-folder selection is inside one', async () => {
+      const server = startInPlainFolder('app/docs')
+      vi.mocked(api.openRepository).mockImplementation(async () => {
+        server.switchRoot()
+        return {
+          ok: true,
+          error: '',
+          path: '/tmp/plain/app',
+          rootPath: '/tmp/plain/app',
+          selectedPath: 'docs',
+          selectedPathType: 'dir',
+          openMode: 'repository',
+          gitState: 'inside-repository',
+        }
+      })
+
+      renderWithClient()
+
+      await waitFor(() => expect(api.openRepository).toHaveBeenCalledWith('/tmp/plain/app/docs'))
+      expect(await screen.findByText('Opened the Git repository app.')).toBeInTheDocument()
+      await waitFor(() => expect(api.getTree).toHaveBeenCalledWith('docs', 'trunk'))
+      expect(api.openRepository).toHaveBeenCalledTimes(1)
+    })
+
+    it('stays in the plain folder and explains why when the repository cannot be opened', async () => {
+      startInPlainFolder('app')
+      vi.mocked(api.openRepository).mockResolvedValue({ ok: false, error: 'Path does not exist: /tmp/plain/app', message: '' })
+
+      renderWithClient()
+
+      expect(await screen.findByText('Path does not exist: /tmp/plain/app')).toBeInTheDocument()
+      expect(api.openRepository).toHaveBeenCalledWith('/tmp/plain/app')
+    })
+
+    it('reports a failed request to open the repository', async () => {
+      startInPlainFolder('app')
+      vi.mocked(api.openRepository).mockRejectedValue(new Error('Server went away.'))
+
+      renderWithClient()
+
+      expect(await screen.findByText('Server went away.')).toBeInTheDocument()
+    })
+
+    it('does nothing for a plain-folder selection outside any repository', async () => {
+      startInPlainFolder('notes')
+
+      renderWithClient()
+
+      await waitFor(() => expect(api.getRepoLocation).toHaveBeenCalledWith('notes', ''))
+      expect(api.openRepository).not.toHaveBeenCalled()
+    })
+
+    it('opens the outer repository in place, without reloading, when Parent Folder leaves a nested repository', async () => {
+      vi.mocked(api.showParentFolder).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        path: '/tmp/outer',
+        rootPath: '/tmp/outer',
+        selectedPath: 'vendor',
+        selectedPathType: 'dir',
+        openMode: 'repository',
+        gitState: 'inside-repository',
+      })
+      vi.mocked(api.getReadme).mockResolvedValue({ path: '' })
+
+      renderWithClient()
+
+      const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+      fireEvent.click(parentFolderButtons[0])
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: /open parent folder/i }))
+
+      expect(await screen.findByText('Opened vendor.')).toBeInTheDocument()
+    })
+  })
+
+  describe('folder actions in the folder view', () => {
+    const plainInfo = {
+      ...buildInfo(''),
+      name: 'plain',
+      path: '/tmp/plain',
+      isGitRepo: false,
+      hasCommits: false,
+      gitContext: null,
+    }
+
+    beforeEach(() => {
+      window.history.replaceState(null, '', '/?path=notes&pathType=dir')
+      vi.mocked(api.getInfo).mockResolvedValue(plainInfo)
+      vi.mocked(api.getRepoLocation).mockResolvedValue({ repositoryRootPath: '', isRepositoryRoot: false, homeReadmePath: '', atFilesystemRoot: false })
+      vi.mocked(api.getTree).mockResolvedValue([{ name: 'a.md', path: 'notes/a.md', type: 'file', localOnly: false }])
+    })
+
+    async function openFolderMenu(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: /folder actions for notes/i }))
+    }
+
+    it('opens the parent of a plain folder without the leave-repository dialog', async () => {
+      window.history.replaceState(null, '', '/')
+      vi.mocked(api.showParentFolder).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        path: '/tmp',
+        rootPath: '/tmp',
+        selectedPath: '',
+        selectedPathType: 'none',
+        openMode: 'folder',
+        gitState: 'outside-repository',
+      })
+      renderWithClient()
+
+      const parentFolderButtons = await screen.findAllByRole('button', { name: 'Parent Folder' })
+      expect(parentFolderButtons[0]).toHaveAttribute('title', 'Go to parent folder')
+      fireEvent.click(parentFolderButtons[0])
+
+      expect(await screen.findByText('Opened tmp.')).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('names the filesystem root when Parent Folder lands on it', async () => {
+      window.history.replaceState(null, '', '/')
+      vi.mocked(api.showParentFolder).mockResolvedValueOnce({
+        ok: true,
+        error: '',
+        rootPath: '/',
+        selectedPath: '',
+        selectedPathType: 'none',
+      })
+      renderWithClient()
+
+      fireEvent.click((await screen.findAllByRole('button', { name: 'Parent Folder' }))[0])
+
+      expect(await screen.findByText('Opened /.')).toBeInTheDocument()
+    })
+
+    it('shows a visible New folder button that starts creating a folder', async () => {
+      const user = userEvent.setup()
+      renderWithClient()
+
+      await user.click(await screen.findByRole('button', { name: 'New folder' }))
+
+      expect(await screen.findByLabelText('Folder name')).toBeInTheDocument()
+    })
+
+    it('runs git init on the current folder and opens the new repository', async () => {
+      const user = userEvent.setup()
+      let opened = false
+      vi.mocked(api.getInfo).mockImplementation(async () => (opened ? { ...buildInfo('main'), name: 'notes', path: '/tmp/plain/notes' } : plainInfo))
+      vi.mocked(api.initFolderRepository).mockResolvedValue({ ok: true, error: '', path: '/tmp/plain/notes' })
+      vi.mocked(api.openRepository).mockImplementation(async () => {
+        opened = true
+        return {
+        ok: true,
+        error: '',
+        path: '/tmp/plain/notes',
+        rootPath: '/tmp/plain/notes',
+        selectedPath: '',
+        selectedPathType: 'none',
+        }
+      })
+      renderWithClient()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Run git init' }))
+
+      await waitFor(() => expect(api.initFolderRepository).toHaveBeenCalledWith({ path: '/tmp/plain/notes' }))
+      await waitFor(() => expect(api.openRepository).toHaveBeenCalledWith('/tmp/plain/notes'))
+      expect(await screen.findByText('Initialized Git in /tmp/plain/notes.')).toBeInTheDocument()
+    })
+
+    it('reports a git init that the server refused or that failed', async () => {
+      const user = userEvent.setup()
+      vi.mocked(api.initFolderRepository)
+        .mockResolvedValueOnce({ ok: false, error: 'Already a repository.' })
+        .mockRejectedValueOnce(new Error('Server went away.'))
+      renderWithClient()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Run git init' }))
+      expect(await screen.findByText('Already a repository.')).toBeInTheDocument()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Run git init' }))
+      expect(await screen.findByText('Server went away.')).toBeInTheDocument()
+    })
+
+    it('clones into a subfolder of the current folder and opens the clone', async () => {
+      const user = userEvent.setup()
+      const promptSpy = vi.spyOn(window, 'prompt')
+        .mockReturnValueOnce('https://example.com/team/tool.git')
+        .mockReturnValueOnce('tool')
+      vi.mocked(api.cloneRepositoryIntoFolder).mockResolvedValue({ ok: true, error: '', path: '/tmp/plain/notes/tool' })
+      vi.mocked(api.openRepository).mockResolvedValue({ ok: false, error: 'stop here', message: '' })
+      renderWithClient()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Clone into subfolder' }))
+
+      expect(promptSpy).toHaveBeenNthCalledWith(2, 'Clone into subfolder', 'tool')
+      await waitFor(() => expect(api.cloneRepositoryIntoFolder).toHaveBeenCalledWith({
+        parentPath: '/tmp/plain/notes',
+        name: 'tool',
+        repositoryUrl: 'https://example.com/team/tool.git',
+      }))
+      await waitFor(() => expect(api.openRepository).toHaveBeenCalledWith('/tmp/plain/notes/tool'))
+      expect(await screen.findByText('stop here')).toBeInTheDocument()
+    })
+
+    it('stops cloning when a prompt is cancelled, and reports clone failures', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(window, 'prompt')
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce('git@example.com:team/x')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce('git@example.com:team/x')
+        .mockReturnValueOnce('x')
+        .mockReturnValueOnce('git@example.com:team/x')
+        .mockReturnValueOnce('x')
+      vi.mocked(api.cloneRepositoryIntoFolder)
+        .mockResolvedValueOnce({ ok: false, error: 'Clone failed.' })
+        .mockRejectedValueOnce(new Error('Network down.'))
+      renderWithClient()
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await openFolderMenu(user)
+        await user.click(await screen.findByRole('menuitem', { name: 'Clone into subfolder' }))
+      }
+      expect(api.cloneRepositoryIntoFolder).not.toHaveBeenCalled()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Clone into subfolder' }))
+      expect(await screen.findByText('Clone failed.')).toBeInTheDocument()
+
+      await openFolderMenu(user)
+      await user.click(await screen.findByRole('menuitem', { name: 'Clone into subfolder' }))
+      expect(await screen.findByText('Network down.')).toBeInTheDocument()
+    })
+  })
+
+  it('offers path completions in the Go to dialog', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.completePath).mockResolvedValue({ suggestions: [{ value: 'docs/', name: 'docs', type: 'dir' }] })
+    renderWithClient()
+    expect(await screen.findByRole('heading', { name: 'repo' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: 'Go to path' }))
+    await user.type(await screen.findByLabelText('Path to go to'), 'd')
+
+    expect(await screen.findByRole('option', { name: 'docs/' })).toBeInTheDocument()
+    expect(api.completePath).toHaveBeenLastCalledWith('d')
   })
 })

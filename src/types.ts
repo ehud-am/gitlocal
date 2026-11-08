@@ -562,3 +562,14 @@ export interface SyncStatus {
   activePathNotice?: BackgroundChangeNotice
   changedFilesSummary?: ChangedFilesSummary
 }
+
+export interface PathCompletion {
+  /** The full text to put in the input: the typed directory part plus this entry's name (and a trailing separator for folders). */
+  value: string
+  name: string
+  type: 'dir' | 'file'
+}
+
+export interface PathCompletionResponse {
+  suggestions: PathCompletion[]
+}

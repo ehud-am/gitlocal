@@ -18,6 +18,7 @@ import {
   createChildFolder,
   classifyLocalPath,
   resolveDirectOpenTarget,
+  resolveDirectoryOpenTarget,
   spawnGit,
   validateRepo,
   getInfo,
@@ -749,8 +750,12 @@ describe('classifyLocalPath', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gitlocal-realpath-race-'))
     try {
       vi.resetModules()
-      const realpathSyncMock = vi.fn(() => {
+      const realpathSyncMock = Object.assign(vi.fn(() => {
         throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+      }), {
+        native: vi.fn(() => {
+          throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+        }),
       })
       vi.doMock('node:fs', async () => {
         const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
@@ -766,10 +771,29 @@ describe('classifyLocalPath', () => {
       expect(() => classifyLocalPathWithMockedRealpath(dir)).toThrow(
         expect.objectContaining({ code: 'ENOENT' }),
       )
-      expect(realpathSyncMock).toHaveBeenCalled()
+      expect(realpathSyncMock.native).toHaveBeenCalled()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('resolveDirectoryOpenTarget', () => {
+  it('roots a folder inside a repository at the repository, selecting the folder', () => {
+    expect(resolveDirectoryOpenTarget('/work/repo/docs/api', 'inside-repository', '/work/repo')).toEqual({
+      rootPath: '/work/repo',
+      selectedPath: 'docs/api',
+      selectedPathType: 'dir',
+    })
+  })
+
+  it('roots a repository root or a plain folder at itself', () => {
+    expect(resolveDirectoryOpenTarget('/work/repo', 'repository-root', '/work/repo')).toEqual({
+      rootPath: '/work/repo', selectedPath: '', selectedPathType: 'none',
+    })
+    expect(resolveDirectoryOpenTarget('/work/notes', 'outside-repository')).toEqual({
+      rootPath: '/work/notes', selectedPath: '', selectedPathType: 'none',
+    })
   })
 })
 

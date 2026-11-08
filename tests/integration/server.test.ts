@@ -575,18 +575,21 @@ describe('Server integration', () => {
     }
   })
 
-  it('POST /api/repo/parent-folder switches a repo view to the parent-folder picker', async () => {
+  it('POST /api/repo/parent-folder opens the parent of a repository in the folder view', async () => {
     const app = createApp(dir)
     const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', {
       method: 'POST',
     }))
     expect(res.status).toBe(200)
-    const body = await res.json() as { ok: boolean }
+    const body = await res.json() as { ok: boolean; rootPath: string; openMode: string }
     expect(body.ok).toBe(true)
+    expect(body.rootPath).toBe(realpathSync(dirname(dir)))
+    expect(body.openMode).toBe('folder')
 
     const infoRes = await app.fetch(new Request('http://localhost/api/info'))
-    const infoBody = await infoRes.json() as { pickerMode: boolean; path: string }
-    expect(infoBody.pickerMode).toBe(true)
+    const infoBody = await infoRes.json() as { pickerMode: boolean; isGitRepo: boolean; path: string }
+    expect(infoBody.pickerMode).toBe(false)
+    expect(infoBody.isGitRepo).toBe(false)
     expect(infoBody.path).toBe(realpathSync(dirname(dir)))
   })
 

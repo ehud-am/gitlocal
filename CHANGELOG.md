@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.18.0 - 2026-11-08
+
+- Folder navigation now switches into and out of Git repositories consistently ([#130](https://github.com/ehud-am/gitlocal/issues/130)):
+  - Opening a folder inside a repository (from the picker, Go to, or the command line) opens the repository with that folder selected. Before, the folder became its own root and showed no branch, sync or change state, and Root and Readme pointed at the wrong place.
+  - Moving from a plain folder into a repository, or into a repository nested inside another one, makes that repository the open root, so its branch and status appear.
+  - Parent Folder no longer switches to the folder picker. It opens the parent in the same folder view: as the outer repository when the parent is inside one, otherwise as a plain folder. Only leaving a repository asks for confirmation.
+  - The folder view has a visible "New folder" button, and its folder menu gains "Run git init" and "Clone into subfolder", which were only in the folder picker. The picker shows the same "New folder" button.
+  - A plain folder no longer shows the "Repository dashboard" and "Browse repository files" cards, which only apply to repositories.
+  - The Readme button of a nested repository no longer goes missing when the outer repository is on a branch the nested one lacks.
+  - A path typed in another letter case on macOS or Windows is matched to its repository.
+- Go to now suggests matching files and folders as you type ([#134](https://github.com/ehud-am/gitlocal/issues/134)). Up/Down picks a suggestion, Tab or Enter fills it in (a folder then lists its contents), Escape closes the list.
+
 ## 0.17.0 - 2026-11-05
 
 - Excel preview: charts are now drawn ([#98](https://github.com/ehud-am/gitlocal/issues/98)). Charts inside a worksheet appear above the sheet's table, labeled with their name and top-left cell; a chart sheet shows its chart. Bar, column, line, area, pie, doughnut and scatter charts are drawn from the values saved in the file, or from the referenced cells when the file has none (as files written by openpyxl do). Other chart types show a note. Formulas are still never recalculated.

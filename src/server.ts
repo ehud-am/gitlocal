@@ -41,6 +41,7 @@ import {
   folderInitRepositoryHandler,
   deleteFolderHandler,
 } from './handlers/folder.js'
+import { pathCompleteHandler } from './handlers/path-complete.js'
 import { searchHandler } from './handlers/search.js'
 import { syncHandler } from './handlers/sync.js'
 import {
@@ -53,7 +54,7 @@ import {
   getTerminalPanelPreferenceHandler,
   updateTerminalPanelPreferenceHandler,
 } from './handlers/terminal-panel-preference.js'
-import { classifyLocalPath, resolveDirectOpenTarget } from './git/repo.js'
+import { classifyLocalPath, resolveDirectOpenTarget, resolveDirectoryOpenTarget } from './git/repo.js'
 import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget } from './types.js'
 
@@ -257,6 +258,27 @@ function initializePaths(initialPath: string, options: CreateAppOptions = {}): v
     return
   }
 
+  // A folder inside a repository opens the repository with that folder selected.
+  if (classification.gitState === 'inside-repository' && classification.pathType === 'directory' && classification.repositoryRootPath) {
+    const target = resolveDirectoryOpenTarget(classification.canonicalPath, classification.gitState, classification.repositoryRootPath)
+    currentRepoPath = target.rootPath
+    currentPickerPath = ''
+    currentStartupOpenTarget = {
+      source: 'explicit-launch',
+      inputPath: classification.canonicalPath,
+      rootPath: target.rootPath,
+      selectedPath: target.selectedPath,
+      selectedPathType: target.selectedPathType,
+      status: 'accepted',
+      message: `Opened ${target.selectedPath}.`,
+      receivedAt: new Date().toISOString(),
+      gitState: classification.gitState,
+      openMode: 'repository',
+      repositoryRootPath: classification.repositoryRootPath,
+    }
+    return
+  }
+
   const candidatePath = classification.canonicalPath || resolvedPath
   if (classification.exists && classification.pathType === 'directory' && isReadableDirectory(candidatePath)) {
     currentRepoPath = candidatePath
@@ -326,6 +348,7 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.get('/api/repo/changes', repositoryChangesHandler)
   app.get('/api/repo/location', repositoryLocationHandler)
   app.get('/api/repo/navigation-hints', repositoryNavigationHintsHandler)
+  app.get('/api/path/complete', pathCompleteHandler)
   app.get('/api/search', searchHandler)
   app.get('/api/sync', syncHandler)
   app.use('/api/terminal/*', async (c, next) => {
