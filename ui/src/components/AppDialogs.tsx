@@ -63,7 +63,7 @@ export function RepoBoundaryDialog({
         <DialogHeader>
           <DialogTitle>Leave this repository?</DialogTitle>
           <DialogDescription>
-            The <code>..</code> entry will move GitLocal up to the parent folder, outside the current repository. You will enter the folder browser so you can choose what to open next.
+            GitLocal will open the parent folder, outside the current repository. Branch and change information will no longer show until you open a repository again.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

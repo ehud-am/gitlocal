@@ -4,7 +4,7 @@ import { writeViewerState } from '../../services/viewerState'
 import type { FolderBrowseEntry, StartupFolderSource } from '../../types'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
-import { ParentFolderIcon, PanelToggleIcon, ThemeIcon } from '../ui/icons'
+import { FolderPlusIcon, ParentFolderIcon, PanelToggleIcon, ThemeIcon } from '../ui/icons'
 import { MetaTag } from '../ui/meta-tag'
 import { Switch } from '../ui/switch'
 
@@ -171,7 +171,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
   }
 
   async function handleCreateFolder() {
-    const name = window.prompt('New subfolder name')
+    const name = window.prompt('New folder name')
     if (!name?.trim()) return
 
     await runFolderAction(async () => {
@@ -356,6 +356,20 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
               <div className="picker-current-path" aria-label="current folder">
                 {currentLabel}
               </div>
+              <div className="picker-browser-actions">
+              {hasFolderActions ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!canCreateChild || loading}
+                  onClick={() => { void handleCreateFolder() }}
+                  title="Create a folder here"
+                >
+                  <FolderPlusIcon />
+                  New folder
+                </Button>
+              ) : null}
               {hasFolderActions ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -365,7 +379,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem disabled={!canCreateChild || loading} onSelect={() => { void handleCreateFolder() }}>
-                      Create subfolder
+                      New folder
                     </DropdownMenuItem>
                     <DropdownMenuItem disabled={!canInitGit || loading} onSelect={() => { void handleInitGit() }}>
                       Run git init
@@ -379,6 +393,7 @@ export default function PickerPage({ darkMode = false, onToggleTheme = () => {} 
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
+              </div>
             </div>
 
             <div className="picker-browser-table-wrap">

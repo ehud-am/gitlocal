@@ -329,8 +329,7 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
   /* v8 ignore stop */
 
   // Leaving a repository nested inside another one (a submodule, or a repository cloned into a
-  // subfolder) returns to the outer repository with the parent folder selected, instead of
-  // dropping into the folder picker inside that outer repository's working tree.
+  // subfolder) returns to the outer repository with the parent folder selected.
   const parentClassification = classifyLocalPath(candidate)
   if (parentClassification.repositoryRootPath && parentClassification.gitState !== 'outside-repository') {
     const target = resolveDirectoryOpenTarget(
@@ -352,10 +351,20 @@ export async function repositoryParentFolderHandler(c: Context<{ Variables: Vari
     }))
   }
 
-  setRepoPath('')
-  setPickerPath(candidate)
-  rememberStartupFolder(candidate, 'picker-open')
-  return c.json({ ok: true, error: '' })
+  // Any other parent opens in the folder view, the same view the user just left, rather than the
+  // folder picker. Moving up never changes which kind of page GitLocal shows.
+  const parentPath = parentClassification.canonicalPath
+  setRepoPath(parentPath)
+  setPickerPath('')
+  rememberStartupFolder(parentPath, 'repo-open')
+  return c.json(repoOpenResult({
+    path: parentPath,
+    rootPath: parentPath,
+    selectedPath: '',
+    selectedPathType: 'none',
+    openMode: 'folder',
+    gitState: 'outside-repository',
+  }))
 }
 
 export async function repositoryLocationHandler(c: Context<{ Variables: Variables }>): Promise<Response> {

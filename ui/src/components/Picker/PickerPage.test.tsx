@@ -690,7 +690,7 @@ describe('PickerPage', () => {
     render(<PickerPage />)
 
     await openFolderActionsMenu()
-    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder/i }))
 
     await waitFor(() => {
       expect(vi.mocked(api.createChildFolder)).toHaveBeenCalledWith({
@@ -703,6 +703,19 @@ describe('PickerPage', () => {
     })
   })
 
+  it('creates a folder from the visible New folder button', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('drafts')
+    vi.mocked(api.createChildFolder).mockResolvedValue({ ok: true, error: '' })
+
+    render(<PickerPage />)
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'New folder' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(api.createChildFolder)).toHaveBeenCalledWith({ parentPath: '/Users/example', name: 'drafts' })
+    })
+  })
+
   it('shows create-subfolder errors from the folder actions menu', async () => {
     vi.spyOn(window, 'prompt').mockReturnValue('notes')
     vi.mocked(api.createChildFolder).mockResolvedValue({ ok: false, error: 'folder already exists' })
@@ -710,7 +723,7 @@ describe('PickerPage', () => {
     render(<PickerPage />)
 
     await openFolderActionsMenu()
-    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/folder already exists/i)
   })
@@ -722,7 +735,7 @@ describe('PickerPage', () => {
     render(<PickerPage />)
 
     await openFolderActionsMenu()
-    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/failed to create the folder/i)
   })
@@ -733,7 +746,7 @@ describe('PickerPage', () => {
     render(<PickerPage />)
 
     await openFolderActionsMenu()
-    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /create subfolder/i }))
+    await userEvent.setup().click(await screen.findByRole('menuitem', { name: /new folder/i }))
 
     expect(vi.mocked(api.createChildFolder)).not.toHaveBeenCalled()
   })

@@ -627,15 +627,15 @@ describe('folder and repository open handlers', () => {
     ]))
   })
 
-  it('switches from a repo view into folder browsing at the parent folder', async () => {
+  it('switches from a repo view to the folder view of the parent folder', async () => {
     const app = createApp(validDir)
     const client = testClient(app)
     const res = await client.api.repo['parent-folder'].$post()
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
-    expect(getRepoPath()).toBe('')
-    expect(getPickerPath()).toBe(realpathSync(dirname(validDir)))
+    expect(getRepoPath()).toBe(realpathSync(dirname(validDir)))
+    expect(getPickerPath()).toBe('')
   })
 
   it('returns an error when asking for a parent folder without an open repository', async () => {

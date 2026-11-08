@@ -485,19 +485,29 @@ describe('repositoryParentFolderHandler', () => {
     expect(await res.json()).toMatchObject({ ok: false, error: 'No repository is currently open' })
   })
 
-  it('opens the parent folder in picker mode for a non-root repository path', async () => {
-    const { dir, cleanup } = makeGitRepo()
-    const nested = join(dir, 'docs')
-    mkdirSync(nested)
-    writeFileSync(join(nested, 'guide.md'), '# Guide')
+  it('opens the parent of a plain folder in the folder view, not the picker', async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), 'gitlocal-plain-parent-')))
+    const child = join(parent, 'child')
+    mkdirSync(child)
 
     try {
-      const app = createApp(nested)
+      const app = createApp(child)
       const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
       expect(res.status).toBe(200)
-      expect(await res.json()).toEqual({ ok: true, error: '' })
+      expect(await res.json()).toEqual({
+        ok: true,
+        error: '',
+        path: parent,
+        rootPath: parent,
+        selectedPath: '',
+        selectedPathType: 'none',
+        openMode: 'folder',
+        gitState: 'outside-repository',
+      })
+      const info = await (await app.fetch(new Request('http://localhost/api/info'))).json() as { path: string; pickerMode: boolean }
+      expect(info).toMatchObject({ path: parent, pickerMode: false })
     } finally {
-      cleanup()
+      rmSync(parent, { recursive: true, force: true })
     }
   })
 
@@ -571,11 +581,11 @@ describe('repositoryParentFolderHandler', () => {
       const app = createApp(child)
       const res = await app.fetch(new Request('http://localhost/api/repo/parent-folder', { method: 'POST' }))
       expect(res.status).toBe(200)
-      expect(await res.json()).toEqual({ ok: true, error: '' })
+      expect(await res.json()).toMatchObject({ ok: true, rootPath: realpathSync(grandparent) })
 
       const infoRes = await app.fetch(new Request('http://localhost/api/info'))
       const infoBody = await infoRes.json() as { pickerMode: boolean; path: string }
-      expect(infoBody.pickerMode).toBe(true)
+      expect(infoBody.pickerMode).toBe(false)
       expect(infoBody.path).toBe(realpathSync(grandparent))
     } finally {
       chmodSync(middle, 0o755)

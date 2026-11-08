@@ -2553,3 +2553,9 @@ pre {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.picker-browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
