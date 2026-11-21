@@ -255,7 +255,7 @@ function parseShape(element: Element, context: ShapeContext): SlideNode | null {
   if (isPlaceholder && !text && !parseFill(spPr, context.scope) && !child(spPr, 'ln') && !ownStyle) return null
   const geometry = readGeometry(spPrs)
   if (!text && (fill === null || fill.type === 'none') && line === null) return null
-  return { kind: 'shape', box, geometry, fill, line, text, textBox, shadow, link: shapeLink(element, context) }
+  return { kind: 'shape', box, geometry, fill, line, text, textBox, shadow, link: shapeLink(element, context), placeholder: isPlaceholder ? type ?? 'body' : null }
 }
 
 function parsePicture(element: Element, context: ShapeContext, frameBox: Box | null = null): SlideNode | null {

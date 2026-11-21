@@ -24,6 +24,21 @@ function clampDevicePixelRatioToCanvasLimit(devicePixelRatio: number, baseWidth:
   return Math.min(devicePixelRatio, maxRatio)
 }
 
+type PdfJsModule = typeof import('pdfjs-dist')
+type PdfPage = Awaited<ReturnType<Awaited<ReturnType<PdfJsModule['getDocument']>['promise']>['getPage']>>
+
+// A transparent, selectable text layer over each page canvas. Read aloud (#139) reads and
+// highlights this text; it also makes PDF text selectable. A failure only loses the text layer.
+async function renderTextLayer(pdfjs: PdfJsModule, page: PdfPage, viewport: ReturnType<PdfPage['getViewport']>, layer: HTMLElement): Promise<void> {
+  try {
+    if (typeof pdfjs.TextLayer !== 'function' || typeof page.streamTextContent !== 'function') return
+    layer.replaceChildren()
+    await new pdfjs.TextLayer({ textContentSource: page.streamTextContent(), container: layer, viewport }).render()
+  } catch {
+    layer.replaceChildren()
+  }
+}
+
 export default function PdfViewer({ content }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [pages, setPages] = useState<PageRenderState[] | null>(null)
@@ -80,6 +95,9 @@ export default function PdfViewer({ content }: Props) {
 
           // eslint-disable-next-line no-await-in-loop -- see above
           await page.render({ canvasContext, viewport, canvas }).promise
+          if (cancelled) return
+          // eslint-disable-next-line no-await-in-loop -- see above
+          await renderTextLayer(pdfjs, page, baseViewport, canvas.nextElementSibling as HTMLElement)
         }
       } catch (renderError) {
         if (cancelled) return
@@ -112,12 +130,14 @@ export default function PdfViewer({ content }: Props) {
         <div className="content-skeleton" aria-label="loading pdf" />
       ) : (
         pages.map((page) => (
-          <canvas
-            key={page.pageNumber}
-            data-pdf-page={page.pageNumber}
-            className="pdf-viewer-page"
-            aria-label={`Page ${page.pageNumber}`}
-          />
+          <div key={page.pageNumber} className="pdf-viewer-page-wrap">
+            <canvas
+              data-pdf-page={page.pageNumber}
+              className="pdf-viewer-page"
+              aria-label={`Page ${page.pageNumber}`}
+            />
+            <div className="textLayer" data-pdf-text-layer={page.pageNumber} />
+          </div>
         ))
       )}
     </div>

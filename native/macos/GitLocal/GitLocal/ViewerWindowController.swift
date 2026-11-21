@@ -22,6 +22,8 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
+        // Read aloud starts from menu commands, which are not page gestures; allow its audio.
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         self.webView = WKWebView(frame: .zero, configuration: configuration)
 
         let window = NSWindow(
@@ -79,6 +81,15 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
 
     @objc func toggleTerminal(_ sender: Any?) {
         dispatchNativeCommand("toggle-terminal")
+    }
+
+    // Read aloud (#139): starts or pauses reading the open preview, and stops it.
+    @objc func readAloud(_ sender: Any?) {
+        dispatchNativeCommand("read-aloud")
+    }
+
+    @objc func stopReading(_ sender: Any?) {
+        dispatchNativeCommand("read-aloud-stop")
     }
 
     @objc func toggleDotfiles(_ sender: Any?) {

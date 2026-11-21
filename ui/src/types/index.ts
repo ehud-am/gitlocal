@@ -205,6 +205,8 @@ export type NativeAppCommand =
   | 'toggle-terminal'
   | 'toggle-dotfiles'
   | 'set-tracked-visibility'
+  | 'read-aloud'
+  | 'read-aloud-stop'
 export type NativeAppOutboundCommand = 'set-default-markdown-reader' | 'dotfiles-state' | 'tracked-visibility-state'
 export interface NativeAppCommandEvent extends CustomEvent<{ command: NativeAppCommand; message?: string; path?: string }> {
   type: 'gitlocal:native-command'

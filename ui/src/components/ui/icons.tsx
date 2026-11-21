@@ -154,3 +154,40 @@ export function FolderPlusIcon() {
     </svg>
   )
 }
+
+export function SpeakerIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function PlayIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M5 3.2v9.6L12.5 8z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function PauseIcon() {
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M4.5 3h2.2v10H4.5zM9.3 3h2.2v10H9.3z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function SkipIcon({ direction, heading = false }: { direction: 'back' | 'forward'; heading?: boolean }) {
+  const flip = direction === 'back' ? 'translate(16 0) scale(-1 1)' : undefined
+  return (
+    <svg className="toolbar-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <g transform={flip}>
+        <path d={heading ? 'M2.5 3.5v9l5-4.5zM7.5 3.5v9l5-4.5z' : 'M4 3.5v9l6-4.5z'} fill="currentColor" />
+        <path d={heading ? 'M13 3.5v9' : 'M11.5 3.5v9'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}

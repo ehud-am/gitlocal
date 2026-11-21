@@ -147,6 +147,9 @@ export interface ShapeNode {
   textBox: Box | null
   shadow: string | null
   link: Link | null
+  // Placeholder type (title, ctrTitle, body, ...) when the shape is a placeholder; read aloud
+  // reads title placeholders as headings.
+  placeholder?: string | null
 }
 
 export interface PictureNode {

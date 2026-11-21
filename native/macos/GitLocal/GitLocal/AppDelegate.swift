@@ -234,6 +234,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleTerminalItem.target = controller
         viewMenu.addItem(toggleTerminalItem)
         viewMenu.addItem(NSMenuItem.separator())
+        let readAloudItem = NSMenuItem(
+            title: "Read Aloud",
+            action: #selector(ViewerWindowController.readAloud(_:)),
+            keyEquivalent: "s"
+        )
+        readAloudItem.keyEquivalentModifierMask = [.control, .option]
+        readAloudItem.target = controller
+        viewMenu.addItem(readAloudItem)
+        let stopReadingItem = NSMenuItem(
+            title: "Stop Reading",
+            action: #selector(ViewerWindowController.stopReading(_:)),
+            keyEquivalent: ""
+        )
+        stopReadingItem.target = controller
+        viewMenu.addItem(stopReadingItem)
+        viewMenu.addItem(NSMenuItem.separator())
         let toggleDotfilesItem = NSMenuItem(
             title: "Hide Dotfiles",
             action: #selector(ViewerWindowController.toggleDotfiles(_:)),
