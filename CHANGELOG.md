@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.19.0 - 2026-11-21
 
 - Read aloud ([#139](https://github.com/ehud-am/gitlocal/issues/139)): a "Read aloud" button (Ctrl+Alt+S; View menu in the macOS app) reads the open preview, or the selected text, one sentence at a time and highlights the sentence being read. Headings are read on their own with longer pauses. Works for Markdown, text, code comments, JSON, CSV, Excel, Word, PowerPoint (slides and speaker notes), PDF and SVG.
   - macOS: speech comes from the built-in `say` command through the local GitLocal server, so every installed Apple voice can be used, including Premium/Enhanced voices. The voice picker offers the System voice, six recommended voices (Ava, Zoe, Serena, Evan, Nathan, Jamie) with install steps when missing, and other installed English voices. Voice and speed are saved in `~/.gitlocal/read-aloud-preference.json`.
