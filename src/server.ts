@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -54,6 +54,13 @@ import {
   getTerminalPanelPreferenceHandler,
   updateTerminalPanelPreferenceHandler,
 } from './handlers/terminal-panel-preference.js'
+import {
+  getReadAloudPreferenceHandler,
+  ttsOpenSettingsHandler,
+  ttsSayHandler,
+  ttsVoicesHandler,
+  updateReadAloudPreferenceHandler,
+} from './handlers/tts.js'
 import { classifyLocalPath, resolveDirectOpenTarget, resolveDirectoryOpenTarget } from './git/repo.js'
 import { buildSafeFallbackResolution, isReadableDirectory, resolveOsDefaultLocation, resolveStartupFolder } from './services/startup-preferences.js'
 import type { StartupFolderResolution, StartupOpenSource, StartupOpenTarget } from './types.js'
@@ -362,6 +369,21 @@ export function createApp(initialRepoPath: string, options: CreateAppOptions = {
   app.delete('/api/terminal/sessions/:id', closeTerminalSessionHandler)
   app.get('/api/terminal-panel-preference', getTerminalPanelPreferenceHandler)
   app.put('/api/terminal-panel-preference', updateTerminalPanelPreferenceHandler)
+  // Read aloud runs local commands (`say`, `open`), so like the terminal it answers only GitLocal's
+  // own loopback origin.
+  const requireLoopback = async (c: Context, next: Next) => {
+    if (!isTrustedTerminalRequest(c.req.header('host'), c.req.header('origin'))) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    await next()
+  }
+  app.use('/api/tts/*', requireLoopback)
+  app.use('/api/read-aloud-preference', requireLoopback)
+  app.get('/api/tts/voices', ttsVoicesHandler)
+  app.post('/api/tts/say', ttsSayHandler)
+  app.post('/api/tts/open-voice-settings', ttsOpenSettingsHandler)
+  app.get('/api/read-aloud-preference', getReadAloudPreferenceHandler)
+  app.put('/api/read-aloud-preference', updateReadAloudPreferenceHandler)
 
   // Static file serving with SPA fallback
   const uiDir = join(import.meta.dirname, '../ui/dist')

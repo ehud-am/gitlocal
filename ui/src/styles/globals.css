@@ -31,6 +31,7 @@
   --surface-subtle: #f6f8fa;
   --header-bg: rgba(255, 255, 255, 0.9);
   --shadow-elevated: 0 12px 40px rgba(31, 35, 40, 0.1);
+  --read-aloud-highlight: rgba(255, 212, 59, 0.55);
   color-scheme: light;
 }
 
@@ -63,6 +64,7 @@
   --surface-subtle: #11161d;
   --header-bg: rgba(13, 17, 23, 0.92);
   --shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --read-aloud-highlight: rgba(187, 128, 9, 0.5);
   color-scheme: dark;
 }
 
@@ -2558,4 +2560,204 @@ pre {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+/* Read aloud (#139) */
+::highlight(read-aloud-sentence) {
+  background-color: var(--read-aloud-highlight);
+}
+
+.read-aloud-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.read-aloud-overlay-rect {
+  position: fixed;
+  background-color: var(--read-aloud-highlight);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.read-aloud-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-elevated);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.read-aloud-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.read-aloud-transport,
+.read-aloud-settings {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.read-aloud-settings {
+  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.read-aloud-position {
+  color: var(--muted-foreground);
+  min-width: 9em;
+}
+
+.read-aloud-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+}
+
+.read-aloud-field select {
+  max-width: 18rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--foreground);
+  padding: 2px 6px;
+}
+
+.read-aloud-text-button,
+.read-aloud-link-button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--foreground);
+  padding: 2px 8px;
+}
+
+.read-aloud-link-button {
+  border: none;
+  background: none;
+  color: var(--primary);
+  padding: 0 4px;
+}
+
+.read-aloud-text-button:disabled {
+  opacity: 0.6;
+}
+
+.read-aloud-notice {
+  margin: 6px 0 0;
+  color: var(--warning);
+}
+
+.read-aloud-setup {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.read-aloud-setup-intro {
+  margin: 0 0 6px;
+}
+
+.read-aloud-setup-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.read-aloud-setup-item {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr) max-content;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.read-aloud-setup-name {
+  font-weight: 600;
+}
+
+.read-aloud-setup-meta {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+
+.read-aloud-setup-status {
+  color: var(--muted-foreground);
+}
+
+.read-aloud-setup-steps {
+  margin: 0 0 8px;
+  padding-left: 1.4em;
+}
+
+.read-aloud-setup-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* PDF text layer (pdf.js TextLayer), positioned over each page canvas. */
+.pdf-viewer-page-wrap {
+  position: relative;
+  width: fit-content;
+  margin: 0 auto 12px;
+  --scale-factor: 1.5;
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+
+.pdf-viewer-page-wrap .pdf-viewer-page {
+  display: block;
+}
+
+.pdf-viewer-page-wrap .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.pdf-viewer-page-wrap .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.pdf-viewer-page-wrap .textLayer > :not(.markedContent),
+.pdf-viewer-page-wrap .textLayer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.pdf-viewer-page-wrap .textLayer .markedContent {
+  display: contents;
+}
+
+.pdf-viewer-page-wrap .textLayer ::selection {
+  background: rgba(9, 105, 218, 0.3);
 }

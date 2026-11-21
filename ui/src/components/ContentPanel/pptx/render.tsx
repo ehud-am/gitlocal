@@ -342,7 +342,11 @@ function ShapeView({ node }: { node: ShapeNode }) {
   const fill = hasFillablePath ? fillStyle(node.fill, box.w, box.h) : null
   const textBox = node.textBox
   return (
-    <div className="pptx-viewer-shape" style={{ ...boxStyle(box), filter: node.shadow ?? undefined }}>
+    <div
+      className="pptx-viewer-shape"
+      style={{ ...boxStyle(box), filter: node.shadow ?? undefined }}
+      data-speech-role={node.placeholder === 'title' || node.placeholder === 'ctrTitle' ? 'title' : undefined}
+    >
       <div style={{ position: 'absolute', inset: 0, transform: flipTransform(box) }}>
         {fill ? (
           <div className="pptx-viewer-fill" style={{ position: 'absolute', inset: 0, ...fill, clipPath: clipPathFor(node.geometry, paths) }} />

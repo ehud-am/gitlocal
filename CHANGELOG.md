@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Read aloud ([#139](https://github.com/ehud-am/gitlocal/issues/139)): a "Read aloud" button (Ctrl+Alt+S; View menu in the macOS app) reads the open preview, or the selected text, one sentence at a time and highlights the sentence being read. Headings are read on their own with longer pauses. Works for Markdown, text, code comments, JSON, CSV, Excel, Word, PowerPoint (slides and speaker notes), PDF and SVG.
+  - macOS: speech comes from the built-in `say` command through the local GitLocal server, so every installed Apple voice can be used, including Premium/Enhanced voices. The voice picker offers the System voice, six recommended voices (Ava, Zoe, Serena, Evan, Nathan, Jamie) with install steps when missing, and other installed English voices. Voice and speed are saved in `~/.gitlocal/read-aloud-preference.json`.
+  - Other platforms: the browser's on-device voices only; network voices are never listed.
+  - Nothing is sent off the machine.
+- PDF previews now have a selectable text layer.
+
 ## 0.18.1 - 2026-11-08
 
 - The integrated terminal starts again on macOS ([#137](https://github.com/ehud-am/gitlocal/issues/137)). `node-pty` 1.1.0 ships its prebuilt macOS `spawn-helper` without the execute permission, so every terminal failed with "Failed to start a terminal session on this platform." when the install-time rebuild did not run or could not build. GitLocal now restores the permission at install time and again before the first terminal starts.

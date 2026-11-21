@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { ReadAloudRenderAllContext } from '../ReadAloud/render-context'
 import { base64ToBytes, revokeObjectUrls } from './preview-shared/bytes'
 import { useObservedSize } from './preview-shared/use-observed-size'
 import { FIT_ZOOM_INDEX, ZOOM_LEVELS, ZoomControls } from './preview-shared/ZoomControls'
@@ -66,6 +67,7 @@ function findScrollableAncestor(element: Element): HTMLElement | null {
 function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibilityChange }: SlideItemProps) {
   const elementRef = useRef<HTMLDivElement | null>(null)
   const [shouldRender, setShouldRender] = useState(false)
+  const renderAll = useContext(ReadAloudRenderAllContext)
 
   useEffect(() => {
     const element = elementRef.current
@@ -109,12 +111,16 @@ function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibil
       ref={elementRef}
       className={slide.hidden ? 'pptx-viewer-slide-item pptx-viewer-slide-hidden' : 'pptx-viewer-slide-item'}
       data-slide-index={slide.index}
+      data-speech-role={slide.hidden ? undefined : 'slide'}
+      data-speech-skip={slide.hidden ? '' : undefined}
+      data-speech-slide={slide.index + 1}
+      data-speech-slide-total={totalSlides}
       tabIndex={0}
       role="group"
       aria-label={`Slide ${slide.index + 1} of ${totalSlides}${slide.hidden ? ' (hidden)' : ''}`}
     >
       {slide.hidden ? <span className="pptx-viewer-hidden-tag">Hidden slide</span> : null}
-      {shouldRender ? (
+      {shouldRender || renderAll ? (
         <PptxSlideCanvas slide={slide} widthPx={widthPx} heightPx={heightPx} scale={scale} />
       ) : (
         <div
@@ -124,8 +130,8 @@ function PptxSlideItem({ slide, widthPx, heightPx, scale, totalSlides, onVisibil
         />
       )}
       {slide.notes ? (
-        <div className="pptx-viewer-notes" aria-label={`Speaker notes for slide ${slide.index + 1}`}>
-          <h4>Notes</h4>
+        <div className="pptx-viewer-notes" aria-label={`Speaker notes for slide ${slide.index + 1}`} data-speech-role="notes">
+          <h4 data-speech-skip="">Notes</h4>
           <p>{slide.notes}</p>
         </div>
       ) : null}

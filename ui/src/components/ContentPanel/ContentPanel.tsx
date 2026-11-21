@@ -18,17 +18,23 @@ import NewFileDraft from './NewFileDraft'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Button } from '../ui/button'
 import { MetaTag } from '../ui/meta-tag'
-import { FolderPlusIcon } from '../ui/icons'
+import { FolderPlusIcon, SpeakerIcon } from '../ui/icons'
 import { describeFileSyncState } from '../../lib/sync'
 import { basenameOf, parentPathOf } from '../../lib/utils'
 import { isSelectAllShortcut, selectContentPanelScope } from './content-panel-selection'
 import CopyButton from './CopyButton'
 import { parseJsonTree } from './json-tree'
 import { previewRegistry } from './preview-registry'
+import type { ReadAloudBarHandle } from '../ReadAloud/ReadAloudBar'
+import { unlockAudio } from '../ReadAloud/engines'
+import { ReadAloudRenderAllContext } from '../ReadAloud/render-context'
+import { selectedRangeWithin } from '../ReadAloud/selection'
+import type { NativeAppCommandEvent } from '../../types'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const MarkdownShareActions = lazy(() => import('./MarkdownShareActions'))
+const ReadAloudBar = lazy(() => import('../ReadAloud/ReadAloudBar'))
 type PanelMode = 'view' | 'edit' | 'create' | 'create-folder' | 'confirm-delete'
 type EmptyStateAction = 'create-file'
 
@@ -352,6 +358,54 @@ export default function ContentPanel({
     previousNativeSelectAllTokenRef.current = nativeSelectAllToken
     selectCurrentPanelContents()
   }, [nativeSelectAllToken])
+
+  const canReadAloud = Boolean(data && mode === 'view' && data.type !== 'binary' && data.type !== 'image')
+  const [readAloud, setReadAloud] = useState<{ key: number; selection: Range | null } | null>(null)
+  const readAloudBarRef = useRef<ReadAloudBarHandle | null>(null)
+  const readAloudActive = readAloud !== null && canReadAloud
+
+  // Reading stops when the file, its content, the view mode or raw/rendered view changes.
+  useEffect(() => {
+    setReadAloud(null)
+  }, [selectedPath, data?.content, mode, effectiveShowRaw])
+
+  function startReadAloud(): void {
+    unlockAudio()
+    setReadAloud({ key: Date.now(), selection: selectedRangeWithin(selectionRootRef.current, document.getSelection()) })
+  }
+
+  const readAloudToggleRef = useRef<() => void>(() => undefined)
+  readAloudToggleRef.current = () => {
+    if (!canReadAloud) return
+    if (readAloudActive) readAloudBarRef.current?.togglePause()
+    else startReadAloud()
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.ctrlKey && event.altKey && !event.metaKey && event.code === 'KeyS') {
+        event.preventDefault()
+        readAloudToggleRef.current()
+        return
+      }
+      if (event.key === 'Escape' && readAloudActive) {
+        const target = event.target instanceof Element ? event.target : null
+        if (target?.closest('input, textarea, select, [role="dialog"]')) return
+        setReadAloud(null)
+      }
+    }
+    const handleNativeCommand = (event: Event) => {
+      const command = (event as NativeAppCommandEvent).detail?.command
+      if (command === 'read-aloud') readAloudToggleRef.current()
+      if (command === 'read-aloud-stop') setReadAloud(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('gitlocal:native-command', handleNativeCommand)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('gitlocal:native-command', handleNativeCommand)
+    }
+  }, [readAloudActive])
 
   function selectCurrentPanelContents(): boolean {
     return selectContentPanelScope(panelRootRef.current, selectionRootRef.current) !== 'unavailable'
@@ -1054,6 +1108,22 @@ export default function ContentPanel({
         <div className="flex flex-wrap items-center gap-2">
           {mode === 'view' ? (
             <>
+            {canReadAloud ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (readAloudActive) setReadAloud(null)
+                  else startReadAloud()
+                }}
+                aria-pressed={readAloudActive}
+                title="Read aloud (Ctrl+Alt+S)"
+              >
+                <SpeakerIcon />
+                {readAloudActive ? 'Stop reading' : 'Read aloud'}
+              </Button>
+            ) : null}
             {canSearchCurrentFile ? (
               <Button
                 type="button"
@@ -1312,6 +1382,7 @@ export default function ContentPanel({
           (() => {
             const PreviewComponent = previewRegistry[data.type].Component
             return (
+              <ReadAloudRenderAllContext.Provider value={readAloudActive}>
               <PreviewComponent
                 data={data}
                 selectedPath={selectedPath}
@@ -1325,10 +1396,23 @@ export default function ContentPanel({
                 onNavigate={onNavigate}
                 setSelectionRoot={setSelectionRoot}
               />
+              </ReadAloudRenderAllContext.Provider>
             )
           })()
         )}
       </div>
+      {readAloudActive && readAloud ? (
+        <Suspense fallback={null}>
+          <ReadAloudBar
+            key={readAloud.key}
+            ref={readAloudBarRef}
+            getRoot={() => selectionRootRef.current}
+            options={{ type: data.type, language: data.language, content: data.content, showRaw: effectiveShowRaw }}
+            selection={readAloud.selection}
+            onClose={() => setReadAloud(null)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

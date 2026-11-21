@@ -58,6 +58,8 @@ export default defineConfig({
         'src/lib/file-tabs.ts',
         'src/lib/go-to-path.ts',
         'src/lib/sync.ts',
+        'src/components/ReadAloud/*.{ts,tsx}',
+        'src/services/readAloudApi.ts',
       ],
       exclude: ['**/*.test.tsx', '**/*.test.ts', 'src/components/ContentPanel/pptx/test-support.ts', 'src/components/ContentPanel/docx/test-support.ts', 'src/components/ContentPanel/ooxml/test-support.ts', 'src/components/ContentPanel/xlsx/test-support.ts'],
       thresholds: {
