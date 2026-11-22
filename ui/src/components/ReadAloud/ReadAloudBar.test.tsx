@@ -51,6 +51,7 @@ vi.mock('./engines', async (importOriginal) => {
 })
 
 import ReadAloudBar, { type ReadAloudBarHandle } from './ReadAloudBar'
+import { OPEN_READ_ALOUD_SETTINGS_EVENT, READ_ALOUD_PREFERENCE_EVENT, announceReadAloudPreference } from './events'
 
 const SAY_CATALOG: VoiceCatalog = {
   engine: 'say',
@@ -118,7 +119,7 @@ describe('ReadAloudBar', () => {
     expect(screen.getByRole('option', { name: 'Evan (not installed)' })).toBeDisabled()
     expect(screen.getByRole('group', { name: 'Other installed voices' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Basic voices' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Voice setup' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Voice setup' })).toBeNull()
   })
 
   it('falls back to the system voice when the saved voice is missing or silent', async () => {
@@ -154,9 +155,26 @@ describe('ReadAloudBar', () => {
     const root = mountContent('<p id="a">Alpha.</p><p id="b">Beta.</p>')
     const range = document.createRange()
     range.selectNodeContents(root.querySelector('#b')!)
-    render(<ReadAloudBar getRoot={() => root} options={{ type: 'markdown' }} selection={range} onClose={() => undefined} />)
+    render(<ReadAloudBar getRoot={() => root} options={{ type: 'markdown' }} selection={{ range, start: 6, end: 11 }} onClose={() => undefined} />)
     await flush()
     expect(engines.played).toEqual(['system:Beta.'])
+  })
+
+  it('finds the selection again by text offsets when the preview re-rendered its DOM', async () => {
+    const root = mountContent('<p>Alpha.</p><p>Beta.</p>')
+    const range = document.createRange()
+    range.selectNodeContents(root.querySelectorAll('p')[1])
+    root.innerHTML = '<p>Alpha.</p><p>Beta.</p>'
+    render(<ReadAloudBar getRoot={() => root} options={{ type: 'markdown' }} selection={{ range, start: 6, end: 11 }} onClose={() => undefined} />)
+    await flush()
+    expect(engines.played).toEqual(['system:Beta.'])
+  })
+
+  it('reports a start failure', async () => {
+    api.voices.mockRejectedValue(new Error('offline'))
+    renderBar('<p>One.</p>')
+    await flush()
+    expect(screen.getByText('Read aloud could not start.')).toBeInTheDocument()
   })
 
   it('shows a message when there is nothing to read', async () => {
@@ -230,6 +248,15 @@ describe('ReadAloudBar', () => {
     fireEvent.click(root.querySelectorAll('p')[1])
     await flush()
     expect(position()).toBe('Sentence 4 of 4')
+    // A click that ends a text selection does not move reading.
+    const selected = document.createRange()
+    selected.selectNodeContents(root.querySelectorAll('p')[0])
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(selected)
+    fireEvent.click(root.querySelectorAll('p')[0])
+    await flush()
+    expect(position()).toBe('Sentence 4 of 4')
+    document.getSelection()!.removeAllRanges()
     const link = document.createElement('a')
     root.appendChild(link)
     fireEvent.click(link)
@@ -238,32 +265,22 @@ describe('ReadAloudBar', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('opens voice setup, previews and uses a voice, opens settings and refreshes', async () => {
-    renderBar('<p>One.</p>')
+  it('offers natural voices through the settings dialog and follows its changes', async () => {
+    engines.holdPlay = true
+    renderBar('<p>One. Two.</p>')
     await flush()
-    const toggle = screen.getByRole('button', { name: 'Voice setup' })
-    fireEvent.click(toggle)
-    expect(screen.queryByRole('region', { name: 'Voice setup' })).toBeNull()
-    fireEvent.click(toggle)
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.queryByRole('button', { name: 'Voice setup' })).toBeNull()
+    const opened = vi.fn()
+    window.addEventListener(OPEN_READ_ALOUD_SETTINGS_EVENT, opened)
+    fireEvent.click(screen.getByRole('button', { name: 'Get natural voices' }))
+    expect(opened).toHaveBeenCalledTimes(1)
+    window.removeEventListener(OPEN_READ_ALOUD_SETTINGS_EVENT, opened)
+    act(() => announceReadAloudPreference({ voice: 'Ava (Premium)', rate: 1.25 }))
     await flush()
-    expect(engines.played).toContain('Ava (Premium):This is how GitLocal reads your documents.')
-    fireEvent.click(screen.getByRole('button', { name: 'Use' }))
-    expect(api.savePreference).toHaveBeenLastCalledWith({ voice: 'Ava (Premium)', rate: 1 })
-    api.voices.mockResolvedValue({ ...SAY_CATALOG, needsSetup: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh voices' }))
-    await flush()
-    expect(api.voices).toHaveBeenLastCalledWith(true)
-    expect(screen.getByText('Recommended voices for natural-sounding reading. They run on this Mac.')).toBeInTheDocument()
-  })
-
-  it('reports a preview that cannot play', async () => {
-    engines.failVoices.add('Ava (Premium)')
-    renderBar('<p>One.</p>')
-    await flush()
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
-    await flush()
-    expect(screen.getByText('Could not play Ava (Premium).')).toBeInTheDocument()
+    expect(engines.created[engines.created.length - 1]).toEqual({ kind: 'say', voice: 'Ava (Premium)', rate: 1.25 })
+    expect(api.savePreference).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Get natural voices' })).toBeNull()
+    window.dispatchEvent(new CustomEvent(READ_ALOUD_PREFERENCE_EVENT))
   })
 
   it('ignores a voice change before voices load and cleans up on unmount', async () => {

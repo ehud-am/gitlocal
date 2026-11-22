@@ -50,7 +50,7 @@ export async function ttsSayHandler(c: Context): Promise<Response> {
         return c.json({ error: 'Voice is not installed', code: 'voice-not-installed' }, 400)
       }
     }
-    const audio = await synthesize({ text, voice, rate })
+    const audio = await synthesize({ text, voice, rate, signal: c.req.raw.signal })
     return new Response(new Uint8Array(audio), {
       headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' },
     })

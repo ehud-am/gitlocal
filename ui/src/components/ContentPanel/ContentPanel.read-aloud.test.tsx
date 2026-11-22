@@ -21,7 +21,7 @@ vi.mock('../ReadAloud/ReadAloudBar', () => ({
       <section aria-label="Read aloud">
         <button type="button" onClick={props.onClose as () => void}>Close bar</button>
         <span data-testid="root-tag">{(props.getRoot as () => HTMLElement | null)()?.tagName}</span>
-        <span data-testid="selection">{(props.selection as Range | null)?.toString() ?? 'none'}</span>
+        <span data-testid="selection">{(props.selection as { range: Range } | null)?.range.toString() ?? 'none'}</span>
       </section>
     )
   }),
@@ -110,13 +110,37 @@ describe('ContentPanel read aloud', () => {
     input.remove()
   })
 
-  it('responds to the native Read Aloud and Stop Reading commands', async () => {
+  it('starts, restarts on a new selection, and stops with Option+Esc', async () => {
+    renderPanel()
+    const viewer = await screen.findByTestId('code-viewer')
+    fireEvent.keyDown(window, { key: 'Escape', altKey: true })
+    expect(await screen.findByRole('region', { name: 'Read aloud' })).toBeInTheDocument()
+    expect(screen.getByTestId('selection')).toHaveTextContent('none')
+    const range = document.createRange()
+    range.selectNodeContents(viewer)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+    fireEvent.keyDown(window, { key: 'Escape', altKey: true })
+    expect(await screen.findByTestId('selection')).toHaveTextContent('Hello there.')
+    document.getSelection()!.removeAllRanges()
+    fireEvent.keyDown(window, { key: 'Escape', altKey: true })
+    expect(screen.queryByRole('region', { name: 'Read aloud' })).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape', altKey: true, ctrlKey: true })
+    expect(screen.queryByRole('region', { name: 'Read aloud' })).toBeNull()
+    expect(bar.togglePause).not.toHaveBeenCalled()
+  })
+
+  it('responds to the native Read Aloud, Pause and Stop Reading commands', async () => {
     renderPanel()
     await screen.findByRole('button', { name: 'Read aloud' })
+    nativeCommand('read-aloud-pause')
+    expect(await screen.findByRole('region', { name: 'Read aloud' })).toBeInTheDocument()
+    nativeCommand('read-aloud-pause')
+    expect(bar.togglePause).toHaveBeenCalledTimes(1)
+    nativeCommand('read-aloud')
+    expect(screen.queryByRole('region', { name: 'Read aloud' })).toBeNull()
     nativeCommand('read-aloud')
     expect(await screen.findByRole('region', { name: 'Read aloud' })).toBeInTheDocument()
-    nativeCommand('read-aloud')
-    expect(bar.togglePause).toHaveBeenCalledTimes(1)
     nativeCommand('refresh')
     nativeCommand('read-aloud-stop')
     expect(screen.queryByRole('region', { name: 'Read aloud' })).toBeNull()

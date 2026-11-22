@@ -89,7 +89,23 @@ describe('MarkdownRenderer', () => {
     )
 
     expect(screen.getByRole('img', { name: /logo/i })).toHaveAttribute('src', 'data:image/svg+xml;base64,Y2FjaGVk')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // An identical re-render keeps the rendered elements, so the image is not fetched again.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the rendered DOM, and a text selection in it, across re-renders', () => {
+    const onNavigate = vi.fn()
+    const { container, rerender } = render(
+      <MarkdownRenderer content={'# Title\n\nFirst paragraph.\n\n- item'} onNavigate={onNavigate} />,
+    )
+    const paragraph = container.querySelector('p')!
+    const heading = container.querySelector('h1')!
+    const item = container.querySelector('li')!
+    rerender(<MarkdownRenderer content={'# Title\n\nFirst paragraph.\n\n- item'} onNavigate={vi.fn()} />)
+    expect(container.querySelector('p')).toBe(paragraph)
+    expect(container.querySelector('h1')).toBe(heading)
+    expect(container.querySelector('li')).toBe(item)
+    expect(heading).toHaveAttribute('id', 'title')
   })
 
   it('renders copy buttons only for fenced code blocks and copies the selected block', async () => {

@@ -28,7 +28,8 @@ import { previewRegistry } from './preview-registry'
 import type { ReadAloudBarHandle } from '../ReadAloud/ReadAloudBar'
 import { unlockAudio } from '../ReadAloud/engines'
 import { ReadAloudRenderAllContext } from '../ReadAloud/render-context'
-import { selectedRangeWithin } from '../ReadAloud/selection'
+import { captureSelection, selectionScope, type CapturedSelection } from '../ReadAloud/selection'
+import { READ_ALOUD_SHORTCUT_LABEL } from '../ReadAloud/voice-options'
 import type { NativeAppCommandEvent } from '../../types'
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'))
@@ -360,7 +361,7 @@ export default function ContentPanel({
   }, [nativeSelectAllToken])
 
   const canReadAloud = Boolean(data && mode === 'view' && data.type !== 'binary' && data.type !== 'image')
-  const [readAloud, setReadAloud] = useState<{ key: number; selection: Range | null } | null>(null)
+  const [readAloud, setReadAloud] = useState<{ key: number; selection: CapturedSelection | null } | null>(null)
   const readAloudBarRef = useRef<ReadAloudBarHandle | null>(null)
   const readAloudActive = readAloud !== null && canReadAloud
 
@@ -369,34 +370,54 @@ export default function ContentPanel({
     setReadAloud(null)
   }, [selectedPath, data?.content, mode, effectiveShowRaw])
 
-  function startReadAloud(): void {
-    unlockAudio()
-    setReadAloud({ key: Date.now(), selection: selectedRangeWithin(selectionRootRef.current, document.getSelection()) })
+  function currentReadAloudSelection(): CapturedSelection | null {
+    const scope = selectionScope(selectionRootRef.current, data?.type ?? '')
+    return captureSelection(scope, scope?.ownerDocument.getSelection())
   }
 
-  const readAloudToggleRef = useRef<() => void>(() => undefined)
-  readAloudToggleRef.current = () => {
+  function startReadAloud(selection = currentReadAloudSelection()): void {
+    unlockAudio()
+    setReadAloud({ key: Date.now(), selection })
+  }
+
+  // Ctrl+Alt+S: start, or pause and resume while reading.
+  const readAloudPauseRef = useRef<() => void>(() => undefined)
+  readAloudPauseRef.current = () => {
     if (!canReadAloud) return
     if (readAloudActive) readAloudBarRef.current?.togglePause()
     else startReadAloud()
+  }
+  // Option+Esc (Alt+Esc), as macOS "speak selection": start, read a new selection, or stop.
+  const readAloudToggleRef = useRef<() => void>(() => undefined)
+  readAloudToggleRef.current = () => {
+    if (!canReadAloud) return
+    const selection = currentReadAloudSelection()
+    if (readAloudActive && !selection) setReadAloud(null)
+    else startReadAloud(selection)
   }
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.ctrlKey && event.altKey && !event.metaKey && event.code === 'KeyS') {
         event.preventDefault()
+        readAloudPauseRef.current()
+        return
+      }
+      if (event.key === 'Escape' && event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault()
         readAloudToggleRef.current()
         return
       }
       if (event.key === 'Escape' && readAloudActive) {
         const target = event.target instanceof Element ? event.target : null
-        if (target?.closest('input, textarea, select, [role="dialog"]')) return
+        if (target?.closest('input, textarea, select, [role="dialog"], [role="menu"], [role="listbox"]')) return
         setReadAloud(null)
       }
     }
     const handleNativeCommand = (event: Event) => {
       const command = (event as NativeAppCommandEvent).detail?.command
       if (command === 'read-aloud') readAloudToggleRef.current()
+      if (command === 'read-aloud-pause') readAloudPauseRef.current()
       if (command === 'read-aloud-stop') setReadAloud(null)
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -1118,7 +1139,7 @@ export default function ContentPanel({
                   else startReadAloud()
                 }}
                 aria-pressed={readAloudActive}
-                title="Read aloud (Ctrl+Alt+S)"
+                title={readAloudActive ? `Stop reading (${READ_ALOUD_SHORTCUT_LABEL})` : `Read aloud (${READ_ALOUD_SHORTCUT_LABEL})`}
               >
                 <SpeakerIcon />
                 {readAloudActive ? 'Stop reading' : 'Read aloud'}
