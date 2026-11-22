@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.19.1 - 2026-11-22
 
 - Read aloud follow-ups:
   - A text selection is kept and read. The Markdown preview rebuilt its whole DOM on every re-render, so starting to read cleared the selection and reading began at the first line.
