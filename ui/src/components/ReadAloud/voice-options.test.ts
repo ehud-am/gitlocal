@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { installedSayVoices, isKnownSayVoice, qualityLabel } from './voice-options'
+import { installedSayVoices, isKnownSayVoice, qualityLabel, readAloudShortcutLabel } from './voice-options'
 
 describe('voice options', () => {
   it('labels quality and lists installed say voices', () => {
@@ -16,5 +16,10 @@ describe('voice options', () => {
     expect(isKnownSayVoice(catalog, 'system')).toBe(true)
     expect(isKnownSayVoice(catalog, 'Albert')).toBe(true)
     expect(isKnownSayVoice(catalog, 'Nope')).toBe(false)
+  })
+
+  it('names the start/stop shortcut for the platform', () => {
+    expect(readAloudShortcutLabel('MacIntel')).toBe('Option+Esc')
+    expect(readAloudShortcutLabel('Win32')).toBe('Alt+Esc')
   })
 })

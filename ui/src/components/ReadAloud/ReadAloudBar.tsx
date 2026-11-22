@@ -5,10 +5,12 @@ import { ReadAloudController, type ReadAloudSnapshot } from './controller'
 import { SayEngine, WebSpeechEngine, loadLocalEnglishVoices, resolveWebVoice, type SpeechEngine, type SpeechError } from './engines'
 import { extractSentences, type ExtractOptions } from './extract'
 import { SentenceHighlighter } from './highlight'
-import { firstVisibleSentence, sentenceAtNode, sentencesInRange } from './selection'
+import { READ_ALOUD_PREFERENCE_EVENT, openReadAloudSettings } from './events'
+import { firstVisibleSentence, resolveCapturedSelection, selectionScope, sentenceAtNode, sentencesInRange, type CapturedSelection } from './selection'
 import type { SpeechSentence } from './speech-model'
-import VoiceSetup from './VoiceSetup'
-import { READ_ALOUD_RATES, SYSTEM_VOICE_ID, isKnownSayVoice, recommendedLabel } from './voice-options'
+import VoiceSelect from './VoiceSelect'
+import { READ_ALOUD_RATES, READ_ALOUD_SHORTCUT_LABEL, SYSTEM_VOICE_ID, isKnownSayVoice } from './voice-options'
+import type { ReadAloudPreference } from '../../services/readAloudApi'
 
 export interface ReadAloudBarHandle {
   togglePause: () => void
@@ -17,11 +19,9 @@ export interface ReadAloudBarHandle {
 interface Props {
   getRoot: () => HTMLElement | null
   options: ExtractOptions
-  selection: Range | null
+  selection: CapturedSelection | null
   onClose: () => void
 }
-
-const PREVIEW_SENTENCE = 'This is how GitLocal reads your documents.'
 
 function makeEngine(catalog: VoiceCatalog, voice: string, rate: number, webVoices: SpeechSynthesisVoice[]): SpeechEngine | null {
   if (catalog.engine === 'say') return new SayEngine(voice, rate)
@@ -45,7 +45,6 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
   const [snapshot, setSnapshot] = useState<ReadAloudSnapshot | null>(null)
   const [message, setMessage] = useState('')
   const [notice, setNotice] = useState('')
-  const [setupOpen, setSetupOpen] = useState(false)
   const controllerRef = useRef<ReadAloudController | null>(null)
   const sentencesRef = useRef<SpeechSentence[]>([])
   const voiceRef = useRef(voice)
@@ -58,7 +57,7 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
 
   useEffect(() => {
     let cancelled = false
-    async function start(): Promise<void> {
+    async function begin(): Promise<void> {
       const [loaded, preference] = await Promise.all([readAloudApi.voices(), readAloudApi.preference()])
       const voices = loaded.engine === 'web-speech' ? await loadLocalEnglishVoices(window.speechSynthesis) : []
       if (cancelled) return
@@ -76,12 +75,11 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
       setWebVoices(voices)
       setVoice(voiceId)
       setRate(preference.rate)
-      if (loaded.engine === 'say' && loaded.needsSetup) setSetupOpen(true)
 
       const { getRoot: readRoot, options: extractOptions, selection: selected } = startRef.current
       const root = readRoot()
       const all = root ? extractSentences(root, extractOptions) : []
-      const selectedIndices = sentencesInRange(all, selected)
+      const selectedIndices = sentencesInRange(all, resolveCapturedSelection(selectionScope(root, extractOptions.type), selected))
       const sentences = selectedIndices ? selectedIndices.map((index) => all[index]) : all
       if (sentences.length === 0) {
         setMessage(extractOptions.type === 'pdf' ? 'This PDF has no text to read.' : 'Nothing to read in this file.')
@@ -112,7 +110,9 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
       controllerRef.current = controller
       controller.start(selectedIndices ? 0 : firstVisibleSentence(sentences, window.innerHeight))
     }
-    void start()
+    begin().catch(() => {
+      if (!cancelled) setMessage('Read aloud could not start.')
+    })
     return () => {
       cancelled = true
       controllerRef.current?.stop()
@@ -128,6 +128,9 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Element | null
       if (!target || target.closest('a, button, input, select, textarea')) return
+      // A drag that selects text ends with a click; that is a new selection, not a jump.
+      const selection = root.ownerDocument.getSelection()
+      if (selection && !selection.isCollapsed) return
       const index = sentenceAtNode(sentencesRef.current, target)
       if (index >= 0) controllerRef.current?.start(index)
     }
@@ -135,30 +138,32 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
     return () => root.removeEventListener('click', handleClick)
   }, [])
 
-  const applyEngine = useCallback((nextVoice: string, nextRate: number) => {
+  const applyEngine = useCallback((nextVoice: string, nextRate: number, save = true) => {
     if (!catalog) return
     voiceRef.current = nextVoice
     rateRef.current = nextRate
     setVoice(nextVoice)
     setRate(nextRate)
-    void readAloudApi.savePreference({ voice: nextVoice, rate: nextRate })
+    if (save) void readAloudApi.savePreference({ voice: nextVoice, rate: nextRate })
     const engine = makeEngine(catalog, nextVoice, nextRate, webVoices)
     if (engine) controllerRef.current?.setEngine(engine)
   }, [catalog, webVoices])
 
-  const preview = useCallback((name: string) => {
-    controllerRef.current?.pause()
-    const engine = new SayEngine(name, rateRef.current)
-    void engine.prepare(PREVIEW_SENTENCE)
-      .then((audio) => engine.play(audio, PREVIEW_SENTENCE, new AbortController().signal))
-      .catch(() => setNotice(`Could not play ${name}.`))
+  // The settings dialog saved a new voice or speed: use it for the rest of this reading.
+  const applyEngineRef = useRef(applyEngine)
+  applyEngineRef.current = applyEngine
+  useEffect(() => {
+    const handlePreference = (event: Event) => {
+      const preference = (event as CustomEvent<ReadAloudPreference>).detail
+      if (preference) applyEngineRef.current(preference.voice, preference.rate, false)
+    }
+    window.addEventListener(READ_ALOUD_PREFERENCE_EVENT, handlePreference)
+    return () => window.removeEventListener(READ_ALOUD_PREFERENCE_EVENT, handlePreference)
   }, [])
 
   const controller = controllerRef.current
   const playing = snapshot?.state === 'playing' || snapshot?.state === 'loading'
-  const sayCatalog = catalog?.engine === 'say' ? catalog : null
-  const goodOther = sayCatalog?.otherInstalled.filter((candidate) => candidate.quality !== 'basic') ?? []
-  const basicOther = sayCatalog?.otherInstalled.filter((candidate) => candidate.quality === 'basic') ?? []
+  const needsSetup = catalog?.engine === 'say' && catalog.needsSetup && voice === SYSTEM_VOICE_ID
 
   return (
     <section className="read-aloud-bar" aria-label="Read aloud">
@@ -184,39 +189,7 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
         <div className="read-aloud-settings">
           <label className="read-aloud-field">
             <span>Voice</span>
-            <select value={voice} disabled={!catalog} onChange={(event) => applyEngine(event.target.value, rateRef.current)}>
-              {catalog?.engine === 'web-speech' ? (
-                <>
-                  <option value={SYSTEM_VOICE_ID}>Browser default voice</option>
-                  {webVoices.length > 0 ? (
-                    <optgroup label="On-device voices">
-                      {webVoices.map((candidate) => <option key={candidate.voiceURI} value={candidate.voiceURI}>{candidate.name}</option>)}
-                    </optgroup>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <option value={SYSTEM_VOICE_ID}>System voice</option>
-                  {sayCatalog ? (
-                    <optgroup label="Recommended">
-                      {sayCatalog.recommended.map((candidate) => (candidate.voice
-                        ? <option key={candidate.key} value={candidate.voice}>{recommendedLabel(candidate)}</option>
-                        : <option key={candidate.key} value={`missing:${candidate.key}`} disabled>{candidate.label} (not installed)</option>))}
-                    </optgroup>
-                  ) : null}
-                  {goodOther.length > 0 ? (
-                    <optgroup label="Other installed voices">
-                      {goodOther.map((candidate) => <option key={candidate.name} value={candidate.name}>{candidate.name}</option>)}
-                    </optgroup>
-                  ) : null}
-                  {basicOther.length > 0 ? (
-                    <optgroup label="Basic voices">
-                      {basicOther.map((candidate) => <option key={candidate.name} value={candidate.name}>{candidate.name}</option>)}
-                    </optgroup>
-                  ) : null}
-                </>
-              )}
-            </select>
+            <VoiceSelect catalog={catalog} webVoices={webVoices} value={voice} onChange={(next) => applyEngine(next, rateRef.current)} />
           </label>
           <label className="read-aloud-field">
             <span>Speed</span>
@@ -224,26 +197,17 @@ const ReadAloudBar = forwardRef<ReadAloudBarHandle, Props>(function ReadAloudBar
               {READ_ALOUD_RATES.map((value) => <option key={value} value={value}>{value}x</option>)}
             </select>
           </label>
-          {sayCatalog ? (
-            <button type="button" className="read-aloud-text-button" aria-expanded={setupOpen} onClick={() => setSetupOpen((open) => !open)}>
-              Voice setup
+          {needsSetup ? (
+            <button type="button" className="read-aloud-text-button" onClick={openReadAloudSettings}>
+              Get natural voices
             </button>
           ) : null}
-          <button type="button" className="panel-icon-button" aria-label="Stop reading" title="Stop reading (Esc)" onClick={onClose}>
+          <button type="button" className="panel-icon-button" aria-label="Stop reading" title={`Stop reading (Esc or ${READ_ALOUD_SHORTCUT_LABEL})`} onClick={onClose}>
             <CloseIcon />
           </button>
         </div>
       </div>
       {notice ? <p className="read-aloud-notice" role="status">{notice}</p> : null}
-      {sayCatalog && setupOpen ? (
-        <VoiceSetup
-          recommended={sayCatalog.recommended}
-          needsSetup={sayCatalog.needsSetup}
-          onRefresh={async () => setCatalog(await readAloudApi.voices(true))}
-          onPreview={preview}
-          onUse={(name) => applyEngine(name, rateRef.current)}
-        />
-      ) : null}
     </section>
   )
 })

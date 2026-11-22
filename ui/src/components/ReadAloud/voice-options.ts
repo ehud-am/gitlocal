@@ -3,6 +3,13 @@ import type { RecommendedVoice, SayVoice, VoiceCatalog, VoiceQuality } from '../
 export const SYSTEM_VOICE_ID = 'system'
 export const READ_ALOUD_RATES = [0.75, 1, 1.25, 1.5] as const
 
+// Option+Esc is the macOS shortcut for speaking the selection; Alt+Esc elsewhere.
+export function readAloudShortcutLabel(platform: string): string {
+  return /Mac|iPhone|iPad/.test(platform) ? 'Option+Esc' : 'Alt+Esc'
+}
+
+export const READ_ALOUD_SHORTCUT_LABEL = readAloudShortcutLabel(navigator.platform || navigator.userAgent)
+
 export function qualityLabel(quality: VoiceQuality | null): string {
   return quality === 'premium' ? 'Premium' : quality === 'enhanced' ? 'Enhanced' : 'Basic'
 }

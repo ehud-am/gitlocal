@@ -234,14 +234,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleTerminalItem.target = controller
         viewMenu.addItem(toggleTerminalItem)
         viewMenu.addItem(NSMenuItem.separator())
+        // Option+Esc matches the macOS "speak selection" shortcut: start, read a new selection, or stop.
         let readAloudItem = NSMenuItem(
             title: "Read Aloud",
             action: #selector(ViewerWindowController.readAloud(_:)),
-            keyEquivalent: "s"
+            keyEquivalent: "\u{1b}"
         )
-        readAloudItem.keyEquivalentModifierMask = [.control, .option]
+        readAloudItem.keyEquivalentModifierMask = [.option]
         readAloudItem.target = controller
         viewMenu.addItem(readAloudItem)
+        let pauseReadingItem = NSMenuItem(
+            title: "Pause or Resume Reading",
+            action: #selector(ViewerWindowController.pauseReading(_:)),
+            keyEquivalent: "s"
+        )
+        pauseReadingItem.keyEquivalentModifierMask = [.control, .option]
+        pauseReadingItem.target = controller
+        viewMenu.addItem(pauseReadingItem)
         let stopReadingItem = NSMenuItem(
             title: "Stop Reading",
             action: #selector(ViewerWindowController.stopReading(_:)),
@@ -249,6 +258,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         stopReadingItem.target = controller
         viewMenu.addItem(stopReadingItem)
+        let readAloudVoicesItem = NSMenuItem(
+            title: "Read Aloud Voices…",
+            action: #selector(ViewerWindowController.readAloudVoices(_:)),
+            keyEquivalent: ""
+        )
+        readAloudVoicesItem.target = controller
+        viewMenu.addItem(readAloudVoicesItem)
         viewMenu.addItem(NSMenuItem.separator())
         let toggleDotfilesItem = NSMenuItem(
             title: "Hide Dotfiles",

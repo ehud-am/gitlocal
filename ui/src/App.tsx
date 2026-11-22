@@ -12,6 +12,8 @@ import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPa
 import { useTerminalPanelPreference } from './hooks/useTerminalPanelPreference'
 import AppFooter from './components/AppFooter'
 import GoToPathDialog from './components/GoToPath/GoToPathDialog'
+import ReadAloudSettingsDialog from './components/ReadAloud/ReadAloudSettingsDialog'
+import { openReadAloudSettings } from './components/ReadAloud/events'
 import { resolveGoToPath } from './lib/go-to-path'
 import {
   FolderDeleteDialog,
@@ -20,7 +22,7 @@ import {
 } from './components/AppDialogs'
 import { Button } from './components/ui/button'
 import { Switch } from './components/ui/switch'
-import { GoToPathIcon, ParentFolderIcon, PanelToggleIcon, RefreshIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
+import { GoToPathIcon, ParentFolderIcon, PanelToggleIcon, RefreshIcon, SpeakerIcon, TerminalIcon, ThemeIcon, ViewOptionsIcon } from './components/ui/icons'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -1532,6 +1534,10 @@ export default function App() {
                     <RefreshIcon spinning={refreshingCurrentView} />
                     {refreshingCurrentView ? 'Refreshing...' : 'Refresh'}
                   </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2" onSelect={openReadAloudSettings}>
+                    <SpeakerIcon />
+                    Read aloud voices…
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuCheckboxItem
                     checked={hideDotfiles}
@@ -1795,6 +1801,7 @@ export default function App() {
         <AppFooter version={info?.version ?? ''} />
       </div>
 
+      <ReadAloudSettingsDialog />
       <GoToPathDialog
         open={goToPathOpen}
         rootPath={info?.path ?? ''}

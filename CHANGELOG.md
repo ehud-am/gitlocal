@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Read aloud follow-ups:
+  - A text selection is kept and read. The Markdown preview rebuilt its whole DOM on every re-render, so starting to read cleared the selection and reading began at the first line.
+  - Option+Esc (Alt+Esc off macOS) starts reading the preview or the selection, reads a new selection, or stops; Ctrl+Alt+S pauses and resumes. The macOS app's View menu has Read Aloud (Option+Esc), Pause or Resume Reading, Stop Reading and Read Aloud Voices….
+  - The Read aloud button only starts reading. Voice, speed and voice install guidance moved to a "Read aloud voices" dialog under View options (browser) or View > Read Aloud Voices… (macOS app). The player bar shows "Get natural voices" when no recommended voices are installed.
+  - Selections inside the HTML preview are read.
+  - A drag that selects text while reading no longer moves reading to where the drag ended.
+  - Skipped sentences stop using the speech server: prepared sentences are cancelled on a jump or stop, and the server does not start `say` for a cancelled request.
+  - Stopping while paused no longer leaves audio suspended.
+  - A start failure shows "Read aloud could not start." instead of "Preparing…".
+
 ## 0.19.0 - 2026-11-21
 
 - Read aloud ([#139](https://github.com/ehud-am/gitlocal/issues/139)): a "Read aloud" button (Ctrl+Alt+S; View menu in the macOS app) reads the open preview, or the selected text, one sentence at a time and highlights the sentence being read. Headings are read on their own with longer pauses. Works for Markdown, text, code comments, JSON, CSV, Excel, Word, PowerPoint (slides and speaker notes), PDF and SVG.

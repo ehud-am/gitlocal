@@ -83,13 +83,22 @@ final class ViewerWindowController: NSWindowController, WKScriptMessageHandler, 
         dispatchNativeCommand("toggle-terminal")
     }
 
-    // Read aloud (#139): starts or pauses reading the open preview, and stops it.
+    // Read aloud (#139): start or stop reading the open preview (or the selection), pause or
+    // resume it, stop it, and open the voice settings.
     @objc func readAloud(_ sender: Any?) {
         dispatchNativeCommand("read-aloud")
     }
 
+    @objc func pauseReading(_ sender: Any?) {
+        dispatchNativeCommand("read-aloud-pause")
+    }
+
     @objc func stopReading(_ sender: Any?) {
         dispatchNativeCommand("read-aloud-stop")
+    }
+
+    @objc func readAloudVoices(_ sender: Any?) {
+        dispatchNativeCommand("read-aloud-settings")
     }
 
     @objc func toggleDotfiles(_ sender: Any?) {

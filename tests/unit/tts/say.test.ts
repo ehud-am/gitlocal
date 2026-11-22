@@ -5,6 +5,7 @@ import {
   SPOKEN_CONTENT_SETTINGS_URLS,
   SayError,
   SilentAudioError,
+  SpeechCancelledError,
   isSayAvailable,
   isSilentWav,
   listInstalledVoices,
@@ -134,6 +135,15 @@ describe('synthesize', () => {
     })
     await Promise.all([1, 2, 3, 4].map(() => synthesize({ text: 'x', voice: 'system', rate: 1 })))
     expect(peak).toBe(2)
+  })
+
+  it('does not run say for a request cancelled before it started', async () => {
+    const calls: { command: string; args: string[]; input?: string }[] = []
+    setSayCommandRunner(sayRunner(wav([3000]), calls))
+    const abort = new AbortController()
+    abort.abort()
+    await expect(synthesize({ text: 'x', voice: 'system', rate: 1, signal: abort.signal })).rejects.toBeInstanceOf(SpeechCancelledError)
+    expect(calls).toEqual([])
   })
 })
 

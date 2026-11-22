@@ -9,7 +9,7 @@ export class SpeechError extends Error {
 }
 
 export interface SpeechEngine {
-  prepare(text: string): Promise<unknown>
+  prepare(text: string, signal?: AbortSignal): Promise<unknown>
   play(prepared: unknown, text: string, signal: AbortSignal): Promise<void>
   pause(): void
   resume(): void
@@ -58,9 +58,10 @@ export class SayEngine implements SpeechEngine {
     private readonly context: () => AudioContext | null = getAudioContext,
   ) {}
 
-  async prepare(text: string): Promise<AudioBuffer> {
+  async prepare(text: string, signal?: AbortSignal): Promise<AudioBuffer> {
     const response = await this.fetchImpl('/api/tts/say', {
       method: 'POST',
+      signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, voice: this.voice, rate: this.rate }),
     })

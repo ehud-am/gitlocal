@@ -264,4 +264,27 @@ describe('ReadAloudController', () => {
     await flush()
     expect(pausing.played).toEqual([])
   })
+
+  it('aborts prepared sentences that a jump skips, and resumes the audio when stopped while paused', async () => {
+    const engine = fakeEngine()
+    const signals: AbortSignal[] = []
+    engine.prepare = vi.fn(async (text: string, signal?: AbortSignal) => {
+      signals.push(signal!)
+      return text
+    })
+    const { controller } = setup(['A', 'B', 'C', 'D', 'E', 'F'].map((text) => sentence(text)), engine)
+    controller.start(0)
+    await flush()
+    expect(signals).toHaveLength(3)
+    controller.start(4)
+    await flush()
+    expect(signals.slice(0, 3).map((signal) => signal.aborted)).toEqual([true, true, true])
+    expect(signals.slice(3).every((signal) => !signal.aborted)).toBe(true)
+    controller.pause()
+    controller.stop()
+    expect(engine.resume).toHaveBeenCalledTimes(1)
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    controller.stop()
+    expect(engine.resume).toHaveBeenCalledTimes(1)
+  })
 })

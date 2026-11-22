@@ -98,11 +98,17 @@ export interface SynthesizeRequest {
   text: string
   voice: string
   rate: number
+  // Aborted when the page no longer needs this sentence (the reader skipped ahead or stopped).
+  signal?: AbortSignal
 }
 
+export class SpeechCancelledError extends SayError {}
+
 // One sentence to 16-bit 22.05 kHz WAV. The text goes to `say` on stdin, never as an argument.
-export function synthesize({ text, voice, rate }: SynthesizeRequest): Promise<Buffer> {
+export function synthesize({ text, voice, rate, signal }: SynthesizeRequest): Promise<Buffer> {
   return withJobSlot(async () => {
+    // A request cancelled while it waited for a slot never starts `say`.
+    if (signal?.aborted) throw new SpeechCancelledError('Speech request cancelled.')
     const dir = await mkdtemp(join(tmpdir(), 'gitlocal-say-'))
     const output = join(dir, 'speech.wav')
     try {

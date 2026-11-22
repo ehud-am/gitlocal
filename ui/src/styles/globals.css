@@ -2660,6 +2660,19 @@ pre {
   color: var(--warning);
 }
 
+.read-aloud-settings-dialog {
+  max-height: 90vh;
+  overflow-y: auto;
+  font-size: 0.875rem;
+}
+
+.read-aloud-settings-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
 .read-aloud-setup {
   margin-top: 8px;
   border-top: 1px solid var(--border);

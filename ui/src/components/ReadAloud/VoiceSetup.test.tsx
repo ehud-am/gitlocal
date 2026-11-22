@@ -11,6 +11,8 @@ const base: RecommendedVoice = { key: 'k', label: 'Zoe', gender: 'female', local
 
 describe('VoiceSetup', () => {
   it('describes each voice status and explains failures to open settings', async () => {
+    const onPreview = vi.fn()
+    const onUse = vi.fn()
     render(
       <VoiceSetup
         recommended={[
@@ -21,10 +23,14 @@ describe('VoiceSetup', () => {
         ]}
         needsSetup
         onRefresh={async () => undefined}
-        onPreview={() => undefined}
-        onUse={() => undefined}
+        onPreview={onPreview}
+        onUse={onUse}
       />,
     )
+    fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Use' })[1])
+    expect(onPreview).toHaveBeenCalledWith('A (Premium)')
+    expect(onUse).toHaveBeenCalledWith('B (Enhanced)')
     expect(screen.getByText('Installed (Premium)')).toBeInTheDocument()
     expect(screen.getByText('Installed (Enhanced). Premium available')).toBeInTheDocument()
     expect(screen.getByText('Only the basic version is installed. Download Premium')).toBeInTheDocument()

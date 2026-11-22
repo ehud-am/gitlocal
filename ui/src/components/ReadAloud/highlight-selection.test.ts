@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HIGHLIGHT_NAME, SentenceHighlighter } from './highlight'
-import { firstVisibleSentence, selectedRangeWithin, sentenceAtNode, sentencesInRange } from './selection'
+import { captureSelection, firstVisibleSentence, resolveCapturedSelection, selectedRangeWithin, selectionScope, sentenceAtNode, sentencesInRange } from './selection'
 import type { SpeechSentence } from './speech-model'
 
 function rangeOf(node: Node): Range {
@@ -109,5 +109,36 @@ describe('selection helpers', () => {
     Object.assign(sentences[0].range!, { getBoundingClientRect: () => ({ top: -50, bottom: -10, height: 40 }) })
     Object.assign(sentences[2].range!, { getBoundingClientRect: () => ({ top: 10, bottom: 30, height: 20 }) })
     expect(firstVisibleSentence(sentences, 800)).toBe(2)
+  })
+
+  it('captures selections as offsets and rebuilds them after a re-render', () => {
+    document.body.innerHTML = '<div id="root"><p>Alpha.</p><p>Beta <b>bold</b> end.</p></div>'
+    const root = document.getElementById('root')!
+    const selection = document.getSelection()!
+    selection.removeAllRanges()
+    expect(captureSelection(root, selection)).toBeNull()
+    expect(resolveCapturedSelection(root, null)).toBeNull()
+    selection.addRange(rangeOf(root.querySelectorAll('p')[1]))
+    const captured = captureSelection(root, selection)!
+    expect(captured).toMatchObject({ start: 6, end: 20 })
+    expect(resolveCapturedSelection(root, captured)).toBe(captured.range)
+    root.innerHTML = '<p>Alpha.</p><p>Beta <b>bold</b> end.</p>'
+    expect(resolveCapturedSelection(root, captured)?.toString()).toBe('Beta bold end.')
+    root.innerHTML = ''
+    expect(resolveCapturedSelection(root, captured)).toBeNull()
+    root.innerHTML = '<p>Al</p>'
+    expect(resolveCapturedSelection(root, { ...captured, start: 9, end: 9 })).toBeNull()
+    selection.removeAllRanges()
+  })
+
+  it('uses the HTML preview frame body as the selection scope', () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const root = document.getElementById('root')!
+    expect(selectionScope(null, 'html')).toBeNull()
+    expect(selectionScope(root, 'markdown')).toBe(root)
+    expect(selectionScope(root, 'html')).toBe(root)
+    const frame = document.createElement('iframe')
+    root.appendChild(frame)
+    expect(selectionScope(root, 'html')).toBe(frame.contentDocument!.body)
   })
 })

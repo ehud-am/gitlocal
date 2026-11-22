@@ -31,7 +31,7 @@ export class ReadAloudController {
   private error: string | null = null
   private generation = 0
   private abort: AbortController | null = null
-  private cache = new Map<number, Promise<unknown>>()
+  private cache = new Map<number, { audio: Promise<unknown>; abort: AbortController }>()
   private paused = false
   private resumeWaiters: (() => void)[] = []
   private readonly lookahead: number
@@ -52,6 +52,7 @@ export class ReadAloudController {
     this.abort?.abort()
     this.engine.stop()
     this.index = Math.max(0, Math.min(index, this.sentences.length))
+    this.dropCache((cached) => cached < this.index || cached > this.index + this.lookahead)
     this.error = null
     if (this.paused) {
       this.paused = false
@@ -86,6 +87,9 @@ export class ReadAloudController {
     this.generation += 1
     this.abort?.abort()
     this.engine.stop()
+    // A paused SayEngine has suspended the shared audio context; leave it running for the next read.
+    if (this.paused) this.engine.resume()
+    this.dropCache(() => true)
     this.paused = false
     this.releaseWaiters()
     this.options.onSentence(null)
@@ -122,7 +126,7 @@ export class ReadAloudController {
     this.abort?.abort()
     this.engine.stop()
     this.engine = engine
-    this.cache.clear()
+    this.dropCache(() => true)
     if (wasActive) this.start(this.index)
   }
 
@@ -144,14 +148,25 @@ export class ReadAloudController {
     }
   }
 
-  private prepared(index: number): Promise<unknown> {
-    let pending = this.cache.get(index)
-    if (!pending) {
-      pending = this.engine.prepare(this.sentences[index].text)
-      pending.catch(() => undefined)
-      this.cache.set(index, pending)
+  // Aborts and forgets prepared sentences, so skipped sentences stop using the speech server.
+  private dropCache(shouldDrop: (index: number) => boolean): void {
+    for (const [index, entry] of this.cache) {
+      if (!shouldDrop(index)) continue
+      entry.abort.abort()
+      this.cache.delete(index)
     }
-    return pending
+  }
+
+  private prepared(index: number): Promise<unknown> {
+    let entry = this.cache.get(index)
+    if (!entry) {
+      const abort = new AbortController()
+      const audio = this.engine.prepare(this.sentences[index].text, abort.signal)
+      audio.catch(() => undefined)
+      entry = { audio, abort }
+      this.cache.set(index, entry)
+    }
+    return entry.audio
   }
 
   private async run(generation: number): Promise<void> {
@@ -187,7 +202,7 @@ export class ReadAloudController {
         const replacement = error instanceof SpeechError ? this.options.onEngineFailure?.(error) ?? null : null
         if (replacement) {
           this.engine = replacement
-          this.cache.clear()
+          this.dropCache(() => true)
           continue
         }
         this.error = error instanceof Error && error.message ? error.message : 'Speech failed.'
