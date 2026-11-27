@@ -1,7 +1,7 @@
 {
   "name": "gitlocal",
   "version": "0.19.1",
-  "description": "Browse local folders and git repositories in your browser",
+  "description": "View code and documents in one local git repo: Markdown, Word, Excel, PowerPoint, PDF, and images, in your browser",
   "keywords": [
     "git",
     "repository",
@@ -13,6 +13,12 @@
     "github-like",
     "code viewer",
     "markdown viewer",
+    "docx viewer",
+    "xlsx viewer",
+    "pptx viewer",
+    "pdf viewer",
+    "docs as code",
+    "product management",
     "browser-based git ui",
     "gitlocal"
   ],

@@ -121,19 +121,22 @@ def screenshot_frames(image_name, duration, caption, char_dur=0.02, type_start=0
         yield fade(img.convert("RGB"), t, duration)
 
 
-# Total runtime is capped at 20 s: 3.0 + 5 x 2.2 + 3.4 + 2.6 = 20.0
+# Total runtime: 3.0 + 7 x 2.2 + 2.6 = 21.0 s
+# shot11-shot17 are screenshots of a demo product repo that keeps code, a Markdown
+# spec, a PowerPoint deck, an Excel sheet, a Word doc, a PDF, and an image together.
 def sequence():
     yield from card_frames(
-        3.0, ["Designed for builders.", "Not just developers."], [WHITE, ACCENT],
-        eyebrow="GITLOCAL", subtext="A local, GitHub-style viewer for the code your AI agent wrote",
+        3.0, ["Code and docs.", "One repo. One viewer."], [WHITE, ACCENT],
+        eyebrow="GITLOCAL", subtext="For product managers and builders who keep everything in git",
         char_dur=0.035)
     shots = [
-        ("shot2-browse.jpg", 2.2, "Browse your repo like GitHub, right on your machine"),
-        ("shot3-markdown.jpg", 2.2, "Read Markdown the way it was meant to be read"),
-        ("shot5-search.jpg", 2.2, "Search file names and contents across the repo"),
-        ("shot6-review.jpg", 2.2, "See exactly what your agent changed"),
-        ("shot8-excel.jpg", 2.2, "Preview PDFs, spreadsheets, decks, and more"),
-        ("shot1-claude-split.jpg", 3.4, "Split the screen: run Claude right beside your code"),
+        ("shot11-repo-tree.jpg", 2.2, "Code, specs, decks, and data in one git repo"),
+        ("shot12-spec.jpg", 2.2, "Read Markdown specs the way they were meant to be read"),
+        ("shot13-deck.jpg", 2.2, "Open PowerPoint decks in place"),
+        ("shot14-sheet.jpg", 2.2, "See Excel sheets and their charts"),
+        ("shot15-word.jpg", 2.2, "Read Word documents as pages"),
+        ("shot16-pdf.jpg", 2.2, "Preview PDFs without downloading them"),
+        ("shot17-review.jpg", 2.2, "Review what changed, across code and docs"),
     ]
     for name, dur, caption in shots:
         yield from screenshot_frames(name, dur, caption)
