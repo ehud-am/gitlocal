@@ -1,6 +1,6 @@
 {
   "name": "gitlocal",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "View code and documents in one local git repo: Markdown, Word, Excel, PowerPoint, PDF, and images, in your browser",
   "keywords": [
     "git",

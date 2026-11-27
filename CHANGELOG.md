@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.19.2 - 2026-11-27
+
+- New positioning: GitLocal is for product managers and other builders who keep code and supporting documents (Markdown specs, Word, Excel, PowerPoint, PDF, images) in one git repository instead of splitting them across GitHub, Google Docs, and Atlassian tools ([#144](https://github.com/ehud-am/gitlocal/pull/144)).
+  - README, npm README, gitlocal.dev (home, features, previews, FAQ, community) and `llms.txt` rewritten around this. The site has a "Why one repo" section, a "Who is GitLocal for?" FAQ entry, and a new home screenshot.
+  - The promo video and README/site GIF were rebuilt from screenshots of a sample repository that mixes code, a spec, a deck, a spreadsheet, a Word document and a PDF.
+  - npm package description and keywords, and the Homebrew cask description, updated.
+  - Constitution 3.4.0: the audience section names this audience and workflow.
+- No application code changed.
+
 ## 0.19.1 - 2026-11-22
 
 - Read aloud follow-ups:
