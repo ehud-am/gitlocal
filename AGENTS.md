@@ -61,7 +61,7 @@ ui/dist/      # Compiled UI bundle (gitignored)
 
 ## Product Direction
 
-GitLocal is for less-technical builders working in an AI-driven development lifecycle. The product should optimize for codebase browsing, Markdown reading, review, and lightweight human intervention rather than full-IDE workflows.
+GitLocal is for product managers and other less-technical builders working in an AI-driven development lifecycle who keep code and supporting documents (Markdown specs, Word, Excel, PowerPoint, PDF, images) in one git repository instead of splitting them across GitHub, Google Docs, and Atlassian tools. The product should optimize for browsing, reading and previewing every file type in the repository, review, and lightweight human intervention rather than full-IDE workflows. User-facing copy (README, `packaging/npm/README.md`, gitlocal.dev, `docs/llms.txt`, the promo video in `docs/assets/promo-src/`, package and cask descriptions) leads with this positioning.
 
 GitLocal has two distributions using the same app code:
 - npm package: cross-platform, one-command install, browser-based, requires the terminal process to stay open.

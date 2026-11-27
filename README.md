@@ -4,7 +4,7 @@
   <img src="ui/public/gitlocal-logo.svg" alt="GitLocal icon" width="96" height="96">
 </p>
 
-<p align="center"><strong>A GitHub-like local viewer for the AI coding era — browse, read, and review the code your agents wrote, without opening a full IDE.</strong></p>
+<p align="center"><strong>One git repo for your code and your docs. GitLocal opens all of it locally: code, Markdown, Word, Excel, PowerPoint, PDF, and images.</strong></p>
 
 [![CI](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehud-am/gitlocal/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/gitlocal)](https://www.npmjs.com/package/gitlocal)
@@ -17,12 +17,16 @@
 
 **Community:** got an idea, a question, or a rough edge? [Start a discussion](https://github.com/ehud-am/gitlocal/discussions) or [open an issue](https://github.com/ehud-am/gitlocal/issues/new/choose). GitLocal is built in the open, and [your input shapes it](#help-shape-gitlocal).
 
-When AI agents do most of the code generation, direct hand-editing of source files becomes the exception rather than the default. A full IDE can be overkill for that. GitLocal focuses on the work humans still need to do constantly: browse the codebase, understand structure, read Markdown documents clearly, inspect changes, and make small edits when needed. Editing remains possible, but the product is optimized first for navigation, reading, review, and lightweight intervention — plus an integrated terminal for when you need to hand something back to an agent.
+GitLocal is for product managers and other builders who are not full-time programmers. A product repo holds more than code: specs, Markdown notes, slide decks, Word documents, spreadsheets, PDFs, and images. Many teams split that across GitHub for code, Google Docs for documents, and Atlassian tools for specs. GitLocal lets you keep all of it in one git repository and view every file in place.
+
+- **One repo, one history.** Code, specs, decks, and spreadsheets are versioned, branched, and reviewed together in git.
+- **Every file opens in place.** Built-in viewers for Word, Excel, PowerPoint, PDF, CSV, SVG, HTML, Markdown, and images, where GitHub's web UI often offers only a download.
+- **No IDE required.** Browse, read, search, review what changed, and make small edits. An integrated terminal is there when you want to run an AI coding agent such as Claude Code or Codex.
 
 Everything runs locally, there are no accounts or telemetry, and any clone, fetch, pull, or push action goes through your installed `git` only when you choose it.
 
 <p align="center">
-  <img src="docs/assets/gitlocal-demo.gif" alt="GitLocal demo: browsing a repo, reading Markdown, searching, reviewing changes, previewing files, and running Claude in a split-screen terminal" width="800">
+  <img src="docs/assets/gitlocal-demo.gif" alt="GitLocal demo: one repository with code and documents, reading a Markdown spec, previewing a PowerPoint deck, an Excel sheet and a PDF, reviewing changes, and running an AI agent in a split-screen terminal" width="800">
 </p>
 
 ---
@@ -117,10 +121,10 @@ Use the macOS app beta if you are on a Mac and want a normal app experience with
 
 ## What GitLocal Helps With
 
+- **Open documents next to code** with built-in Word (`.docx`), Excel (`.xlsx`/`.xls`), PowerPoint (`.pptx`), PDF, CSV, SVG, and HTML viewers alongside Markdown, JSON, and images. These are files GitHub's web UI often can't render inline and offers only as a raw download.
 - **Browse local projects** with a lazy-loading, keyboard-navigable file tree (arrow keys, Enter/Space) for regular folders and git repositories.
 - **Keep several files open in tabs**, like a code editor: opening a file adds a tab next to a folder tab, and closing the last file tab returns to the folder view. Open tabs survive a reload.
 - **Read Markdown clearly** in the normal repository viewer with GitHub-like rendering, relative links, heading anchors, rendered find highlights, and share/copy actions.
-- **Preview beyond code, locally** with built-in PDF, SVG, CSV, Word (`.docx`), Excel (`.xlsx`/`.xls`), PowerPoint (`.pptx`), and HTML viewers alongside Markdown, JSON, and images — files GitHub's web UI often can't render inline and falls back to a raw download for.
 - **Start from useful repository context** with a root dashboard for status, key documents, recent files, recently changed files, and raw directory browsing.
 - **Review background changes** with active-file refresh/deletion notices and a changed-files panel for modified, deleted, untracked, generated, and local-only paths.
 - **Search intentionally** with a separate repository search surface, current-folder and Markdown-focused scopes, generated/local controls, result counts, and file-level find inside the current file.
@@ -139,7 +143,7 @@ GitLocal supports light and dark themes. The macOS app also supports native menu
 
 ## Help Shape GitLocal
 
-GitLocal is built in the open for people working with AI coding tools, and it gets better when those people tell us what they need. You don't have to write code to take part:
+GitLocal is built in the open for product managers and builders who keep their work in git, and it gets better when those people tell us what they need. You don't have to write code to take part:
 
 - **Share an idea or a wish** in [Discussions → Ideas](https://github.com/ehud-am/gitlocal/discussions/categories/ideas). Describe the job you're trying to get done, and we'll figure out the rest together.
 - **Ask a question or show how you use it** in [Q&A](https://github.com/ehud-am/gitlocal/discussions/categories/q-a) and [Show and tell](https://github.com/ehud-am/gitlocal/discussions/categories/show-and-tell).

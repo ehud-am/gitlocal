@@ -1,6 +1,6 @@
 # gitlocal Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-11-22
+Auto-generated from all feature plans. Last updated: 2026-11-27
 
 ## Active Technologies
 - **Runtime**: Node.js 22+ (active LTS), TypeScript 5.x
@@ -37,7 +37,7 @@ Releases (constitution Principle IX): start one only after the maintainer approv
 
 ## Product Direction
 
-GitLocal is for less-technical builders working in an AI-driven development lifecycle. The product should optimize for codebase browsing, Markdown reading, review, and lightweight human intervention rather than full-IDE workflows.
+GitLocal is for product managers and other less-technical builders working in an AI-driven development lifecycle who keep code and supporting documents (Markdown specs, Word, Excel, PowerPoint, PDF, images) in one git repository instead of splitting them across GitHub, Google Docs, and Atlassian tools. The product should optimize for browsing, reading and previewing every file type in the repository, review, and lightweight human intervention rather than full-IDE workflows. User-facing copy (README, `packaging/npm/README.md`, gitlocal.dev, `docs/llms.txt`, the promo video in `docs/assets/promo-src/`, package and cask descriptions) leads with this positioning.
 
 GitLocal has two distributions using the same app code:
 - npm package: cross-platform, one-command install, browser-based, requires the terminal process to stay open.
@@ -54,6 +54,7 @@ Applies to every contributor and every Claude session working on this repository
 TypeScript 5.x + Node.js 22+: follow standard conventions. Use `.js` extensions on all imports (NodeNext module resolution). Keep product server, CLI, and UI behavior in the existing TypeScript/React stack. Swift is permitted only for the scoped macOS native wrapper under `native/macos/`, and shell/Ruby packaging files are permitted only for Homebrew/macOS release automation under `packaging/macos/` and `.github/workflows/`.
 
 ## Recent Changes
+- 0.19.2 (#144, positioning only, no app code): user-facing copy repositioned for product managers and builders who keep code and documents in one repo (see Product Direction); constitution 3.4.0 audience section. Promo video/GIF regenerate with `docs/assets/promo-src/build_promo.py` (Pillow + ffmpeg); its screenshots `shot11`-`shot17` and `docs/assets/site/screenshot-repo.jpg` come from a throwaway demo repo (python-docx/python-pptx/openpyxl/reportlab generated, not committed) opened in the built app and captured with Playwright at 1280x896. See `releases/0.19.2-release-review.md`.
 - 0.19.1 (#142, read aloud follow-ups): `MarkdownRenderer` builds its react-markdown element renderers once (`createComponents` + a props ref); inline renderers were new component types on every render, so React replaced the Markdown DOM on each re-render, which cleared selections and detached read-aloud ranges. Read-aloud selections are captured as a range plus text offsets (`captureSelection`/`resolveCapturedSelection` in `ReadAloud/selection.ts`; HTML preview uses the frame body via `selectionScope`). Shortcuts: Option/Alt+Esc start/new selection/stop, Ctrl+Alt+S pause, Esc stop; native commands `read-aloud`, `read-aloud-pause`, `read-aloud-stop`, `read-aloud-settings`. Voice settings are `ReadAloudSettingsDialog` (View options item / macOS View > Read Aloud Voices…), linked to an active bar by window events in `ReadAloud/events.ts`. The controller aborts prefetches outside the lookahead window; `synthesize` skips requests aborted while queued. See `releases/0.19.1-release-review.md`.
 - 0.19.0 (#139, #140, read aloud): `ui/src/components/ReadAloud/` extracts sentences from the preview DOM (selection root), plays them through `ReadAloudController`, highlights with the CSS Custom Highlight API `read-aloud-sentence` (overlay fallback). Engines: macOS `SayEngine` (server runs `/usr/bin/say` via async spawn, `src/tts/say.ts`, routes `/api/tts/*` + `/api/read-aloud-preference`, loopback-only), else `WebSpeechEngine` with `localService` voices only. Voice list/recommendations in `src/tts/voices.ts`; preference in `~/.gitlocal/read-aloud-preference.json`. PPTX gets `data-speech-role` attributes and renders all slides under `ReadAloudRenderAllContext`; PDF gained a pdf.js text layer. macOS app: View menu Read Aloud/Stop Reading, `mediaTypesRequiringUserActionForPlayback = []`. See `releases/0.19.0-release-review.md`.
 - 0.18.1 (#137, #136): `node-pty` 1.1.0 ships the macOS prebuilt `spawn-helper` at mode 0644, so every terminal spawn fails ("posix_spawnp failed"); `ensureSpawnHelperExecutable` (`src/terminal/spawn-helper.ts`) restores the execute bit before the first spawn, and `scripts/verify-node-pty.mjs` does it at install. The folder view's table has a ".." row (`onOpenParent` prop on `ContentPanel`, wired to `handleNavigateParent` in `App.tsx`, omitted at the filesystem root). See `releases/0.18.1-release-review.md`.

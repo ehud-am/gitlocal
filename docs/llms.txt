@@ -1,10 +1,10 @@
 # GitLocal
 
-> GitLocal is a free, local-first, GitHub-style viewer for local folders and git repositories. It is built for browsing codebases, reading Markdown, reviewing changes, and making small edits without opening a full IDE.
+> GitLocal is a free, local-first viewer for git repositories that hold both code and documents. It is built for product managers and other builders who keep code, specs, slide decks, Word documents, spreadsheets, PDFs, and images in one git repository instead of splitting them across GitHub, Google Docs, and Atlassian tools.
 
 GitLocal runs entirely on the user's machine, with no accounts or telemetry. Clone, fetch, pull, and push actions go through the user's locally installed `git` only, and only when the user chooses to run them. It ships as a cross-platform npm package (macOS, Windows, Linux) and a native macOS app (beta, via Homebrew).
 
-Core features: a lazy-loading keyboard-navigable file tree, GitHub-like Markdown rendering with relative links and heading anchors, a changed-files review panel, repository-wide search, a plain-language git status summary, safe local file/folder editing with revision-token conflict protection, and an integrated terminal docked to the right, left, or bottom of the window (plain shell tabs) for handing work back to an AI coding agent.
+Core features: built-in local viewers for Word (.docx), Excel (.xlsx/.xls), PowerPoint (.pptx), PDF, CSV, SVG, and HTML files alongside Markdown, JSON, and images; a lazy-loading keyboard-navigable file tree, GitHub-like Markdown rendering with relative links and heading anchors, a changed-files review panel, repository-wide search, a plain-language git status summary, safe local file/folder editing with revision-token conflict protection, and an integrated terminal docked to the right, left, or bottom of the window (plain shell tabs) for handing work back to an AI coding agent.
 
 ## Site
 - [Features](https://gitlocal.dev/features/): Overview of everything GitLocal does, with a page for each topic: [browse](https://gitlocal.dev/features/browse/), [search](https://gitlocal.dev/features/search/), [Markdown](https://gitlocal.dev/features/markdown/), [file previews](https://gitlocal.dev/features/previews/), [review changes](https://gitlocal.dev/features/review/), [git state](https://gitlocal.dev/features/git-state/), [safe edits](https://gitlocal.dev/features/edit/), [terminal](https://gitlocal.dev/features/terminal/)

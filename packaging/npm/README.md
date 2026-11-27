@@ -5,7 +5,9 @@
 [![Discussions](https://img.shields.io/badge/discussions-join%20in-8957e5)](https://github.com/ehud-am/gitlocal/discussions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ehud-am/gitlocal/blob/main/LICENSE)
 
-GitLocal is a local folder and git repository viewer that opens in your browser. It is built for browsing codebases, reading Markdown, reviewing changes, and making small local edits without needing a full IDE.
+GitLocal is a local viewer for git repositories that hold both code and documents. It is built for product managers and other builders who keep code, specs, slide decks, Word documents, spreadsheets, PDFs, and images in one repository, instead of splitting them across GitHub, Google Docs, and Atlassian tools.
+
+GitLocal opens in your browser and shows every file in place: browse, read Markdown, preview Office files and PDFs, review what changed, and make small edits, without a full IDE.
 
 **Website:** https://gitlocal.dev
 
@@ -35,14 +37,15 @@ npx gitlocal
 
 ## What you get
 
+- A GitHub-like file tree and folder view for any local folder or git repository, with a changed-files review panel and repository search.
 - Several files open at once in editor-style tabs, with a folder tab that takes you back to the GitHub-like folder view.
-- GitHub-style Markdown rendering, plus built-in preview for PDF, SVG, CSV, Word (`.docx`), Excel (`.xlsx`/`.xls`), PowerPoint (`.pptx`), and HTML files alongside JSON and images — file types GitHub's web UI often can't render inline and falls back to a raw download for.
+- Built-in preview for Word (`.docx`), Excel (`.xlsx`/`.xls`), PowerPoint (`.pptx`), PDF, CSV, SVG, and HTML files, plus GitHub-style Markdown, JSON, and images. GitHub's web UI often can't render these file types inline and offers only a raw download.
 - Local print, Save as PDF, email/share, copy, and download fallback actions on rendered Markdown.
-- A Refresh button, focused undo/redo while editing, and panel-scoped Select All.
+- Small edits with conflict protection, and an integrated terminal for running an AI coding agent.
 
 ## Help shape GitLocal
 
-GitLocal is built in the open for people working with AI coding tools, and it gets better when those people tell us what they need. You don't have to write code to take part:
+GitLocal is built in the open for product managers and builders who keep their work in git, and it gets better when those people tell us what they need. You don't have to write code to take part:
 
 - **Share an idea or a wish** in [Discussions → Ideas](https://github.com/ehud-am/gitlocal/discussions/categories/ideas). Describe the job you're trying to get done, and we'll figure out the rest together.
 - **Ask a question or show how you use it** in [Q&A](https://github.com/ehud-am/gitlocal/discussions/categories/q-a) and [Show and tell](https://github.com/ehud-am/gitlocal/discussions/categories/show-and-tell).

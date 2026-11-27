@@ -1,11 +1,18 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 3.2.0 → 3.3.0 (MINOR — added Principle IX, release
-  authorization and agent-run publishing)
+  Version change: 3.3.0 → 3.4.0 (MINOR — material expansion of the Target
+  Audience & UX Philosophy section)
   Modified principles: none
-  Added principles:
-    - Principle IX: Release Authorization and Agent-Run Publishing
+  Modified sections:
+    - Target Audience & UX Philosophy: audience named as product managers and
+      other less-technical builders who keep code and supporting documents
+      (Markdown specs, Word, Excel, PowerPoint, PDF, images) in one git
+      repository instead of splitting them across GitHub, Google Docs, and
+      Atlassian tools; viewing every common file type added as a primary use
+      case; user-facing copy must lead with this positioning
+  Rationale: product repositioning (PR #144)
+  Added principles: none
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -14,10 +21,9 @@
     - .specify/templates/tasks-template.md — ✅ no change needed
     - .specify/templates/checklist-template.md — ✅ no change needed
     - .specify/templates/constitution-template.md — ✅ no change needed
-    - README.md — ✅ no change needed
-    - AGENTS.md — ✅ no change needed
-    - CLAUDE.md — ✅ updated (release path, approval rule)
-    - .github/workflows/publish.yml — ✅ workflow_dispatch release path added
+    - README.md — ✅ updated (same PR)
+    - AGENTS.md — ✅ updated (Product Direction, same PR)
+    - CLAUDE.md — ✅ updated (Product Direction, same PR)
   Follow-up TODOs: none
 -->
 
@@ -148,13 +154,18 @@ manual fallback.
 
 ## Target Audience & UX Philosophy
 
-GitLocal is built for **less-technical builders** who collaborate with AI agents on code
-repositories but do not need or want a full IDE. In this workflow, direct human editing is
-often the exception; understanding and reviewing the codebase is the recurring human task.
+GitLocal is built for **product managers and other less-technical builders** who collaborate
+with AI agents and keep code and supporting documents (Markdown specs, Word, Excel,
+PowerPoint, PDF, images) in one git repository, instead of splitting them across GitHub for
+code, Google Docs for documents, and Atlassian tools for specs. They do not need or want a
+full IDE. In this workflow, direct human editing is often the exception; understanding and
+reviewing everything in the repository, code and documents alike, is the recurring human task.
 The primary use cases are:
 
 - Browsing a local Git repository's file tree
-- Reading rendered Markdown documentation
+- Reading rendered Markdown documentation and specs
+- Viewing the common document types kept next to code (Word, Excel, PowerPoint, PDF, CSV,
+  images) in place, without a separate tool or download
 - Viewing source files with syntax highlighting
 - Reviewing Git history, branches, and diffs
 - Light raw-file editing when needed
@@ -162,8 +173,9 @@ The primary use cases are:
 The UX MUST assume users are comfortable with a browser but not necessarily with terminal
 commands or IDE workflows. Every interaction should feel as natural as browsing a repo
 on GitHub. Editing must remain available, but the product should optimize first for
-navigation, reading, Markdown review, and lightweight human intervention around
-AI-generated changes.
+navigation, reading, document preview, Markdown review, and lightweight human intervention
+around AI-generated changes. User-facing copy (README, npm README, gitlocal.dev, promo video,
+package and cask descriptions) MUST lead with this audience and the one-repository workflow.
 
 ## Governance
 
@@ -184,4 +196,4 @@ implementation decisions, code reviews, and release gates MUST comply with these
 - **Runtime guidance**: See `AGENTS.md` and `CLAUDE.md` for development-time conventions and
   workflow details that supplement but do not override this constitution.
 
-**Version**: 3.3.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-10-31
+**Version**: 3.4.0 | **Ratified**: 2026-03-28 | **Last Amended**: 2026-11-27

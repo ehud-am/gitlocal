@@ -4,7 +4,7 @@ cask "gitlocal" do
 
   url "__URL__"
   name "GitLocal"
-  desc "Native macOS repository viewer for GitLocal"
+  desc "Local viewer for code and documents in git repositories"
   homepage "https://github.com/ehud-am/gitlocal"
 
   app "GitLocal.app"
